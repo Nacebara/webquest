@@ -6,7 +6,6 @@
 use std::str::FromStr;
 use std::time::Duration;
 
-use sqlx::PgPool;
 use sqlx::migrate::Migrator;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 
@@ -18,6 +17,7 @@ pub mod users;
 pub mod wallets;
 
 pub use error::StorageError;
+pub use sqlx::PgPool;
 
 /// Миграции встроены в бинарник и применяются при старте до открытия приёма заявок.
 pub static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
