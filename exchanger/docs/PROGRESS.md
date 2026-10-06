@@ -31,4 +31,4 @@
 - Интеграционные тесты `storage` требуют `DATABASE_URL` к PostgreSQL с правом создавать базы: `sqlx::test` создаёт отдельную базу на каждый тест.
 - Макросы `sqlx::query!` при сборке без БД берут данные из `.sqlx/` (`SQLX_OFFLINE=true`). После изменения SQL — `cargo sqlx prepare --workspace -- --all-targets` и коммит `.sqlx/`.
 - `exch run` пока только применяет миграции и держит пульс БД: приём заявок откроется в M4–M5.
-- CI-workflow проверен локально по шагам (YAML, `psql -1 -f schema.sql`, `sqlx prepare --check`, тесты), но на GitHub Actions ещё не запускался — смотреть первый прогон после push.
+- CI на GitHub Actions зелёный с первого прогона ([run 37548527139](https://github.com/Nacebara/webquest/actions/runs/37548527139), ≈ 3,5 мин).
