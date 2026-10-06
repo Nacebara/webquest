@@ -1,8 +1,8 @@
 -- =====================================================================
 -- Проверка инвариантов schema.sql на живом PostgreSQL 16.
--- Запуск:  createdb exch_test && psql -d exch_test -f schema.sql && psql -d exch_test -f schema_test.sql
+-- Запуск:  createdb exch_test && psql -1 -d exch_test -f schema.sql && psql -d exch_test -f schema_test.sql
 -- Ожидание: каждый блок «must FAIL» печатает ERROR, остальные — без ошибок.
--- В CI: тот же сценарий как интеграционный тест storage (SPEC §11.2).
+-- В CI те же проверки выполняет crates/storage/tests/invariants.rs (SPEC §11.2).
 -- =====================================================================
 \set ON_ERROR_STOP 0
 -- setup

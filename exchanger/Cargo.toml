@@ -1,0 +1,50 @@
+[workspace]
+resolver = "3"
+members = ["crates/domain"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+domain = { path = "crates/domain" }
+storage = { path = "crates/storage" }
+
+anyhow = "1"
+base64 = "0.22"
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std", "serde"] }
+clap = { version = "4.6", features = ["derive", "env"] }
+dotenvy = "0.15.7"
+proptest = "1.11"
+rust_decimal = { version = "1.43", features = ["serde-with-str"] }
+rust_decimal_macros = "1.40"
+secrecy = "0.10.3"
+serde = { version = "1", features = ["derive"] }
+sqlx = { version = "0.9.0", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls-ring-webpki",
+    "postgres",
+    "macros",
+    "migrate",
+    "rust_decimal",
+    "chrono",
+] }
+thiserror = "2.0.21"
+tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "signal", "time", "sync"] }
+tokio-util = "0.7.19"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+float_arithmetic = "deny"
+float_cmp = "deny"
+lossy_float_literal = "deny"
+unwrap_used = "warn"
+dbg_macro = "deny"
+todo = "deny"

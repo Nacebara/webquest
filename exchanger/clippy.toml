@@ -1,0 +1,7 @@
+# Деньги — только rust_decimal::Decimal (SPEC §10.4, CLAUDE.md «Деньги» п.1).
+disallowed-types = [
+    { path = "f32", reason = "деньги и проценты — только rust_decimal::Decimal" },
+    { path = "f64", reason = "деньги и проценты — только rust_decimal::Decimal" },
+]
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
