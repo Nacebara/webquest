@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO ledger_entries (tx_id, account_id, asset, amount)\n        SELECT $1, account_id, asset, amount\n          FROM UNNEST($2::int4[], $3::text[], $4::numeric[]) AS t(account_id, asset, amount)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4Array",
+        "TextArray",
+        "NumericArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e2823cf9216d78dd6adf17b269b6fb2fdff97c079e16d20ef86ac02805d36f5e"
+}

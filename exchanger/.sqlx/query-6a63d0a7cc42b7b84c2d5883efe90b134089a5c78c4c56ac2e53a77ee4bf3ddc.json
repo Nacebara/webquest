@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO order_transitions (order_id, from_state, to_state, actor) VALUES ($1, NULL, $2, 'system')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6a63d0a7cc42b7b84c2d5883efe90b134089a5c78c4c56ac2e53a77ee4bf3ddc"
+}

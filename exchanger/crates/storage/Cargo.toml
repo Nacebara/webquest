@@ -1,0 +1,23 @@
+[package]
+name = "storage"
+description = "PostgreSQL: миграции, заявки, леджер, outbox (SPEC §10.2, §10.7)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono.workspace = true
+domain.workspace = true
+rust_decimal.workspace = true
+serde_json = "1"
+sqlx = { workspace = true, features = ["json"] }
+thiserror.workspace = true
+
+[dev-dependencies]
+rust_decimal_macros.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO users (tg_user_id, username, first_name, language_code)\n        VALUES ($1, $2, $3, $4)\n        ON CONFLICT (tg_user_id) DO UPDATE\n           SET username = EXCLUDED.username,\n               first_name = EXCLUDED.first_name,\n               language_code = EXCLUDED.language_code,\n               last_seen_at = now()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "24caffe7079a4b21145e8328323b8cb67671405bbf0b69bbbdee86162afff6d9"
+}

@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO ledger_accounts (code, type, asset, wallet_account_id)\n        VALUES ($1, $2, $3, $4)\n        ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "ledger_accounts",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "007f3e0847245937b38483c9e65589dae70a605c1006acea347df77ea093fe73"
+}

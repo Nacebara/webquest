@@ -1,0 +1,86 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT wallet_account_id AS \"wallet_account_id!\",\n               label             AS \"label!\",\n               asset             AS \"asset!\",\n               ledger_balance    AS \"ledger_balance!\",\n               held              AS \"held!\",\n               available         AS \"available!\"\n          FROM wallet_available\n         ORDER BY wallet_account_id, asset\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "wallet_account_id!",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "wallet_available",
+            "name": "wallet_account_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "label!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "wallet_available",
+            "name": "label"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "asset!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "wallet_available",
+            "name": "asset"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "ledger_balance!",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "wallet_available",
+            "name": "ledger_balance"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "held!",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "wallet_available",
+            "name": "held"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "available!",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "wallet_available",
+            "name": "available"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "1e6d1a28ba4ba1e61cd3ccee0b8700222f5e4262f66716309108e37ecf3b044d"
+}

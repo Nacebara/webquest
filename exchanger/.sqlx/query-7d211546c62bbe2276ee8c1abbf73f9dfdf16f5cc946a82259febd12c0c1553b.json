@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO wallet_accounts (platform, kind, label, userbot_id) VALUES ($1, $2, $3, $4)\n        ON CONFLICT (label) DO UPDATE SET userbot_id = EXCLUDED.userbot_id\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "wallet_accounts",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7d211546c62bbe2276ee8c1abbf73f9dfdf16f5cc946a82259febd12c0c1553b"
+}

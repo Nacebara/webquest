@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO userbot_accounts (label, phone_masked) VALUES ($1, $2)\n        ON CONFLICT (label) DO UPDATE SET phone_masked = EXCLUDED.phone_masked\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "userbot_accounts",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "79e45b6cd515b7232955641f5200626c3f276551ba5e97359d7ef38e944690f0"
+}
