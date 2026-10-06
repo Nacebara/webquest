@@ -1,0 +1,84 @@
+@startuml use-cases
+' Варианты использования бота-обменника xRocket <-> CryptoBot
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+
+actor "Клиент" as Client
+actor "Владелец" as Owner
+actor "Админ" as Admin
+actor "Оператор" as Operator
+actor "Юзербот\n(аккаунт Telegram)" as Userbot <<system>>
+actor "CryptoBot\n(@send + Crypto Pay API)" as CB <<external>>
+actor "xRocket\n(@xrocket + xRocket Pay API)" as XR <<external>>
+
+Owner --|> Admin
+Admin --|> Operator
+
+rectangle "Бот-обменник" {
+  usecase "Узнать условия\n(комиссии, лимиты)" as UC_Terms
+  usecase "Обменять чек\nxRocket → CryptoBot" as UC_XC
+  usecase "Обменять чек\nCryptoBot → xRocket" as UC_CX
+  usecase "Оплатить счёт CryptoBot\nбалансом xRocket" as UC_PayCB
+  usecase "Оплатить счёт xRocket\nбалансом CryptoBot" as UC_PayXR
+  usecase "Ввести пароль чека" as UC_Pwd
+  usecase "Получить возврат" as UC_Refund
+  usecase "История и статус заявки" as UC_History
+  usecase "Помощь / поддержка" as UC_Help
+
+  usecase "Активировать чек" as UC_Activate
+  usecase "Открыть и оплатить\nчужой счёт" as UC_PayInvoice
+  usecase "Выплатить через API\n(transfer, spend_id)" as UC_Payout
+  usecase "Сверить балансы" as UC_Reconcile
+
+  usecase "Разобрать заявку вручную" as UC_Manual
+  usecase "Карточка пользователя,\nпоиск заявки" as UC_Search
+  usecase "Бан / разбан" as UC_Ban
+  usecase "Маржа, лимиты,\nпауза направления" as UC_Pricing
+  usecase "Ребалансировка резервов" as UC_Rebalance
+  usecase "Статистика и дашборды" as UC_Stats
+  usecase "Рассылка, экспорт CSV" as UC_Broadcast
+  usecase "Роли, режим обслуживания,\nротация сессий" as UC_Owner
+  usecase "Логи и алерты по темам" as UC_Logs
+}
+
+Client --> UC_Terms
+Client --> UC_XC
+Client --> UC_CX
+Client --> UC_PayCB
+Client --> UC_PayXR
+Client --> UC_History
+Client --> UC_Help
+UC_XC ..> UC_Activate : <<include>>
+UC_CX ..> UC_Activate : <<include>>
+UC_XC ..> UC_Payout : <<include>>
+UC_CX ..> UC_Payout : <<include>>
+UC_PayCB ..> UC_PayInvoice : <<include>>
+UC_PayXR ..> UC_PayInvoice : <<include>>
+UC_PayCB ..> UC_Activate : <<include>>\n(оплата клиентом чеком)
+UC_Pwd ..> UC_Activate : <<extend>>
+UC_Refund ..> UC_Payout : <<include>>
+
+Userbot --> UC_Activate
+Userbot --> UC_PayInvoice
+UC_Activate --> CB
+UC_Activate --> XR
+UC_PayInvoice --> CB
+UC_PayInvoice --> XR
+UC_Payout --> CB
+UC_Payout --> XR
+UC_Reconcile --> CB
+UC_Reconcile --> XR
+
+Operator --> UC_Manual
+Operator --> UC_Search
+Operator --> UC_Logs
+Admin --> UC_Ban
+Admin --> UC_Pricing
+Admin --> UC_Rebalance
+Admin --> UC_Stats
+Admin --> UC_Broadcast
+Admin --> UC_Reconcile
+Owner --> UC_Owner
+@enduml

@@ -1,0 +1,49 @@
+@startuml sequence-check-exchange
+' Последовательность: обмен чека xRocket -> CryptoBot
+skinparam shadowing false
+autonumber "<b>[00]"
+title Обмен чека xRocket → CryptoBot
+
+actor "Клиент" as C
+participant "Бот\n(Bot API, frankenstein)" as BOT
+participant "Ядро\n(FSM + outbox)" as CORE
+database "PostgreSQL" as DB
+participant "Юзербот X\n(grammers, актор)" as UBX
+participant "@xrocket" as XRB
+participant "Crypto Pay API" as CPAY
+
+C -> BOT : сообщение со ссылкой t.me/xrocket?start=mc_…
+BOT -> CORE : IncomingLink{user, start_param}
+CORE -> DB : SELECT direction, reserves, bans, limits
+CORE -> DB : BEGIN; INSERT order(NEW→INTAKE_PENDING);\nINSERT operation(activate_check, key=ord-42-intake);\nINSERT hold(cb:app, max_order); COMMIT
+CORE -> BOT : editable progress msg «Проверяю чек…»
+BOT -> C : «Проверяю чек…»
+
+CORE -> UBX : dispatch(op ord-42-intake)
+note right of CORE : перед отправкой: UPDATE operation\nSET status='dispatched', dispatched_at=now()\n(коммит до сетевого вызова)
+UBX -> XRB : messages.startBot(start_param="mc_…")
+XRB --> UBX : сообщение/правка «Вы получили 100 USDT» (или капча)
+UBX -> DB : INSERT wallet_message(raw, peer_id, msg_id) — всегда, до разбора
+UBX -> CORE : Reply(raw)
+CORE -> CORE : parser::xrocket::v3 → Activated{100 USDT}
+CORE -> DB : BEGIN; operation→succeeded; order→RECEIVED;\nledger: Дт xr:personal 100 / Кт payable 100;\nhold := 97.50 (точная выплата); INSERT operation(payout_transfer,\nspend_id=ord-42-payout); order→PAYOUT_PENDING; COMMIT
+CORE -> BOT : edit «Чек принят: 100 USDT. Отправляю 97.50 USDT…»
+
+group Outbox-воркер (ретраи с тем же spend_id)
+  CORE -> CPAY : POST /transfer {user_id, asset=USDT, amount=97.50,\nspend_id=ord-42-payout}
+  alt 200 ok
+    CPAY --> CORE : Transfer{transfer_id, status=completed}
+  else таймаут / 5xx
+    CORE -> CPAY : повтор с тем же spend_id (backoff 1s,2s,4s… + jitter)
+    CORE -> CPAY : GET /getTransfers?spend_id=ord-42-payout
+    CPAY --> CORE : [Transfer] или []
+  else USER_NOT_FOUND и т.п.
+    CORE -> CPAY : POST /createCheck {pin_to_user_id}
+    note right : фолбэк, ключа идемпотентности нет —\nперед повтором getChecks по метке
+  end
+end
+CORE -> DB : BEGIN; operation→succeeded(ext_id); order→COMPLETED;\nledger: Дт payable 100 / Кт cb:app 97.50 / Кт revenue 2.50;\nhold → consumed; COMMIT
+CORE -> BOT : edit итог с разбивкой
+BOT -> C : «Готово: 97.50 USDT на балансе CryptoBot»
+CORE -> BOT : лог в тему «Обмены» (ops-бот, агрегировано)
+@enduml

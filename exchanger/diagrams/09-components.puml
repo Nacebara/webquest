@@ -1,0 +1,50 @@
+@startuml components
+' Компоненты: один процесс exch (tokio), крейты рабочего пространства
+skinparam shadowing false
+skinparam componentStyle rectangle
+title Компоненты (Cargo workspace, один бинарник exch)
+
+package "exch (бинарник, tokio runtime)" {
+  component "app\n(wiring, config,\nграцефул-шатдаун)" as APP
+  component "bot\n(Bot API: клиентский бот\n+ ops-бот)" as BOT
+  component "ui\n(тексты, HTML + rich,\nфолбэк, эмодзи)" as UI
+  component "engine\n(FSM-драйвер, outbox-воркер,\nрестарт-рекавери)" as ENG
+  component "domain\n(деньги, цены, FSM,\nправила леджера) — без IO" as DOM
+  component "parsers\n(ссылки, ответы ботов\nкошельков, версии)" as PAR
+  component "wallets\n(трейты WalletApi,\nWalletUserbot + фейки)" as WAL
+  component "userbot\n(grammers: акторы аккаунтов,\nочереди, FloodWait)" as UB
+  component "storage\n(sqlx, миграции,\nрепозитории)" as STO
+  component "ops\n(алерты, агрегация,\nстатистика, графики)" as OPS
+  component "admin\n(роли, команды,\nдвойное подтверждение)" as ADM
+  component "jobs\n(сверка, резервы,\nкурсы, бэкап-пинг)" as JOB
+}
+
+cloud "Telegram Bot API" as TBA
+cloud "Telegram MTProto\n(DC4 AMS)" as MTP
+cloud "Crypto Pay API\npay.crypt.bot" as CPA
+cloud "xRocket Pay API\npay.xrocket.tg" as XPA
+database "PostgreSQL 16" as PG
+
+APP --> BOT
+APP --> ENG
+APP --> JOB
+APP --> ADM
+BOT --> UI
+BOT --> TBA
+ADM --> BOT
+ENG --> DOM
+ENG --> PAR
+ENG --> WAL
+ENG --> STO
+OPS --> BOT
+OPS --> STO
+JOB --> WAL
+JOB --> STO
+JOB --> OPS
+WAL --> UB
+WAL --> CPA
+WAL --> XPA
+UB --> MTP
+STO --> PG
+ADM --> ENG
+@enduml

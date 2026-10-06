@@ -1,0 +1,64 @@
+@startuml activity-recovery-reconcile
+' Восстановление после падения и периодическая сверка
+skinparam shadowing false
+title Восстановление после рестарта и сверка
+
+|Процесс|
+start
+:Старт: миграции применены, конфиг проверен;
+:Режим «прогрев»: приём новых заявок закрыт;
+
+|Юзербот|
+:Подключение MTProto, проверка сессии;
+:Догнать историю чатов с @send/@xrocket
+с last_seen_message_id, сохранить сырые сообщения;
+
+|Ядро|
+:Найти незавершённые операции (outbox);
+while (Есть операция?) is (да)
+  switch (kind / статус)
+  case (API-выплата PENDING/DISPATCHED)
+    :Повторить с тем же spend_id / transferId
+    (идемпотентно);
+  case (activate_check DISPATCHED)
+    :Сопоставить с сохранёнными ответами;
+    if (Ответ найден?) then (да)
+      :Применить результат;
+    else (нет)
+      :Повторить /start (идемпотентно для чека);
+    endif
+  case (pay_invoice DISPATCHED)
+    :НЕ нажимать повторно;
+    :Открыть счёт, прочитать статус,
+    сверить баланс cb:personal;
+    if (Однозначно?) then (да)
+      :COMPLETED или REFUND_PENDING;
+    else (нет)
+      :MANUAL_REVIEW + CRITICAL;
+    endif
+  endswitch
+endwhile (нет)
+:Сверка балансов: API getBalance / app/info,
+личные балансы через юзербота;
+if (Расхождение > допуска?) then (да)
+  :Пауза затронутых направлений, CRITICAL;
+else (нет)
+  :Открыть приём заявок, INFO «Перезапуск»;
+endif
+stop
+
+|Планировщик|
+start
+:Каждые 5 мин — API-балансы,
+каждые 15 мин — личные балансы;
+:expected = сумма проводок по счёту кошелька
+− hold'ы в полёте;
+if (|real − expected| > 0.01 актива?) then (да)
+  if (> порога паузы 1 USDT?) then (да)
+    :Пауза направлений, CRITICAL;
+  else (нет)
+    :WARN, запись в reconciliations;
+  endif
+endif
+stop
+@enduml

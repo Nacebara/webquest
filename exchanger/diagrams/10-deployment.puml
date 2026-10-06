@@ -1,0 +1,38 @@
+@startuml deployment
+' Развёртывание: DigitalOcean AMS3
+skinparam shadowing false
+title Развёртывание (DigitalOcean AMS3)
+
+node "Ноутбук разработчика (Windows)" as DEV {
+  artifact "git, cargo,\nDocker Desktop" as DEVTOOLS
+}
+node "GitHub" as GH {
+  artifact "репозиторий" as REPO
+  artifact "Actions: fmt, clippy,\ntest, build image" as CI
+  artifact "GHCR: образ exch:<sha>" as IMG
+}
+node "Droplet Ubuntu 24.04\n2 vCPU / 4 GB, AMS3" as VM {
+  node "Docker Engine" as DOCKER {
+    component "exch\n(контейнер, restart: unless-stopped)" as EXCH
+    database "postgres:16\n(том pgdata)" as PG
+  }
+  artifact ".env (chmod 600)\nтокены, ключ шифрования сессий" as ENV
+  artifact "systemd timer:\npg_dump → age → Spaces" as BKP
+  artifact "ufw: только 22/tcp\n(+443 при вебхуках)" as FW
+}
+cloud "DO Spaces / Backblaze B2\n(зашифрованные бэкапы)" as S3
+cloud "Telegram (Bot API + MTProto DC4)" as TG
+cloud "Crypto Pay API / xRocket Pay API" as WAPI
+cloud "healthchecks.io\n(dead man's switch)" as HC
+
+DEV --> REPO : git push
+REPO --> CI
+CI --> IMG
+VM --> IMG : docker compose pull
+EXCH --> PG : 5432 (внутр. сеть)
+EXCH --> TG : HTTPS / MTProto
+EXCH --> WAPI : HTTPS
+EXCH --> HC : пинг раз в минуту
+BKP --> S3 : ежесуточно
+DEV --> VM : SSH (ключ ed25519)
+@enduml

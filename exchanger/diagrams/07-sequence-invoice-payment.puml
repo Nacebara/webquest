@@ -1,0 +1,58 @@
+@startuml sequence-invoice-payment
+' Последовательность: оплата счёта CryptoBot балансом xRocket
+skinparam shadowing false
+autonumber "<b>[00]"
+title Оплата счёта CryptoBot балансом xRocket
+
+actor "Клиент" as C
+participant "Бот" as BOT
+participant "Ядро" as CORE
+database "PostgreSQL" as DB
+participant "Юзербот C" as UBC
+participant "@send (CryptoBot)" as SEND
+participant "Юзербот X" as UBX
+participant "@xrocket" as XRB
+participant "xRocket Pay API" as XPAY
+
+C -> BOT : t.me/send?start=IV…
+BOT -> CORE : IncomingLink(invoice)
+CORE -> DB : order NEW; operation(open_invoice)
+CORE -> UBC : open_invoice(IV…)
+UBC -> SEND : messages.startBot(start_param="IV…")
+SEND --> UBC : карточка счёта: 10 USDT, active, кнопки
+UBC -> DB : wallet_message(raw)
+CORE -> CORE : parser::cryptobot → Invoice{10 USDT, single, active, expires_at}
+CORE -> DB : BEGIN; order→AWAITING_FUNDS(quote: прислать 10.30 USDT,\nTTL 15 мин); hold(cb:personal, 10.00); COMMIT
+CORE -> BOT : котировка + кнопки [Пришлю чек xRocket] [Оплачу счёт xRocket] [Отмена]
+BOT -> C : «Отправьте 10.30 USDT → оплатим счёт на 10 USDT»
+
+alt Клиент платит чеком
+  C -> BOT : t.me/xrocket?start=mc_…
+  CORE -> UBX : activate_check
+  UBX -> XRB : startBot(mc_…)
+  XRB --> UBX : «Вы получили 10.30 USDT»
+else Клиент платит нашим счётом xRocket
+  CORE -> XPAY : POST /tg-invoices {amount=10.30, numPayments=1,\npayload=ord-77, expiredIn=900}
+  XPAY --> CORE : link t.me/xRocket?start=inv_…
+  CORE -> BOT : кнопка-ссылка «Оплатить в xRocket»
+  XPAY --> CORE : webhook invoicePay (подпись rocket-pay-signature)\nили опрос GET /tg-invoices/{id}
+end
+CORE -> DB : BEGIN; order→RECEIVED; ledger; operation(pay_invoice, key=ord-77-pay); order→INVOICE_PAY_PENDING; COMMIT
+
+CORE -> UBC : pay_invoice(IV…)
+UBC -> SEND : startBot(IV…) — повторное открытие
+SEND --> UBC : карточка, статус active
+UBC -> DB : operation→dispatched (коммит ДО нажатия)
+UBC -> SEND : messages.getBotCallbackAnswer(кнопка «Оплатить»)
+SEND --> UBC : «Счёт оплачен» / запрос подтверждения / код-пароль
+alt оплачено
+  CORE -> DB : order→COMPLETED; ledger: Дт payable X / Кт cb:personal A / Кт revenue X−A
+  CORE -> BOT : «Счёт оплачен»
+else нужен код-пароль / мини-приложение
+  CORE -> DB : order→MANUAL_REVIEW (оператор оплачивает в приложении)
+  CORE -> BOT : «Оплачиваем вручную, до 15 мин. Деньги у нас, в безопасности»
+else таймаут / незнакомый ответ
+  CORE -> DB : operation→unknown; НЕ повторять нажатие
+  CORE -> UBC : открыть счёт снова, прочитать статус; баланс cb:personal
+end
+@enduml

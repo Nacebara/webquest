@@ -1,0 +1,76 @@
+@startuml state-order
+' Машина состояний заявки (orders.state)
+skinparam shadowing false
+hide empty description
+title Состояния заявки
+
+[*] --> NEW : ссылка распознана
+
+NEW --> REJECTED : бан / лимит / пауза /\nнет резерва / неверная ссылка
+NEW --> INTAKE_PENDING : обмен чека:\nhold + op activate_check
+NEW --> AWAITING_FUNDS : оплата счёта:\nсчёт открыт, котировка, hold
+
+AWAITING_FUNDS --> INTAKE_PENDING : клиент прислал чек
+AWAITING_FUNDS --> RECEIVED : оплачен наш счёт\n(webhook / опрос)
+AWAITING_FUNDS --> EXPIRED : TTL котировки истёк
+AWAITING_FUNDS --> CANCELLED : клиент отменил
+AWAITING_FUNDS --> REFUND_PENDING : TTL истёк / отмена,\nно часть денег уже пришла
+INTAKE_PENDING --> AWAITING_FUNDS : оплата счёта: чек не принят\nили недоплата — ждём ещё
+AWAITING_PASSWORD --> AWAITING_FUNDS : оплата счёта:\nпароль не пришёл
+INTAKE_UNKNOWN --> AWAITING_FUNDS : оплата счёта:\nсверка — не пришли
+
+INTAKE_PENDING --> RECEIVED : «получено X»
+INTAKE_PENDING --> INTAKE_FAILED : чек истёк / активирован /\nне для нас / Premium / подписка
+INTAKE_PENDING --> AWAITING_PASSWORD : чек с паролем
+AWAITING_PASSWORD --> INTAKE_PENDING : пароль получен
+AWAITING_PASSWORD --> INTAKE_FAILED : TTL 10 мин
+INTAKE_PENDING --> INTAKE_UNKNOWN : таймаут /\nнезнакомый ответ
+INTAKE_UNKNOWN --> RECEIVED : сверка: деньги пришли
+INTAKE_UNKNOWN --> INTAKE_FAILED : сверка: не пришли
+INTAKE_UNKNOWN --> MANUAL_REVIEW : неоднозначно
+
+RECEIVED --> PAYOUT_PENDING : обмен: op payout (spend_id)
+RECEIVED --> INVOICE_PAY_PENDING : оплата счёта: op pay_invoice
+RECEIVED --> REFUND_PENDING : сверх лимита / актив не тот /\nнедоплата без доплаты
+RECEIVED --> MANUAL_REVIEW : паника / kill switch
+
+PAYOUT_PENDING --> COMPLETED : transfer ok
+PAYOUT_PENDING --> PAYOUT_PENDING : ретрай с тем же spend_id
+PAYOUT_PENDING --> MANUAL_REVIEW : неизвестная ошибка /\nисчерпаны ретраи
+
+INVOICE_PAY_PENDING --> COMPLETED : «счёт оплачен»
+INVOICE_PAY_PENDING --> REFUND_PENDING : счёт истёк / оплачен\nкем-то другим ДО нашего нажатия
+INVOICE_PAY_PENDING --> MANUAL_REVIEW : код-пароль / неясный\nисход нажатия
+
+REFUND_PENDING --> REFUNDED : transfer возврата ok
+REFUND_PENDING --> MANUAL_REVIEW : ошибка возврата
+
+MANUAL_REVIEW --> PAYOUT_PENDING : оператор: «повторить выплату»
+MANUAL_REVIEW --> REFUND_PENDING : оператор: «вернуть»
+MANUAL_REVIEW --> COMPLETED : оператор: «закрыть — выплачено»\n(с доказательством)
+MANUAL_REVIEW --> CLOSED_MANUAL : оператор: «закрыть без выплаты»\n(владелец, причина)
+MANUAL_REVIEW --> INVOICE_PAY_PENDING : оператор: «повторить оплату»\n(после проверки статуса счёта)
+
+REJECTED --> [*]
+INTAKE_FAILED --> [*]
+EXPIRED --> [*]
+CANCELLED --> [*]
+COMPLETED --> [*]
+REFUNDED --> [*]
+CLOSED_MANUAL --> [*]
+
+note right of MANUAL_REVIEW
+  Инварианты:
+  • из PAYOUT_PENDING в REFUND_PENDING
+    напрямую нельзя (только через разбор);
+  • не больше одной активной операции
+    payout/refund/pay_invoice на заявку;
+  • деньги клиента = кредит счёта payable
+    в леджере, пока заявка не терминальна;
+  • EXPIRED / CANCELLED / REJECTED /
+    INTAKE_FAILED запрещены, если intake_amount
+    задан (CHECK в schema.sql);
+  • список переходов = таблица
+    order_state_transitions (триггер в БД).
+end note
+@enduml

@@ -1,0 +1,197 @@
+@startuml er
+' ER-диаграмма (соответствует schema.sql, миграция 0001)
+skinparam shadowing false
+skinparam linetype ortho
+hide circle
+title ER-модель данных
+
+entity users {
+  * tg_user_id : BIGINT <<PK>>
+  --
+  username, first_name, language_code
+  referrer_id : BIGINT <<FK users>>
+  daily_limit_usd : NUMERIC
+  created_at, last_seen_at, first_completed_at
+}
+entity staff {
+  * tg_user_id : BIGINT <<PK>>
+  --
+  role : owner|admin|operator
+  max_manual_payout : NUMERIC
+  added_by <<FK staff>>, disabled_at
+}
+entity bans {
+  * id <<PK>>
+  --
+  user_id <<FK users>>
+  reason, expires_at
+  banned_by, lifted_by <<FK staff>>
+}
+entity directions {
+  * code <<PK>>
+  --
+  kind, source_platform, target_platform
+  asset <<FK assets>>
+  fee_pct, min_fee, skew_k_pct, floor/cap
+  min/max/new_user_max amount
+  is_open, auto_paused, pause_reason
+}
+entity assets {
+  * code <<PK>>
+  --
+  title, is_stable
+}
+entity platform_assets {
+  * platform, asset <<PK>>
+  --
+  platform_code, decimals, payout_step
+  min_transfer, max_transfer, min_check
+}
+entity orders {
+  * id <<PK>>
+  --
+  public_id <<UQ>>
+  user_id <<FK users>>
+  direction <<FK directions>>
+  state, is_terminal, version
+  intake_platform, intake_start_param
+  invoice_platform, invoice_start_param
+  intake_amount, fee_amount, payout_amount
+  quote_amount_in, quote_expires_at
+  progress_chat_id, progress_message_id
+}
+entity order_transitions {
+  * id <<PK>>
+  --
+  order_id <<FK orders>>
+  from_state, to_state, actor, reason, at
+}
+entity pending_inputs {
+  * order_id <<PK,FK orders>>
+  --
+  user_id, kind, expires_at
+}
+entity operations {
+  * id <<PK>>
+  --
+  order_id <<FK orders>> | rebalance_id <<FK>>
+  kind, money_role, via, platform
+  status, idempotency_key <<UQ>>
+  start_param, amount, asset
+  attempts, next_attempt_at, external_id
+}
+entity wallet_messages {
+  * id <<PK>>
+  --
+  userbot_id, bot_peer_id, message_id, edit_date <<UQ>>
+  text, entities, reply_markup
+  parsed_kind, parser_version
+  operation_id <<FK operations>>
+}
+entity userbot_accounts {
+  * id <<PK>>
+  --
+  tg_user_id, phone_masked
+  session_ciphertext, session_nonce, key_version
+  status, flood_wait_until
+}
+entity wallet_accounts {
+  * id <<PK>>
+  --
+  platform, kind (personal|app), label
+  userbot_id <<FK userbot_accounts>>
+}
+entity wallet_chat_cursors {
+  * userbot_id, bot_peer_id <<PK>>
+  --
+  last_message_id
+}
+entity ledger_accounts {
+  * id <<PK>>
+  --
+  code <<UQ>>, type, asset
+  wallet_account_id <<FK>>
+}
+entity ledger_transactions {
+  * id <<PK>>
+  --
+  kind, memo, created_by
+  order_id, rebalance_id, operation_id <<FK>>
+}
+entity ledger_entries {
+  * id <<PK>>
+  --
+  tx_id <<FK>>, account_id <<FK>>
+  asset, amount (+дебет / −кредит)
+}
+entity holds {
+  * id <<PK>>
+  --
+  order_id <<FK orders>>
+  wallet_account_id <<FK>>
+  asset, amount, state
+}
+entity reserve_thresholds {
+  * wallet_account_id, asset <<PK>>
+  --
+  target, low, critical, high
+}
+entity reconciliations {
+  * id <<PK>>
+  --
+  wallet_account_id, asset, source
+  expected, actual, diff, verdict
+}
+entity rebalances {
+  * id <<PK>>
+  --
+  from_wallet_id, to_wallet_id <<FK>>
+  amount, network, address, state
+  withdrawal_id <<UQ>>, tx_hash
+}
+entity admin_audit {
+  * id <<PK>>
+  --
+  staff_id <<FK staff>>
+  action, target, before, after
+  reason, double_confirmed
+}
+entity alerts {
+  * id <<PK>>
+  --
+  level, topic, dedup_key, count
+  acked_by <<FK staff>>
+}
+entity settings {
+  * key <<PK>>
+  --
+  value JSONB
+}
+
+users ||--o{ orders
+users ||--o{ bans
+users |o--o{ users : referrer
+staff ||--o{ bans
+staff ||--o{ admin_audit
+directions ||--o{ orders
+assets ||--o{ directions
+assets ||--o{ platform_assets
+orders ||--o{ order_transitions
+orders ||--o| pending_inputs
+orders ||--o{ operations
+orders ||--o{ holds
+orders ||--o{ ledger_transactions
+rebalances ||--o{ operations
+rebalances ||--o{ ledger_transactions
+operations ||--o{ wallet_messages
+operations ||--o{ ledger_transactions
+userbot_accounts ||--o{ wallet_accounts
+userbot_accounts ||--o{ wallet_messages
+userbot_accounts ||--o{ wallet_chat_cursors
+wallet_accounts ||--o{ ledger_accounts
+wallet_accounts ||--o{ holds
+wallet_accounts ||--o{ reconciliations
+wallet_accounts ||--o| reserve_thresholds
+ledger_transactions ||--|{ ledger_entries
+ledger_accounts ||--o{ ledger_entries
+@enduml

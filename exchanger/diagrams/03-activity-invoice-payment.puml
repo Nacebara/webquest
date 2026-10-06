@@ -1,0 +1,106 @@
+@startuml activity-invoice-payment
+' Оплата счёта CryptoBot балансом xRocket (обратное направление симметрично)
+skinparam shadowing false
+title Оплата счёта CryptoBot балансом xRocket
+
+|Клиент|
+start
+:Присылает ссылку на счёт
+t.me/send?start=IV…;
+
+|Бот / ядро|
+:Разобрать ссылку, проверить бан, лимиты,
+открыто ли направление «оплата счетов»;
+:order = NEW
+operation(open_invoice) в outbox;
+
+|Юзербот|
+:messages.startBot(@send, IV…)
+— только просмотр, без оплаты;
+:Ответ: сумма, актив/фиат, статус,
+описание, срок действия;
+
+|Бот / ядро|
+if (Счёт активен, одноразовый,
+актив поддержан, сумма в лимитах?) then (нет)
+  :Отказ с причиной
+  деньги не тронуты;
+  stop
+endif
+if (Счёт в фиате?) then (да)
+  :Курс getExchangeRates
+  + буфер 1 % на движение курса;
+endif
+if (Резерв cb:personal ≥ сумма счёта?) then (нет)
+  :«Сейчас не можем оплатить счёт
+  на эту сумму»;
+  stop
+endif
+:BEGIN TX
+NEW → AWAITING_FUNDS (TTL котировки 15 мин)
+hold cb:personal на сумму счёта
+COMMIT;
+
+|Клиент|
+:Видит котировку:
+«Отправьте X USDT → оплатим Y»
+[Пришлю чек] [Счёт xRocket] [Отмена];
+if (Способ) then (чек)
+  :Присылает чек xRocket;
+  |Юзербот|
+  :Активировать чек (как в обмене);
+else (счёт xRocket)
+  |Бот / ядро|
+  :createInvoice xRocket Pay (tg-invoice)
+  на X, ждать webhook/опрос;
+endif
+
+|Бот / ядро|
+switch (Получено)
+case (ровно X)
+  :→ RECEIVED;
+case (меньше X)
+  :→ AWAITING_FUNDS: предложить дослать
+  разницу до конца TTL, иначе возврат
+  всего полученного;
+  stop
+case (больше X)
+  :→ RECEIVED, излишек → возврат
+  (если ≥ 0.50 USDT);
+endswitch
+:RECEIVED → INVOICE_PAY_PENDING
+operation(pay_invoice) в outbox;
+
+|Юзербот|
+:Повторно открыть счёт
+(проверить, что ещё active);
+if (Счёт ещё активен?) then (нет: оплачен / истёк)
+  |Бот / ядро|
+  :→ REFUND_PENDING
+  вернуть X на xRocket (transfer);
+  stop
+endif
+:Нажать «Оплатить» (callback), выбрать актив,
+подтвердить; сохранить все ответы;
+
+|Бот / ядро|
+switch (Результат оплаты)
+case (оплачено)
+  :→ COMPLETED
+  Дт payable X / Кт cb:personal A, Кт revenue X−A
+  итог — клиенту;
+case (требуется код-пароль / мини-приложение)
+  :→ MANUAL_REVIEW (оператор платит руками
+  в приложении, SLA 15 мин), клиенту — S8;
+  stop
+case (таймаут / незнакомый ответ)
+  :operation → unknown
+  (заявка остаётся INVOICE_PAY_PENDING),
+  НЕ повторять нажатие,
+  сверка по статусу счёта и балансу;
+  stop
+endswitch
+|Клиент|
+:Видит «Счёт оплачен» и разбивку;
+stop
+@enduml

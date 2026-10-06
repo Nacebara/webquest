@@ -1,0 +1,119 @@
+@startuml activity-check-exchange
+' Обмен чека (на примере xRocket -> CryptoBot; обратное направление симметрично)
+skinparam shadowing false
+skinparam ActivityBackgroundColor #FFFFFF
+title Обмен чека xRocket → CryptoBot (обратное направление симметрично)
+
+|Клиент|
+start
+:Присылает ссылку на чек
+t.me/xrocket?start=mc_…;
+
+|Бот / ядро|
+:Разобрать ссылку
+(канонический бот, start-параметр);
+if (Ссылка валидна и бот канонический?) then (нет)
+  :Ответ «не похоже на чек»
+  деньги не тронуты;
+  stop
+endif
+if (Клиент забанен / лимит частоты?) then (да)
+  :Отказ с причиной
+  деньги не тронуты;
+  stop
+endif
+if (Направление открыто и
+резерв выплаты ≥ max_order?) then (нет)
+  :«Направление на паузе / лимит»
+  чек НЕ активируем;
+  stop
+endif
+:BEGIN TX
+order = NEW → INTAKE_PENDING
+operation(activate_check) в outbox
+hold резерва max_order
+COMMIT;
+:Прогресс-сообщение «Проверяю чек…»;
+
+|Юзербот|
+:Очередь аккаунта xRocket
+(1 действие за раз, rate-limit);
+:messages.startBot(@xrocket, mc_…)
+сохранить сырые ответы;
+if (Капча / пароль?) then (капча)
+  :Решить кнопочную капчу
+  (по фикстурам) или → MANUAL;
+elseif (пароль) then
+  |Клиент|
+  :Вводит пароль чека
+  (TTL 10 мин);
+  |Юзербот|
+  :Отправить пароль боту xRocket;
+else (нет)
+endif
+
+|Бот / ядро|
+:Парсер ответа (версия формата);
+switch (Результат активации)
+case (Получено X актива)
+  :BEGIN TX
+  INTAKE_PENDING → RECEIVED
+  проводка: Дт xr:personal / Кт payable (на всю сумму)
+  COMMIT;
+case (Истёк / уже активирован\n/ не для нас / Premium / подписка)
+  :INTAKE_PENDING → INTAKE_FAILED
+  снять hold;
+  :«Чек не принят: причина
+  деньги у вас / у отправителя»;
+  stop
+case (Незнакомый ответ / таймаут)
+  :→ INTAKE_UNKNOWN
+  автопауза направления
+  CRITICAL владельцу;
+  :Сверка: повторный /start
+  (идемпотентно) + баланс;
+  if (Деньги пришли?) then (да)
+    :→ RECEIVED;
+  else (неясно)
+    :→ MANUAL_REVIEW;
+    stop
+  endif
+endswitch
+
+if (Сумма > лимита / актив не поддержан?) then (да)
+  :BEGIN TX RECEIVED → REFUND_PENDING
+  operation(refund_transfer, transferId) в outbox
+  снять hold; COMMIT;
+  stop
+endif
+
+|Бот / ядро|
+:BEGIN TX
+hold → точная сумма выплаты
+operation(payout_transfer, spend_id) в outbox
+RECEIVED → PAYOUT_PENDING
+COMMIT;
+:Outbox-воркер: transfer
+(user_id, USDT, payout, spend_id=ord-<id>-payout);
+switch (Ответ Crypto Pay)
+case (ok)
+  :PAYOUT_PENDING → COMPLETED
+  Дт payable / Кт cb:app, Кт revenue;
+case (таймаут / 5xx)
+  :Повтор с тем же spend_id
+  backoff + jitter; затем getTransfers(spend_id);
+case (USER_NOT_FOUND)
+  :Фолбэк: createCheck(pin_to_user_id)
+  ссылку — клиенту;
+case (неизвестная ошибка)
+  :operation → unknown,
+  заявка → MANUAL_REVIEW,
+  возврат запрещён до разбора;
+  stop
+endswitch
+
+|Клиент|
+:Видит итог с разбивкой:
+получено / комиссия / выплачено;
+stop
+@enduml
