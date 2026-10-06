@@ -1,0 +1,87 @@
+name: exchanger-ci
+
+# Бот-обменник (каталог exchanger/): fmt, clippy, офлайн-данные sqlx, тесты на PostgreSQL 16.
+on:
+  push:
+    paths:
+      - "exchanger/**"
+      - ".github/workflows/exchanger-ci.yml"
+  pull_request:
+    paths:
+      - "exchanger/**"
+      - ".github/workflows/exchanger-ci.yml"
+
+concurrency:
+  group: exchanger-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: exchanger
+
+env:
+  CARGO_TERM_COLOR: always
+  DATABASE_URL: postgres://postgres:dev@localhost:5432/exch
+  SQLX_CLI_VERSION: 0.9.0
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: exchanger
+          cache-bin: true
+
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy (offline sqlx data)
+        env:
+          SQLX_OFFLINE: "true"
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Install sqlx-cli
+        run: |
+          if ! sqlx --version 2>/dev/null | grep -q "$SQLX_CLI_VERSION"; then
+            cargo install sqlx-cli --version "$SQLX_CLI_VERSION" --locked --no-default-features --features postgres,rustls
+          fi
+
+      - name: schema.sql applies standalone in one transaction
+        env:
+          PGPASSWORD: dev
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -qc "CREATE DATABASE schema_check"
+          psql -h localhost -U postgres -d schema_check -v ON_ERROR_STOP=1 -q -1 -f schema.sql
+
+      - name: Apply migrations
+        run: |
+          sqlx database create
+          sqlx migrate run --source migrations
+
+      - name: sqlx offline data is up to date
+        run: cargo sqlx prepare --workspace --check -- --all-targets
+
+      - name: cargo test
+        run: cargo test --workspace

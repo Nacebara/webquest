@@ -1,6 +1,6 @@
 # CLAUDE.md — бот-обменник xRocket ⇄ CryptoBot (exch)
 
-Черновик для корня репозитория проекта. Источник правды — `SPEC.md`. Если код и SPEC расходятся — остановись и спроси, не «чини» SPEC молча.
+Корень проекта — каталог `exchanger/`. Источник правды — `SPEC.md`. Если код и SPEC расходятся — остановись и спроси, не «чини» SPEC молча.
 
 ## Что это
 
@@ -12,20 +12,24 @@ Telegram-бот на Rust: клиент присылает чек или счё�
 # локальная БД (Windows: Docker Desktop; Linux: то же)
 docker run -d --name exch-pg -e POSTGRES_PASSWORD=dev -p 5432:5432 postgres:16
 export DATABASE_URL=postgres://postgres:dev@localhost:5432/exch   # PowerShell: $env:DATABASE_URL="…"
+cargo install sqlx-cli --version 0.9.0 --locked --no-default-features --features postgres,rustls   # один раз
 
+cargo sqlx database create && cargo sqlx migrate run --source migrations
 cargo fmt --all
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-features                  # нужен DATABASE_URL; sqlx::test создаёт БД на тест
-cargo sqlx migrate run                     # миграции из migrations/
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace                     # нужен DATABASE_URL; sqlx::test создаёт БД на тест
 cargo sqlx prepare --workspace -- --all-targets   # после изменения SQL-запросов; коммитить .sqlx/
-cargo run -p app -- --help                 # CLI: run | migrate | login --account <label> | selftest
+cargo run --bin exch -- --help             # CLI: run | migrate | check-config (login — M3, selftest — M5)
 ```
 
-Перед **каждым** коммитом все четыре: fmt, clippy без предупреждений, test, `sqlx prepare --check`.
+Сборка без БД: `SQLX_OFFLINE=true cargo build` (данные запросов — в `.sqlx/`). CI — `../.github/workflows/exchanger-ci.yml`.
+
+Перед **каждым** коммитом все четыре: fmt, clippy без предупреждений, test, `cargo sqlx prepare --workspace --check -- --all-targets`.
 
 ## Карта крейтов (SPEC §10.2)
 
-`domain` (деньги, FSM, цены, проводки; без IO) ← `parsers` ← `storage` ← `wallets` (трейты `WalletApi`, `WalletUserbot`, фейки под feature `fakes`) ← `userbot` (grammers) ← `tgbot` (frankenstein, UI) ← `engine` (FSM-драйвер, outbox, рекавери, сверка) ← `ops` (ops-бот) ← `app` (бинарник).
+`domain` (деньги, FSM, цены, проводки; без IO) ← `parsers` ← `storage` ← `wallets` (трейты `WalletApi`, `WalletUserbot`, фейки под feature `fakes`) ← `userbot` (grammers) ← `tgbot` (frankenstein, UI) ← `engine` (FSM-драйвер, outbox, рекавери, сверка) ← `ops` (ops-бот) ← `app` (бинарник `exch`).
+Сейчас есть `domain`, `storage`, `app` (M1); остальные появятся в своих вехах — пустые крейты заранее не создаём.
 Зависимости только в эту сторону. В `domain` нет tokio, sqlx, reqwest.
 
 ## Правила, которые нельзя нарушать
