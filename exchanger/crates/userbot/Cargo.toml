@@ -1,0 +1,30 @@
+[package]
+name = "userbot"
+description = "Юзербот: сценарии работы с ботами кошельков поверх трейта Transport, симулятор кошельков (SPEC v0.2)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# Симулятор ботов @send и @xrocket для тестов engine и сценариев.
+sim = []
+
+[dependencies]
+async-trait = "0.1.92"
+domain.workspace = true
+parsers = { path = "../parsers" }
+rust_decimal.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+rust_decimal_macros.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true
