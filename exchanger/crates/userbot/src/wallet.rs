@@ -37,7 +37,9 @@ pub enum ActivationOutcome {
     Received(Money),
     Rejected(RejectReason),
     /// Ответа нет или он незнакомый — сверка по балансу и истории.
-    Unknown { raw: Option<RawMessage> },
+    Unknown {
+        raw: Option<RawMessage>,
+    },
 }
 
 /// Чек, созданный юзерботом для клиента.
@@ -83,9 +85,13 @@ pub enum PayOutcome {
     Expired,
     InsufficientFunds,
     /// Нужен человек: PIN в мини-приложении без известного протокола, незнакомый экран.
-    NeedsHuman { reason: String },
+    NeedsHuman {
+        reason: String,
+    },
     /// Нажатие ушло, исход неизвестен. Нажимать снова нельзя.
-    Unknown { detail: String },
+    Unknown {
+        detail: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

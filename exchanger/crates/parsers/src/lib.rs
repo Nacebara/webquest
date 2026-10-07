@@ -9,4 +9,6 @@ pub mod links;
 pub mod replies;
 
 pub use links::{LinkError, LinkKind, WalletLink};
-pub use replies::{ActivationReply, BalanceLine, CreatedCheck, InvoiceCard, InvoicePayReply, InvoiceStatus};
+pub use replies::{
+    ActivationReply, BalanceLine, CreatedCheck, InvoiceCard, InvoicePayReply, InvoiceStatus,
+};

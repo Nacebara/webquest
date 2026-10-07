@@ -9,7 +9,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActivationReply {
     /// «Вы получили 100 USDT».
-    Received { amount: Decimal, asset: Asset },
+    Received {
+        amount: Decimal,
+        asset: Asset,
+    },
     /// «Этот чек уже активирован».
     AlreadyActivated,
     /// «Чек не найден», «Мульти-чек не найден», «не существует».
@@ -27,7 +30,10 @@ pub enum ActivationReply {
     /// «Ваш чек активировал @…» — клиент забрал наш чек выплаты.
     ClaimNotice,
     /// «Вы получили 5 USDT от @x» — входящий перевод, НЕ ответ на активацию.
-    IncomingTransfer { amount: Decimal, asset: Asset },
+    IncomingTransfer {
+        amount: Decimal,
+        asset: Asset,
+    },
     Unknown,
 }
 
