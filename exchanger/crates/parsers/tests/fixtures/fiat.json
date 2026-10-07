@@ -1,0 +1,11 @@
+{
+  "about": "Суммы в фиате (parse_fiat): знак валюты до или после числа, код ISO 4217 из SPEC §1.4. fiat: [сумма, код] или null.",
+  "cases": [
+    { "text": "$5.00", "fiat": ["5.00", "USD"] },
+    { "text": "Счёт на 10 EUR", "fiat": ["10", "EUR"] },
+    { "text": "К оплате: 1 500 ₽", "fiat": ["1500", "RUB"] },
+    { "text": "≈ 7.5 $", "fiat": ["7.5", "USD"] },
+    { "text": "10 USDT", "fiat": null },
+    { "text": "try again", "fiat": null }
+  ]
+}

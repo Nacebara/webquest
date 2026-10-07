@@ -19,6 +19,8 @@ url = "2.5"
 [dev-dependencies]
 proptest.workspace = true
 rust_decimal_macros.workspace = true
+# Загрузка фикстур tests/fixtures/*.json; уже есть в дереве зависимостей (sqlx).
+serde_json = "1"
 
 [lints]
 workspace = true

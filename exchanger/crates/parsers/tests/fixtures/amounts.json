@@ -1,0 +1,24 @@
+{
+  "about": "Суммы в тексте (parse_money): число перед кодом актива, разделители тысяч — пробелы (обычный, U+00A0, U+202F, U+2009), запятая или точка; неоднозначная запись «1,234» не угадывается. money: [сумма, актив] или null.",
+  "cases": [
+    { "platform": "cryptobot", "text": "100 USDT", "money": ["100", "USDT"] },
+    { "platform": "cryptobot", "text": "1 234,56 USDT", "money": ["1234.56", "USDT"] },
+    { "platform": "cryptobot", "text": "1 234,56 USDT", "money": ["1234.56", "USDT"] },
+    { "platform": "xrocket", "text": "1 234,56 USDT", "money": ["1234.56", "USDT"] },
+    { "platform": "xrocket", "text": "1 000 000 USDT", "money": ["1000000", "USDT"] },
+    { "platform": "cryptobot", "text": "0.5 TON", "money": ["0.5", "TON"] },
+    { "platform": "xrocket", "text": "10 TONCOIN", "money": ["10", "TON"] },
+    { "platform": "xrocket", "text": "🚀 Rocket-чек на 400 TON", "money": ["400", "TON"] },
+    { "platform": "cryptobot", "text": "1,234.56 USDT", "money": ["1234.56", "USDT"] },
+    { "platform": "cryptobot", "text": "0,5 TON", "money": ["0.5", "TON"] },
+    { "platform": "cryptobot", "text": "🦋 Чек на 5 USDT ($5.00)", "money": ["5", "USDT"] },
+    { "platform": "cryptobot", "text": "Вы получили 0.5 USDT ($0.50).", "money": ["0.5", "USDT"] },
+    { "platform": "xrocket", "text": "Вы получили\n1 USDT", "money": ["1", "USDT"] },
+    { "platform": "cryptobot", "text": "$5.00", "money": null },
+    { "platform": "cryptobot", "text": "5 USD", "money": null },
+    { "platform": "cryptobot", "text": "0.001 BTC", "money": null },
+    { "platform": "cryptobot", "text": "1,234 USDT", "money": null },
+    { "platform": "cryptobot", "text": "12..5 USDT", "money": null },
+    { "platform": "cryptobot", "text": "-5 USDT", "money": null }
+  ]
+}

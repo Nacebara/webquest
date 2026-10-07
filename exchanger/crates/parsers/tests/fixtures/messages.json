@@ -1,0 +1,57 @@
+{
+  "about": "Сообщения клиента: текст, URL сущностей text_link и URL кнопок. Ожидание — список результатов extract_from_message по порядку (текст, сущности, кнопки), без повторов и без ссылок не на ботов кошельков. Тексты анонсов чеков — синтетический корпус lovec (benches/hotpath.rs), остальное синтетическое.",
+  "cases": [
+    {
+      "text": "🦋 Чек на 5 USDT ($5.00)\n\nАктивируйте: https://t.me/send?start=CQAbCdEfGhIj",
+      "expect": [ { "ok": { "platform": "cryptobot", "kind": "check", "param": "CQAbCdEfGhIj" } } ]
+    },
+    {
+      "text": "🚀 Rocket-чек на 400 TON\nhttps://t.me/xrocket?start=mci_fdraQh70UOwz3nu",
+      "expect": [ { "ok": { "platform": "xrocket", "kind": "check", "param": "mci_fdraQh70UOwz3nu" } } ]
+    },
+    {
+      "text": "жми",
+      "entity_urls": [ "https://t.me/send?start=CQAbCdEfGhIj" ],
+      "expect": [ { "ok": { "platform": "cryptobot", "kind": "check", "param": "CQAbCdEfGhIj" } } ]
+    },
+    {
+      "text": "🦋 Чек на 10 USDT",
+      "button_urls": [ "https://t.me/send?start=CQAbCdEfGhIj" ],
+      "expect": [ { "ok": { "platform": "cryptobot", "kind": "check", "param": "CQAbCdEfGhIj" } } ]
+    },
+    {
+      "text": "Вот: t.me/xrocket?start=t_ABCDEFGHIJKLMNO, и ещё (https://t.me/send?start=CQAbCdEfGhIj).",
+      "entity_urls": [ "https://t.me/send?start=CQAbCdEfGhIj" ],
+      "button_urls": [ "https://t.me/xrocket/app?startapp=t_ABCDEFGHIJKLMNO", "https://t.me/send?start=IVdixIeFSdqP" ],
+      "expect": [
+        { "ok": { "platform": "xrocket", "kind": "check", "param": "t_ABCDEFGHIJKLMNO" } },
+        { "ok": { "platform": "cryptobot", "kind": "check", "param": "CQAbCdEfGhIj" } },
+        { "ok": { "platform": "cryptobot", "kind": "invoice", "param": "IVdixIeFSdqP" } }
+      ]
+    },
+    {
+      "text": "Подписывайтесь на t.me/news и https://example.com — а чек вот: tg://resolve?domain=send&start=CQAbCdEfGhIj!",
+      "expect": [ { "ok": { "platform": "cryptobot", "kind": "check", "param": "CQAbCdEfGhIj" } } ]
+    },
+    {
+      "text": "Фейк t.me/СryptoBot?start=CQAbCdEfGhIj и тест https://t.me/CryptoTestnetBot?start=CQAbCdEfGhIj, реф t.me/send?start=r-123",
+      "expect": [
+        { "err": "foreign_bot", "bot": "СryptoBot" },
+        { "err": "testnet" },
+        { "err": "not_check_or_invoice" }
+      ]
+    },
+    {
+      "text": "Мультичек на 1500 USDT https://t.me/xrocket?start=mc_ABCDEFGHIJ",
+      "expect": [ { "err": "not_check_or_invoice" } ]
+    },
+    {
+      "text": "https://evil.com/t.me/send?start=CQAbCdEfGhIj xt.me/send?start=CQAbCdEfGhIj",
+      "expect": []
+    },
+    {
+      "text": "Просто текст без ссылок, код CQAbCdEfGhIj голым словом сюда не попадает",
+      "expect": []
+    }
+  ]
+}

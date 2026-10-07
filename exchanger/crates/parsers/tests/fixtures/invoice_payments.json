@@ -1,0 +1,21 @@
+{
+  "about": "Ответ бота на «Оплатить» (classify_invoice_payment). Тексты синтетические. Paid — только по явной фразе успеха: голое «Счёт оплачен» может значить «оплачен кем-то раньше», это unknown. Признаки нескольких классов — unknown. class: paid | already_paid | expired | insufficient_funds | unknown.",
+  "cases": [
+    { "platform": "cryptobot", "text": "Вы оплатили счёт на 5 USDT", "class": "paid" },
+    { "platform": "cryptobot", "text": "✅ Счёт успешно оплачен", "class": "paid" },
+    { "platform": "xrocket", "text": "Invoice paid successfully", "class": "paid" },
+    { "platform": "xrocket", "text": "Payment completed", "class": "paid" },
+    { "platform": "cryptobot", "text": "Счёт уже оплачен", "class": "already_paid" },
+    { "platform": "cryptobot", "text": "This invoice has already been paid", "class": "already_paid" },
+    { "platform": "cryptobot", "text": "Срок действия счёта истёк", "class": "expired" },
+    { "platform": "xrocket", "text": "Invoice expired", "class": "expired" },
+    { "platform": "cryptobot", "text": "Недостаточно средств на балансе", "class": "insufficient_funds" },
+    { "platform": "xrocket", "text": "Insufficient funds", "class": "insufficient_funds" },
+    { "platform": "cryptobot", "text": "Not enough USDT", "class": "insufficient_funds" },
+    { "platform": "cryptobot", "text": "Счёт оплачен", "class": "unknown" },
+    { "platform": "cryptobot", "text": "Счёт не оплачен", "class": "unknown" },
+    { "platform": "cryptobot", "text": "Недостаточно средств, счёт истёк", "class": "unknown" },
+    { "platform": "cryptobot", "text": "Ошибка, попробуйте позже", "class": "unknown" },
+    { "platform": "cryptobot", "text": "", "class": "unknown" }
+  ]
+}

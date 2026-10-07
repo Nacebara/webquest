@@ -1,0 +1,63 @@
+{
+  "about": "Ответы ботов на /start <чек> (classify_activation). Русские образцы «Вы получили\\n1 USDT», «Этот чек уже активирован.», «Мульти-чек не найден.», «Введите пароль», «Подпишитесь», «Ваш чек активировал @someone» — из тестов lovec (не живые записи); остальное синтетическое, по словарям lovec replies.rs и SPEC §1.3. Живые тексты собрать в M0 и добавить сюда. class: received | already_activated | not_found | not_for_you | needs_subscription | captcha | password_required | premium_only | in_progress | claim_notice | incoming_transfer | unknown; для received и incoming_transfer — amount и asset.",
+  "cases": [
+    { "platform": "cryptobot", "text": "Вы получили 0.5 USDT ($0.50).", "class": "received", "amount": "0.5", "asset": "USDT" },
+    { "platform": "cryptobot", "text": "Вы получили 1 USDT", "class": "received", "amount": "1", "asset": "USDT" },
+    { "platform": "xrocket", "text": "Вы получили\n1 USDT", "class": "received", "amount": "1", "asset": "USDT" },
+    { "platform": "cryptobot", "text": "YOU RECEIVED 5 TON", "class": "received", "amount": "5", "asset": "TON" },
+    { "platform": "cryptobot", "text": "✅ You have received 12.34 USDT ($12.34)", "class": "received", "amount": "12.34", "asset": "USDT" },
+    { "platform": "xrocket", "text": "🚀 Вы успешно получили 2,5 TONCOIN", "class": "received", "amount": "2.5", "asset": "TON" },
+    { "platform": "xrocket", "text": "Вы получили 1 000 USDT", "class": "received", "amount": "1000", "asset": "USDT" },
+    { "platform": "cryptobot", "text": "Вы получили 3 USDT. Купите Telegram Premium в @send", "class": "received", "amount": "3", "asset": "USDT" },
+
+    { "platform": "cryptobot", "text": "Этот чек уже активирован.", "class": "already_activated" },
+    { "platform": "xrocket", "text": "Этот чек уже получен", "class": "already_activated" },
+    { "platform": "cryptobot", "text": "This check has already been activated.", "class": "already_activated" },
+    { "platform": "xrocket", "text": "Cheque already claimed", "class": "already_activated" },
+
+    { "platform": "cryptobot", "text": "Чек не найден", "class": "not_found" },
+    { "platform": "xrocket", "text": "Мульти-чек не найден.", "class": "not_found" },
+    { "platform": "xrocket", "text": "Этот чек не существует", "class": "not_found" },
+    { "platform": "cryptobot", "text": "Check not found", "class": "not_found" },
+
+    { "platform": "cryptobot", "text": "Вы не можете активировать этот чек", "class": "not_for_you" },
+    { "platform": "xrocket", "text": "Этот чек предназначен для другого пользователя", "class": "not_for_you" },
+    { "platform": "cryptobot", "text": "This check is not intended for you.", "class": "not_for_you" },
+
+    { "platform": "cryptobot", "text": "Подпишитесь", "class": "needs_subscription" },
+    { "platform": "cryptobot", "text": "Чтобы активировать чек, подпишитесь на каналы:", "class": "needs_subscription" },
+    { "platform": "xrocket", "text": "Subscribe to the channels to receive the cheque", "class": "needs_subscription" },
+
+    { "platform": "xrocket", "text": "Введите символы, которые вы видите на картинке", "class": "captcha" },
+    { "platform": "xrocket", "text": "🧩 Решите капчу", "class": "captcha" },
+    { "platform": "xrocket", "text": "Please solve the captcha", "class": "captcha" },
+
+    { "platform": "cryptobot", "text": "Введите пароль", "class": "password_required" },
+    { "platform": "cryptobot", "text": "🔒 Введите пароль от чека", "class": "password_required" },
+    { "platform": "cryptobot", "text": "Неверный пароль, попробуйте ещё", "class": "password_required" },
+    { "platform": "cryptobot", "text": "Enter the password for this check", "class": "password_required" },
+
+    { "platform": "cryptobot", "text": "Этот чек только для пользователей Telegram Premium.", "class": "premium_only" },
+    { "platform": "xrocket", "text": "Only Telegram Premium users can activate this cheque", "class": "premium_only" },
+    { "platform": "cryptobot", "text": "Вы не можете активировать этот чек: он только для Premium", "class": "premium_only" },
+
+    { "platform": "cryptobot", "text": "Подождите, идёт обработка", "class": "in_progress" },
+    { "platform": "xrocket", "text": "⏳ Получение чека…", "class": "in_progress" },
+    { "platform": "cryptobot", "text": "Processing, please wait", "class": "in_progress" },
+
+    { "platform": "cryptobot", "text": "Ваш чек активировал @someone", "class": "claim_notice" },
+    { "platform": "cryptobot", "text": "🦋 Ваш чек на 5 USDT получил @someone", "class": "claim_notice" },
+    { "platform": "xrocket", "text": "Your cheque was claimed by @someone", "class": "claim_notice" },
+
+    { "platform": "cryptobot", "text": "Вы получили 5 USDT от @x", "class": "incoming_transfer", "amount": "5", "asset": "USDT" },
+    { "platform": "cryptobot", "text": "You received 5 USDT from @x", "class": "incoming_transfer", "amount": "5", "asset": "USDT" },
+    { "platform": "xrocket", "text": "💰 Вы получили 0.25 TON от пользователя Иван", "class": "incoming_transfer", "amount": "0.25", "asset": "TON" },
+
+    { "platform": "cryptobot", "text": "что-то новое", "class": "unknown" },
+    { "platform": "cryptobot", "text": "", "class": "unknown" },
+    { "platform": "cryptobot", "text": "Вы получили подарок", "class": "unknown" },
+    { "platform": "cryptobot", "text": "Вы получили 0.001 BTC", "class": "unknown" },
+    { "platform": "cryptobot", "text": "Вы получили 1,234 TON", "class": "unknown" },
+    { "platform": "cryptobot", "text": "Вы получили перевод от @x", "class": "unknown" }
+  ]
+}

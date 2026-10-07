@@ -172,11 +172,7 @@ pub trait Transport: Send + Sync + 'static {
     ) -> Result<RawMessage, TransportError>;
 
     /// Открыть мини-приложение бота (`messages.requestWebView`): URL с `tgWebAppData`.
-    async fn open_webapp(
-        &self,
-        bot: Platform,
-        button_url: &str,
-    ) -> Result<String, TransportError>;
+    async fn open_webapp(&self, bot: Platform, button_url: &str) -> Result<String, TransportError>;
 
     /// Сообщения чата с id > `after_id`, по возрастанию id (догон после рестарта).
     async fn history(

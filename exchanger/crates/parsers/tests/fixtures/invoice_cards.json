@@ -1,0 +1,70 @@
+{
+  "about": "Карточки чужих счетов после /start IV… или /start inv_… (parse_invoice_card). Тексты синтетические: живые карточки собрать в M0 (SPEC §1.4, допущение). Статус — только при одном однозначном слове, иначе unknown. money/fiat: [сумма, актив|код] или null.",
+  "cases": [
+    {
+      "platform": "cryptobot",
+      "text": "🧾 Счёт #IVdixIeFSdqP\n\nСумма: 5 USDT ($5.00)\nОписание: Оплата заказа №1\nСтатус: активен",
+      "status": "active", "money": ["5", "USDT"], "fiat": null, "single_use": null, "description": "Оплата заказа №1"
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Invoice #IVdixIeFSdqP\n\nAmount: 12.5 TON\nDescription: Coffee\nStatus: Active",
+      "status": "active", "money": ["12.5", "TON"], "fiat": null, "single_use": null, "description": "Coffee"
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Счёт на $10.00\nК оплате: 10.05 USDT\nОжидает оплаты",
+      "status": "active", "money": null, "fiat": ["10.00", "USD"], "single_use": null, "description": null
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Счёт оплачен",
+      "status": "paid", "money": null, "fiat": null, "single_use": null, "description": null
+    },
+    {
+      "platform": "xrocket",
+      "text": "Invoice paid. Amount: 3 USDT",
+      "status": "paid", "money": ["3", "USDT"], "fiat": null, "single_use": null, "description": null
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Срок действия счёта истёк",
+      "status": "expired", "money": null, "fiat": null, "single_use": null, "description": null
+    },
+    {
+      "platform": "xrocket",
+      "text": "This invoice has expired",
+      "status": "expired", "money": null, "fiat": null, "single_use": null, "description": null
+    },
+    {
+      "platform": "xrocket",
+      "text": "Многоразовый счёт на 1 TONCOIN\nСтатус: активен",
+      "status": "active", "money": ["1", "TON"], "fiat": null, "single_use": false, "description": null
+    },
+    {
+      "platform": "xrocket",
+      "text": "Multi-use invoice: 2 USDT per payment",
+      "status": "unknown", "money": ["2", "USDT"], "fiat": null, "single_use": false, "description": null
+    },
+    {
+      "platform": "xrocket",
+      "text": "Одноразовый счёт на 7 USDT. Истекает через 1 час. Статус: активен",
+      "status": "active", "money": ["7", "USDT"], "fiat": null, "single_use": true, "description": null
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Счёт не оплачен",
+      "status": "unknown", "money": null, "fiat": null, "single_use": null, "description": null
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Оплачен, но истёк",
+      "status": "unknown", "money": null, "fiat": null, "single_use": null, "description": null
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Счёт",
+      "status": "unknown", "money": null, "fiat": null, "single_use": null, "description": null
+    }
+  ]
+}
