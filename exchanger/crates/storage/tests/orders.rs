@@ -4,7 +4,7 @@
 
 mod common;
 
-use common::{CB_APP, CLIENT, XR_PERSONAL, setup};
+use common::{CB, CLIENT, XR, setup};
 use domain::fsm::{Effect, Event, OrderState, PostingKind, Settlement};
 use domain::pricing::{FeePolicy, quote_check_exchange};
 use domain::{Asset, Direction, Step, ledger};
@@ -12,14 +12,13 @@ use rust_decimal_macros::dec;
 use sqlx::{PgPool, Row};
 use storage::StorageError;
 use storage::ledger::PostingRefs;
-use storage::orders::{Actor, IntakeMethod, NewOrder, OrderPatch};
+use storage::orders::{Actor, NewOrder, OrderPatch};
 
 fn new_check_order(check: &str) -> NewOrder<'_> {
     NewOrder {
         user_id: CLIENT,
-        direction: Direction::XrToCbCheck,
+        direction: Direction::CbToXrCheck,
         asset: Asset::Usdt,
-        intake_method: Some(IntakeMethod::Check),
         intake_start_param: Some(check),
         invoice_start_param: None,
     }
@@ -31,7 +30,7 @@ fn new_check_order(check: &str) -> NewOrder<'_> {
 async fn check_exchange_lifecycle_posts_balanced_ledger(pool: PgPool) {
     setup(&pool).await;
     let mut tx = pool.begin().await.unwrap();
-    let order = storage::orders::insert(&mut tx, &new_check_order("mc_life"))
+    let order = storage::orders::insert(&mut tx, &new_check_order("CQlife"))
         .await
         .unwrap();
     assert_eq!((order.state, order.version), (OrderState::New, 0));
@@ -74,7 +73,7 @@ async fn check_exchange_lifecycle_posts_balanced_ledger(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(t.effects, vec![Effect::Post(PostingKind::Intake)]);
-    let intake = ledger::intake(XR_PERSONAL, Asset::Usdt, quote.amount_in).unwrap();
+    let intake = ledger::intake(CB, Asset::Usdt, quote.amount_in).unwrap();
     storage::ledger::post(
         &mut tx,
         &intake,
@@ -107,14 +106,7 @@ async fn check_exchange_lifecycle_posts_balanced_ledger(pool: PgPool) {
     .await
     .unwrap();
     assert!(t.effects.contains(&Effect::Post(PostingKind::Payout)));
-    let payout = ledger::payout(
-        CB_APP,
-        Asset::Usdt,
-        quote.amount_in,
-        quote.payout,
-        quote.fee,
-    )
-    .unwrap();
+    let payout = ledger::payout(XR, Asset::Usdt, quote.amount_in, quote.payout, quote.fee).unwrap();
     storage::ledger::post(
         &mut tx,
         &payout,
@@ -143,8 +135,8 @@ async fn check_exchange_lifecycle_posts_balanced_ledger(pool: PgPool) {
     };
     assert_eq!(get("liability:payable:USDT"), dec!(0));
     assert_eq!(get("revenue:fee:USDT"), dec!(-2.5));
-    assert_eq!(get("asset:cb:app:USDT"), dec!(902.5));
-    assert_eq!(get("asset:xr:personal:USDT"), dec!(100));
+    assert_eq!(get("asset:xr:USDT"), dec!(902.5));
+    assert_eq!(get("asset:cb:USDT"), dec!(1100));
 
     let row = sqlx::query("SELECT finished_at IS NOT NULL AS done, received_at IS NOT NULL AS recv, (SELECT count(*) FROM order_transitions WHERE order_id = $1) AS n FROM orders WHERE id = $1")
         .bind(order.id)
@@ -160,9 +152,9 @@ async fn check_exchange_lifecycle_posts_balanced_ledger(pool: PgPool) {
 
     let mut conn = pool.acquire().await.unwrap();
     let balances = storage::ledger::wallet_balances(&mut conn).await.unwrap();
-    let cb_app = balances.iter().find(|b| b.label == "cb:app").unwrap();
+    let xr = balances.iter().find(|b| b.label == "xr").unwrap();
     assert_eq!(
-        (cb_app.ledger_balance, cb_app.held, cb_app.available),
+        (xr.ledger_balance, xr.held, xr.available),
         (dec!(902.5), dec!(0), dec!(902.5))
     );
 }
@@ -172,7 +164,7 @@ async fn check_exchange_lifecycle_posts_balanced_ledger(pool: PgPool) {
 async fn stale_version_is_a_conflict(pool: PgPool) {
     setup(&pool).await;
     let mut conn = pool.acquire().await.unwrap();
-    let order = storage::orders::insert(&mut conn, &new_check_order("mc_race"))
+    let order = storage::orders::insert(&mut conn, &new_check_order("CQrace"))
         .await
         .unwrap();
     let (_fresh, _) = storage::orders::apply_event(
@@ -210,7 +202,7 @@ async fn stale_version_is_a_conflict(pool: PgPool) {
 async fn illegal_event_changes_nothing(pool: PgPool) {
     setup(&pool).await;
     let mut conn = pool.acquire().await.unwrap();
-    let order = storage::orders::insert(&mut conn, &new_check_order("mc_illegal"))
+    let order = storage::orders::insert(&mut conn, &new_check_order("CQillegal"))
         .await
         .unwrap();
     let err = storage::orders::apply_event(
@@ -235,10 +227,10 @@ async fn illegal_event_changes_nothing(pool: PgPool) {
 async fn duplicate_live_check_is_reported(pool: PgPool) {
     setup(&pool).await;
     let mut conn = pool.acquire().await.unwrap();
-    let first = storage::orders::insert(&mut conn, &new_check_order("mc_dup"))
+    let first = storage::orders::insert(&mut conn, &new_check_order("CQdup"))
         .await
         .unwrap();
-    let err = storage::orders::insert(&mut conn, &new_check_order("mc_dup"))
+    let err = storage::orders::insert(&mut conn, &new_check_order("CQdup"))
         .await
         .unwrap_err();
     assert!(matches!(err, StorageError::DuplicateLiveCheck), "{err:?}");
@@ -253,7 +245,7 @@ async fn duplicate_live_check_is_reported(pool: PgPool) {
     )
     .await
     .unwrap();
-    storage::orders::insert(&mut conn, &new_check_order("mc_dup"))
+    storage::orders::insert(&mut conn, &new_check_order("CQdup"))
         .await
         .unwrap();
 }
@@ -263,19 +255,19 @@ async fn duplicate_live_check_is_reported(pool: PgPool) {
 async fn same_operation_cannot_be_posted_twice(pool: PgPool) {
     setup(&pool).await;
     let mut conn = pool.acquire().await.unwrap();
-    let order = storage::orders::insert(&mut conn, &new_check_order("mc_post"))
+    let order = storage::orders::insert(&mut conn, &new_check_order("CQpost"))
         .await
         .unwrap();
     let op_id: i64 = sqlx::query(
         "INSERT INTO operations (order_id, kind, money_role, via, platform, idempotency_key, start_param, status)
-         VALUES ($1, 'activate_check', 'intake', 'userbot', 'xrocket', 'ord-x-intake-1', 'mc_post', 'succeeded') RETURNING id",
+         VALUES ($1, 'activate_check', 'intake', 'userbot', 'cryptobot', 'ord-x-intake-1', 'CQpost', 'succeeded') RETURNING id",
     )
     .bind(order.id)
     .fetch_one(&mut *conn)
     .await
     .unwrap()
     .get(0);
-    let intake = ledger::intake(XR_PERSONAL, Asset::Usdt, dec!(10)).unwrap();
+    let intake = ledger::intake(CB, Asset::Usdt, dec!(10)).unwrap();
     let refs = PostingRefs {
         order_id: Some(order.id),
         operation_id: Some(op_id),
@@ -298,12 +290,12 @@ async fn same_operation_cannot_be_posted_twice(pool: PgPool) {
 async fn posting_to_unknown_account_fails(pool: PgPool) {
     setup(&pool).await;
     let mut conn = pool.acquire().await.unwrap();
-    let ton = ledger::intake(XR_PERSONAL, Asset::Ton, dec!(1)).unwrap();
+    let ton = ledger::intake(XR, Asset::Ton, dec!(1)).unwrap();
     let err = storage::ledger::post(&mut conn, &ton, PostingRefs::default())
         .await
         .unwrap_err();
     assert!(
-        matches!(err, StorageError::UnknownAccount(ref c) if c == "asset:xr:personal:TON"),
+        matches!(err, StorageError::UnknownAccount(ref c) if c == "asset:xr:TON"),
         "{err:?}"
     );
 }

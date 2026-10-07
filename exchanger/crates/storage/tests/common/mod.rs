@@ -1,40 +1,33 @@
-//! Общие фикстуры интеграционных тестов: четыре кошелька, счета леджера, капитал, клиент.
+//! Общие фикстуры интеграционных тестов: два аккаунта юзербота с кошельками `cb` и `xr`,
+//! счета леджера, по 1 000 USDT капитала на каждом кошельке, клиент.
 
 #![allow(dead_code, clippy::unwrap_used)]
 
 use domain::ledger::{self, AccountCode};
-use domain::{Asset, Decimal, Platform, WalletKind, WalletRef};
+use domain::{Asset, Decimal, Platform};
 use sqlx::PgPool;
 use storage::ledger::PostingRefs;
 use storage::users::Profile;
 
 pub const CLIENT: i64 = 111;
-pub const CB_APP: WalletRef = WalletRef::new(Platform::CryptoBot, WalletKind::App);
-pub const CB_PERSONAL: WalletRef = WalletRef::new(Platform::CryptoBot, WalletKind::Personal);
-pub const XR_APP: WalletRef = WalletRef::new(Platform::XRocket, WalletKind::App);
-pub const XR_PERSONAL: WalletRef = WalletRef::new(Platform::XRocket, WalletKind::Personal);
+pub const CB: Platform = Platform::CryptoBot;
+pub const XR: Platform = Platform::XRocket;
 
-/// Кошельки, счета леджера USDT, клиент и 1 000 USDT капитала на `cb:app`.
 pub async fn setup(pool: &PgPool) {
     let mut tx = pool.begin().await.unwrap();
-    let ub_xr = storage::wallets::ensure_userbot(&mut tx, "ub-xr-1", "+31******01")
-        .await
-        .unwrap();
-    let ub_cb = storage::wallets::ensure_userbot(&mut tx, "ub-cb-1", "+31******02")
-        .await
-        .unwrap();
-    for (wallet, ub) in [
-        (CB_PERSONAL, Some(ub_cb)),
-        (CB_APP, None),
-        (XR_PERSONAL, Some(ub_xr)),
-        (XR_APP, None),
+    for (platform, label, phone) in [
+        (CB, "ub-cb-1", "+31******01"),
+        (XR, "ub-xr-1", "+31******02"),
     ] {
-        let wallet_id = storage::wallets::ensure_wallet(&mut tx, wallet, ub)
+        let ub = storage::wallets::ensure_userbot(&mut tx, label, phone)
+            .await
+            .unwrap();
+        let wallet_id = storage::wallets::ensure_wallet(&mut tx, platform, ub)
             .await
             .unwrap();
         storage::ledger::ensure_account(
             &mut tx,
-            &AccountCode::wallet(wallet, Asset::Usdt),
+            &AccountCode::wallet(platform, Asset::Usdt),
             Asset::Usdt,
             Some(wallet_id),
         )
@@ -51,18 +44,20 @@ pub async fn setup(pool: &PgPool) {
             .await
             .unwrap();
     }
-    let capital = ledger::capital_in(CB_APP, Asset::Usdt, Decimal::from(1000)).unwrap();
-    storage::ledger::post(
-        &mut tx,
-        &capital,
-        PostingRefs {
-            memo: Some("initial capital"),
-            created_by: Some("staff:1"),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
+    for platform in [CB, XR] {
+        let capital = ledger::capital_in(platform, Asset::Usdt, Decimal::from(1000)).unwrap();
+        storage::ledger::post(
+            &mut tx,
+            &capital,
+            PostingRefs {
+                memo: Some("initial capital"),
+                created_by: Some("staff:1"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
     storage::users::upsert(
         &mut tx,
         CLIENT,

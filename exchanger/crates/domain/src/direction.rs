@@ -1,4 +1,5 @@
 //! Направления обмена (`directions.code`, SPEC §2.3).
+//! Основной спрос — CryptoBot → xRocket: люди уходят из CryptoBot и забирают баланс в xRocket.
 
 use std::fmt;
 use std::str::FromStr;
@@ -10,9 +11,9 @@ use crate::fsm::Flow;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Direction {
-    /// Чек xRocket → выплата в CryptoBot.
+    /// Чек xRocket → чек CryptoBot (встречный поток, пополняет сторону xRocket).
     XrToCbCheck,
-    /// Чек CryptoBot → выплата в xRocket.
+    /// Чек CryptoBot → чек xRocket — основной спрос.
     CbToXrCheck,
     /// Оплата счёта CryptoBot деньгами клиента из xRocket.
     PayCbInvoice,

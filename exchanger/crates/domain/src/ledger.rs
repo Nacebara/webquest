@@ -1,4 +1,8 @@
-//! Шаблоны проводок двойной записи (SPEC §10.4). Знак: дебет > 0, кредит < 0.
+//! Шаблоны проводок двойной записи (SPEC §10.4, v0.2). Знак: дебет > 0, кредит < 0.
+//!
+//! Кошелёк сервиса на платформе один — личный баланс аккаунта юзербота (`asset:cb:USDT`,
+//! `asset:xr:USDT`). Выплата и возврат — чек, который юзербот создаёт в боте кошелька:
+//! деньги списываются с нашего баланса в момент создания чека, тогда же делаем проводку.
 //! Комиссия признаётся в момент выплаты; возврат — сторно `payable` без отмены дохода.
 
 use std::collections::BTreeMap;
@@ -7,22 +11,24 @@ use std::fmt;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use crate::asset::{Asset, Platform, WalletKind, WalletRef};
+use crate::asset::{Asset, Platform, wallet_label};
 
 /// Код счёта леджера, как в `ledger_accounts.code`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct AccountCode(String);
 
 impl AccountCode {
-    /// `asset:cb:app:USDT`
-    pub fn wallet(wallet: WalletRef, asset: Asset) -> Self {
-        Self(format!("asset:{}:{}", wallet.label(), asset.code()))
+    /// Баланс аккаунта юзербота на платформе: `asset:cb:USDT`.
+    pub fn wallet(platform: Platform, asset: Asset) -> Self {
+        Self(format!("asset:{}:{}", wallet_label(platform), asset.code()))
     }
 
+    /// Деньги в пути между платформами при ребалансировке.
     pub fn transit(asset: Asset) -> Self {
         Self(format!("asset:transit:{}", asset.code()))
     }
 
+    /// Деньги клиентов в незавершённых заявках.
     pub fn payable(asset: Asset) -> Self {
         Self(format!("liability:payable:{}", asset.code()))
     }
@@ -115,7 +121,6 @@ pub enum TxKind {
     ExcessRefund,
     ExcessKept,
     InvoicePaid,
-    AppTopup,
     CapitalIn,
     ManualClose,
 }
@@ -129,7 +134,6 @@ impl TxKind {
             TxKind::ExcessRefund => "excess_refund",
             TxKind::ExcessKept => "excess_kept",
             TxKind::InvoicePaid => "invoice_paid",
-            TxKind::AppTopup => "app_topup",
             TxKind::CapitalIn => "capital_in",
             TxKind::ManualClose => "manual_close",
         }
@@ -218,21 +222,21 @@ fn line(account: AccountCode, asset: Asset, amount: Decimal) -> Line {
     }
 }
 
-/// Пришли деньги клиента: Дт кошелёк / Кт payable на всю сумму.
-pub fn intake(wallet: WalletRef, asset: Asset, amount: Decimal) -> Result<Posting, PostingError> {
+/// Чек клиента активирован: Дт кошелёк платформы входа / Кт payable на всю сумму.
+pub fn intake(platform: Platform, asset: Asset, amount: Decimal) -> Result<Posting, PostingError> {
     let a = positive(amount)?;
     Posting::new(
         TxKind::Intake,
         vec![
-            line(AccountCode::wallet(wallet, asset), asset, a),
+            line(AccountCode::wallet(platform, asset), asset, a),
             line(AccountCode::payable(asset), asset, -a),
         ],
     )
 }
 
-/// Выплата по обмену: Дт payable (всё принятое) / Кт кошелёк выплаты / Кт revenue:fee.
+/// Чек выплаты создан: Дт payable (всё принятое) / Кт кошелёк выплаты / Кт revenue:fee.
 pub fn payout(
-    wallet: WalletRef,
+    platform: Platform,
     asset: Asset,
     amount_in: Decimal,
     payout: Decimal,
@@ -245,7 +249,7 @@ pub fn payout(
     }
     let mut lines = vec![
         line(AccountCode::payable(asset), asset, a),
-        line(AccountCode::wallet(wallet, asset), asset, -p),
+        line(AccountCode::wallet(platform, asset), asset, -p),
     ];
     if !fee.is_zero() {
         lines.push(line(AccountCode::revenue(Revenue::Fee, asset), asset, -fee));
@@ -253,9 +257,9 @@ pub fn payout(
     Posting::new(TxKind::Payout, lines)
 }
 
-/// Чужой счёт оплачен: Дт payable X / Кт личный кошелёк A / Кт revenue:fee X−A.
+/// Чужой счёт оплачен: Дт payable X / Кт кошелёк платформы счёта A / Кт revenue:fee X−A.
 pub fn invoice_paid(
-    wallet: WalletRef,
+    platform: Platform,
     asset: Asset,
     client_paid: Decimal,
     invoice_amount: Decimal,
@@ -269,7 +273,7 @@ pub fn invoice_paid(
     }
     let mut lines = vec![
         line(AccountCode::payable(asset), asset, x),
-        line(AccountCode::wallet(wallet, asset), asset, -a),
+        line(AccountCode::wallet(platform, asset), asset, -a),
     ];
     if x > a {
         lines.push(line(
@@ -281,23 +285,23 @@ pub fn invoice_paid(
     Posting::new(TxKind::InvoicePaid, lines)
 }
 
-/// Возврат клиенту: Дт payable / Кт кошелёк возврата.
-pub fn refund(wallet: WalletRef, asset: Asset, amount: Decimal) -> Result<Posting, PostingError> {
-    refund_kind(TxKind::Refund, wallet, asset, amount)
+/// Чек возврата создан на платформе входа: Дт payable / Кт кошелёк.
+pub fn refund(platform: Platform, asset: Asset, amount: Decimal) -> Result<Posting, PostingError> {
+    refund_kind(TxKind::Refund, platform, asset, amount)
 }
 
 /// Возврат переплаты: то же, но отдельный вид, чтобы не путать с возвратом всей заявки.
 pub fn excess_refund(
-    wallet: WalletRef,
+    platform: Platform,
     asset: Asset,
     amount: Decimal,
 ) -> Result<Posting, PostingError> {
-    refund_kind(TxKind::ExcessRefund, wallet, asset, amount)
+    refund_kind(TxKind::ExcessRefund, platform, asset, amount)
 }
 
 fn refund_kind(
     kind: TxKind,
-    wallet: WalletRef,
+    platform: Platform,
     asset: Asset,
     amount: Decimal,
 ) -> Result<Posting, PostingError> {
@@ -306,7 +310,7 @@ fn refund_kind(
         kind,
         vec![
             line(AccountCode::payable(asset), asset, a),
-            line(AccountCode::wallet(wallet, asset), asset, -a),
+            line(AccountCode::wallet(platform, asset), asset, -a),
         ],
     )
 }
@@ -323,33 +327,9 @@ pub fn excess_kept(asset: Asset, amount: Decimal) -> Result<Posting, PostingErro
     )
 }
 
-/// Пополнение баланса приложения с личного баланса той же платформы.
-pub fn app_topup(
-    platform: Platform,
-    asset: Asset,
-    amount: Decimal,
-) -> Result<Posting, PostingError> {
-    let a = positive(amount)?;
-    Posting::new(
-        TxKind::AppTopup,
-        vec![
-            line(
-                AccountCode::wallet(WalletRef::new(platform, WalletKind::App), asset),
-                asset,
-                a,
-            ),
-            line(
-                AccountCode::wallet(WalletRef::new(platform, WalletKind::Personal), asset),
-                asset,
-                -a,
-            ),
-        ],
-    )
-}
-
 /// Взнос оборотного капитала: Дт кошелёк / Кт equity:capital.
 pub fn capital_in(
-    wallet: WalletRef,
+    platform: Platform,
     asset: Asset,
     amount: Decimal,
 ) -> Result<Posting, PostingError> {
@@ -357,7 +337,7 @@ pub fn capital_in(
     Posting::new(
         TxKind::CapitalIn,
         vec![
-            line(AccountCode::wallet(wallet, asset), asset, a),
+            line(AccountCode::wallet(platform, asset), asset, a),
             line(AccountCode::equity(Equity::Capital, asset), asset, -a),
         ],
     )
@@ -369,16 +349,16 @@ mod tests {
     use proptest::prelude::*;
     use rust_decimal_macros::dec;
 
-    const CB_APP: WalletRef = WalletRef::new(Platform::CryptoBot, WalletKind::App);
-    const XR_PERSONAL: WalletRef = WalletRef::new(Platform::XRocket, WalletKind::Personal);
-    const CB_PERSONAL: WalletRef = WalletRef::new(Platform::CryptoBot, WalletKind::Personal);
+    const CB: Platform = Platform::CryptoBot;
+    const XR: Platform = Platform::XRocket;
 
     #[test]
     fn account_codes_match_schema_conventions() {
         assert_eq!(
-            AccountCode::wallet(CB_APP, Asset::Usdt).as_str(),
-            "asset:cb:app:USDT"
+            AccountCode::wallet(CB, Asset::Usdt).as_str(),
+            "asset:cb:USDT"
         );
+        assert_eq!(AccountCode::wallet(XR, Asset::Ton).as_str(), "asset:xr:TON");
         assert_eq!(
             AccountCode::payable(Asset::Ton).as_str(),
             "liability:payable:TON"
@@ -393,11 +373,11 @@ mod tests {
         );
     }
 
-    /// SPEC §10.4: обмен 100 USDT — приём, затем выплата 97,50 с комиссией 2,50.
+    /// Основной поток v0.2: чек CryptoBot 100 USDT → чек xRocket 97,50 USDT, комиссия 2,50.
     #[test]
-    fn spec_example_exchange_lifecycle() {
-        let i = intake(XR_PERSONAL, Asset::Usdt, dec!(100)).unwrap();
-        let p = payout(CB_APP, Asset::Usdt, dec!(100), dec!(97.50), dec!(2.50)).unwrap();
+    fn main_flow_cryptobot_to_xrocket() {
+        let i = intake(CB, Asset::Usdt, dec!(100)).unwrap();
+        let p = payout(XR, Asset::Usdt, dec!(100), dec!(97.50), dec!(2.50)).unwrap();
         let payable = AccountCode::payable(Asset::Usdt);
         assert_eq!(
             i.net(&payable) + p.net(&payable),
@@ -408,16 +388,14 @@ mod tests {
             p.net(&AccountCode::revenue(Revenue::Fee, Asset::Usdt)),
             dec!(-2.50)
         );
-        assert_eq!(
-            p.net(&AccountCode::wallet(CB_APP, Asset::Usdt)),
-            dec!(-97.50)
-        );
+        assert_eq!(p.net(&AccountCode::wallet(XR, Asset::Usdt)), dec!(-97.50));
+        assert_eq!(i.net(&AccountCode::wallet(CB, Asset::Usdt)), dec!(100));
     }
 
     #[test]
-    fn spec_example_invoice_paid() {
-        let i = intake(XR_PERSONAL, Asset::Usdt, dec!(10.30)).unwrap();
-        let p = invoice_paid(CB_PERSONAL, Asset::Usdt, dec!(10.30), dec!(10)).unwrap();
+    fn invoice_payment_from_xrocket_funds() {
+        let i = intake(XR, Asset::Usdt, dec!(10.30)).unwrap();
+        let p = invoice_paid(CB, Asset::Usdt, dec!(10.30), dec!(10)).unwrap();
         let payable = AccountCode::payable(Asset::Usdt);
         assert_eq!(i.net(&payable) + p.net(&payable), Decimal::ZERO);
         assert_eq!(
@@ -428,13 +406,8 @@ mod tests {
 
     #[test]
     fn refund_reverses_intake_without_touching_revenue() {
-        let i = intake(XR_PERSONAL, Asset::Usdt, dec!(100)).unwrap();
-        let r = refund(
-            WalletRef::new(Platform::XRocket, WalletKind::App),
-            Asset::Usdt,
-            dec!(100),
-        )
-        .unwrap();
+        let i = intake(CB, Asset::Usdt, dec!(100)).unwrap();
+        let r = refund(CB, Asset::Usdt, dec!(100)).unwrap();
         let payable = AccountCode::payable(Asset::Usdt);
         assert_eq!(i.net(&payable) + r.net(&payable), Decimal::ZERO);
         assert!(
@@ -447,7 +420,7 @@ mod tests {
     #[test]
     fn invalid_postings_are_rejected() {
         let a = AccountCode::payable(Asset::Usdt);
-        let b = AccountCode::wallet(CB_APP, Asset::Usdt);
+        let b = AccountCode::wallet(XR, Asset::Usdt);
         assert_eq!(
             Posting::new(TxKind::Intake, vec![line(a.clone(), Asset::Usdt, dec!(1))]),
             Err(PostingError::TooFewLines)
@@ -469,8 +442,8 @@ mod tests {
             ),
             Err(PostingError::Unbalanced { .. })
         ));
-        assert!(payout(CB_APP, Asset::Usdt, dec!(100), dec!(97.5), dec!(2.4)).is_err());
-        assert!(intake(CB_APP, Asset::Usdt, dec!(0)).is_err());
+        assert!(payout(XR, Asset::Usdt, dec!(100), dec!(97.5), dec!(2.4)).is_err());
+        assert!(intake(CB, Asset::Usdt, dec!(0)).is_err());
     }
 
     fn amt() -> impl Strategy<Value = Decimal> {
@@ -489,33 +462,31 @@ mod tests {
         #![proptest_config(ProptestConfig::with_cases(10_000))]
 
         #[test]
-        fn templates_are_always_balanced(a in amt(), b in amt(), wi in 0usize..4) {
-            let w = WalletRef::ALL[wi];
+        fn templates_are_always_balanced(a in amt(), b in amt(), pi in 0usize..2) {
+            let p = Platform::ALL[pi];
             let (big, small) = if a >= b { (a, b) } else { (b, a) };
             let postings = [
-                intake(w, Asset::Usdt, a),
-                refund(w, Asset::Usdt, a),
-                excess_refund(w, Asset::Usdt, a),
+                intake(p, Asset::Usdt, a),
+                refund(p, Asset::Usdt, a),
+                excess_refund(p, Asset::Usdt, a),
                 excess_kept(Asset::Usdt, a),
-                capital_in(w, Asset::Usdt, a),
-                app_topup(w.platform, Asset::Usdt, a),
-                invoice_paid(w, Asset::Usdt, big, small),
-                payout(w, Asset::Usdt, big + small, big, small),
+                capital_in(p, Asset::Usdt, a),
+                invoice_paid(p, Asset::Usdt, big, small),
+                payout(p, Asset::Usdt, big + small, big, small),
             ];
-            for p in postings {
-                let p = p.unwrap();
-                prop_assert!(sum_by_asset(&p).values().all(|s| s.is_zero()));
-                prop_assert!(p.lines().iter().all(|l| !l.amount.is_zero()));
+            for posting in postings {
+                let posting = posting.unwrap();
+                prop_assert!(sum_by_asset(&posting).values().all(|s| s.is_zero()));
+                prop_assert!(posting.lines().iter().all(|l| !l.amount.is_zero()));
             }
         }
 
         #[test]
         fn exchange_lifecycle_closes_payable(amount_in in amt(), fee_part in 0i64..=1_000) {
-            // fee = amount_in · fee_part / 10 000, остальное — выплата
             let fee = (amount_in * Decimal::new(fee_part, 4)).round_dp(8);
             prop_assume!(fee < amount_in);
-            let i = intake(XR_PERSONAL, Asset::Usdt, amount_in).unwrap();
-            let p = payout(CB_APP, Asset::Usdt, amount_in, amount_in - fee, fee).unwrap();
+            let i = intake(CB, Asset::Usdt, amount_in).unwrap();
+            let p = payout(XR, Asset::Usdt, amount_in, amount_in - fee, fee).unwrap();
             let payable = AccountCode::payable(Asset::Usdt);
             prop_assert_eq!(i.net(&payable) + p.net(&payable), Decimal::ZERO);
         }

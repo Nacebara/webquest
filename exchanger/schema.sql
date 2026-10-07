@@ -1,6 +1,8 @@
 -- =====================================================================
--- Бот-обменник xRocket <-> CryptoBot — схема БД (PostgreSQL 16)
+-- Бот-обменник xRocket <-> CryptoBot — схема БД (PostgreSQL 16), SPEC v0.2
 -- Миграция 0001_init. Деньги — только NUMERIC(38,18), никаких float.
+-- v0.2: вся работа — через юзербота (личные балансы аккаунтов), API кошельков не используем;
+-- выплата и возврат — чек, созданный юзерботом; чеки с паролем не принимаем.
 -- Инварианты, которые держит сама БД (а не только код):
 --   I1. Один чек (start_param) — не больше одной незавершённой заявки.
 --   I2. На заявку — не больше одной «расчётной» операции (выплата,
@@ -43,17 +45,17 @@ CREATE TABLE platform_assets (
     UNIQUE (platform, platform_code)
 );
 
--- Кошельки: личный (юзербот) и приложение (API) на каждой платформе.
+-- Кошелёк сервиса — личный баланс аккаунта юзербота на платформе (метка 'cb', 'xr').
+-- Активный кошелёк на платформе ровно один; запасные аккаунты — с is_active = false.
 CREATE TABLE wallet_accounts (
     id              SMALLSERIAL PRIMARY KEY,
     platform        TEXT NOT NULL CHECK (platform IN ('cryptobot', 'xrocket')),
-    kind            TEXT NOT NULL CHECK (kind IN ('personal', 'app')),
-    label           TEXT NOT NULL UNIQUE,          -- 'cb:personal', 'xr:app'
-    userbot_id      SMALLINT,                      -- для personal: какой аккаунт Telegram
+    label           TEXT NOT NULL UNIQUE,          -- 'cb', 'xr', 'cb-reserve'
+    userbot_id      SMALLINT NOT NULL,             -- аккаунт Telegram, чей баланс это
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CHECK ((kind = 'personal') = (userbot_id IS NOT NULL))
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX wallet_accounts_one_active ON wallet_accounts (platform) WHERE is_active;
 
 -- Аккаунты Telegram юзербота. Сессия хранится ТОЛЬКО зашифрованной
 -- (XChaCha20-Poly1305, ключ из переменной окружения, key_version для ротации).
@@ -172,7 +174,7 @@ CREATE TABLE orders (
     user_id             BIGINT NOT NULL REFERENCES users(tg_user_id),
     direction           TEXT NOT NULL REFERENCES directions(code),
     state               TEXT NOT NULL DEFAULT 'NEW' CHECK (state IN (
-                            'NEW', 'AWAITING_FUNDS', 'AWAITING_PASSWORD',
+                            'NEW', 'AWAITING_FUNDS',
                             'INTAKE_PENDING', 'INTAKE_UNKNOWN', 'RECEIVED',
                             'PAYOUT_PENDING', 'INVOICE_PAY_PENDING',
                             'REFUND_PENDING', 'MANUAL_REVIEW',
@@ -185,7 +187,7 @@ CREATE TABLE orders (
     asset               TEXT NOT NULL REFERENCES assets(code),
 
     -- Вход: чек клиента (или наш счёт для оплаты клиентом)
-    intake_method       TEXT CHECK (intake_method IN ('check', 'our_invoice')),
+    intake_method       TEXT CHECK (intake_method IN ('check')),            -- v0.2: клиент платит только чеком
     intake_platform     TEXT NOT NULL CHECK (intake_platform IN ('cryptobot', 'xrocket')),
     intake_start_param  TEXT,                                 -- 'CQ…' / 'mc_…' — ценность до активации, в логах маскируется
     intake_amount       NUMERIC(38,18) CHECK (intake_amount > 0),          -- сколько реально пришло
@@ -205,7 +207,8 @@ CREATE TABLE orders (
     fee_pct_applied     NUMERIC(9,6),
     fee_amount          NUMERIC(38,18) CHECK (fee_amount >= 0),
     payout_amount       NUMERIC(38,18) CHECK (payout_amount > 0),
-    payout_method       TEXT CHECK (payout_method IN ('transfer', 'check', 'invoice')),
+    payout_method       TEXT CHECK (payout_method IN ('check', 'invoice')),  -- чек юзербота или оплаченный счёт
+    payout_check_url    TEXT,                                                -- ссылка на созданный чек выплаты/возврата
     refund_amount       NUMERIC(38,18) CHECK (refund_amount > 0),
 
     -- Сообщение прогресса (редактируется по шагам)
@@ -254,24 +257,15 @@ CREATE TABLE order_state_transitions (
 );
 INSERT INTO order_state_transitions (from_state, to_state) VALUES
     ('NEW', 'REJECTED'), ('NEW', 'INTAKE_PENDING'), ('NEW', 'AWAITING_FUNDS'),
-    ('AWAITING_FUNDS', 'INTAKE_PENDING'), ('AWAITING_FUNDS', 'RECEIVED'),
-    ('AWAITING_FUNDS', 'EXPIRED'), ('AWAITING_FUNDS', 'CANCELLED'),
-    ('AWAITING_FUNDS', 'REFUND_PENDING'),          -- TTL истёк, а часть денег уже пришла
-    ('INTAKE_PENDING', 'RECEIVED'), ('INTAKE_PENDING', 'INTAKE_FAILED'),
-    ('INTAKE_PENDING', 'AWAITING_PASSWORD'), ('INTAKE_PENDING', 'INTAKE_UNKNOWN'),
-    ('INTAKE_PENDING', 'AWAITING_FUNDS'),           -- оплата счёта: чек не принят или недоплата — ждём ещё
-    ('AWAITING_PASSWORD', 'INTAKE_PENDING'), ('AWAITING_PASSWORD', 'INTAKE_FAILED'),
-    ('AWAITING_PASSWORD', 'AWAITING_FUNDS'),
-    ('INTAKE_UNKNOWN', 'RECEIVED'), ('INTAKE_UNKNOWN', 'INTAKE_FAILED'),
-    ('INTAKE_UNKNOWN', 'MANUAL_REVIEW'), ('INTAKE_UNKNOWN', 'AWAITING_FUNDS'),
-    ('RECEIVED', 'PAYOUT_PENDING'), ('RECEIVED', 'INVOICE_PAY_PENDING'),
-    ('RECEIVED', 'REFUND_PENDING'), ('RECEIVED', 'MANUAL_REVIEW'),
-    ('PAYOUT_PENDING', 'COMPLETED'), ('PAYOUT_PENDING', 'MANUAL_REVIEW'),
-    ('INVOICE_PAY_PENDING', 'COMPLETED'), ('INVOICE_PAY_PENDING', 'REFUND_PENDING'),
-    ('INVOICE_PAY_PENDING', 'MANUAL_REVIEW'),
-    ('REFUND_PENDING', 'REFUNDED'), ('REFUND_PENDING', 'MANUAL_REVIEW'),
-    ('MANUAL_REVIEW', 'PAYOUT_PENDING'), ('MANUAL_REVIEW', 'REFUND_PENDING'),
-    ('MANUAL_REVIEW', 'COMPLETED'), ('MANUAL_REVIEW', 'CLOSED_MANUAL'),
+    ('AWAITING_FUNDS', 'INTAKE_PENDING'), ('AWAITING_FUNDS', 'EXPIRED'), ('AWAITING_FUNDS', 'CANCELLED'),
+    ('AWAITING_FUNDS', 'REFUND_PENDING'), ('INTAKE_PENDING', 'RECEIVED'), ('INTAKE_PENDING', 'INTAKE_FAILED'),
+    ('INTAKE_PENDING', 'INTAKE_UNKNOWN'), ('INTAKE_PENDING', 'AWAITING_FUNDS'), ('INTAKE_UNKNOWN', 'RECEIVED'),
+    ('INTAKE_UNKNOWN', 'INTAKE_FAILED'), ('INTAKE_UNKNOWN', 'MANUAL_REVIEW'), ('INTAKE_UNKNOWN', 'AWAITING_FUNDS'),
+    ('RECEIVED', 'PAYOUT_PENDING'), ('RECEIVED', 'INVOICE_PAY_PENDING'), ('RECEIVED', 'REFUND_PENDING'),
+    ('RECEIVED', 'MANUAL_REVIEW'), ('PAYOUT_PENDING', 'COMPLETED'), ('PAYOUT_PENDING', 'MANUAL_REVIEW'),
+    ('INVOICE_PAY_PENDING', 'COMPLETED'), ('INVOICE_PAY_PENDING', 'REFUND_PENDING'), ('INVOICE_PAY_PENDING', 'MANUAL_REVIEW'),
+    ('REFUND_PENDING', 'REFUNDED'), ('REFUND_PENDING', 'MANUAL_REVIEW'), ('MANUAL_REVIEW', 'PAYOUT_PENDING'),
+    ('MANUAL_REVIEW', 'REFUND_PENDING'), ('MANUAL_REVIEW', 'COMPLETED'), ('MANUAL_REVIEW', 'CLOSED_MANUAL'),
     ('MANUAL_REVIEW', 'INVOICE_PAY_PENDING');
 
 CREATE FUNCTION orders_guard_transition() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -305,16 +299,6 @@ CREATE TABLE order_transitions (
 );
 CREATE INDEX order_transitions_order ON order_transitions (order_id, id);
 
--- Ввод от клиента, которого ждёт заявка (пароль чека).
-CREATE TABLE pending_inputs (
-    order_id    BIGINT PRIMARY KEY REFERENCES orders(id),
-    user_id     BIGINT NOT NULL REFERENCES users(tg_user_id),
-    kind        TEXT NOT NULL CHECK (kind IN ('check_password')),
-    expires_at  TIMESTAMPTZ NOT NULL,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE UNIQUE INDEX pending_inputs_one_per_user ON pending_inputs (user_id);
-
 -- ---------------------------------------------------------------------
 -- Ребалансировки
 -- ---------------------------------------------------------------------
@@ -325,7 +309,7 @@ CREATE TABLE rebalances (
     to_wallet_id        SMALLINT NOT NULL REFERENCES wallet_accounts(id),
     asset               TEXT NOT NULL REFERENCES assets(code),
     amount              NUMERIC(38,18) NOT NULL CHECK (amount > 0),
-    network             TEXT CHECK (network IN ('TON', 'TRX', 'BSC', 'ETH', 'SOL', 'internal')),
+    network             TEXT CHECK (network IN ('TON', 'TRX', 'BSC', 'ETH', 'SOL')),
     address             TEXT,                       -- только из белого списка (settings.rebalance_whitelist)
     state               TEXT NOT NULL DEFAULT 'planned' CHECK (state IN (
                             'planned', 'confirmed', 'sent', 'arrived', 'completed', 'failed', 'cancelled')),
@@ -350,27 +334,28 @@ CREATE TABLE operations (
     order_id            BIGINT REFERENCES orders(id),
     rebalance_id        BIGINT REFERENCES rebalances(id),
     kind                TEXT NOT NULL CHECK (kind IN (
-                            'activate_check', 'submit_check_password',
-                            'open_invoice', 'pay_invoice',
-                            'create_intake_invoice',
-                            'payout_transfer', 'payout_check',
-                            'refund_transfer', 'refund_check',
-                            'withdrawal', 'read_balance')),
+                            'activate_check',                -- /start <чек> боту кошелька
+                            'open_invoice', 'pay_invoice',   -- чужой счёт: просмотр и оплата
+                            'create_payout_check',           -- чек выплаты клиенту
+                            'create_refund_check',           -- чек возврата клиенту
+                            'create_excess_check',           -- чек возврата переплаты
+                            'withdrawal',                    -- вывод в сеть (ребалансировка)
+                            'read_balance')),
     -- Роль в расчёте по заявке: 'settle' — то, чем заявка закрывается
     -- (выплата / возврат / оплата счёта); 'excess_refund' — возврат переплаты.
     money_role          TEXT NOT NULL CHECK (money_role IN ('intake', 'settle', 'excess_refund', 'aux')),
-    via                 TEXT NOT NULL CHECK (via IN ('api', 'userbot')),
+    via                 TEXT NOT NULL DEFAULT 'userbot' CHECK (via IN ('userbot', 'manual')),
     platform            TEXT NOT NULL CHECK (platform IN ('cryptobot', 'xrocket')),
     wallet_account_id   SMALLINT REFERENCES wallet_accounts(id),
     status              TEXT NOT NULL DEFAULT 'pending' CHECK (status IN (
                             'pending', 'dispatched', 'succeeded', 'failed', 'unknown', 'cancelled')),
-    idempotency_key     TEXT NOT NULL UNIQUE CHECK (length(idempotency_key) BETWEEN 8 AND 50), -- I3; = spend_id / transferId / withdrawalId
+    idempotency_key     TEXT NOT NULL UNIQUE CHECK (length(idempotency_key) BETWEEN 8 AND 50), -- I3; метка ord-<id>-payout и т. п., пишется в описание чека
     start_param         TEXT,                       -- для activate_check / open_invoice / pay_invoice
     amount              NUMERIC(38,18),
     asset               TEXT REFERENCES assets(code),
     request             JSONB NOT NULL DEFAULT '{}'::jsonb,   -- без секретов
     response            JSONB,
-    external_id         TEXT,                       -- transfer_id, check_id, invoice id
+    external_id         TEXT,                       -- ссылка/ID созданного чека, ID счёта
     attempts            INTEGER NOT NULL DEFAULT 0,
     max_attempts        INTEGER NOT NULL DEFAULT 8,
     next_attempt_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -379,9 +364,10 @@ CREATE TABLE operations (
     dispatched_at       TIMESTAMPTZ,
     finished_at         TIMESTAMPTZ,
     CHECK ((order_id IS NULL) <> (rebalance_id IS NULL) OR kind = 'read_balance'),
-    -- Ретраи вслепую разрешены только API-операциям с ключом идемпотентности
-    -- и активации чека (повтор /start не может стоить нам денег).
-    CHECK (via = 'api' OR kind IN ('activate_check', 'submit_check_password', 'open_invoice', 'read_balance') OR max_attempts = 1)
+    -- Операции, которые выводят деньги, — одна попытка: у действий юзербота нет ключа
+    -- идемпотентности на стороне кошелька. Повторять можно только активацию чека,
+    -- просмотр счёта и чтение баланса (повтор не стоит нам денег).
+    CHECK (kind IN ('activate_check', 'open_invoice', 'read_balance') OR max_attempts = 1)
 );
 -- I2: на заявку не больше одной живой/успешной расчётной операции.
 CREATE UNIQUE INDEX operations_one_settle_per_order
@@ -444,7 +430,7 @@ CREATE TABLE ledger_transactions (
     id                  BIGSERIAL PRIMARY KEY,
     kind                TEXT NOT NULL CHECK (kind IN (
                             'intake', 'payout', 'refund', 'excess_refund', 'excess_kept', 'invoice_paid',
-                            'app_topup', 'rebalance_out', 'rebalance_in', 'network_fee', 'platform_fee',
+                            'rebalance_out', 'rebalance_in', 'network_fee', 'platform_fee',
                             'capital_in', 'capital_out', 'profit_sweep', 'manual_close', 'adjustment', 'loss')),
     order_id            BIGINT REFERENCES orders(id),
     rebalance_id        BIGINT REFERENCES rebalances(id),
@@ -572,7 +558,7 @@ CREATE TABLE reconciliations (
     id                  BIGSERIAL PRIMARY KEY,
     wallet_account_id   SMALLINT NOT NULL REFERENCES wallet_accounts(id),
     asset               TEXT NOT NULL REFERENCES assets(code),
-    source              TEXT NOT NULL CHECK (source IN ('api', 'userbot', 'manual')),
+    source              TEXT NOT NULL CHECK (source IN ('userbot', 'manual')),
     expected            NUMERIC(38,18) NOT NULL,
     actual              NUMERIC(38,18) NOT NULL,
     diff                NUMERIC(38,18) GENERATED ALWAYS AS (actual - expected) STORED,
@@ -708,8 +694,8 @@ INSERT INTO platform_assets (platform, asset, platform_code, decimals, payout_st
 
 INSERT INTO directions (code, kind, source_platform, target_platform, asset, fee_pct, min_fee, skew_k_pct,
                         fee_floor_pct, fee_cap_pct, min_amount, max_amount, new_user_max_amount, is_open) VALUES
-    ('xr_to_cb_check', 'check_exchange',  'xrocket',   'cryptobot', 'USDT', 2.5, 0.10, 0.75, 1.5, 3.5, 2, 300, 100, FALSE),
-    ('cb_to_xr_check', 'check_exchange',  'cryptobot', 'xrocket',   'USDT', 1.5, 0.10, 0.75, 0.5, 3.0, 2, 300, 100, FALSE),
+    ('cb_to_xr_check', 'check_exchange',  'cryptobot', 'xrocket',   'USDT', 2.5, 0.10, 0.75, 1.5, 3.5, 2, 300, 100, FALSE),  -- основной спрос
+    ('xr_to_cb_check', 'check_exchange',  'xrocket',   'cryptobot', 'USDT', 1.5, 0.10, 0.75, 0.5, 3.0, 2, 300, 100, FALSE),
     ('pay_cb_invoice', 'invoice_payment', 'xrocket',   'cryptobot', 'USDT', 3.0, 0.20, 0.75, 2.0, 4.0, 2, 300, 100, FALSE),
     ('pay_xr_invoice', 'invoice_payment', 'cryptobot', 'xrocket',   'USDT', 2.0, 0.20, 0.75, 1.0, 3.5, 2, 300, 100, FALSE);
 
@@ -717,7 +703,6 @@ INSERT INTO settings (key, value) VALUES
     ('maintenance',            '{"on": false, "message": null}'),
     ('kill_switch_payouts',    '{"on": false}'),
     ('quote_ttl_seconds',      '900'),
-    ('check_password_ttl_seconds', '600'),
     ('user_rate_limit',        '{"orders_per_10min": 5, "links_per_min": 10}'),
     ('daily_limit_usd',        '{"default": 1000, "new_user": 200}'),
     ('min_refund_amount',      '0.50'),

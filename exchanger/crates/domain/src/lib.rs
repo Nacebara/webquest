@@ -8,7 +8,7 @@ pub mod ledger;
 pub mod money;
 pub mod pricing;
 
-pub use asset::{Asset, Platform, WalletKind, WalletRef};
+pub use asset::{Asset, Platform, wallet_label};
 pub use direction::Direction;
 pub use fsm::{Event, Flow, OrderState, Transition};
 pub use money::{Money, Step};

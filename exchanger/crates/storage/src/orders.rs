@@ -27,29 +27,12 @@ impl Actor {
     }
 }
 
-/// Как клиент платит (`orders.intake_method`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IntakeMethod {
-    Check,
-    OurInvoice,
-}
-
-impl IntakeMethod {
-    const fn as_db(self) -> &'static str {
-        match self {
-            IntakeMethod::Check => "check",
-            IntakeMethod::OurInvoice => "our_invoice",
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct NewOrder<'a> {
     pub user_id: i64,
     pub direction: Direction,
     pub asset: Asset,
-    pub intake_method: Option<IntakeMethod>,
-    /// `CQ…` / `mc_…` — для обмена чека.
+    /// `CQ…` / `mc_…` — для обмена чека. Клиент платит только чеком (v0.2).
     pub intake_start_param: Option<&'a str>,
     /// `IV…` / `inv_…` — для оплаты чужого счёта.
     pub invoice_start_param: Option<&'a str>,
@@ -76,6 +59,8 @@ pub struct OrderPatch<'a> {
     pub fee_amount: Option<Decimal>,
     pub payout_amount: Option<Decimal>,
     pub refund_amount: Option<Decimal>,
+    /// Ссылка на чек выплаты или возврата, созданный юзерботом.
+    pub payout_check_url: Option<&'a str>,
     pub failure_code: Option<&'a str>,
     pub manual_reason: Option<&'a str>,
 }
@@ -90,13 +75,12 @@ pub async fn insert(conn: &mut PgConnection, new: &NewOrder<'_>) -> Result<Order
         r#"
         INSERT INTO orders (user_id, direction, asset, intake_method, intake_platform,
                             intake_start_param, invoice_platform, invoice_start_param)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, 'check', $4, $5, $6, $7)
         RETURNING id, public_id, state, version
         "#,
         new.user_id,
         new.direction.code(),
         new.asset.code(),
-        new.intake_method.map(IntakeMethod::as_db),
         source.db_name(),
         new.intake_start_param,
         invoice_platform,
@@ -190,6 +174,7 @@ pub async fn apply_event(
                refund_amount   = COALESCE($9, refund_amount),
                failure_code    = COALESCE($10, failure_code),
                manual_reason   = COALESCE($11, manual_reason),
+               payout_check_url = COALESCE($14, payout_check_url),
                received_at     = CASE WHEN $12 AND received_at IS NULL THEN now() ELSE received_at END,
                finished_at     = CASE WHEN $4 THEN now() ELSE finished_at END
          WHERE id = $1 AND version = $2 AND state = $13
@@ -208,6 +193,7 @@ pub async fn apply_event(
         patch.manual_reason,
         mark_received,
         order.state.as_db_str(),
+        patch.payout_check_url,
     )
     .fetch_optional(&mut *conn)
     .await?

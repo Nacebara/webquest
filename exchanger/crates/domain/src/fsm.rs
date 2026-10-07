@@ -1,4 +1,8 @@
-//! Машина состояний заявки (SPEC §4, §10.5.1, diagrams/08-state-order.puml).
+//! Машина состояний заявки (SPEC §4, §10.5.1, diagrams/08-state-order.puml; v0.2).
+//!
+//! v0.2: вся работа идёт через юзербота. Клиент платит только чеком; выплата и возврат —
+//! чек, который юзербот создаёт в боте кошелька; чужой счёт оплачивает юзербот.
+//! Чеки с паролем не принимаем (обычный отказ `CheckRejected`).
 //!
 //! `transition(flow, state, event)` — единственный способ сменить состояние.
 //! Множество переходов, достижимых через события, совпадает с [`ALLOWED`] и с таблицей
@@ -14,7 +18,6 @@ use serde::{Deserialize, Serialize};
 pub enum OrderState {
     New,
     AwaitingFunds,
-    AwaitingPassword,
     IntakePending,
     IntakeUnknown,
     Received,
@@ -32,10 +35,9 @@ pub enum OrderState {
 }
 
 impl OrderState {
-    pub const ALL: [OrderState; 17] = [
+    pub const ALL: [OrderState; 16] = [
         OrderState::New,
         OrderState::AwaitingFunds,
-        OrderState::AwaitingPassword,
         OrderState::IntakePending,
         OrderState::IntakeUnknown,
         OrderState::Received,
@@ -56,7 +58,6 @@ impl OrderState {
         match self {
             OrderState::New => "NEW",
             OrderState::AwaitingFunds => "AWAITING_FUNDS",
-            OrderState::AwaitingPassword => "AWAITING_PASSWORD",
             OrderState::IntakePending => "INTAKE_PENDING",
             OrderState::IntakeUnknown => "INTAKE_UNKNOWN",
             OrderState::Received => "RECEIVED",
@@ -124,11 +125,11 @@ impl Flow {
 /// Как закрываем полученные деньги (из `RECEIVED`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Settlement {
-    /// Обмен чека: выплата через API.
+    /// Обмен чека: юзербот создаёт чек выплаты на платформе назначения.
     Payout,
-    /// Оплата счёта: юзербот платит чужой счёт.
+    /// Оплата счёта: юзербот оплачивает чужой счёт.
     PayInvoice,
-    /// Сверх лимита, не тот актив, счёт стал неоплачиваемым.
+    /// Сверх лимита, не тот актив, счёт стал неоплачиваемым: чек возврата на платформе входа.
     Refund,
     /// Стоп-кран или паника — человеку.
     Manual,
@@ -137,10 +138,12 @@ pub enum Settlement {
 /// Решение оператора по заявке в `MANUAL_REVIEW` (SPEC §4, П9).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum OperatorAction {
+    /// Создать чек выплаты заново — только после того, как оператор убедился,
+    /// что прежняя попытка чек не создала.
     RetryPayout,
     RetryInvoicePayment,
     Refund,
-    /// «Закрыть: выплачено» — только с доказательством.
+    /// «Закрыть: выплачено» — только с доказательством (ссылка на созданный чек).
     CloseAsPaid,
     /// «Закрыть без выплаты» — только владелец, с причиной.
     CloseWithoutPayout,
@@ -155,8 +158,6 @@ pub enum Event {
     Rejected,
     /// Оплата счёта: клиент прислал чек.
     ClientCheckSubmitted,
-    /// Оплата счёта: клиент оплатил наш счёт.
-    OurInvoicePaid,
     QuoteExpired {
         funds_received: bool,
     },
@@ -167,11 +168,8 @@ pub enum Event {
     CheckActivated {
         fully_funded: bool,
     },
-    /// Чек истёк, забран другим, Premium, подписка и т. п. — денег нет.
+    /// Чек истёк, забран другим, с паролем, Premium, подписка — денег нет.
     CheckRejected,
-    PasswordRequested,
-    PasswordSubmitted,
-    PasswordTimedOut,
     /// Таймаут или незнакомый ответ кошелька при активации.
     IntakeOutcomeUnknown,
     ReconciledReceived {
@@ -180,13 +178,16 @@ pub enum Event {
     ReconciledNotReceived,
     ReconciliationAmbiguous,
     Settle(Settlement),
+    /// Чек выплаты создан, ссылка у нас.
     PayoutConfirmed,
+    /// Не удалось создать чек или исход неясен — человеку, повторять вслепую нельзя.
     PayoutFailed,
     InvoicePaid,
     /// Счёт истёк или его оплатили до нашего нажатия.
     InvoiceUnpayable,
-    /// Нужен код-пароль, мини-приложение или исход нажатия неясен.
+    /// Исход нажатия «Оплатить» неясен — человеку.
     InvoicePayNeedsHuman,
+    /// Чек возврата создан.
     RefundConfirmed,
     RefundFailed,
     Operator(OperatorAction),
@@ -199,11 +200,7 @@ impl Event {
             Event::LinkAccepted,
             Event::Rejected,
             Event::ClientCheckSubmitted,
-            Event::OurInvoicePaid,
             Event::CheckRejected,
-            Event::PasswordRequested,
-            Event::PasswordSubmitted,
-            Event::PasswordTimedOut,
             Event::IntakeOutcomeUnknown,
             Event::ReconciledNotReceived,
             Event::ReconciliationAmbiguous,
@@ -242,25 +239,33 @@ impl Event {
     }
 }
 
-/// Вид операции outbox (`operations.kind`).
+/// Вид операции outbox (`operations.kind`). Все операции выполняет юзербот.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum OpKind {
+    /// `/start <параметр чека>` боту кошелька. Повтор безопасен: второй раз чек не зачислят.
     ActivateCheck,
-    SubmitCheckPassword,
+    /// Оплатить чужой счёт (кнопки бота, для CryptoBot — мини-приложение и PIN).
+    /// Без ключа идемпотентности: одна попытка, дальше сверка или человек.
     PayInvoice,
-    PayoutTransfer,
-    RefundTransfer,
+    /// Создать чек выплаты на платформе назначения. Одна попытка.
+    CreatePayoutCheck,
+    /// Создать чек возврата на платформе входа. Одна попытка.
+    CreateRefundCheck,
 }
 
 impl OpKind {
     pub const fn as_db_str(self) -> &'static str {
         match self {
             OpKind::ActivateCheck => "activate_check",
-            OpKind::SubmitCheckPassword => "submit_check_password",
             OpKind::PayInvoice => "pay_invoice",
-            OpKind::PayoutTransfer => "payout_transfer",
-            OpKind::RefundTransfer => "refund_transfer",
+            OpKind::CreatePayoutCheck => "create_payout_check",
+            OpKind::CreateRefundCheck => "create_refund_check",
         }
+    }
+
+    /// Можно ли повторить операцию, исход которой неизвестен (SPEC §10.5.4).
+    pub const fn retry_is_safe(self) -> bool {
+        matches!(self, OpKind::ActivateCheck)
     }
 }
 
@@ -302,15 +307,10 @@ pub enum PostingKind {
 }
 
 /// Побочный эффект перехода. Все эффекты выполняются в той же транзакции БД, что и переход;
-/// сетевые вызовы делает outbox-воркер после коммита.
+/// действия юзербота выполняет outbox-воркер после коммита.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Effect {
-    /// Создать операцию outbox. Для `Settle` движок переиспользует незавершённую операцию
-    /// того же вида с тем же ключом идемпотентности (SPEC §10.5.2).
-    Operation {
-        kind: OpKind,
-        role: MoneyRole,
-    },
+    Operation { kind: OpKind, role: MoneyRole },
     Hold(HoldAction),
     Post(PostingKind),
 }
@@ -335,25 +335,20 @@ pub enum FsmError {
 }
 
 /// Все разрешённые переходы — 1:1 с `order_state_transitions` в `schema.sql`.
-pub const ALLOWED: [(OrderState, OrderState); 36] = {
+pub const ALLOWED: [(OrderState, OrderState); 31] = {
     use OrderState::*;
     [
         (New, Rejected),
         (New, IntakePending),
         (New, AwaitingFunds),
         (AwaitingFunds, IntakePending),
-        (AwaitingFunds, Received),
         (AwaitingFunds, Expired),
         (AwaitingFunds, Cancelled),
         (AwaitingFunds, RefundPending),
         (IntakePending, Received),
         (IntakePending, IntakeFailed),
-        (IntakePending, AwaitingPassword),
         (IntakePending, IntakeUnknown),
         (IntakePending, AwaitingFunds),
-        (AwaitingPassword, IntakePending),
-        (AwaitingPassword, IntakeFailed),
-        (AwaitingPassword, AwaitingFunds),
         (IntakeUnknown, Received),
         (IntakeUnknown, IntakeFailed),
         (IntakeUnknown, ManualReview),
@@ -401,7 +396,7 @@ pub fn transition(flow: Flow, state: OrderState, event: Event) -> Result<Transit
     let refund = || {
         vec![
             Hold(HoldAction::Release),
-            op(OpKind::RefundTransfer, MoneyRole::Settle),
+            op(OpKind::CreateRefundCheck, MoneyRole::Settle),
         ]
     };
 
@@ -422,9 +417,6 @@ pub fn transition(flow: Flow, state: OrderState, event: Event) -> Result<Transit
             S::IntakePending,
             vec![op(OpKind::ActivateCheck, MoneyRole::Intake)],
         )),
-        (S::AwaitingFunds, Invoice, E::OurInvoicePaid) => {
-            Some((S::Received, vec![Post(PostingKind::Intake)]))
-        }
         (
             S::AwaitingFunds,
             Invoice,
@@ -446,18 +438,7 @@ pub fn transition(flow: Flow, state: OrderState, event: Event) -> Result<Transit
             },
         ) => Some((S::AwaitingFunds, vec![Post(PostingKind::Intake)])),
         (S::IntakePending, _, E::CheckRejected) => Some(intake_lost(flow)),
-        (S::IntakePending, _, E::PasswordRequested) => Some((S::AwaitingPassword, vec![])),
         (S::IntakePending, _, E::IntakeOutcomeUnknown) => Some((S::IntakeUnknown, vec![])),
-
-        (S::AwaitingPassword, _, E::PasswordSubmitted) => Some((
-            S::IntakePending,
-            vec![op(OpKind::SubmitCheckPassword, MoneyRole::Intake)],
-        )),
-        // Отмена ввода пароля бросает только этот чек; деньги, пришедшие раньше
-        // (доплата по счёту), остаются в заявке, и она возвращается в AWAITING_FUNDS.
-        (S::AwaitingPassword, _, E::PasswordTimedOut | E::ClientCancelled { .. }) => {
-            Some(intake_lost(flow))
-        }
 
         (S::IntakeUnknown, _, E::ReconciledReceived { fully_funded: true }) => {
             Some((S::Received, vec![Post(PostingKind::Intake)]))
@@ -476,7 +457,7 @@ pub fn transition(flow: Flow, state: OrderState, event: Event) -> Result<Transit
             S::PayoutPending,
             vec![
                 Hold(HoldAction::ShrinkToPayout),
-                op(OpKind::PayoutTransfer, MoneyRole::Settle),
+                op(OpKind::CreatePayoutCheck, MoneyRole::Settle),
             ],
         )),
         (S::Received, Invoice, E::Settle(Settlement::PayInvoice)) => Some((
@@ -506,7 +487,7 @@ pub fn transition(flow: Flow, state: OrderState, event: Event) -> Result<Transit
 
         (S::ManualReview, Check, E::Operator(OperatorAction::RetryPayout)) => Some((
             S::PayoutPending,
-            vec![op(OpKind::PayoutTransfer, MoneyRole::Settle)],
+            vec![op(OpKind::CreatePayoutCheck, MoneyRole::Settle)],
         )),
         (S::ManualReview, Invoice, E::Operator(OperatorAction::RetryInvoicePayment)) => Some((
             S::InvoicePayPending,
@@ -562,7 +543,10 @@ mod tests {
         for s in OrderState::ALL {
             assert_eq!(s.as_db_str().parse::<OrderState>(), Ok(s));
         }
-        assert!("PAYOUT_UNKNOWN".parse::<OrderState>().is_err());
+        assert!(
+            "AWAITING_PASSWORD".parse::<OrderState>().is_err(),
+            "password flow was removed in v0.2"
+        );
     }
 
     #[test]
@@ -616,6 +600,14 @@ mod tests {
     fn spec_paths() {
         use Flow::{CheckExchange as C, InvoicePayment as I};
         use HoldAction as H;
+        let payout_op = Operation {
+            kind: OpKind::CreatePayoutCheck,
+            role: MoneyRole::Settle,
+        };
+        let refund_op = Operation {
+            kind: OpKind::CreateRefundCheck,
+            role: MoneyRole::Settle,
+        };
         let cases: Vec<(Flow, OrderState, Event, OrderState, Vec<Effect>)> = vec![
             (
                 C,
@@ -642,13 +634,7 @@ mod tests {
                 S::Received,
                 Event::Settle(Settlement::Payout),
                 S::PayoutPending,
-                vec![
-                    Hold(H::ShrinkToPayout),
-                    Operation {
-                        kind: OpKind::PayoutTransfer,
-                        role: MoneyRole::Settle,
-                    },
-                ],
+                vec![Hold(H::ShrinkToPayout), payout_op],
             ),
             (
                 C,
@@ -669,13 +655,7 @@ mod tests {
                 S::Received,
                 Event::Settle(Settlement::Refund),
                 S::RefundPending,
-                vec![
-                    Hold(H::Release),
-                    Operation {
-                        kind: OpKind::RefundTransfer,
-                        role: MoneyRole::Settle,
-                    },
-                ],
+                vec![Hold(H::Release), refund_op],
             ),
             (
                 C,
@@ -683,6 +663,13 @@ mod tests {
                 Event::RefundConfirmed,
                 S::Refunded,
                 vec![Post(PostingKind::Refund)],
+            ),
+            (
+                C,
+                S::PayoutPending,
+                Event::PayoutFailed,
+                S::ManualReview,
+                vec![],
             ),
             (
                 I,
@@ -714,13 +701,7 @@ mod tests {
                     funds_received: true,
                 },
                 S::RefundPending,
-                vec![
-                    Hold(H::Release),
-                    Operation {
-                        kind: OpKind::RefundTransfer,
-                        role: MoneyRole::Settle,
-                    },
-                ],
+                vec![Hold(H::Release), refund_op],
             ),
             (
                 I,
@@ -786,6 +767,19 @@ mod tests {
         }
     }
 
+    /// Деньги уходят только чеком юзербота, и такие операции нельзя повторять вслепую.
+    #[test]
+    fn money_out_operations_are_single_attempt() {
+        for kind in [
+            OpKind::PayInvoice,
+            OpKind::CreatePayoutCheck,
+            OpKind::CreateRefundCheck,
+        ] {
+            assert!(!kind.retry_is_safe(), "{kind:?}");
+        }
+        assert!(OpKind::ActivateCheck.retry_is_safe());
+    }
+
     /// Поток определяет, какие расчёты возможны: обмен не платит счёт и наоборот.
     #[test]
     fn settlement_must_match_flow() {
@@ -823,6 +817,7 @@ mod tests {
             )
             .is_err()
         );
+        assert!(transition(Flow::CheckExchange, S::New, Event::ClientCheckSubmitted).is_err());
     }
 
     /// После прихода денег заявку нельзя «просто закрыть»: только выплата, возврат или человек.

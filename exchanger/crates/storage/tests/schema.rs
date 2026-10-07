@@ -29,7 +29,7 @@ async fn db_transition_table_equals_domain_fsm(pool: PgPool) {
         .into_iter()
         .collect();
     let code: BTreeSet<_> = domain::fsm::ALLOWED.into_iter().collect();
-    assert_eq!(db.len(), 36);
+    assert_eq!(db.len(), domain::fsm::ALLOWED.len());
     assert_eq!(
         db, code,
         "order_state_transitions and domain::fsm::ALLOWED diverged"

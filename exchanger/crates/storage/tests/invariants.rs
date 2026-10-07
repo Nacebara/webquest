@@ -11,7 +11,7 @@ use sqlx::{PgPool, Row};
 async fn insert_order(pool: &PgPool, state: &str, check: &str) -> i64 {
     sqlx::query(
         "INSERT INTO orders (user_id, direction, asset, intake_method, intake_platform, intake_start_param, state)
-         VALUES ($1, 'xr_to_cb_check', 'USDT', 'check', 'xrocket', $2, $3) RETURNING id",
+         VALUES ($1, 'cb_to_xr_check', 'USDT', 'check', 'cryptobot', $2, $3) RETURNING id",
     )
     .bind(CLIENT)
     .bind(check)
@@ -68,7 +68,7 @@ async fn one_live_order_per_check(pool: PgPool) {
     insert_order(&pool, "INTAKE_PENDING", "mc_abc").await;
     let err = sqlx::query(
         "INSERT INTO orders (user_id, direction, asset, intake_method, intake_platform, intake_start_param, state)
-         VALUES ($1, 'xr_to_cb_check', 'USDT', 'check', 'xrocket', 'mc_abc', 'INTAKE_PENDING')",
+         VALUES ($1, 'cb_to_xr_check', 'USDT', 'check', 'cryptobot', 'mc_abc', 'INTAKE_PENDING')",
     )
     .bind(CLIENT)
     .execute(&pool)
@@ -85,7 +85,7 @@ async fn one_live_order_per_check(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn unbalanced_ledger_tx_is_rejected_on_commit(pool: PgPool) {
     setup(&pool).await;
-    let xr = account(&pool, "asset:xr:personal:USDT").await;
+    let xr = account(&pool, "asset:cb:USDT").await;
     let payable = account(&pool, "liability:payable:USDT").await;
     let mut tx = pool.begin().await.unwrap();
     let tx_id: i64 =
@@ -113,7 +113,7 @@ async fn unbalanced_ledger_tx_is_rejected_on_commit(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn entry_asset_must_match_account(pool: PgPool) {
     setup(&pool).await;
-    let xr = account(&pool, "asset:xr:personal:USDT").await;
+    let xr = account(&pool, "asset:cb:USDT").await;
     let mut tx = pool.begin().await.unwrap();
     let tx_id: i64 =
         sqlx::query("INSERT INTO ledger_transactions (kind) VALUES ('intake') RETURNING id")
@@ -143,24 +143,24 @@ async fn second_settle_operation_is_rejected(pool: PgPool) {
     let order = insert_order(&pool, "INTAKE_PENDING", "mc_settle").await;
     Op {
         order,
-        kind: "payout_transfer",
+        kind: "create_payout_check",
         role: "settle",
-        via: "api",
+        via: "userbot",
         key: "ord-1-payout",
         start_param: None,
-        max_attempts: 8,
+        max_attempts: 1,
     }
     .insert(&pool)
     .await
     .unwrap();
     let err = Op {
         order,
-        kind: "refund_transfer",
+        kind: "create_refund_check",
         role: "settle",
-        via: "api",
+        via: "userbot",
         key: "ord-1-refund",
         start_param: None,
-        max_attempts: 8,
+        max_attempts: 1,
     }
     .insert(&pool)
     .await
@@ -178,12 +178,12 @@ async fn second_settle_operation_is_rejected(pool: PgPool) {
         .unwrap();
     Op {
         order,
-        kind: "refund_transfer",
+        kind: "create_refund_check",
         role: "settle",
-        via: "api",
+        via: "userbot",
         key: "ord-1-refund",
         start_param: None,
-        max_attempts: 8,
+        max_attempts: 1,
     }
     .insert(&pool)
     .await
@@ -200,7 +200,7 @@ async fn idempotency_key_is_globally_unique(pool: PgPool) {
         order: a,
         kind: "read_balance",
         role: "aux",
-        via: "api",
+        via: "userbot",
         key: "same-key-1",
         start_param: None,
         max_attempts: 8,
@@ -212,7 +212,7 @@ async fn idempotency_key_is_globally_unique(pool: PgPool) {
         order: b,
         kind: "read_balance",
         role: "aux",
-        via: "api",
+        via: "userbot",
         key: "same-key-1",
         start_param: None,
         max_attempts: 8,
@@ -227,40 +227,53 @@ async fn idempotency_key_is_globally_unique(pool: PgPool) {
     );
 }
 
-/// Действия юзербота без ключа идемпотентности нельзя ретраить вслепую (SPEC §10.5.4).
+/// Действия юзербота, которые выводят деньги, — одна попытка: у кошелька нет ключа
+/// идемпотентности, повтор вслепую может выплатить дважды (SPEC §10.5.4).
 #[sqlx::test(migrator = "storage::MIGRATOR")]
-async fn userbot_pay_invoice_must_be_single_attempt(pool: PgPool) {
+async fn money_out_operations_must_be_single_attempt(pool: PgPool) {
     setup(&pool).await;
     let order = insert_order(&pool, "INTAKE_PENDING", "mc_pay").await;
-    let err = Op {
-        order,
-        kind: "pay_invoice",
-        role: "aux",
-        via: "userbot",
-        key: "ord-1-pay",
-        start_param: None,
-        max_attempts: 5,
+    for (i, kind) in [
+        "pay_invoice",
+        "create_payout_check",
+        "create_refund_check",
+        "create_excess_check",
+        "withdrawal",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let key = format!("ord-1-out-{i}");
+        let err = Op {
+            order,
+            kind,
+            role: "aux",
+            via: "userbot",
+            key: &key,
+            start_param: None,
+            max_attempts: 5,
+        }
+        .insert(&pool)
+        .await
+        .unwrap_err();
+        assert!(
+            db_error_text(&err).contains("operations_check1"),
+            "{kind}: {}",
+            db_error_text(&err)
+        );
+        Op {
+            order,
+            kind,
+            role: "aux",
+            via: "userbot",
+            key: &key,
+            start_param: None,
+            max_attempts: 1,
+        }
+        .insert(&pool)
+        .await
+        .unwrap();
     }
-    .insert(&pool)
-    .await
-    .unwrap_err();
-    assert!(
-        db_error_text(&err).contains("operations_check1"),
-        "{}",
-        db_error_text(&err)
-    );
-    Op {
-        order,
-        kind: "pay_invoice",
-        role: "aux",
-        via: "userbot",
-        key: "ord-1-pay",
-        start_param: None,
-        max_attempts: 1,
-    }
-    .insert(&pool)
-    .await
-    .unwrap();
 }
 
 /// Один чек никогда не активируется двумя операциями.
@@ -323,7 +336,7 @@ async fn ledger_and_journals_are_append_only(pool: PgPool) {
 async fn one_active_hold_per_order(pool: PgPool) {
     setup(&pool).await;
     let order = insert_order(&pool, "INTAKE_PENDING", "mc_hold").await;
-    let wallet: i16 = sqlx::query("SELECT id FROM wallet_accounts WHERE label = 'cb:app'")
+    let wallet: i16 = sqlx::query("SELECT id FROM wallet_accounts WHERE label = 'xr'")
         .fetch_one(&pool)
         .await
         .unwrap()

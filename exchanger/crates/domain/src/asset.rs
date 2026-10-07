@@ -1,4 +1,4 @@
-//! Активы, платформы и кошельки (SPEC §1.7, §3.1).
+//! Активы, платформы и кошельки (SPEC §1.7, §3.1; v0.2 — один личный кошелёк на платформу).
 
 use std::fmt;
 use std::str::FromStr;
@@ -85,45 +85,10 @@ impl Platform {
     }
 }
 
-/// Личный баланс аккаунта (юзербот) или баланс приложения (API).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum WalletKind {
-    Personal,
-    App,
-}
-
-impl WalletKind {
-    pub const fn db_name(self) -> &'static str {
-        match self {
-            WalletKind::Personal => "personal",
-            WalletKind::App => "app",
-        }
-    }
-}
-
-/// Один из четырёх кошельков (SPEC §3.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct WalletRef {
-    pub platform: Platform,
-    pub kind: WalletKind,
-}
-
-impl WalletRef {
-    pub const fn new(platform: Platform, kind: WalletKind) -> Self {
-        Self { platform, kind }
-    }
-
-    pub const ALL: [WalletRef; 4] = [
-        WalletRef::new(Platform::CryptoBot, WalletKind::Personal),
-        WalletRef::new(Platform::CryptoBot, WalletKind::App),
-        WalletRef::new(Platform::XRocket, WalletKind::Personal),
-        WalletRef::new(Platform::XRocket, WalletKind::App),
-    ];
-
-    /// Метка как в `wallet_accounts.label`: `cb:personal`, `xr:app`.
-    pub fn label(self) -> String {
-        format!("{}:{}", self.platform.short(), self.kind.db_name())
-    }
+/// Кошелёк сервиса на платформе — личный баланс аккаунта юзербота (SPEC v0.2: только юзербот,
+/// API кошельков не используем). Метка как в `wallet_accounts.label`: `cb`, `xr`.
+pub const fn wallet_label(platform: Platform) -> &'static str {
+    platform.short()
 }
 
 #[cfg(test)]
@@ -148,8 +113,8 @@ mod tests {
 
     #[test]
     fn wallet_labels_match_schema() {
-        let labels: Vec<String> = WalletRef::ALL.iter().map(|w| w.label()).collect();
-        assert_eq!(labels, ["cb:personal", "cb:app", "xr:personal", "xr:app"]);
+        assert_eq!(wallet_label(Platform::CryptoBot), "cb");
+        assert_eq!(wallet_label(Platform::XRocket), "xr");
     }
 
     #[test]

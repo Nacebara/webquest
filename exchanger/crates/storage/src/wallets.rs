@@ -1,7 +1,7 @@
-//! Аккаунты юзерботов и четыре кошелька (SPEC §3.1). Наполнение — при подключении
-//! аккаунтов (веха M3); здесь — идемпотентное создание записей.
+//! Аккаунты юзерботов и их кошельки: по одному активному на платформу (SPEC v0.2 §3.1).
+//! Наполнение — при подключении аккаунтов (`exch login`); здесь — идемпотентное создание.
 
-use domain::{WalletKind, WalletRef};
+use domain::{Platform, wallet_label};
 use sqlx::PgConnection;
 
 use crate::error::StorageError;
@@ -26,22 +26,20 @@ pub async fn ensure_userbot(
     Ok(id)
 }
 
-/// Кошелёк по метке `cb:app` и т. п. Для личного кошелька обязателен аккаунт юзербота.
+/// Активный кошелёк платформы (метка `cb` / `xr`) — баланс аккаунта `userbot_id`.
 pub async fn ensure_wallet(
     conn: &mut PgConnection,
-    wallet: WalletRef,
-    userbot_id: Option<i16>,
+    platform: Platform,
+    userbot_id: i16,
 ) -> Result<i16, StorageError> {
-    debug_assert_eq!(wallet.kind == WalletKind::Personal, userbot_id.is_some());
     let id = sqlx::query_scalar!(
         r#"
-        INSERT INTO wallet_accounts (platform, kind, label, userbot_id) VALUES ($1, $2, $3, $4)
+        INSERT INTO wallet_accounts (platform, label, userbot_id) VALUES ($1, $2, $3)
         ON CONFLICT (label) DO UPDATE SET userbot_id = EXCLUDED.userbot_id
         RETURNING id
         "#,
-        wallet.platform.db_name(),
-        wallet.kind.db_name(),
-        wallet.label(),
+        platform.db_name(),
+        wallet_label(platform),
         userbot_id,
     )
     .fetch_one(conn)
