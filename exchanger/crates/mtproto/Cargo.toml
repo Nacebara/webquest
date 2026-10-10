@@ -1,0 +1,46 @@
+[package]
+name = "mtproto"
+description = "Настоящий транспорт юзербота: MTProto через grammers 0.10, зашифрованная сессия, вход (DESIGN v0.2 §4)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait = "0.1.92"
+# XChaCha20-Poly1305 для сессии в БД (SPEC §10, CLAUDE.md п. 13); zeroize — ключ шифра стирается при drop.
+chacha20poly1305 = { version = "0.11.0", features = ["zeroize"] }
+domain.workspace = true
+# grammers закреплён точной версией с crates.io (слой TL 227). Тяжёлые зависимости MTProto —
+# только в этом крейте: userbot и engine знают лишь трейт userbot::Transport.
+grammers-client = { version = "=0.10.0", default-features = false }
+grammers-mtsender = { version = "=0.10.0" }
+grammers-session = { version = "=0.10.0", default-features = false }
+grammers-tl-types = { version = "=0.10.0" }
+# grammers-crypto 0.10.0 требует glass_pumpkin "2.0.0-rc0", а под это условие подходит и
+# 2.0.0-rc1 с несовместимым API (сборка падает). Закрепляем rc0 явно.
+glass_pumpkin = "=2.0.0-rc0"
+# Пароль 2FA при `exch login` вводится без эха.
+rpassword = "7.5"
+secrecy.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+url = "2.5"
+userbot = { path = "../userbot" }
+zeroize = { version = "1.8", features = ["std"] }
+
+[dev-dependencies]
+# Поддельный сервер MTProto в tests/support (шифрование на стороне сервера, транспорт Full)
+# и ошибки транспорта для тестов отображения ошибок. Все — уже в дереве через grammers.
+grammers-crypto = "=0.10.0"
+grammers-mtproto = "=0.10.0"
+grammers-tl-types = { version = "=0.10.0", features = ["deserializable-functions"] }
+sha1 = "0.11"
+sha2 = "0.11"
+tokio = { workspace = true, features = ["test-util", "net", "io-util"] }
+
+[lints]
+workspace = true
