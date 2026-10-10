@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 9ad0c81309e6a8340ae250ade859449996ab73d0d362f9e7c7285b3916b9889c # shrinks to planted = [(WalletLink { platform: CryptoBot, kind: Check, param: "CQ0aa0aa_-_A" }, 0, false)], before = "", seps = [(" ", "."), (" ", " "), (" ", " "), (" ", " "), (" ", " "), (" ", " ")], fillers = ["Чек", "", "", "", "", ""]
+cc 1ee5700a6d0345a222d3d05d360a976e1718f82fec2fb7bbb38de8a1f43cf864 # shrinks to planted = [(WalletLink { platform: CryptoBot, kind: Check, param: "CQaaA00A0_-A" }, 0, false), (WalletLink { platform: CryptoBot, kind: Check, param: "CQaAaaAA0Aa0" }, 9, false)], before = "", seps = [(" ", " "), (" ", "."), (" ", " "), (" ", " "), (" ", " "), (" ", " ")], fillers = ["", "Чек", "", "", "", ""]

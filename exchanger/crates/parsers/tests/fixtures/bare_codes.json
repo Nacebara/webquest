@@ -1,0 +1,16 @@
+{
+  "about": "Голые коды чеков без ссылки (parse_bare_code): клиент прислал только код. Счета голыми не принимаются. Без поля ok — ожидается None.",
+  "cases": [
+    { "input": "CQAbCdEfGhIj", "ok": { "platform": "cryptobot", "kind": "check", "param": "CQAbCdEfGhIj" } },
+    { "input": "  CQAbCdEfGhIj.\n", "ok": { "platform": "cryptobot", "kind": "check", "param": "CQAbCdEfGhIj" } },
+    { "input": "«t_val6vkkTbAbxd06»", "ok": { "platform": "xrocket", "kind": "check", "param": "t_val6vkkTbAbxd06" } },
+    { "input": "mci_fdraQh70UOwz3nu", "ok": { "platform": "xrocket", "kind": "check", "param": "mci_fdraQh70UOwz3nu" } },
+    { "input": "mc_VhxQyBOeQXDmHAX", "ok": { "platform": "xrocket", "kind": "check", "param": "mc_VhxQyBOeQXDmHAX" } },
+    { "input": "mc_ABCDEFGHIJ" },
+    { "input": "CQabc" },
+    { "input": "IVdixIeFSdqP" },
+    { "input": "inv_C9QiNcpEbXyZ" },
+    { "input": "вот чек CQAbCdEfGhIj" },
+    { "input": "" }
+  ]
+}

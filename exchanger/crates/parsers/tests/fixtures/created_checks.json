@@ -1,0 +1,59 @@
+{
+  "about": "Сообщения с чеком, созданным юзерботом (parse_created_check): инлайн-сообщение в «Избранном» (ссылка в URL-кнопке) и ответ меню бота (ссылка в тексте). Тексты синтетические: точный вид проверить в M0 (DESIGN-v0.2 §8, п. 2). expect: {url, param, money: [сумма, актив] | null} или null.",
+  "cases": [
+    {
+      "platform": "cryptobot",
+      "text": "🦋 Чек на 10 USDT ($10.00)",
+      "buttons": [ "https://t.me/send?start=CQAbCdEfGhIj" ],
+      "expect": { "url": "https://t.me/send?start=CQAbCdEfGhIj", "param": "CQAbCdEfGhIj", "money": ["10", "USDT"] }
+    },
+    {
+      "platform": "cryptobot",
+      "text": "🦋 Check for 2.5 USDT",
+      "buttons": [ "https://t.me/CryptoBot?start=CQAbCdEfGhIj" ],
+      "expect": { "url": "https://t.me/send?start=CQAbCdEfGhIj", "param": "CQAbCdEfGhIj", "money": ["2.5", "USDT"] }
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Чек создан.\n\nСумма: 10 USDT\nСсылка: https://t.me/send?start=CQAbCdEfGhIj",
+      "buttons": [],
+      "expect": { "url": "https://t.me/send?start=CQAbCdEfGhIj", "param": "CQAbCdEfGhIj", "money": ["10", "USDT"] }
+    },
+    {
+      "platform": "xrocket",
+      "text": "🚀 Чек на 10 USDT",
+      "buttons": [ "https://t.me/xrocket?start=t_val6vkkTbAbxd06" ],
+      "expect": { "url": "https://t.me/xrocket?start=t_val6vkkTbAbxd06", "param": "t_val6vkkTbAbxd06", "money": ["10", "USDT"] }
+    },
+    {
+      "platform": "xrocket",
+      "text": "Персональный чек создан!\nhttps://t.me/xrocket?start=t_ABCDEFGHIJKLMNO",
+      "buttons": [],
+      "expect": { "url": "https://t.me/xrocket?start=t_ABCDEFGHIJKLMNO", "param": "t_ABCDEFGHIJKLMNO", "money": null }
+    },
+    {
+      "platform": "cryptobot",
+      "text": "🚀 Чек на 10 USDT",
+      "buttons": [ "https://t.me/xrocket?start=t_val6vkkTbAbxd06" ],
+      "expect": null
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Счёт: https://t.me/send?start=IVdixIeFSdqP",
+      "buttons": [],
+      "expect": null
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Два чека: t.me/send?start=CQAbCdEfGhIj и t.me/send?start=CQzzzzzzzzzz",
+      "buttons": [],
+      "expect": null
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Недостаточно средств",
+      "buttons": [],
+      "expect": null
+    }
+  ]
+}

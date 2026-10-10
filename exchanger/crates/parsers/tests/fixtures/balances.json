@@ -1,0 +1,35 @@
+{
+  "about": "Экран «Кошелёк» (parse_balance). Тексты синтетические: живые экраны собрать в M0. Построчно «Название: 10.5 USDT» или «USDT: 10.5»; актив с разными суммами в двух строках не возвращается. expect: список [сумма, актив] по порядку.",
+  "cases": [
+    {
+      "platform": "cryptobot",
+      "text": "👛 Кошелёк\n\nTether: 10.5 USDT\n≈ $10.50\nToncoin: 1.2 TON\n≈ $3.00\nBitcoin: 0 BTC",
+      "expect": [ ["10.5", "USDT"], ["1.2", "TON"] ]
+    },
+    {
+      "platform": "cryptobot",
+      "text": "Wallet\n\nUSDT: 0\nTON: 0.000000001",
+      "expect": [ ["0", "USDT"], ["0.000000001", "TON"] ]
+    },
+    {
+      "platform": "xrocket",
+      "text": "💎 TONCOIN: 0.5\n💵 USDT: 1 234,56\n🐸 NOT: 100",
+      "expect": [ ["0.5", "TON"], ["1234.56", "USDT"] ]
+    },
+    {
+      "platform": "xrocket",
+      "text": "Баланс\nUSDT: 10\nUSDT: 12\nTON: 1",
+      "expect": [ ["1", "TON"] ]
+    },
+    {
+      "platform": "cryptobot",
+      "text": "USDT: 1,234",
+      "expect": []
+    },
+    {
+      "platform": "cryptobot",
+      "text": "",
+      "expect": []
+    }
+  ]
+}
