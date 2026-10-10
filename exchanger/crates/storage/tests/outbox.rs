@@ -114,8 +114,15 @@ async fn operation_lifecycle_claim_finish_release_retry(pool: PgPool) {
     .unwrap();
     // Итог записан — второй раз нельзя.
     assert!(matches!(
-        storage::operations::finish(&mut conn, activate, OpStatus::Failed, &json!({}), None, None)
-            .await,
+        storage::operations::finish(
+            &mut conn,
+            activate,
+            OpStatus::Failed,
+            &json!({}),
+            None,
+            None
+        )
+        .await,
         Err(StorageError::OperationState(_))
     ));
 
@@ -172,9 +179,12 @@ async fn one_live_settle_per_order_and_one_activation_per_check(pool: PgPool) {
     let id = order(&pool, "CQAbCdEfGhIj").await;
     let (cb, xr) = (wallet(&pool, CB).await, wallet(&pool, XR).await);
     let mut conn = pool.acquire().await.unwrap();
-    storage::operations::insert(&mut conn, &op(id, OpKind::CreatePayoutCheck, "ord-1-payout-1", xr))
-        .await
-        .unwrap();
+    storage::operations::insert(
+        &mut conn,
+        &op(id, OpKind::CreatePayoutCheck, "ord-1-payout-1", xr),
+    )
+    .await
+    .unwrap();
     let second = storage::operations::insert(
         &mut conn,
         &op(id, OpKind::CreatePayoutCheck, "ord-1-payout-2", xr),
@@ -182,9 +192,12 @@ async fn one_live_settle_per_order_and_one_activation_per_check(pool: PgPool) {
     .await;
     assert!(second.is_err(), "вторая живая выплата по заявке");
 
-    storage::operations::insert(&mut conn, &op(id, OpKind::ActivateCheck, "ord-1-intake-1", cb))
-        .await
-        .unwrap();
+    storage::operations::insert(
+        &mut conn,
+        &op(id, OpKind::ActivateCheck, "ord-1-intake-1", cb),
+    )
+    .await
+    .unwrap();
     let other = order(&pool, "CQzzzzzzzzzz").await;
     let same_check = storage::operations::insert(
         &mut conn,
@@ -219,7 +232,9 @@ async fn holds_never_exceed_the_reserve(pool: PgPool) {
     tx.commit().await.unwrap();
 
     let mut conn = pool.acquire().await.unwrap();
-    storage::holds::shrink(&mut conn, a, dec!(97.5)).await.unwrap();
+    storage::holds::shrink(&mut conn, a, dec!(97.5))
+        .await
+        .unwrap();
     assert!(matches!(
         storage::holds::shrink(&mut conn, a, dec!(98)).await,
         Err(StorageError::HoldState(_))
