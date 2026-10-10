@@ -35,11 +35,11 @@ pub struct Config {
     pub owner_tg_id: i64,
     pub client_bot_token: Option<SecretString>,
     pub ops_bot_token: Option<SecretString>,
-    pub cryptopay_token: Option<SecretString>,
-    pub xrocket_pay_token: Option<SecretString>,
     pub tg_api_id: Option<i32>,
     pub tg_api_hash: Option<SecretString>,
     pub session_key: Option<SessionKey>,
+    /// PIN CryptoBot для оплаты счетов в мини-приложении (DESIGN-v0.2, Р4).
+    pub cryptobot_pin: Option<SecretString>,
     pub cryptobot_peer_id: Option<i64>,
     pub xrocket_peer_id: Option<i64>,
     pub healthcheck_url: Option<String>,
@@ -82,11 +82,10 @@ impl Config {
             owner_tg_id,
             client_bot_token: secret("CLIENT_BOT_TOKEN"),
             ops_bot_token: secret("OPS_BOT_TOKEN"),
-            cryptopay_token: secret("CRYPTOPAY_TOKEN"),
-            xrocket_pay_token: secret("XROCKET_PAY_TOKEN"),
             tg_api_id: parse_num("TG_API_ID", get("TG_API_ID"))?,
             tg_api_hash: secret("TG_API_HASH"),
             session_key: get("SESSION_KEY").map(parse_session_key).transpose()?,
+            cryptobot_pin: secret("CRYPTOBOT_PIN"),
             cryptobot_peer_id: parse_num("CRYPTOBOT_PEER_ID", get("CRYPTOBOT_PEER_ID"))?,
             xrocket_peer_id: parse_num("XROCKET_PEER_ID", get("XROCKET_PEER_ID"))?,
             healthcheck_url: get("HEALTHCHECK_URL"),
@@ -96,14 +95,13 @@ impl Config {
 
     /// Чего не хватает для следующих вех (без значений — только имена переменных).
     pub fn pending(&self) -> Vec<Pending> {
-        let checks: [(&'static str, &'static str, bool); 10] = [
-            ("CRYPTOPAY_TOKEN", "M2", self.cryptopay_token.is_some()),
-            ("XROCKET_PAY_TOKEN", "M2", self.xrocket_pay_token.is_some()),
-            ("TG_API_ID", "M3", self.tg_api_id.is_some()),
-            ("TG_API_HASH", "M3", self.tg_api_hash.is_some()),
-            ("SESSION_KEY", "M3", self.session_key.is_some()),
-            ("CRYPTOBOT_PEER_ID", "M3", self.cryptobot_peer_id.is_some()),
-            ("XROCKET_PEER_ID", "M3", self.xrocket_peer_id.is_some()),
+        // Вехи — docs/HANDOVER.md §5. Peer id ботов кошельков закреплены в `mtproto::config`;
+        // переменные `*_PEER_ID` — только для сверки, поэтому в этом списке их нет.
+        let checks: [(&'static str, &'static str, bool); 7] = [
+            ("TG_API_ID", "M2", self.tg_api_id.is_some()),
+            ("TG_API_HASH", "M2", self.tg_api_hash.is_some()),
+            ("SESSION_KEY", "M2", self.session_key.is_some()),
+            ("CRYPTOBOT_PIN", "M2", self.cryptobot_pin.is_some()),
             ("CLIENT_BOT_TOKEN", "M4", self.client_bot_token.is_some()),
             ("OPS_BOT_TOKEN", "M5", self.ops_bot_token.is_some()),
             ("HEALTHCHECK_URL", "M5", self.healthcheck_url.is_some()),
@@ -174,7 +172,7 @@ mod tests {
             "blank values count as unset"
         );
         assert_eq!(cfg.tz_owner, "UTC");
-        assert_eq!(cfg.pending().len(), 10);
+        assert_eq!(cfg.pending().len(), 7);
     }
 
     #[test]
@@ -226,9 +224,8 @@ mod tests {
             ("DATABASE_URL", "postgres://u:hunter2@db/exch"),
             ("CLIENT_BOT_TOKEN", "123:client-secret"),
             ("OPS_BOT_TOKEN", "456:ops-secret"),
-            ("CRYPTOPAY_TOKEN", "cp-secret"),
-            ("XROCKET_PAY_TOKEN", "xr-secret"),
             ("TG_API_HASH", "hash-secret"),
+            ("CRYPTOBOT_PIN", "918273"),
             ("SESSION_KEY", KEY_B64),
         ];
         let mut pairs = secrets.to_vec();
@@ -239,6 +236,6 @@ mod tests {
             assert!(!debug.contains(value), "{var} leaked in Debug output");
         }
         assert!(!debug.contains("hunter2"));
-        assert!(cfg.pending().iter().all(|p| p.var != "CRYPTOPAY_TOKEN"));
+        assert!(cfg.pending().iter().all(|p| p.var != "CRYPTOBOT_PIN"));
     }
 }
