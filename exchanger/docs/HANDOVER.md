@@ -13,7 +13,7 @@
    2. `docs/DESIGN-v0.2.md` — решения владельца, они главнее всего остального;
    3. `CLAUDE.md` — правила, которые нельзя нарушать;
    4. `docs/LOVEC-PORTING.md` §2–§3, §6, §8 — как боты кошельков отвечают и где ловушки.
-2. Поднять PostgreSQL и прогнать проверки (раздел 4). Должно быть зелёным: fmt, clippy, **308 тестов**, `sqlx prepare --check`.
+2. Поднять PostgreSQL и прогнать проверки (раздел 4). Должно быть зелёным: fmt, clippy, **348 тестов**, `sqlx prepare --check`.
 3. Взять первую невыполненную задачу из раздела 5 и работать по её критериям приёмки.
 
 `SPEC.md` (v0.1, 1 763 строки) читать как справочник по эксплуатации, админке, статистике и рискам. В нём устарели разделы про API кошельков, пароли и основной поток (раздел 3).
@@ -70,7 +70,7 @@ XR → CB — то же зеркально (инлайн `@send 97.5usdt`, ме�
 
 ## 2. Что готово
 
-**Проверки:** fmt, clippy `-D warnings`, 308 тестов (`cargo test --workspace --all-features`), `sqlx prepare --check` — зелёные. CI: `.github/workflows/exchanger-ci.yml` (в корне репозитория).
+**Проверки:** fmt, clippy `-D warnings`, 348 тестов (`cargo test --workspace --all-features`), `sqlx prepare --check` — зелёные. CI: `.github/workflows/exchanger-ci.yml` (в корне репозитория).
 
 | Часть | Где | Состояние | Что внутри |
 |---|---|---|---|
@@ -81,7 +81,7 @@ XR → CB — то же зеркально (инлайн `@send 97.5usdt`, ме�
 | Парсеры | `crates/parsers` | ✅ готово | Ссылки на чеки и счета во всех формах (антифишинг, тестнет, омоглифы), суммы и фиат, классификатор ответов на `/start` (12 классов, словари lovec), карточка счёта, ответ на оплату, баланс, созданный чек. Фикстуры — **синтетические**, по словарям lovec (настоящие тексты — M0) |
 | Контракты юзербота | `crates/userbot/src/transport.rs`, `wallet.rs` | ✅ готово | Трейт `Transport` (send_text, press, inline_query, send_inline, open_webapp, history, subscribe) и трейт `WalletBot` (activate_check, issue_check, find_issued_check, inspect_invoice, pay_invoice, balances) |
 | Симулятор кошельков | `crates/userbot/src/sim` (feature `sim`) | ✅ готово | `SimWorld` + `SimTransport`: оба бота, все классы ответов, инлайн-чеки, меню чеков, счета с мини-приложением и PIN, «Ваш чек активировал», входящие переводы, `random_id`-дубли, сбои (`inject`: таймаут до/после выполнения, разрыв, FLOOD_WAIT, задержка, «обработка» с правкой, незнакомый текст, молчание), виртуальное время |
-| Сценарии юзербота | `crates/userbot/src/flows` | ❌ **нет** | `UserbotWallet<T: Transport>` — главный недостающий кусок (задача M2.1) |
+| Сценарии юзербота | `crates/userbot/src/flows` | ✅ готово | `UserbotWallet<T: Transport>`: ворота аккаунта (темп, FLOOD_WAIT, карантин чата после неотвеченной команды), корреляция ответов по id, активация (повтор xRocket после «не найден»), выдача чека (метка операции в «Избранном», инлайн → меню), `find_issued_check` между метками, счета (xRocket — одно нажатие; CryptoBot — через `WebAppPayer`, без него `NeedsHuman`), баланс. 31 сценарный тест (`crates/userbot/tests/flows.rs`) |
 | MTProto-транспорт | `crates/mtproto` | ✅ офлайн / ❓ живьём | `GrammersTransport` на grammers `=0.10.0`: закреплённые боты, сверка при старте, ровно заданный `random_id`, без скрытых повторов, поток апдейтов, сторож и переподключение, шифрованная сессия (XChaCha20-Poly1305), помощник входа. Тесты против поддельного сервера MTProto. **Живьём не проверено ничего** (сеть к Telegram в среде разработки закрыта; список — в doc-комментарии `crates/mtproto/src/lib.rs`) |
 | Bot API клиент | `crates/botapi` | ✅ готово | Тонкий JSON-клиент по образцу lovec `bot_call`, типы Bot API 10.3 (`style`, `icon_custom_emoji_id`, `copy_text`, `sendRichMessage`), клавиатуры; HTTP за feature `client` |
 | Интерфейс клиента | `crates/ui` | ✅ готово | Все экраны (приветствие, курс и лимиты, обмен, инструкции, счёт, все шаги заявки, итоги, возвраты, ручной разбор, история, карточка заявки, помощь, поддержка, ошибки); главное меню; callback-данные; команды; тексты в `ui/ru.toml`; rich + HTML-фолбэк; 41 снимок `insta`; валидатор HTML |
@@ -125,7 +125,7 @@ cargo sqlx database create && cargo sqlx migrate run --source migrations
 
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-features          # 308 тестов; sqlx::test создаёт БД на каждый тест
+cargo test --workspace --all-features          # 348 тестов; sqlx::test создаёт БД на каждый тест
 cargo sqlx prepare --workspace --check -- --all-targets
 ```
 
@@ -151,7 +151,7 @@ cargo sqlx prepare --workspace --check -- --all-targets
 
 ### M2. Юзербот (сценарии, вход, запись ответов)
 
-**M2.1. `userbot::flows::UserbotWallet<T: Transport>`** — реализация `WalletBot`. Главная задача проекта. Спецификация — DESIGN-v0.2 §4, LOVEC-PORTING §3, §8, §9.
+**M2.1. `userbot::flows::UserbotWallet<T: Transport>`** — ✅ **сделано 10 октября** (описание ниже оставлено как спецификация того, что уже есть; код — `crates/userbot/src/flows/`, тесты — `crates/userbot/tests/flows.rs`). Что добавить позже: фоновый слушатель «непрошеных» сообщений (уведомления «Ваш чек активировал…», входящие переводы) вне операций — он нужен движку (M3) для журнала и отметки «клиент забрал чек».
 
 - *Актор аккаунта:* одно действие в полёте; не чаще 1 действия в 1,5 с; при `FloodWait(d)` — пауза всего аккаунта на `d`, вызовы до её конца сразу получают `BotError::FloodWait`.
 - *Корреляция:* подписка (`subscribe`) **до** отправки. Ответ — первое сообщение бота с id больше id нашей команды. Правки того же сообщения переклассифицируют. Промежуточное «обработка» ждёт дальше. `ClaimNotice` и `IncomingTransfer` не закрывают ожидание. Таймаут 30 с → `Unknown`. Каждое сообщение отдаётся наружу для сохранения в `wallet_messages` (колбэк или канал — до разбора).
