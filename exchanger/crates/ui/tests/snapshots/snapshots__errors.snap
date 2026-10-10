@@ -1,0 +1,407 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: errors.trim_end()
+---
+## not_check_or_invoice
+### plain
+--- html
+❌ Это не чек и не счёт. Пришлите ссылку вида <code>t.me/send?start=CQ…</code> или <code>t.me/xrocket?start=t_…</code>. Деньги не тронуты.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Это не чек и не счёт. Пришлите ссылку вида <code>t.me/send?start=CQ…</code> или <code>t.me/xrocket?start=t_…</code>. Деньги не тронуты.
+--- keyboard: none
+
+## foreign_bot
+### plain
+--- html
+❌ Ссылка ведёт не на официальный кошелёк (<code>CryptoBotX &lt;fake&gt; &amp; co</code>). Я её не открывал. Проверьте, у кого вы взяли чек.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Ссылка ведёт не на официальный кошелёк (<code>CryptoBotX &lt;fake&gt; &amp; co</code>). Я её не открывал. Проверьте, у кого вы взяли чек.
+--- keyboard: none
+
+## testnet
+### plain
+--- html
+❌ Это чек тестовой сети — он ничего не стоит, такие не принимаю. Пришлите обычный чек CryptoBot или xRocket.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Это чек тестовой сети — он ничего не стоит, такие не принимаю. Пришлите обычный чек CryptoBot или xRocket.
+--- keyboard: none
+
+## already_activated
+### plain
+--- html
+❌ Чек уже кто-то забрал. Деньги у того, кто открыл его первым, — я ничего не получил и ничего не списал. Попросите у отправителя новый чек.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Чек уже кто-то забрал. Деньги у того, кто открыл его первым, — я ничего не получил и ничего не списал. Попросите у отправителя новый чек.
+--- keyboard: none
+
+## not_found
+### plain
+--- html
+❌ Чек не найден — я ничего не получил. Если чек истёк или удалён, деньги вернулись тому, кто его создал. Если ссылка неполная — пришлите её целиком.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Чек не найден — я ничего не получил. Если чек истёк или удалён, деньги вернулись тому, кто его создал. Если ссылка неполная — пришлите её целиком.
+--- keyboard: none
+
+## not_for_us
+### plain
+--- html
+❌ Чек привязан к другому аккаунту — открыть его не могу. Деньги остались в чеке. Создайте чек без привязки.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Чек привязан к другому аккаунту — открыть его не могу. Деньги остались в чеке. Создайте чек без привязки.
+--- keyboard: none
+
+## not_for_us_bind
+### plain
+--- html
+❌ Чек привязан к другому аккаунту — открыть его не могу. Деньги остались в чеке. Создайте чек без привязки или на <code>@exch_cb</code>.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Чек привязан к другому аккаунту — открыть его не могу. Деньги остались в чеке. Создайте чек без привязки или на <code>@exch_cb</code>.
+--- keyboard: none
+
+## premium_only
+### plain
+--- html
+❌ Чек только для Telegram Premium — открыть его не могу. Деньги остались в чеке. Создайте обычный чек.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Чек только для Telegram Premium — открыть его не могу. Деньги остались в чеке. Создайте обычный чек.
+--- keyboard: none
+
+## subscription
+### plain
+--- html
+❌ Чек требует подписки на каналы — такие не принимаю. Деньги остались в чеке. Создайте чек без условий.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Чек требует подписки на каналы — такие не принимаю. Деньги остались в чеке. Создайте чек без условий.
+--- keyboard: none
+
+## captcha
+### plain
+--- html
+❌ Чек с капчей — такие не принимаю. Деньги остались в чеке. Создайте чек без капчи.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Чек с капчей — такие не принимаю. Деньги остались в чеке. Создайте чек без капчи.
+--- keyboard: none
+
+## password
+### plain
+--- html
+❌ Чек с паролем не принимаю — деньги остались в чеке. Создайте чек без пароля и пришлите его сюда.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Чек с паролем не принимаю — деньги остались в чеке. Создайте чек без пароля и пришлите его сюда.
+--- keyboard: none
+
+## multi_check
+### plain
+--- html
+❌ Это мульти-чек на нескольких получателей — принимаю только чек на одного. Деньги остались в чеке.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Это мульти-чек на нескольких получателей — принимаю только чек на одного. Деньги остались в чеке.
+--- keyboard: none
+
+## below_minimum
+### plain
+--- html
+⚠️ Чек на <code>1.50 USDT</code> — меньше минимума <code>2.00 USDT</code>. Верну деньги чеком CryptoBot — он придёт сюда.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000003">⚠️</tg-emoji> Чек на <code>1.50 USDT</code> — меньше минимума <code>2.00 USDT</code>. Верну деньги чеком CryptoBot — он придёт сюда.
+--- keyboard: none
+
+## above_maximum
+### plain
+--- html
+⚠️ Чек на <code>750.00 USDT</code> — больше текущего лимита <code>500.00 USDT</code>. Верну всё чеком CryptoBot, он придёт сюда. Разбейте сумму на части.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000003">⚠️</tg-emoji> Чек на <code>750.00 USDT</code> — больше текущего лимита <code>500.00 USDT</code>. Верну всё чеком CryptoBot, он придёт сюда. Разбейте сумму на части.
+--- keyboard: none
+
+## paused
+### plain
+--- html
+⏸ «CryptoBot → xRocket» временно на паузе. Чек я не открывал — деньги в нём. Нажмите кнопку — напишу, когда заработает.
+--- keyboard: inline
+[{"callback_data":"notify:cb_to_xr_check","text":"🔔 Сообщить, когда заработает"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> «CryptoBot → xRocket» временно на паузе. Чек я не открывал — деньги в нём. Нажмите кнопку — напишу, когда заработает.
+--- keyboard: inline
+[{"callback_data":"notify:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000018","text":"Сообщить, когда заработает"}]
+
+## paused_until
+### plain
+--- html
+⏸ «xRocket → CryptoBot» временно на паузе. Чек я не открывал — деньги в нём. Попробуйте после <tg-time unix="1791381600" format="t">17:00 МСК</tg-time>.
+--- keyboard: inline
+[{"callback_data":"notify:xr_to_cb_check","text":"🔔 Сообщить, когда заработает"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> «xRocket → CryptoBot» временно на паузе. Чек я не открывал — деньги в нём. Попробуйте после <tg-time unix="1791381600" format="t">17:00 МСК</tg-time>.
+--- keyboard: inline
+[{"callback_data":"notify:xr_to_cb_check","icon_custom_emoji_id":"5368000000000000018","text":"Сообщить, когда заработает"}]
+
+## no_reserve
+### plain
+--- html
+⏸ Сейчас могу принять не больше <code>120.00 USDT</code>. Чек я не открывал — деньги в нём. Попробуйте через 10–15 минут или пришлите чек поменьше.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> Сейчас могу принять не больше <code>120.00 USDT</code>. Чек я не открывал — деньги в нём. Попробуйте через 10–15 минут или пришлите чек поменьше.
+--- keyboard: none
+
+## maintenance
+### plain
+--- html
+🛠 Бот на обслуживании. Чек я не открывал — деньги в нём. Попробуйте чуть позже.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000008">🛠</tg-emoji> Бот на обслуживании. Чек я не открывал — деньги в нём. Попробуйте чуть позже.
+--- keyboard: none
+
+## maintenance_until
+### plain
+--- html
+🛠 Бот на обслуживании до <tg-time unix="1791379800" format="t">16:30 МСК</tg-time>. Чек я не открывал — деньги в нём.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000008">🛠</tg-emoji> Бот на обслуживании до <tg-time unix="1791379800" format="t">16:30 МСК</tg-time>. Чек я не открывал — деньги в нём.
+--- keyboard: none
+
+## rate_limited
+### plain
+--- html
+Слишком много заявок подряд. Подождите <code>42</code> с — ссылку я не открывал, деньги в чеке.
+--- keyboard: none
+
+### premium
+--- html
+Слишком много заявок подряд. Подождите <code>42</code> с — ссылку я не открывал, деньги в чеке.
+--- keyboard: none
+
+## banned
+### plain
+--- html
+⛔ Доступ ограничен. Причина: серия неудачных чеков. Новые чеки не открываю — деньги в них. Если заявка уже была в работе — доведу её до конца. Вопросы — /help.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000009">⛔</tg-emoji> Доступ ограничен. Причина: серия неудачных чеков. Новые чеки не открываю — деньги в них. Если заявка уже была в работе — доведу её до конца. Вопросы — /help.
+--- keyboard: none
+
+## banned_until
+### plain
+--- html
+⛔ Доступ ограничен до <tg-time unix="1791378000" format="dt">07.10.2026 16:00 МСК</tg-time>. Причина: серия неудачных чеков. Новые чеки не открываю — деньги в них. Если заявка уже была в работе — доведу её до конца. Вопросы — /help.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000009">⛔</tg-emoji> Доступ ограничен до <tg-time unix="1791378000" format="dt">07.10.2026 16:00 МСК</tg-time>. Причина: серия неудачных чеков. Новые чеки не открываю — деньги в них. Если заявка уже была в работе — доведу её до конца. Вопросы — /help.
+--- keyboard: none
+
+## duplicate
+### plain
+--- html
+Этот чек уже в работе — заявка <code>A1B2C3D4E5</code>. Присылать его ещё раз не нужно: результат будет в сообщении заявки.
+--- keyboard: inline
+[{"callback_data":"order:A1B2C3D4E5","text":"Открыть заявку"}]
+
+### premium
+--- html
+Этот чек уже в работе — заявка <code>A1B2C3D4E5</code>. Присылать его ещё раз не нужно: результат будет в сообщении заявки.
+--- keyboard: inline
+[{"callback_data":"order:A1B2C3D4E5","text":"Открыть заявку"}]
+
+## invoice_reusable
+### plain
+--- html
+❌ Не могу оплатить этот счёт: он многоразовый. Деньги не списаны.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Не могу оплатить этот счёт: он многоразовый. Деньги не списаны.
+--- keyboard: none
+
+## invoice_already_paid
+### plain
+--- html
+❌ Не могу оплатить этот счёт: он уже оплачен. Деньги не списаны.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Не могу оплатить этот счёт: он уже оплачен. Деньги не списаны.
+--- keyboard: none
+
+## invoice_expired
+### plain
+--- html
+❌ Не могу оплатить этот счёт: он истёк. Деньги не списаны.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Не могу оплатить этот счёт: он истёк. Деньги не списаны.
+--- keyboard: none
+
+## invoice_no_amount
+### plain
+--- html
+❌ Не могу оплатить этот счёт: в нём нет суммы. Деньги не списаны.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Не могу оплатить этот счёт: в нём нет суммы. Деньги не списаны.
+--- keyboard: none
+
+## invoice_not_usdt
+### plain
+--- html
+❌ Не могу оплатить этот счёт: он не в USDT. Деньги не списаны.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Не могу оплатить этот счёт: он не в USDT. Деньги не списаны.
+--- keyboard: none
+
+## invoice_expires_soon
+### plain
+--- html
+❌ Не могу оплатить этот счёт: он истекает слишком скоро. Деньги не списаны.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Не могу оплатить этот счёт: он истекает слишком скоро. Деньги не списаны.
+--- keyboard: none
+
+## invoice_unreadable
+### plain
+--- html
+❌ Не могу оплатить этот счёт: не смог его прочитать. Деньги не списаны.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Не могу оплатить этот счёт: не смог его прочитать. Деньги не списаны.
+--- keyboard: none
+
+## payout_delayed
+### plain
+--- html
+⚠️ Кошелёк xRocket отвечает с задержкой. Ваши <code>97.50 USDT</code> зарезервированы — чек придёт сюда автоматически. Заявка <code>A1B2C3D4E5</code>.
+--- keyboard: inline
+[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000003">⚠️</tg-emoji> Кошелёк xRocket отвечает с задержкой. Ваши <code>97.50 USDT</code> зарезервированы — чек придёт сюда автоматически. Заявка <code>A1B2C3D4E5</code>.
+--- keyboard: inline
+[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+
+## unsupported_asset
+### plain
+--- html
+⚠️ В чеке <code>1.5 TON</code>, а я меняю только USDT. Верну деньги чеком xRocket — он придёт сюда.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000003">⚠️</tg-emoji> В чеке <code>1.5 TON</code>, а я меняю только USDT. Верну деньги чеком xRocket — он придёт сюда.
+--- keyboard: none
+
+## invoice_paid_elsewhere
+### plain
+--- html
+⚠️ Счёт успели оплатить до меня. Верну ваши <code>10.30 USDT</code> чеком xRocket — он придёт сюда.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000003">⚠️</tg-emoji> Счёт успели оплатить до меня. Верну ваши <code>10.30 USDT</code> чеком xRocket — он придёт сюда.
+--- keyboard: none
+
+## rate_moved
+### plain
+--- html
+⚠️ Курс сдвинулся больше чем на 1 %. Верну <code>10.30 USDT</code> чеком xRocket — пришлите ссылку на счёт ещё раз, посчитаю заново.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000003">⚠️</tg-emoji> Курс сдвинулся больше чем на 1 %. Верну <code>10.30 USDT</code> чеком xRocket — пришлите ссылку на счёт ещё раз, посчитаю заново.
+--- keyboard: none
+
+## quote_expired
+### plain
+--- html
+Время вышло — счёт я не оплачивал, деньги не списаны. Пришлите ссылку ещё раз.
+--- keyboard: none
+
+### premium
+--- html
+Время вышло — счёт я не оплачивал, деньги не списаны. Пришлите ссылку ещё раз.
+--- keyboard: none
+
+## internal
+### plain
+--- html
+❌ Что-то пошло не так у меня. Чек я не открывал — деньги в нём. Попробуйте через минуту.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Что-то пошло не так у меня. Чек я не открывал — деньги в нём. Попробуйте через минуту.
+--- keyboard: none

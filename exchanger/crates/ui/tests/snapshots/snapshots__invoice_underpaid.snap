@@ -1,0 +1,17 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+⚠️ Пришло <code>8.00 USDT</code> из <code>10.30 USDT</code>.
+Дошлите чек на <code>2.30 USDT</code> до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> — или верну то, что пришло.
+--- keyboard: inline
+[{"copy_text":{"text":"2.30"},"text":"📋 2.30"},{"callback_data":"refund:A1B2C3D4E5","style":"danger","text":"Вернуть деньги"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000003">⚠️</tg-emoji> Пришло <code>8.00 USDT</code> из <code>10.30 USDT</code>.
+Дошлите чек на <code>2.30 USDT</code> до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> — или верну то, что пришло.
+--- keyboard: inline
+[{"copy_text":{"text":"2.30"},"icon_custom_emoji_id":"5368000000000000013","text":"2.30"},{"callback_data":"refund:A1B2C3D4E5","style":"danger","text":"Вернуть деньги"}]

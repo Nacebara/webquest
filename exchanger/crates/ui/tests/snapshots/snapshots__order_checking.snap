@@ -1,0 +1,17 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+⏳ <b>Проверяю чек</b> <code>A1B2C3D4E5</code>
+Чек CryptoBot, выплата чеком xRocket. Обычно до 10 секунд.
+--- keyboard: inline
+[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> <b>Проверяю чек</b> <code>A1B2C3D4E5</code>
+Чек CryptoBot, выплата чеком xRocket. Обычно до 10 секунд.
+--- keyboard: inline
+[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]

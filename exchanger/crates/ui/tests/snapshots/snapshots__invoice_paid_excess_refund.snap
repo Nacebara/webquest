@@ -1,0 +1,25 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+✅ <b>Счёт оплачен.</b> Продавец уже видит оплату.
+<blockquote>Счёт: <code>10.00 USDT</code>
+Вы прислали: <code>10.30 USDT</code>
+Комиссия: <code>0.30 USDT</code>
+Переплата <code>5.00 USDT</code> — верну чеком xRocket.</blockquote>
+Заявка <code>A1B2C3D4E5</code> · <tg-time unix="1791376800" format="t">15:40 МСК</tg-time>
+--- keyboard: inline
+[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000001">✅</tg-emoji> <b>Счёт оплачен.</b> Продавец уже видит оплату.
+<blockquote>Счёт: <code>10.00 USDT</code>
+Вы прислали: <code>10.30 USDT</code>
+Комиссия: <code>0.30 USDT</code>
+Переплата <code>5.00 USDT</code> — верну чеком xRocket.</blockquote>
+Заявка <code>A1B2C3D4E5</code> · <tg-time unix="1791376800" format="t">15:40 МСК</tg-time>
+--- keyboard: inline
+[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]

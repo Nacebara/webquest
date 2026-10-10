@@ -1,0 +1,19 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+Пришлите чек или ссылку на счёт, например:
+<code>https://t.me/send?start=CQ…</code>
+<code>https://t.me/xrocket?start=t_…</code>
+Можно переслать сообщение с чеком или создать чек прямо здесь: <code>@send 10usdt</code>.
+--- keyboard: none
+
+### premium
+--- html
+Пришлите чек или ссылку на счёт, например:
+<code>https://t.me/send?start=CQ…</code>
+<code>https://t.me/xrocket?start=t_…</code>
+Можно переслать сообщение с чеком или создать чек прямо здесь: <code>@send 10usdt</code>.
+--- keyboard: none

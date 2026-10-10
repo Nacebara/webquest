@@ -1,0 +1,77 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+<b>Обмен CryptoBot ⇄ xRocket</b>
+Пришлите <b>чек</b> или ссылку на <b>счёт</b> — остальное сделаю сам.
+
+<blockquote>🔵 Чек CryptoBot → чек xRocket · <b>пауза</b>
+🚀 Чек xRocket → чек CryptoBot · <b>пауза</b>
+🧾 Счёт CryptoBot → оплачу из xRocket · <b>пауза</b>
+🧾 Счёт xRocket → оплачу из CryptoBot · <b>пауза</b></blockquote>
+Сейчас все направления на паузе: чеки не открываю — деньги остаются в них. Загляните чуть позже.
+
+<blockquote expandable><b>Как сделать чек</b>
+• CryptoBot: наберите здесь <code>@send 10usdt</code> и отправьте чек.
+• xRocket: наберите здесь <code>@xrocket 10</code> и выберите чек в USDT.</blockquote>
+<i>Курс 1:1, выплата — чеком другого кошелька. Подробно — «Курс и лимиты».</i>
+--- rich
+<h3>Обмен CryptoBot ⇄ xRocket</h3>
+<p>Пришлите <b>чек</b> или ссылку на <b>счёт</b> — остальное сделаю сам.</p>
+<table bordered compact>
+<tr><th>Что прислать</th><th>Что получите</th><th align="right">Комиссия</th></tr>
+<tr><td>🔵 Чек CryptoBot</td><td>чек xRocket</td><td align="right">пауза</td></tr>
+<tr><td>🚀 Чек xRocket</td><td>чек CryptoBot</td><td align="right">пауза</td></tr>
+<tr><td>🧾 Счёт CryptoBot</td><td>оплачу из xRocket</td><td align="right">пауза</td></tr>
+<tr><td>🧾 Счёт xRocket</td><td>оплачу из CryptoBot</td><td align="right">пауза</td></tr>
+</table>
+<p>Сейчас все направления на паузе: чеки не открываю — деньги остаются в них. Загляните чуть позже.</p>
+<details><summary>Как сделать чек</summary>
+<ul>
+<li>CryptoBot: наберите здесь <code>@send 10usdt</code> и отправьте чек.</li>
+<li>xRocket: наберите здесь <code>@xrocket 10</code> и выберите чек в USDT.</li></ul>
+</details>
+<footer>Курс 1:1, выплата — чеком другого кошелька. Подробно — «Курс и лимиты».</footer>
+--- keyboard: reply {"input_field_placeholder":"Пришлите чек или ссылку на счёт","is_persistent":true,"resize_keyboard":true}
+[{"text":"💱 Обменять чек"},{"text":"🧾 Оплатить счёт"}]
+[{"text":"📈 Курс и лимиты"},{"text":"📜 История"}]
+[{"text":"💬 Поддержка"}]
+
+### premium
+--- html
+<b>Обмен CryptoBot ⇄ xRocket</b>
+Пришлите <b>чек</b> или ссылку на <b>счёт</b> — остальное сделаю сам.
+
+<blockquote><tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> Чек CryptoBot → чек xRocket · <b>пауза</b>
+<tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> Чек xRocket → чек CryptoBot · <b>пауза</b>
+<tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт CryptoBot → оплачу из xRocket · <b>пауза</b>
+<tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт xRocket → оплачу из CryptoBot · <b>пауза</b></blockquote>
+Сейчас все направления на паузе: чеки не открываю — деньги остаются в них. Загляните чуть позже.
+
+<blockquote expandable><b>Как сделать чек</b>
+• CryptoBot: наберите здесь <code>@send 10usdt</code> и отправьте чек.
+• xRocket: наберите здесь <code>@xrocket 10</code> и выберите чек в USDT.</blockquote>
+<i>Курс 1:1, выплата — чеком другого кошелька. Подробно — «Курс и лимиты».</i>
+--- rich
+<h3>Обмен CryptoBot ⇄ xRocket</h3>
+<p>Пришлите <b>чек</b> или ссылку на <b>счёт</b> — остальное сделаю сам.</p>
+<table bordered compact>
+<tr><th>Что прислать</th><th>Что получите</th><th align="right">Комиссия</th></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> Чек CryptoBot</td><td>чек xRocket</td><td align="right">пауза</td></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> Чек xRocket</td><td>чек CryptoBot</td><td align="right">пауза</td></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт CryptoBot</td><td>оплачу из xRocket</td><td align="right">пауза</td></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт xRocket</td><td>оплачу из CryptoBot</td><td align="right">пауза</td></tr>
+</table>
+<p>Сейчас все направления на паузе: чеки не открываю — деньги остаются в них. Загляните чуть позже.</p>
+<details><summary>Как сделать чек</summary>
+<ul>
+<li>CryptoBot: наберите здесь <code>@send 10usdt</code> и отправьте чек.</li>
+<li>xRocket: наберите здесь <code>@xrocket 10</code> и выберите чек в USDT.</li></ul>
+</details>
+<footer>Курс 1:1, выплата — чеком другого кошелька. Подробно — «Курс и лимиты».</footer>
+--- keyboard: reply {"input_field_placeholder":"Пришлите чек или ссылку на счёт","is_persistent":true,"resize_keyboard":true}
+[{"icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять чек"},{"icon_custom_emoji_id":"5368000000000000004","style":"primary","text":"Оплатить счёт"}]
+[{"icon_custom_emoji_id":"5368000000000000015","text":"Курс и лимиты"},{"icon_custom_emoji_id":"5368000000000000016","text":"История"}]
+[{"icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]

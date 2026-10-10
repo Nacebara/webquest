@@ -1,0 +1,25 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+<b>Оплатить счёт</b>
+Пришлите ссылку на счёт CryptoBot или xRocket. Я посчитаю, сколько прислать, — до вашего чека деньги не тронуты.
+
+<blockquote>🧾 Счёт CryptoBot — оплачу из xRocket · <b>3 %</b>
+🧾 Счёт xRocket — на паузе</blockquote>
+Ссылка выглядит так: <code>https://t.me/send?start=IV…</code> или <code>https://t.me/xrocket?start=inv_…</code>
+Оплачиваю одноразовые счета с суммой.
+--- keyboard: none
+
+### premium
+--- html
+<b>Оплатить счёт</b>
+Пришлите ссылку на счёт CryptoBot или xRocket. Я посчитаю, сколько прислать, — до вашего чека деньги не тронуты.
+
+<blockquote><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт CryptoBot — оплачу из xRocket · <b>3 %</b>
+<tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт xRocket — на паузе</blockquote>
+Ссылка выглядит так: <code>https://t.me/send?start=IV…</code> или <code>https://t.me/xrocket?start=inv_…</code>
+Оплачиваю одноразовые счета с суммой.
+--- keyboard: none

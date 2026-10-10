@@ -1,0 +1,19 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+💬 <b>Поддержка</b>
+Напишите оператору: @exch_support. Приложите номер заявки, если он есть.
+Мы никогда не пишем первыми и не просим пароли и PIN от кошельков.
+--- keyboard: inline
+[{"style":"primary","text":"💬 Написать оператору","url":"https://t.me/exch_support"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000010">💬</tg-emoji> <b>Поддержка</b>
+Напишите оператору: @exch_support. Приложите номер заявки, если он есть.
+Мы никогда не пишем первыми и не просим пароли и PIN от кошельков.
+--- keyboard: inline
+[{"icon_custom_emoji_id":"5368000000000000010","style":"primary","text":"Написать оператору","url":"https://t.me/exch_support"}]

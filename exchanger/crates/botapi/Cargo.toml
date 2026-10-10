@@ -1,0 +1,32 @@
+[package]
+name = "botapi"
+description = "Тонкий клиент Telegram Bot API 10.3: JSON-вызовы, rich-сообщения, клавиатуры со стилями (по образцу lovec bot_call)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = ["client"]
+# HTTP-клиент (reqwest + rustls на ring). Без него остаются только типы Bot API —
+# их использует крейт `ui`, которому сеть не нужна.
+client = ["dep:reqwest", "dep:rustls", "dep:webpki-roots", "dep:secrecy", "dep:tracing"]
+
+[dependencies]
+serde.workspace = true
+serde_json = "1.0.149"
+thiserror.workspace = true
+# reqwest 0.13 без aws-lc: провайдер rustls — ring, как у sqlx (`tls-rustls-ring-webpki`).
+# JSON сериализуем сами (serde_json), поэтому фича `json` не нужна.
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"], optional = true }
+rustls = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+webpki-roots = { version = "1.0.9", optional = true }
+secrecy = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["net", "io-util"] }
+
+[lints]
+workspace = true

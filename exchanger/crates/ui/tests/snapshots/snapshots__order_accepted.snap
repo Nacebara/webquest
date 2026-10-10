@@ -1,0 +1,17 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+⏳ <b>Чек принят:</b> <code>100.00 USDT</code>
+Комиссия 2,5 %: <code>2.50 USDT</code>. Готовлю чек xRocket на <code>97.50 USDT</code>…
+--- keyboard: inline
+[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> <b>Чек принят:</b> <code>100.00 USDT</code>
+Комиссия 2,5 %: <code>2.50 USDT</code>. Готовлю чек xRocket на <code>97.50 USDT</code>…
+--- keyboard: inline
+[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]

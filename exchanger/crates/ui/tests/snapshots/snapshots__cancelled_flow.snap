@@ -1,0 +1,13 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+Отменил. Когда будете готовы — пришлите чек или ссылку на счёт.
+--- keyboard: none
+
+### premium
+--- html
+Отменил. Когда будете готовы — пришлите чек или ссылку на счёт.
+--- keyboard: none

@@ -1,0 +1,13 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+📜 Заявок пока нет. Пришлите чек — первая заявка появится здесь.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000016">📜</tg-emoji> Заявок пока нет. Пришлите чек — первая заявка появится здесь.
+--- keyboard: none

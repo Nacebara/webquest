@@ -1,0 +1,19 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+🛠 <b>Заявка <code>A1B2C3D4E5</code> на ручной проверке.</b>
+Ваши <code>100.00 USDT</code> у меня и в безопасности.
+Оператор закончит до <tg-time unix="1791378000" format="t">16:00 МСК</tg-time> — я напишу сюда.
+--- keyboard: inline
+[{"callback_data":"support:A1B2C3D4E5","text":"💬 Написать в поддержку"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000006">🛠</tg-emoji> <b>Заявка <code>A1B2C3D4E5</code> на ручной проверке.</b>
+Ваши <code>100.00 USDT</code> у меня и в безопасности.
+Оператор закончит до <tg-time unix="1791378000" format="t">16:00 МСК</tg-time> — я напишу сюда.
+--- keyboard: inline
+[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Написать в поддержку"}]

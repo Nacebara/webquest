@@ -1,0 +1,49 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: out
+---
+### plain: main menu
+--- keyboard: reply {"input_field_placeholder":"Пришлите чек или ссылку на счёт","is_persistent":true,"resize_keyboard":true}
+[{"text":"💱 Обменять чек"},{"text":"🧾 Оплатить счёт"}]
+[{"text":"📈 Курс и лимиты"},{"text":"📜 История"}]
+[{"text":"💬 Поддержка"}]
+
+### plain: terms sent as rich
+--- keyboard: inline
+[{"callback_data":"privacy","text":"🔒 Конфиденциальность"}]
+[{"callback_data":"plain","text":"Не отображается?"}]
+
+### premium: main menu
+--- keyboard: reply {"input_field_placeholder":"Пришлите чек или ссылку на счёт","is_persistent":true,"resize_keyboard":true}
+[{"icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять чек"},{"icon_custom_emoji_id":"5368000000000000004","style":"primary","text":"Оплатить счёт"}]
+[{"icon_custom_emoji_id":"5368000000000000015","text":"Курс и лимиты"},{"icon_custom_emoji_id":"5368000000000000016","text":"История"}]
+[{"icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
+
+### premium: terms sent as rich
+--- keyboard: inline
+[{"callback_data":"privacy","icon_custom_emoji_id":"5368000000000000017","text":"Конфиденциальность"}]
+[{"callback_data":"plain","text":"Не отображается?"}]
+
+### setMyCommands
+[
+  {
+    "command": "start",
+    "description": "Как это работает"
+  },
+  {
+    "command": "terms",
+    "description": "Курс и лимиты"
+  },
+  {
+    "command": "history",
+    "description": "История заявок"
+  },
+  {
+    "command": "help",
+    "description": "Помощь"
+  },
+  {
+    "command": "privacy",
+    "description": "Конфиденциальность"
+  }
+]

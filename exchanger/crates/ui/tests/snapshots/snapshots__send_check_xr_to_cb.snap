@@ -1,0 +1,27 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+<b>xRocket → CryptoBot</b>
+Пришлите сюда чек xRocket на сумму от <code>2.00</code> до <code>300.00</code> USDT.
+Комиссия 1,5 %, минимум <code>0.10</code> USDT. Взамен — чек CryptoBot.
+
+<blockquote>Быстрее всего: наберите в этом чате <code>@xrocket 10</code>, выберите чек и отправьте.</blockquote>
+Подойдёт чек в USDT для одного человека — без пароля, капчи и подписок.
+--- keyboard: inline
+[{"callback_data":"howto:xr_to_cb_check","text":"Как создать чек"}]
+[{"callback_data":"cancel","text":"Отмена"}]
+
+### premium
+--- html
+<b>xRocket → CryptoBot</b>
+Пришлите сюда чек xRocket на сумму от <code>2.00</code> до <code>300.00</code> USDT.
+Комиссия 1,5 %, минимум <code>0.10</code> USDT. Взамен — чек CryptoBot.
+
+<blockquote>Быстрее всего: наберите в этом чате <code>@xrocket 10</code>, выберите чек и отправьте.</blockquote>
+Подойдёт чек в USDT для одного человека — без пароля, капчи и подписок.
+--- keyboard: inline
+[{"callback_data":"howto:xr_to_cb_check","text":"Как создать чек"}]
+[{"callback_data":"cancel","text":"Отмена"}]

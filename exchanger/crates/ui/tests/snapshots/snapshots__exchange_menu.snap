@@ -1,0 +1,29 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+<b>Обменять чек</b>
+Выберите направление:
+
+🔵 <b>CryptoBot → xRocket</b> — 2,5 %, от <code>2.00</code> до <code>500.00</code> USDT
+🚀 <b>xRocket → CryptoBot</b> — 1,5 %, от <code>2.00</code> до <code>300.00</code> USDT
+
+Курс 1:1. Выплата — чеком другого кошелька: забрать его можно одной кнопкой.
+--- keyboard: inline
+[{"callback_data":"dir:cb_to_xr_check","style":"primary","text":"CryptoBot → xRocket"}]
+[{"callback_data":"dir:xr_to_cb_check","text":"xRocket → CryptoBot"}]
+
+### premium
+--- html
+<b>Обменять чек</b>
+Выберите направление:
+
+<tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot → xRocket</b> — 2,5 %, от <code>2.00</code> до <code>500.00</code> USDT
+<tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket → CryptoBot</b> — 1,5 %, от <code>2.00</code> до <code>300.00</code> USDT
+
+Курс 1:1. Выплата — чеком другого кошелька: забрать его можно одной кнопкой.
+--- keyboard: inline
+[{"callback_data":"dir:cb_to_xr_check","style":"primary","text":"CryptoBot → xRocket"}]
+[{"callback_data":"dir:xr_to_cb_check","text":"xRocket → CryptoBot"}]

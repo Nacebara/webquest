@@ -1,0 +1,29 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+✅ <b>Готово!</b> Ваш чек xRocket на <code>97.50 USDT</code>.
+Нажмите «Забрать чек» — деньги придут на ваш баланс xRocket.
+<blockquote>Получено: <code>100.00 USDT</code>
+Комиссия 2,5 %: <code>2.50 USDT</code>
+Выплачено: <code>97.50 USDT</code></blockquote>
+Забрать чек может любой, у кого есть ссылка, — не пересылайте её.
+Заявка <code>A1B2C3D4E5</code> · <tg-time unix="1791376500" format="t">15:35 МСК</tg-time>
+--- keyboard: inline
+[{"style":"success","text":"Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"text":"📋 Скопировать ссылку"}]
+[{"callback_data":"exchange","text":"Ещё обмен"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000001">✅</tg-emoji> <b>Готово!</b> Ваш чек xRocket на <code>97.50 USDT</code>.
+Нажмите «Забрать чек» — деньги придут на ваш баланс xRocket.
+<blockquote>Получено: <code>100.00 USDT</code>
+Комиссия 2,5 %: <code>2.50 USDT</code>
+Выплачено: <code>97.50 USDT</code></blockquote>
+Забрать чек может любой, у кого есть ссылка, — не пересылайте её.
+Заявка <code>A1B2C3D4E5</code> · <tg-time unix="1791376500" format="t">15:35 МСК</tg-time>
+--- keyboard: inline
+[{"style":"success","text":"Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"icon_custom_emoji_id":"5368000000000000013","text":"Скопировать ссылку"}]
+[{"callback_data":"exchange","text":"Ещё обмен"}]

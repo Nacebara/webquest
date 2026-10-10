@@ -1,0 +1,15 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+⏸ «xRocket → CryptoBot» временно на паузе. Чек я не открывал — деньги в нём. Нажмите кнопку — напишу, когда заработает.
+--- keyboard: inline
+[{"callback_data":"notify:xr_to_cb_check","text":"🔔 Сообщить, когда заработает"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> «xRocket → CryptoBot» временно на паузе. Чек я не открывал — деньги в нём. Нажмите кнопку — напишу, когда заработает.
+--- keyboard: inline
+[{"callback_data":"notify:xr_to_cb_check","icon_custom_emoji_id":"5368000000000000018","text":"Сообщить, когда заработает"}]

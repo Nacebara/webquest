@@ -1,0 +1,13 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+Заявка <code>A1B2C3D4E5</code> отменена. Деньги не списаны.
+--- keyboard: none
+
+### premium
+--- html
+Заявка <code>A1B2C3D4E5</code> отменена. Деньги не списаны.
+--- keyboard: none

@@ -1,0 +1,39 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+<b>Как создать чек xRocket</b>
+
+<b>Быстро — прямо в этом чате:</b>
+1. Наберите <code>@xrocket 10</code> — вместо <code>10</code> ваша сумма.
+2. Выберите чек в USDT и отправьте.
+3. Чек появится здесь — я сразу его заберу.
+
+<b>Через меню xRocket:</b>
+<code>/cheques</code> → «Персональный» → «Создать чек» → USDT → сумма → ссылку пришлите сюда.
+
+Чек — в USDT, для одного человека, без пароля, капчи и подписок.
+--- keyboard: inline
+[{"copy_text":{"text":"@xrocket 10"},"text":"📋 @xrocket 10"}]
+[{"text":"Открыть xRocket","url":"https://t.me/xrocket"}]
+[{"callback_data":"dir:xr_to_cb_check","text":"Назад"}]
+
+### premium
+--- html
+<b>Как создать чек xRocket</b>
+
+<b>Быстро — прямо в этом чате:</b>
+1. Наберите <code>@xrocket 10</code> — вместо <code>10</code> ваша сумма.
+2. Выберите чек в USDT и отправьте.
+3. Чек появится здесь — я сразу его заберу.
+
+<b>Через меню xRocket:</b>
+<code>/cheques</code> → «Персональный» → «Создать чек» → USDT → сумма → ссылку пришлите сюда.
+
+Чек — в USDT, для одного человека, без пароля, капчи и подписок.
+--- keyboard: inline
+[{"copy_text":{"text":"@xrocket 10"},"icon_custom_emoji_id":"5368000000000000013","text":"@xrocket 10"}]
+[{"text":"Открыть xRocket","url":"https://t.me/xrocket"}]
+[{"callback_data":"dir:xr_to_cb_check","text":"Назад"}]

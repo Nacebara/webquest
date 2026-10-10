@@ -1,0 +1,45 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+<b>Заявка <code>A1B2C3D4E5</code> · готово</b>
+<blockquote>Создана: <tg-time unix="1791376200" format="dt">07.10.2026 15:30 МСК</tg-time>
+Направление: CryptoBot → xRocket
+Получено: <code>100.00 USDT</code>
+Комиссия: <code>2.50 USDT</code>
+Выплачено: <code>97.50 USDT</code></blockquote>
+--- rich
+<h3>Заявка <code>A1B2C3D4E5</code> · готово</h3>
+<table compact>
+<tr><td>Создана</td><td><tg-time unix="1791376200" format="dt">07.10.2026 15:30 МСК</tg-time></td></tr>
+<tr><td>Направление</td><td>CryptoBot → xRocket</td></tr>
+<tr><td>Получено</td><td><code>100.00 USDT</code></td></tr>
+<tr><td>Комиссия</td><td><code>2.50 USDT</code></td></tr>
+<tr><td>Выплачено</td><td><code>97.50 USDT</code></td></tr>
+</table>
+--- keyboard: inline
+[{"style":"success","text":"Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"text":"📋 Скопировать ссылку"}]
+[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"},{"callback_data":"support:A1B2C3D4E5","text":"💬 Вопрос по заявке"}]
+
+### premium
+--- html
+<b>Заявка <code>A1B2C3D4E5</code> · готово</b>
+<blockquote>Создана: <tg-time unix="1791376200" format="dt">07.10.2026 15:30 МСК</tg-time>
+Направление: CryptoBot → xRocket
+Получено: <code>100.00 USDT</code>
+Комиссия: <code>2.50 USDT</code>
+Выплачено: <code>97.50 USDT</code></blockquote>
+--- rich
+<h3>Заявка <code>A1B2C3D4E5</code> · готово</h3>
+<table compact>
+<tr><td>Создана</td><td><tg-time unix="1791376200" format="dt">07.10.2026 15:30 МСК</tg-time></td></tr>
+<tr><td>Направление</td><td>CryptoBot → xRocket</td></tr>
+<tr><td>Получено</td><td><code>100.00 USDT</code></td></tr>
+<tr><td>Комиссия</td><td><code>2.50 USDT</code></td></tr>
+<tr><td>Выплачено</td><td><code>97.50 USDT</code></td></tr>
+</table>
+--- keyboard: inline
+[{"style":"success","text":"Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"icon_custom_emoji_id":"5368000000000000013","text":"Скопировать ссылку"}]
+[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"},{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Вопрос по заявке"}]

@@ -1,0 +1,89 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+<b>Курс и лимиты</b>
+<blockquote>CryptoBot → xRocket: <b>2,5 %</b>, от <code>2.00</code> до <code>500.00</code> USDT · работает
+xRocket → CryptoBot: <b>1,5 %</b>, от <code>2.00</code> до <code>300.00</code> USDT · пауза
+Оплата счёта CryptoBot: <b>3 %</b>, от <code>2.00</code> до <code>200.00</code> USDT · работает
+Оплата счёта xRocket: <b>2 %</b>, от <code>2.00</code> до <code>200.00</code> USDT · выключено</blockquote>
+
+<blockquote expandable><b>Какие чеки принимаю</b>
+• В USDT, на одного получателя.
+• Без пароля, капчи, подписок и «только для Premium».</blockquote>
+<blockquote expandable><b>Какие счета оплачиваю</b>
+• Одноразовые, с суммой, не истекающие в ближайшие 20 минут.
+• В фиате — по курсу кошелька с запасом 1 %, остаток верну.</blockquote>
+<blockquote expandable><b>Правила</b>
+Нельзя: средства от мошенничества, даркнета, миксеров, санкционных площадок. Могу отказать и вернуть деньги — туда же, откуда они пришли.</blockquote>
+<i>Комиссия меняется раз в минуту от загрузки направления. В заявке она фиксируется на 15 минут.</i>
+--- rich
+<h3>Курс и лимиты</h3>
+<table bordered striped compact>
+<tr><th>Направление</th><th align="right">Комиссия</th><th align="right">Мин., USDT</th><th align="right">Макс., USDT</th><th>Статус</th></tr>
+<tr><td>CryptoBot → xRocket</td><td align="right">2,5 %</td><td align="right">2.00</td><td align="right">500.00</td><td>работает</td></tr>
+<tr><td>xRocket → CryptoBot</td><td align="right">1,5 %</td><td align="right">2.00</td><td align="right">300.00</td><td>пауза</td></tr>
+<tr><td>Оплата счёта CryptoBot</td><td align="right">3 %</td><td align="right">2.00</td><td align="right">200.00</td><td>работает</td></tr>
+<tr><td>Оплата счёта xRocket</td><td align="right">2 %</td><td align="right">2.00</td><td align="right">200.00</td><td>выключено</td></tr>
+</table>
+<details><summary>Какие чеки принимаю</summary>
+<ul>
+<li>В USDT, на одного получателя.</li>
+<li>Без пароля, капчи, подписок и «только для Premium».</li></ul>
+</details>
+<details><summary>Какие счета оплачиваю</summary>
+<ul>
+<li>Одноразовые, с суммой, не истекающие в ближайшие 20 минут.</li>
+<li>В фиате — по курсу кошелька с запасом 1 %, остаток верну.</li></ul>
+</details>
+<details><summary>Правила</summary>
+<p>Нельзя: средства от мошенничества, даркнета, миксеров, санкционных площадок. Могу отказать и вернуть деньги — туда же, откуда они пришли.</p>
+</details>
+<footer>Комиссия меняется раз в минуту от загрузки направления. В заявке она фиксируется на 15 минут.</footer>
+--- keyboard: inline
+[{"callback_data":"privacy","text":"🔒 Конфиденциальность"}]
+
+### premium
+--- html
+<b>Курс и лимиты</b>
+<blockquote>CryptoBot → xRocket: <b>2,5 %</b>, от <code>2.00</code> до <code>500.00</code> USDT · работает
+xRocket → CryptoBot: <b>1,5 %</b>, от <code>2.00</code> до <code>300.00</code> USDT · пауза
+Оплата счёта CryptoBot: <b>3 %</b>, от <code>2.00</code> до <code>200.00</code> USDT · работает
+Оплата счёта xRocket: <b>2 %</b>, от <code>2.00</code> до <code>200.00</code> USDT · выключено</blockquote>
+
+<blockquote expandable><b>Какие чеки принимаю</b>
+• В USDT, на одного получателя.
+• Без пароля, капчи, подписок и «только для Premium».</blockquote>
+<blockquote expandable><b>Какие счета оплачиваю</b>
+• Одноразовые, с суммой, не истекающие в ближайшие 20 минут.
+• В фиате — по курсу кошелька с запасом 1 %, остаток верну.</blockquote>
+<blockquote expandable><b>Правила</b>
+Нельзя: средства от мошенничества, даркнета, миксеров, санкционных площадок. Могу отказать и вернуть деньги — туда же, откуда они пришли.</blockquote>
+<i>Комиссия меняется раз в минуту от загрузки направления. В заявке она фиксируется на 15 минут.</i>
+--- rich
+<h3>Курс и лимиты</h3>
+<table bordered striped compact>
+<tr><th>Направление</th><th align="right">Комиссия</th><th align="right">Мин., USDT</th><th align="right">Макс., USDT</th><th>Статус</th></tr>
+<tr><td>CryptoBot → xRocket</td><td align="right">2,5 %</td><td align="right">2.00</td><td align="right">500.00</td><td>работает</td></tr>
+<tr><td>xRocket → CryptoBot</td><td align="right">1,5 %</td><td align="right">2.00</td><td align="right">300.00</td><td>пауза</td></tr>
+<tr><td>Оплата счёта CryptoBot</td><td align="right">3 %</td><td align="right">2.00</td><td align="right">200.00</td><td>работает</td></tr>
+<tr><td>Оплата счёта xRocket</td><td align="right">2 %</td><td align="right">2.00</td><td align="right">200.00</td><td>выключено</td></tr>
+</table>
+<details><summary>Какие чеки принимаю</summary>
+<ul>
+<li>В USDT, на одного получателя.</li>
+<li>Без пароля, капчи, подписок и «только для Premium».</li></ul>
+</details>
+<details><summary>Какие счета оплачиваю</summary>
+<ul>
+<li>Одноразовые, с суммой, не истекающие в ближайшие 20 минут.</li>
+<li>В фиате — по курсу кошелька с запасом 1 %, остаток верну.</li></ul>
+</details>
+<details><summary>Правила</summary>
+<p>Нельзя: средства от мошенничества, даркнета, миксеров, санкционных площадок. Могу отказать и вернуть деньги — туда же, откуда они пришли.</p>
+</details>
+<footer>Комиссия меняется раз в минуту от загрузки направления. В заявке она фиксируется на 15 минут.</footer>
+--- keyboard: inline
+[{"callback_data":"privacy","icon_custom_emoji_id":"5368000000000000017","text":"Конфиденциальность"}]

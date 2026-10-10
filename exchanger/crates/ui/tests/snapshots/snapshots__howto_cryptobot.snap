@@ -1,0 +1,39 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+<b>Как создать чек CryptoBot</b>
+
+<b>Быстро — прямо в этом чате:</b>
+1. Наберите <code>@send 10usdt</code> — вместо <code>10</code> ваша сумма.
+2. Выберите в списке чек на эту сумму и отправьте.
+3. Чек появится здесь — я сразу его заберу.
+
+<b>Через меню CryptoBot:</b>
+<code>/checks</code> → «Создать чек» → USDT → сумма → скопируйте ссылку и пришлите сюда.
+
+Чек — в USDT, для одного человека, без пароля, капчи и подписок.
+--- keyboard: inline
+[{"copy_text":{"text":"@send 10usdt"},"text":"📋 @send 10usdt"}]
+[{"text":"Открыть CryptoBot","url":"https://t.me/send"}]
+[{"callback_data":"dir:cb_to_xr_check","text":"Назад"}]
+
+### premium
+--- html
+<b>Как создать чек CryptoBot</b>
+
+<b>Быстро — прямо в этом чате:</b>
+1. Наберите <code>@send 10usdt</code> — вместо <code>10</code> ваша сумма.
+2. Выберите в списке чек на эту сумму и отправьте.
+3. Чек появится здесь — я сразу его заберу.
+
+<b>Через меню CryptoBot:</b>
+<code>/checks</code> → «Создать чек» → USDT → сумма → скопируйте ссылку и пришлите сюда.
+
+Чек — в USDT, для одного человека, без пароля, капчи и подписок.
+--- keyboard: inline
+[{"copy_text":{"text":"@send 10usdt"},"icon_custom_emoji_id":"5368000000000000013","text":"@send 10usdt"}]
+[{"text":"Открыть CryptoBot","url":"https://t.me/send"}]
+[{"callback_data":"dir:cb_to_xr_check","text":"Назад"}]

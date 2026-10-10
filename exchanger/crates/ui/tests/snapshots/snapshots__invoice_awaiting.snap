@@ -1,0 +1,19 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+⏳ <b>Жду чек xRocket на <code>10.30 USDT</code></b> до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>
+Пришлите его сюда — сумма должна совпасть точно.
+--- keyboard: inline
+[{"copy_text":{"text":"10.30"},"text":"📋 Сумма"},{"callback_data":"howto:pay_cb_invoice","text":"Как создать чек"}]
+[{"callback_data":"cancel:A1B2C3D4E5","text":"Отмена"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> <b>Жду чек xRocket на <code>10.30 USDT</code></b> до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>
+Пришлите его сюда — сумма должна совпасть точно.
+--- keyboard: inline
+[{"copy_text":{"text":"10.30"},"icon_custom_emoji_id":"5368000000000000013","text":"Сумма"},{"callback_data":"howto:pay_cb_invoice","text":"Как создать чек"}]
+[{"callback_data":"cancel:A1B2C3D4E5","text":"Отмена"}]

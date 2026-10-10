@@ -1,0 +1,21 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+✅ <b>Возврат готов:</b> ваш чек CryptoBot на <code>750.00 USDT</code>.
+Нажмите «Забрать чек» — деньги вернутся на ваш баланс CryptoBot.
+Забрать чек может любой, у кого есть ссылка, — не пересылайте её.
+Заявка <code>A1B2C3D4E5</code>
+--- keyboard: inline
+[{"style":"success","text":"Забрать чек","url":"https://t.me/send?start=CQ5mN8pQ2rT7"},{"copy_text":{"text":"https://t.me/send?start=CQ5mN8pQ2rT7"},"text":"📋 Скопировать ссылку"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000001">✅</tg-emoji> <b>Возврат готов:</b> ваш чек CryptoBot на <code>750.00 USDT</code>.
+Нажмите «Забрать чек» — деньги вернутся на ваш баланс CryptoBot.
+Забрать чек может любой, у кого есть ссылка, — не пересылайте её.
+Заявка <code>A1B2C3D4E5</code>
+--- keyboard: inline
+[{"style":"success","text":"Забрать чек","url":"https://t.me/send?start=CQ5mN8pQ2rT7"},{"copy_text":{"text":"https://t.me/send?start=CQ5mN8pQ2rT7"},"icon_custom_emoji_id":"5368000000000000013","text":"Скопировать ссылку"}]

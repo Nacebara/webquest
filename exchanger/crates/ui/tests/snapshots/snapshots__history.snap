@@ -1,0 +1,55 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+<b>Последние заявки</b>
+<code>ORD0000000</code> · <tg-time unix="1791364500" format="dt">07.10 12:15 МСК</tg-time> · CryptoBot → xRocket · <code>100.00 USDT</code> · готово
+<code>ORD0000001</code> · <tg-time unix="1791368100" format="dt">07.10 13:15 МСК</tg-time> · xRocket → CryptoBot · <code>25.50 USDT</code> · возврат выполнен
+<code>ORD0000002</code> · <tg-time unix="1791371700" format="dt">07.10 14:15 МСК</tg-time> · Оплата счёта CryptoBot · <code>10.30 USDT</code> · оплачиваю счёт
+<code>ORD0000003</code> · <tg-time unix="1791375300" format="dt">07.10 15:15 МСК</tg-time> · CryptoBot → xRocket · — · чек не принят
+<code>ORD0000004</code> · <tg-time unix="1791378900" format="dt">07.10 16:15 МСК</tg-time> · CryptoBot → xRocket · <code>7.00 USDT</code> · на ручной проверке
+<i>Подробно — нажмите номер заявки ниже.</i>
+--- rich
+<h4>Последние заявки</h4>
+<table compact striped>
+<tr><th>№</th><th>Когда</th><th>Что</th><th align="right">Сумма</th><th>Итог</th></tr>
+<tr><td><code>ORD0000000</code></td><td><tg-time unix="1791364500" format="dt">07.10 12:15 МСК</tg-time></td><td>CryptoBot → xRocket</td><td align="right"><code>100.00 USDT</code></td><td>готово</td></tr>
+<tr><td><code>ORD0000001</code></td><td><tg-time unix="1791368100" format="dt">07.10 13:15 МСК</tg-time></td><td>xRocket → CryptoBot</td><td align="right"><code>25.50 USDT</code></td><td>возврат выполнен</td></tr>
+<tr><td><code>ORD0000002</code></td><td><tg-time unix="1791371700" format="dt">07.10 14:15 МСК</tg-time></td><td>Оплата счёта CryptoBot</td><td align="right"><code>10.30 USDT</code></td><td>оплачиваю счёт</td></tr>
+<tr><td><code>ORD0000003</code></td><td><tg-time unix="1791375300" format="dt">07.10 15:15 МСК</tg-time></td><td>CryptoBot → xRocket</td><td align="right">—</td><td>чек не принят</td></tr>
+<tr><td><code>ORD0000004</code></td><td><tg-time unix="1791378900" format="dt">07.10 16:15 МСК</tg-time></td><td>CryptoBot → xRocket</td><td align="right"><code>7.00 USDT</code></td><td>на ручной проверке</td></tr>
+</table>
+<footer>Подробно — нажмите номер заявки ниже.</footer>
+--- keyboard: inline
+[{"callback_data":"order:ORD0000000","text":"ORD0000000"},{"callback_data":"order:ORD0000001","text":"ORD0000001"}]
+[{"callback_data":"order:ORD0000002","text":"ORD0000002"},{"callback_data":"order:ORD0000003","text":"ORD0000003"}]
+[{"callback_data":"order:ORD0000004","text":"ORD0000004"}]
+[{"callback_data":"history:1","text":"Ещё"}]
+
+### premium
+--- html
+<b>Последние заявки</b>
+<code>ORD0000000</code> · <tg-time unix="1791364500" format="dt">07.10 12:15 МСК</tg-time> · CryptoBot → xRocket · <code>100.00 USDT</code> · готово
+<code>ORD0000001</code> · <tg-time unix="1791368100" format="dt">07.10 13:15 МСК</tg-time> · xRocket → CryptoBot · <code>25.50 USDT</code> · возврат выполнен
+<code>ORD0000002</code> · <tg-time unix="1791371700" format="dt">07.10 14:15 МСК</tg-time> · Оплата счёта CryptoBot · <code>10.30 USDT</code> · оплачиваю счёт
+<code>ORD0000003</code> · <tg-time unix="1791375300" format="dt">07.10 15:15 МСК</tg-time> · CryptoBot → xRocket · — · чек не принят
+<code>ORD0000004</code> · <tg-time unix="1791378900" format="dt">07.10 16:15 МСК</tg-time> · CryptoBot → xRocket · <code>7.00 USDT</code> · на ручной проверке
+<i>Подробно — нажмите номер заявки ниже.</i>
+--- rich
+<h4>Последние заявки</h4>
+<table compact striped>
+<tr><th>№</th><th>Когда</th><th>Что</th><th align="right">Сумма</th><th>Итог</th></tr>
+<tr><td><code>ORD0000000</code></td><td><tg-time unix="1791364500" format="dt">07.10 12:15 МСК</tg-time></td><td>CryptoBot → xRocket</td><td align="right"><code>100.00 USDT</code></td><td>готово</td></tr>
+<tr><td><code>ORD0000001</code></td><td><tg-time unix="1791368100" format="dt">07.10 13:15 МСК</tg-time></td><td>xRocket → CryptoBot</td><td align="right"><code>25.50 USDT</code></td><td>возврат выполнен</td></tr>
+<tr><td><code>ORD0000002</code></td><td><tg-time unix="1791371700" format="dt">07.10 14:15 МСК</tg-time></td><td>Оплата счёта CryptoBot</td><td align="right"><code>10.30 USDT</code></td><td>оплачиваю счёт</td></tr>
+<tr><td><code>ORD0000003</code></td><td><tg-time unix="1791375300" format="dt">07.10 15:15 МСК</tg-time></td><td>CryptoBot → xRocket</td><td align="right">—</td><td>чек не принят</td></tr>
+<tr><td><code>ORD0000004</code></td><td><tg-time unix="1791378900" format="dt">07.10 16:15 МСК</tg-time></td><td>CryptoBot → xRocket</td><td align="right"><code>7.00 USDT</code></td><td>на ручной проверке</td></tr>
+</table>
+<footer>Подробно — нажмите номер заявки ниже.</footer>
+--- keyboard: inline
+[{"callback_data":"order:ORD0000000","text":"ORD0000000"},{"callback_data":"order:ORD0000001","text":"ORD0000001"}]
+[{"callback_data":"order:ORD0000002","text":"ORD0000002"},{"callback_data":"order:ORD0000003","text":"ORD0000003"}]
+[{"callback_data":"order:ORD0000004","text":"ORD0000004"}]
+[{"callback_data":"history:1","text":"Ещё"}]

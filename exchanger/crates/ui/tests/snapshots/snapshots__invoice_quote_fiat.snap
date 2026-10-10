@@ -1,0 +1,31 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+🧾 <b>Счёт CryptoBot на <code>10.00 USDT</code></b>
+
+Пришлите чек xRocket на <code>10.30 USDT</code> — и я оплачу этот счёт.
+<blockquote>Счёт: <code>10.00 USDT</code>
+(= <code>950 RUB</code> по курсу CryptoBot с запасом 1 %; что останется — верну)
+Комиссия 3 %: <code>0.30 USDT</code>
+К оплате вами: <code>10.30 USDT</code></blockquote>
+Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>. Деньги пока не списаны.
+--- keyboard: inline
+[{"callback_data":"pay_check:A1B2C3D4E5","style":"primary","text":"Пришлю чек xRocket"}]
+[{"copy_text":{"text":"10.30"},"text":"📋 Сумма"},{"callback_data":"cancel:A1B2C3D4E5","text":"Отмена"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> <b>Счёт CryptoBot на <code>10.00 USDT</code></b>
+
+Пришлите чек xRocket на <code>10.30 USDT</code> — и я оплачу этот счёт.
+<blockquote>Счёт: <code>10.00 USDT</code>
+(= <code>950 RUB</code> по курсу CryptoBot с запасом 1 %; что останется — верну)
+Комиссия 3 %: <code>0.30 USDT</code>
+К оплате вами: <code>10.30 USDT</code></blockquote>
+Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>. Деньги пока не списаны.
+--- keyboard: inline
+[{"callback_data":"pay_check:A1B2C3D4E5","style":"primary","text":"Пришлю чек xRocket"}]
+[{"copy_text":{"text":"10.30"},"icon_custom_emoji_id":"5368000000000000013","text":"Сумма"},{"callback_data":"cancel:A1B2C3D4E5","text":"Отмена"}]
