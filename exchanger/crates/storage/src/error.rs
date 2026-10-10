@@ -23,6 +23,12 @@ pub enum StorageError {
     /// Индекс `ledger_tx_once_per_operation`: повторная обработка ответа не задвоит леджер.
     #[error("operation {0} has already been posted")]
     AlreadyPosted(i64),
+    /// Нет аккаунта юзербота с такой меткой (`userbot_accounts.label`).
+    #[error("userbot account {0} is not registered: run `exch login --label {0}` first")]
+    UnknownUserbot(String),
+    /// Уникальность `userbot_accounts.tg_user_id`: этот аккаунт Telegram уже под другой меткой.
+    #[error("Telegram account {0} is already registered under another userbot label")]
+    TelegramAccountInUse(i64),
     #[error("unexpected value in {column}: {value}")]
     Corrupt { column: &'static str, value: String },
 }

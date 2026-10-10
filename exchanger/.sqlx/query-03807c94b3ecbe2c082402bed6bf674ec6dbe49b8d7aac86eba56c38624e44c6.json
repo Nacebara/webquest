@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO wallet_messages AS m\n            (userbot_id, bot_peer_id, message_id, edit_date, is_outgoing, text,\n             entities, reply_markup, operation_id)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n        ON CONFLICT (userbot_id, bot_peer_id, message_id, edit_date)\n        DO UPDATE SET operation_id = COALESCE(m.operation_id, EXCLUDED.operation_id)\n        RETURNING m.id, m.operation_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "wallet_messages",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "operation_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "wallet_messages",
+            "name": "operation_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int2",
+        "Int8",
+        "Int4",
+        "Int4",
+        "Bool",
+        "Text",
+        "Jsonb",
+        "Jsonb",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "03807c94b3ecbe2c082402bed6bf674ec6dbe49b8d7aac86eba56c38624e44c6"
+}

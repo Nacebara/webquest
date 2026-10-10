@@ -26,6 +26,33 @@ pub async fn ensure_userbot(
     Ok(id)
 }
 
+/// К какому аккаунту юзербота привязан кошелёк платформы (метка `cb` / `xr`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WalletBinding {
+    pub wallet_id: i16,
+    pub userbot_id: i16,
+    pub userbot_label: String,
+}
+
+/// Привязка кошелька платформы, если кошелёк уже есть.
+pub async fn wallet_binding(
+    conn: &mut PgConnection,
+    platform: Platform,
+) -> Result<Option<WalletBinding>, StorageError> {
+    let row = sqlx::query_as!(
+        WalletBinding,
+        r#"
+        SELECT w.id AS wallet_id, w.userbot_id, u.label AS userbot_label
+        FROM wallet_accounts w JOIN userbot_accounts u ON u.id = w.userbot_id
+        WHERE w.label = $1
+        "#,
+        wallet_label(platform),
+    )
+    .fetch_optional(conn)
+    .await?;
+    Ok(row)
+}
+
 /// Активный кошелёк платформы (метка `cb` / `xr`) — баланс аккаунта `userbot_id`.
 pub async fn ensure_wallet(
     conn: &mut PgConnection,
