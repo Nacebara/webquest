@@ -1,50 +1,50 @@
 @startuml components
-' Компоненты: один процесс exch (tokio), крейты рабочего пространства
+' Компоненты: один процесс exch (tokio), крейты рабочего пространства — карта из CLAUDE.md (v0.2).
+' engine, tgbot, ops — ещё не созданы (вехи M3–M5).
 skinparam shadowing false
 skinparam componentStyle rectangle
 title Компоненты (Cargo workspace, один бинарник exch)
 
 package "exch (бинарник, tokio runtime)" {
-  component "app\n(wiring, config,\nграцефул-шатдаун)" as APP
-  component "bot\n(Bot API: клиентский бот\n+ ops-бот)" as BOT
-  component "ui\n(тексты, HTML + rich,\nфолбэк, эмодзи)" as UI
-  component "engine\n(FSM-драйвер, outbox-воркер,\nрестарт-рекавери)" as ENG
-  component "domain\n(деньги, цены, FSM,\nправила леджера) — без IO" as DOM
-  component "parsers\n(ссылки, ответы ботов\nкошельков, версии)" as PAR
-  component "wallets\n(трейты WalletApi,\nWalletUserbot + фейки)" as WAL
-  component "userbot\n(grammers: акторы аккаунтов,\nочереди, FloodWait)" as UB
+  component "app\n(бинарник exch: конфиг,\nсупервизор, CLI)" as APP
+  component "tgbot\n(клиентский бот) — M4" as TG
+  component "ops\n(ops-бот: админка, алерты,\nстатистика) — M5" as OPS
+  component "ui\n(экраны, клавиатуры,\nru.toml, rich + HTML)" as UI
+  component "botapi\n(клиент Bot API 10.3)" as BA
+  component "engine\n(FSM-драйвер, outbox,\nсверка, резервы) — M3" as ENG
+  component "userbot\n(Transport, WalletBot,\nflows, sim)" as UB
+  component "mtproto\n(grammers 0.10:\nGrammersTransport, сессия, вход)" as MT
+  component "parsers\n(ссылки, суммы,\nответы ботов кошельков)" as PAR
   component "storage\n(sqlx, миграции,\nрепозитории)" as STO
-  component "ops\n(алерты, агрегация,\nстатистика, графики)" as OPS
-  component "admin\n(роли, команды,\nдвойное подтверждение)" as ADM
-  component "jobs\n(сверка, резервы,\nкурсы, бэкап-пинг)" as JOB
+  component "domain\n(деньги, цены, FSM,\nпроводки) — без IO" as DOM
 }
 
-cloud "Telegram Bot API" as TBA
-cloud "Telegram MTProto\n(DC4 AMS)" as MTP
-cloud "Crypto Pay API\npay.crypt.bot" as CPA
-cloud "xRocket Pay API\npay.xrocket.tg" as XPA
+cloud "Telegram Bot API\n(клиентский и ops-бот)" as TBA
+cloud "Telegram MTProto\n(@send, @xrocket, «Избранное»)" as MTP
 database "PostgreSQL 16" as PG
 
-APP --> BOT
+APP --> TG
+APP --> OPS
 APP --> ENG
-APP --> JOB
-APP --> ADM
-BOT --> UI
-BOT --> TBA
-ADM --> BOT
-ENG --> DOM
-ENG --> PAR
-ENG --> WAL
+APP --> MT
+APP --> STO
+TG --> UI
+TG --> BA
+TG --> ENG
+OPS --> BA
+OPS --> ENG
+UI --> BA
+UI --> DOM
+ENG --> UB
 ENG --> STO
-OPS --> BOT
-OPS --> STO
-JOB --> WAL
-JOB --> STO
-JOB --> OPS
-WAL --> UB
-WAL --> CPA
-WAL --> XPA
-UB --> MTP
+ENG --> DOM
+UB --> PAR
+UB --> DOM
+PAR --> DOM
+MT ..|> UB : реализует Transport
+MT --> DOM
+STO --> DOM
 STO --> PG
-ADM --> ENG
+BA --> TBA
+MT --> MTP
 @enduml

@@ -1,5 +1,5 @@
 @startuml er
-' ER-диаграмма (соответствует schema.sql, миграция 0001)
+' ER-диаграмма (соответствует schema.sql, миграция 0001, v0.2)
 skinparam shadowing false
 skinparam linetype ortho
 hide circle
@@ -57,6 +57,7 @@ entity orders {
   intake_platform, intake_start_param
   invoice_platform, invoice_start_param
   intake_amount, fee_amount, payout_amount
+  payout_method, payout_check_url
   quote_amount_in, quote_expires_at
   progress_chat_id, progress_message_id
 }
@@ -66,19 +67,15 @@ entity order_transitions {
   order_id <<FK orders>>
   from_state, to_state, actor, reason, at
 }
-entity pending_inputs {
-  * order_id <<PK,FK orders>>
-  --
-  user_id, kind, expires_at
-}
 entity operations {
   * id <<PK>>
   --
   order_id <<FK orders>> | rebalance_id <<FK>>
-  kind, money_role, via, platform
+  kind, money_role, via (userbot|manual), platform
   status, idempotency_key <<UQ>>
   start_param, amount, asset
-  attempts, next_attempt_at, external_id
+  request (random_id), response, external_id
+  attempts, max_attempts (=1 для выводящих деньги)
 }
 entity wallet_messages {
   * id <<PK>>
@@ -98,7 +95,7 @@ entity userbot_accounts {
 entity wallet_accounts {
   * id <<PK>>
   --
-  platform, kind (personal|app), label
+  platform, label (cb|xr), is_active
   userbot_id <<FK userbot_accounts>>
 }
 entity wallet_chat_cursors {
@@ -177,7 +174,6 @@ directions ||--o{ orders
 assets ||--o{ directions
 assets ||--o{ platform_assets
 orders ||--o{ order_transitions
-orders ||--o| pending_inputs
 orders ||--o{ operations
 orders ||--o{ holds
 orders ||--o{ ledger_transactions

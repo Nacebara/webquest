@@ -1,7 +1,9 @@
 @startuml activity-invoice-payment
-' Оплата счёта CryptoBot балансом xRocket (обратное направление симметрично)
+' Оплата счёта CryptoBot деньгами из xRocket (pay_cb_invoice), DESIGN-v0.2 Р4.
+' Клиент платит только чеком. Счёт оплачивает юзербот; шаг PIN в мини-приложении
+' пока неизвестен (нет HAR) — до этого платит оператор. Счёт xRocket — симметрично, без мини-приложения.
 skinparam shadowing false
-title Оплата счёта CryptoBot балансом xRocket
+title Оплата счёта CryptoBot деньгами из xRocket
 
 |Клиент|
 start
@@ -10,97 +12,97 @@ t.me/send?start=IV…;
 
 |Бот / ядро|
 :Разобрать ссылку, проверить бан, лимиты,
-открыто ли направление «оплата счетов»;
-:order = NEW
-operation(open_invoice) в outbox;
+открыто ли направление pay_cb_invoice;
+:operation(open_invoice) в outbox;
 
-|Юзербот|
-:messages.startBot(@send, IV…)
+|Юзербот CryptoBot|
+:sendMessage(@send, "/start IV…")
 — только просмотр, без оплаты;
-:Ответ: сумма, актив/фиат, статус,
-описание, срок действия;
+:Карточка счёта: сумма, актив или фиат,
+статус, одноразовость, срок;
 
 |Бот / ядро|
-if (Счёт активен, одноразовый,
-актив поддержан, сумма в лимитах?) then (нет)
-  :Отказ с причиной
-  деньги не тронуты;
+if (Счёт активен, одноразовый, с суммой,
+в USDT, сумма в лимитах?) then (нет)
+  :«Не могу оплатить этот счёт: причина.
+  Деньги не списаны»;
   stop
 endif
 if (Счёт в фиате?) then (да)
-  :Курс getExchangeRates
-  + буфер 1 % на движение курса;
+  :Сумма в USDT — из карточки кошелька
+  + буфер 1 %;
 endif
-if (Резерв cb:personal ≥ сумма счёта?) then (нет)
-  :«Сейчас не можем оплатить счёт
+if (Резерв cb ≥ сумма счёта A?) then (нет)
+  :«Сейчас не могу оплатить счёт
   на эту сумму»;
   stop
 endif
 :BEGIN TX
 NEW → AWAITING_FUNDS (TTL котировки 15 мин)
-hold cb:personal на сумму счёта
+hold(cb, A)
 COMMIT;
 
 |Клиент|
 :Видит котировку:
-«Отправьте X USDT → оплатим Y»
-[Пришлю чек] [Счёт xRocket] [Отмена];
-if (Способ) then (чек)
-  :Присылает чек xRocket;
-  |Юзербот|
-  :Активировать чек (как в обмене);
-else (счёт xRocket)
-  |Бот / ядро|
-  :createInvoice xRocket Pay (tg-invoice)
-  на X, ждать webhook/опрос;
-endif
+«Пришлите чек xRocket на X — оплачу счёт»
+[Пришлю чек xRocket] [Сумма] [Отмена];
+:Присылает чек xRocket;
+
+|Бот / ядро|
+:AWAITING_FUNDS → INTAKE_PENDING
+(ClientCheckSubmitted), activate_check;
+
+|Юзербот xRocket|
+:"/start t_…" → ответ (как в обмене);
 
 |Бот / ядро|
 switch (Получено)
-case (ровно X)
-  :→ RECEIVED;
-case (меньше X)
-  :→ AWAITING_FUNDS: предложить дослать
-  разницу до конца TTL, иначе возврат
-  всего полученного;
+case (≥ X)
+  :→ RECEIVED, проводка intake
+  (Дт asset:xr / Кт payable);
+case (меньше X / чек не принят)
+  :→ AWAITING_FUNDS: «Дошлите чек на разницу
+  до конца TTL», иначе возврат всего
+  полученного чеком xRocket;
   stop
-case (больше X)
-  :→ RECEIVED, излишек → возврат
-  (если ≥ 0.50 USDT);
 endswitch
 :RECEIVED → INVOICE_PAY_PENDING
-operation(pay_invoice) в outbox;
+operation(pay_invoice, max_attempts = 1);
+:Outbox: operation → dispatched (COMMIT);
 
-|Юзербот|
-:Повторно открыть счёт
-(проверить, что ещё active);
+|Юзербот CryptoBot|
+:Снова открыть счёт;
 if (Счёт ещё активен?) then (нет: оплачен / истёк)
   |Бот / ядро|
-  :→ REFUND_PENDING
-  вернуть X на xRocket (transfer);
+  :InvoiceUnpayable → REFUND_PENDING,
+  чек возврата X на xRocket;
   stop
 endif
-:Нажать «Оплатить» (callback), выбрать актив,
-подтвердить; сохранить все ответы;
+:Кнопка USDT → «Оплатить» →
+кнопка мини-приложения → requestWebView;
+:Ввод PIN (CRYPTOBOT_PIN) в мини-приложении —
+протокол пока неизвестен (нужен HAR);
 
 |Бот / ядро|
-switch (Результат оплаты)
-case (оплачено)
+switch (PayOutcome)
+case (Paid)
   :→ COMPLETED
-  Дт payable X / Кт cb:personal A, Кт revenue X−A
-  итог — клиенту;
-case (требуется код-пароль / мини-приложение)
-  :→ MANUAL_REVIEW (оператор платит руками
-  в приложении, SLA 15 мин), клиенту — S8;
+  Дт payable X / Кт asset:cb A / Кт revenue:fee X−A,
+  переплата ≥ 0,50 — чек на излишек (create_excess_check);
+case (NeedsHuman — пока нет HAR)
+  :→ MANUAL_REVIEW: задача оператору
+  «оплати счёт вручную» (служебный аккаунт,
+  юзербот на паузе), SLA 15 мин; клиенту — S8;
+  :Оператор: «Оплачено» → COMPLETED
+  или «Не получилось» → возврат;
   stop
-case (таймаут / незнакомый ответ)
-  :operation → unknown
-  (заявка остаётся INVOICE_PAY_PENDING),
-  НЕ повторять нажатие,
-  сверка по статусу счёта и балансу;
+case (Unknown: таймаут / незнакомый ответ)
+  :→ MANUAL_REVIEW,
+  НЕ нажимать повторно,
+  сверка: статус счёта и баланс cb;
   stop
 endswitch
 |Клиент|
-:Видит «Счёт оплачен» и разбивку;
+:«Счёт оплачен» и разбивка;
 stop
 @enduml

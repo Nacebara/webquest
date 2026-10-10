@@ -1,5 +1,6 @@
 @startuml activity-recovery-reconcile
-' Восстановление после падения и периодическая сверка
+' Восстановление после падения и периодическая сверка (v0.2: всё через юзербота).
+' Операции, выводящие деньги, после рестарта не повторяются — только сверка.
 skinparam shadowing false
 title Восстановление после рестарта и сверка
 
@@ -8,29 +9,42 @@ start
 :Старт: миграции применены, конфиг проверен;
 :Режим «прогрев»: приём новых заявок закрыт;
 
-|Юзербот|
-:Подключение MTProto, проверка сессии;
-:Догнать историю чатов с @send/@xrocket
-с last_seen_message_id, сохранить сырые сообщения;
+|Юзерботы|
+:Подключение MTProto, сверка закреплённых
+ботов (@send 1559501630, @xrocket 5014831088);
+:Догнать историю чатов с @send / @xrocket
+и «Избранного» с курсора wallet_chat_cursors,
+сохранить сырые сообщения в wallet_messages;
 
 |Ядро|
 :Найти незавершённые операции (outbox);
 while (Есть операция?) is (да)
   switch (kind / статус)
-  case (API-выплата PENDING/DISPATCHED)
-    :Повторить с тем же spend_id / transferId
-    (идемпотентно);
+  case (любая PENDING)
+    :Выполнить как обычно:
+    действие ещё не начиналось;
   case (activate_check DISPATCHED)
     :Сопоставить с сохранёнными ответами;
     if (Ответ найден?) then (да)
       :Применить результат;
     else (нет)
-      :Повторить /start (идемпотентно для чека);
+      :Повторить /start с ТЕМ ЖЕ random_id
+      (Telegram вернёт прежнее сообщение
+      или RANDOM_ID_DUPLICATE);
+    endif
+  case (create_payout / refund / excess_check DISPATCHED)
+    :Повторно НЕ создавать;
+    :find_issued_check: «Избранное»
+    и список чеков бота;
+    if (Однозначно?) then (да)
+      :PayoutConfirmed / RefundConfirmed;
+    else (нет)
+      :MANUAL_REVIEW + CRITICAL;
     endif
   case (pay_invoice DISPATCHED)
     :НЕ нажимать повторно;
     :Открыть счёт, прочитать статус,
-    сверить баланс cb:personal;
+    сверить баланс кошелька;
     if (Однозначно?) then (да)
       :COMPLETED или REFUND_PENDING;
     else (нет)
@@ -38,8 +52,8 @@ while (Есть операция?) is (да)
     endif
   endswitch
 endwhile (нет)
-:Сверка балансов: API getBalance / app/info,
-личные балансы через юзербота;
+:Сверка балансов: экран «Кошелёк»
+через юзербота по каждому кошельку;
 if (Расхождение > допуска?) then (да)
   :Пауза затронутых направлений, CRITICAL;
 else (нет)
@@ -49,13 +63,19 @@ stop
 
 |Планировщик|
 start
-:Каждые 5 мин — API-балансы,
-каждые 15 мин — личные балансы;
-:expected = сумма проводок по счёту кошелька
-− hold'ы в полёте;
-if (|real − expected| > 0.01 актива?) then (да)
+:Каждые 15 мин и после 10 заявок —
+баланс кошелька через юзербота (balances);
+if (Есть операции dispatched / unknown
+по этому кошельку?) then (да)
+  :skipped_inflight, повтор через 30 с;
+  stop
+endif
+:expected = сумма проводок по счёту кошелька;
+if (|real − expected| > 0,01 актива?) then (да)
   if (> порога паузы 1 USDT?) then (да)
-    :Пауза направлений, CRITICAL;
+    :Пауза направлений, CRITICAL,
+    real < expected → «Безопасность»,
+    стоп выплат с этого кошелька;
   else (нет)
     :WARN, запись в reconciliations;
   endif

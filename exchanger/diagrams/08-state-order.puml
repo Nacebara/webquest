@@ -1,55 +1,52 @@
 @startuml state-order
-' Машина состояний заявки (orders.state)
+' Машина состояний заявки (orders.state), v0.2.
+' Переходы = domain::fsm::ALLOWED = order_state_transitions (31). Сверяется скриптом.
+' Подписи: событие FSM и главный эффект. Терминальные состояния ничего не принимают.
 skinparam shadowing false
 hide empty description
-title Состояния заявки
+title Состояния заявки (16 состояний, 31 переход)
 
 [*] --> NEW : ссылка распознана
 
-NEW --> REJECTED : бан / лимит / пауза /\nнет резерва / неверная ссылка
-NEW --> INTAKE_PENDING : обмен чека:\nhold + op activate_check
-NEW --> AWAITING_FUNDS : оплата счёта:\nсчёт открыт, котировка, hold
+NEW --> REJECTED : Rejected: бан / лимит / пауза /\nнет резерва / счёт не подходит
+NEW --> INTAKE_PENDING : обмен — LinkAccepted:\nhold + activate_check
+NEW --> AWAITING_FUNDS : оплата счёта — LinkAccepted:\nсчёт открыт, котировка, hold
 
-AWAITING_FUNDS --> INTAKE_PENDING : клиент прислал чек
-AWAITING_FUNDS --> RECEIVED : оплачен наш счёт\n(webhook / опрос)
-AWAITING_FUNDS --> EXPIRED : TTL котировки истёк
-AWAITING_FUNDS --> CANCELLED : клиент отменил
-AWAITING_FUNDS --> REFUND_PENDING : TTL истёк / отмена,\nно часть денег уже пришла
-INTAKE_PENDING --> AWAITING_FUNDS : оплата счёта: чек не принят\nили недоплата — ждём ещё
-AWAITING_PASSWORD --> AWAITING_FUNDS : оплата счёта:\nпароль не пришёл
-INTAKE_UNKNOWN --> AWAITING_FUNDS : оплата счёта:\nсверка — не пришли
+AWAITING_FUNDS --> INTAKE_PENDING : ClientCheckSubmitted:\nactivate_check
+AWAITING_FUNDS --> EXPIRED : QuoteExpired,\nденег нет
+AWAITING_FUNDS --> CANCELLED : ClientCancelled,\nденег нет
+AWAITING_FUNDS --> REFUND_PENDING : QuoteExpired / ClientCancelled,\nчасть денег пришла: create_refund_check
 
-INTAKE_PENDING --> RECEIVED : «получено X»
-INTAKE_PENDING --> INTAKE_FAILED : чек истёк / активирован /\nне для нас / Premium / подписка
-INTAKE_PENDING --> AWAITING_PASSWORD : чек с паролем
-AWAITING_PASSWORD --> INTAKE_PENDING : пароль получен
-AWAITING_PASSWORD --> INTAKE_FAILED : TTL 10 мин
-INTAKE_PENDING --> INTAKE_UNKNOWN : таймаут /\nнезнакомый ответ
-INTAKE_UNKNOWN --> RECEIVED : сверка: деньги пришли
-INTAKE_UNKNOWN --> INTAKE_FAILED : сверка: не пришли
-INTAKE_UNKNOWN --> MANUAL_REVIEW : неоднозначно
+INTAKE_PENDING --> RECEIVED : CheckActivated (вся сумма):\nпроводка intake
+INTAKE_PENDING --> INTAKE_FAILED : обмен — CheckRejected: уже активирован /\nне найден / не для нас / пароль / капча /\nподписка / Premium; hold снят
+INTAKE_PENDING --> INTAKE_UNKNOWN : IntakeOutcomeUnknown:\nнет ответа 30 с / незнакомый текст
+INTAKE_PENDING --> AWAITING_FUNDS : оплата счёта — CheckRejected\nили недоплата: ждём ещё чек
 
-RECEIVED --> PAYOUT_PENDING : обмен: op payout (spend_id)
-RECEIVED --> INVOICE_PAY_PENDING : оплата счёта: op pay_invoice
-RECEIVED --> REFUND_PENDING : сверх лимита / актив не тот /\nнедоплата без доплаты
-RECEIVED --> MANUAL_REVIEW : паника / kill switch
+INTAKE_UNKNOWN --> RECEIVED : ReconciledReceived
+INTAKE_UNKNOWN --> INTAKE_FAILED : обмен — ReconciledNotReceived
+INTAKE_UNKNOWN --> MANUAL_REVIEW : ReconciliationAmbiguous
+INTAKE_UNKNOWN --> AWAITING_FUNDS : оплата счёта — сверка:\nне пришло или недоплата
 
-PAYOUT_PENDING --> COMPLETED : transfer ok
-PAYOUT_PENDING --> PAYOUT_PENDING : ретрай с тем же spend_id
-PAYOUT_PENDING --> MANUAL_REVIEW : неизвестная ошибка /\nисчерпаны ретраи
+RECEIVED --> PAYOUT_PENDING : обмен — Settle(Payout):\ncreate_payout_check (1 попытка)
+RECEIVED --> INVOICE_PAY_PENDING : оплата — Settle(PayInvoice):\npay_invoice (1 попытка)
+RECEIVED --> REFUND_PENDING : Settle(Refund): сверх лимита /\nне USDT: create_refund_check
+RECEIVED --> MANUAL_REVIEW : Settle(Manual):\nстоп-кран
 
-INVOICE_PAY_PENDING --> COMPLETED : «счёт оплачен»
-INVOICE_PAY_PENDING --> REFUND_PENDING : счёт истёк / оплачен\nкем-то другим ДО нашего нажатия
-INVOICE_PAY_PENDING --> MANUAL_REVIEW : код-пароль / неясный\nисход нажатия
+PAYOUT_PENDING --> COMPLETED : PayoutConfirmed: чек создан\n(или найден сверкой)
+PAYOUT_PENDING --> MANUAL_REVIEW : PayoutFailed: нет средств /\nисход неясен, чек не найден
 
-REFUND_PENDING --> REFUNDED : transfer возврата ok
-REFUND_PENDING --> MANUAL_REVIEW : ошибка возврата
+INVOICE_PAY_PENDING --> COMPLETED : InvoicePaid
+INVOICE_PAY_PENDING --> REFUND_PENDING : InvoiceUnpayable: счёт истёк /\nоплачен кем-то до нас
+INVOICE_PAY_PENDING --> MANUAL_REVIEW : InvoicePayNeedsHuman:\nPIN (NeedsHuman) / исход неясен
 
-MANUAL_REVIEW --> PAYOUT_PENDING : оператор: «повторить выплату»
-MANUAL_REVIEW --> REFUND_PENDING : оператор: «вернуть»
-MANUAL_REVIEW --> COMPLETED : оператор: «закрыть — выплачено»\n(с доказательством)
-MANUAL_REVIEW --> CLOSED_MANUAL : оператор: «закрыть без выплаты»\n(владелец, причина)
-MANUAL_REVIEW --> INVOICE_PAY_PENDING : оператор: «повторить оплату»\n(после проверки статуса счёта)
+REFUND_PENDING --> REFUNDED : RefundConfirmed:\nчек возврата создан
+REFUND_PENDING --> MANUAL_REVIEW : RefundFailed
+
+MANUAL_REVIEW --> PAYOUT_PENDING : оператор: RetryPayout\n(после сверки; новый ключ и random_id)
+MANUAL_REVIEW --> INVOICE_PAY_PENDING : оператор: RetryInvoicePayment\n(после проверки статуса счёта)
+MANUAL_REVIEW --> REFUND_PENDING : оператор: Refund
+MANUAL_REVIEW --> COMPLETED : оператор: CloseAsPaid\n(с доказательством)
+MANUAL_REVIEW --> CLOSED_MANUAL : владелец: CloseWithoutPayout\n(с причиной)
 
 REJECTED --> [*]
 INTAKE_FAILED --> [*]
@@ -63,14 +60,17 @@ note right of MANUAL_REVIEW
   Инварианты:
   • из PAYOUT_PENDING в REFUND_PENDING
     напрямую нельзя (только через разбор);
-  • не больше одной активной операции
-    payout/refund/pay_invoice на заявку;
+  • не больше одной живой расчётной операции
+    (выплата / возврат / оплата счёта) на заявку;
+  • create_*_check и pay_invoice — одна попытка
+    (CHECK max_attempts = 1); неясный исход →
+    сверка или MANUAL_REVIEW, не повтор;
   • деньги клиента = кредит счёта payable
     в леджере, пока заявка не терминальна;
   • EXPIRED / CANCELLED / REJECTED /
     INTAKE_FAILED запрещены, если intake_amount
     задан (CHECK в schema.sql);
-  • список переходов = таблица
+  • переходы = domain::fsm::ALLOWED =
     order_state_transitions (триггер в БД).
 end note
 @enduml
