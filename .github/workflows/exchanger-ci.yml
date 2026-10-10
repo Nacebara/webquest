@@ -60,7 +60,7 @@ jobs:
       - name: cargo clippy (offline sqlx data)
         env:
           SQLX_OFFLINE: "true"
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Install sqlx-cli
         run: |
@@ -84,4 +84,4 @@ jobs:
         run: cargo sqlx prepare --workspace --check -- --all-targets
 
       - name: cargo test
-        run: cargo test --workspace
+        run: cargo test --workspace --all-features
