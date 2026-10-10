@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT available AS \"available!\" FROM wallet_available WHERE wallet_account_id = $1 AND asset = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "available!",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "wallet_available",
+            "name": "available"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int2",
+        "Text"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "0a3851d428434ad72ec25297e132c7946d90e99344984f6d8060285f9a46bddc"
+}

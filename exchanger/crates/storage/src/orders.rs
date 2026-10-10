@@ -226,6 +226,61 @@ pub async fn apply_event(
     Ok((updated, transition))
 }
 
+/// Суммы и параметры заявки, нужные для эффектов перехода и для экрана клиента.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OrderDetails {
+    pub intake_start_param: Option<String>,
+    pub invoice_start_param: Option<String>,
+    pub intake_amount: Option<Decimal>,
+    pub fee_pct_applied: Option<Decimal>,
+    pub fee_amount: Option<Decimal>,
+    pub payout_amount: Option<Decimal>,
+    pub refund_amount: Option<Decimal>,
+    pub invoice_amount: Option<Decimal>,
+    pub payout_check_url: Option<String>,
+    pub failure_code: Option<String>,
+    pub manual_reason: Option<String>,
+}
+
+pub async fn details(conn: &mut PgConnection, id: i64) -> Result<OrderDetails, StorageError> {
+    let r = sqlx::query!(
+        r#"
+        SELECT intake_start_param, invoice_start_param, intake_amount, fee_pct_applied,
+               fee_amount, payout_amount, refund_amount, invoice_amount, payout_check_url,
+               failure_code, manual_reason
+          FROM orders WHERE id = $1
+        "#,
+        id
+    )
+    .fetch_optional(conn)
+    .await?
+    .ok_or(StorageError::NotFound(id))?;
+    Ok(OrderDetails {
+        intake_start_param: r.intake_start_param,
+        invoice_start_param: r.invoice_start_param,
+        intake_amount: r.intake_amount,
+        fee_pct_applied: r.fee_pct_applied,
+        fee_amount: r.fee_amount,
+        payout_amount: r.payout_amount,
+        refund_amount: r.refund_amount,
+        invoice_amount: r.invoice_amount,
+        payout_check_url: r.payout_check_url,
+        failure_code: r.failure_code,
+        manual_reason: r.manual_reason,
+    })
+}
+
+/// Клиент ещё не завершил ни одной заявки (для него — `new_user_max_amount`).
+pub async fn is_new_user(conn: &mut PgConnection, user_id: i64) -> Result<bool, StorageError> {
+    let done = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM orders WHERE user_id = $1 AND state = 'COMPLETED') AS "done!""#,
+        user_id
+    )
+    .fetch_one(conn)
+    .await?;
+    Ok(!done)
+}
+
 fn parse_state(s: &str) -> Result<OrderState, StorageError> {
     s.parse()
         .map_err(|_| StorageError::corrupt("orders.state", s))

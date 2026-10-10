@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, userbot_id FROM wallet_accounts WHERE platform = $1 AND is_active",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "wallet_accounts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "userbot_id",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "wallet_accounts",
+            "name": "userbot_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "34bb8ffb0009ebdebfec0ea459e35532f1f8546dfda012a663c159edac9ecb55"
+}

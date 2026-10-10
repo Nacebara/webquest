@@ -1,0 +1,148 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT intake_start_param, invoice_start_param, intake_amount, fee_pct_applied,\n               fee_amount, payout_amount, refund_amount, invoice_amount, payout_check_url,\n               failure_code, manual_reason\n          FROM orders WHERE id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "intake_start_param",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "intake_start_param"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "invoice_start_param",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "invoice_start_param"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "intake_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "intake_amount"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "fee_pct_applied",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "fee_pct_applied"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "fee_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "fee_amount"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "payout_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "payout_amount"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "refund_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "refund_amount"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "invoice_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "invoice_amount"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "payout_check_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "payout_check_url"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "failure_code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "failure_code"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "manual_reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "manual_reason"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "a4f05d512c54a745e3e82bd2bd55ee14c888a536d4c3567313b0d1fdab518212"
+}

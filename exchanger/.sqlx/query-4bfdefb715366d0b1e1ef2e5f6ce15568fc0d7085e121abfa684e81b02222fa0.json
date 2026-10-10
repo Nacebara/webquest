@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT payout_step FROM platform_assets WHERE platform = $1 AND asset = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "payout_step",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "platform_assets",
+            "name": "payout_step"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4bfdefb715366d0b1e1ef2e5f6ce15568fc0d7085e121abfa684e81b02222fa0"
+}

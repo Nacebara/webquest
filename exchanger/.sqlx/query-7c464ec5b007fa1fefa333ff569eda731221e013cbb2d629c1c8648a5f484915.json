@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE holds SET amount = $2 WHERE order_id = $1 AND state = 'active' AND amount >= $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Numeric"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7c464ec5b007fa1fefa333ff569eda731221e013cbb2d629c1c8648a5f484915"
+}

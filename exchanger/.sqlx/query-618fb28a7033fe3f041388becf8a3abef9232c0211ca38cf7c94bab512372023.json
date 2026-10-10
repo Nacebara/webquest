@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE operations\n           SET status = 'pending', attempts = attempts - 1, next_attempt_at = $2, last_error = $3\n         WHERE id = $1 AND status = 'dispatched'\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "618fb28a7033fe3f041388becf8a3abef9232c0211ca38cf7c94bab512372023"
+}

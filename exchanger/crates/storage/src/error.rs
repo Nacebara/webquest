@@ -23,6 +23,18 @@ pub enum StorageError {
     /// Индекс `ledger_tx_once_per_operation`: повторная обработка ответа не задвоит леджер.
     #[error("operation {0} has already been posted")]
     AlreadyPosted(i64),
+    /// Итог операции уже записан или она не в том статусе.
+    #[error("operation {0} is not in a state that allows this change")]
+    OperationState(i64),
+    /// Нет активного удержания нужного размера.
+    #[error("order {0} has no matching active hold")]
+    HoldState(i64),
+    /// Резерва кошелька не хватает под заявку (SPEC §3.4).
+    #[error("insufficient reserve: available {available}, needed {needed}")]
+    InsufficientReserve {
+        available: domain::Decimal,
+        needed: domain::Decimal,
+    },
     #[error("unexpected value in {column}: {value}")]
     Corrupt { column: &'static str, value: String },
 }

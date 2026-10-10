@@ -9,8 +9,11 @@ use std::time::Duration;
 use sqlx::migrate::Migrator;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 
+pub mod directions;
 pub mod error;
+pub mod holds;
 pub mod ledger;
+pub mod operations;
 pub mod orders;
 pub mod transitions;
 pub mod users;

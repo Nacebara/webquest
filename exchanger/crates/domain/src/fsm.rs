@@ -263,6 +263,18 @@ impl OpKind {
         }
     }
 
+    /// Обратно из `operations.kind`.
+    pub fn from_db_str(s: &str) -> Option<Self> {
+        [
+            OpKind::ActivateCheck,
+            OpKind::PayInvoice,
+            OpKind::CreatePayoutCheck,
+            OpKind::CreateRefundCheck,
+        ]
+        .into_iter()
+        .find(|k| k.as_db_str() == s)
+    }
+
     /// Можно ли повторить операцию, исход которой неизвестен (SPEC §10.5.4).
     pub const fn retry_is_safe(self) -> bool {
         matches!(self, OpKind::ActivateCheck)
@@ -282,6 +294,13 @@ impl MoneyRole {
             MoneyRole::Intake => "intake",
             MoneyRole::Settle => "settle",
         }
+    }
+
+    /// Обратно из `operations.money_role`.
+    pub fn from_db_str(s: &str) -> Option<Self> {
+        [MoneyRole::Intake, MoneyRole::Settle]
+            .into_iter()
+            .find(|r| r.as_db_str() == s)
     }
 }
 

@@ -46,3 +46,17 @@ pub async fn ensure_wallet(
     .await?;
     Ok(id)
 }
+
+/// Активный кошелёк платформы: (id кошелька, id аккаунта юзербота).
+pub async fn active(
+    conn: &mut PgConnection,
+    platform: Platform,
+) -> Result<Option<(i16, i16)>, StorageError> {
+    let row = sqlx::query!(
+        "SELECT id, userbot_id FROM wallet_accounts WHERE platform = $1 AND is_active",
+        platform.db_name()
+    )
+    .fetch_optional(conn)
+    .await?;
+    Ok(row.map(|r| (r.id, r.userbot_id)))
+}

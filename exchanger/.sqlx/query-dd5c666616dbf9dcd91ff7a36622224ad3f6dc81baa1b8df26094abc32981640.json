@@ -1,0 +1,208 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,\n               idempotency_key, start_param, amount, asset, request, attempts, max_attempts,\n               external_id, dispatched_at\n          FROM operations WHERE id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "order_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "order_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "money_role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "money_role"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "platform",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "platform"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "wallet_account_id",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "wallet_account_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "idempotency_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "idempotency_key"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "start_param",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "start_param"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "amount"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "asset",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "asset"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "request",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "request"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "attempts",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "attempts"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "max_attempts",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "max_attempts"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "external_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "external_id"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "dispatched_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "dispatched_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "dd5c666616dbf9dcd91ff7a36622224ad3f6dc81baa1b8df26094abc32981640"
+}

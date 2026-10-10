@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT target FROM reserve_thresholds WHERE wallet_account_id = $1 AND asset = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "target",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "reserve_thresholds",
+            "name": "target"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int2",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "abd3c8e1ddc18e4455ba1f453798fb8b4708fb91e3cc2e0b22ac87a285da5fed"
+}

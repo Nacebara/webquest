@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE holds SET state = $2, closed_at = now() WHERE order_id = $1 AND state = 'active'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c2fc47cd232815ca55c46b5c46a42a4520f3cdfdcc94060723bbf8f74b3b9ee8"
+}
