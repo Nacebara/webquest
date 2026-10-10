@@ -850,6 +850,27 @@ impl Transport for GrammersTransport {
         ))
     }
 
+    async fn recent(&self, chat: Chat, limit: u32) -> Result<Vec<RawMessage>, TransportError> {
+        let request = requests::get_recent(self.shared.bots.input_peer(chat), limit);
+        let result = self
+            .call(Lane::Read, &request, "messages.getHistory")
+            .await?;
+        let messages = convert::messages_of(result);
+        for m in &messages {
+            if let tl::enums::Message::Message(inner) = m {
+                self.shared.remember_webapps(inner.reply_markup.as_ref());
+            }
+        }
+        let limit = usize::try_from(limit.clamp(1, requests::MAX_HISTORY_LIMIT)).unwrap_or(1);
+        Ok(convert::history_page(
+            &messages,
+            chat,
+            0,
+            limit,
+            &self.shared.ctx,
+        ))
+    }
+
     fn subscribe(&self) -> broadcast::Receiver<RawMessage> {
         self.shared.tx.subscribe()
     }

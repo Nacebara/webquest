@@ -36,6 +36,7 @@
 
 mod bots;
 mod model;
+mod payer;
 mod state;
 pub mod texts;
 mod transport;
@@ -50,6 +51,7 @@ pub use model::{
     AccountId, Call, CheckOrigin, CheckSpec, CheckStatus, ClaimOutcome, Fault, InvoiceAmount,
     InvoicePayment, InvoiceSpec, SimCheck, SimError, SimInvoice, SimInvoiceStatus, WebAppPayment,
 };
+pub use payer::SimWebAppPayer;
 pub use transport::SimTransport;
 
 use state::{Delayed, Draft, Op, Outbound, WorldState};

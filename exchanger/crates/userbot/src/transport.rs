@@ -182,6 +182,10 @@ pub trait Transport: Send + Sync + 'static {
         limit: u32,
     ) -> Result<Vec<RawMessage>, TransportError>;
 
+    /// Последние `limit` сообщений чата по возрастанию id: поиск своей команды после
+    /// `RandomIdDuplicate` и выданного чека после сбоя, когда id-якоря нет.
+    async fn recent(&self, chat: Chat, limit: u32) -> Result<Vec<RawMessage>, TransportError>;
+
     /// Поток новых и отредактированных сообщений в чатах с ботами кошельков и в «Избранном».
     fn subscribe(&self) -> broadcast::Receiver<RawMessage>;
 }

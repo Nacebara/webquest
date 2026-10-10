@@ -130,7 +130,7 @@ pub fn normalize(text: &str) -> String {
     out
 }
 
-fn has(norm: &str, needles: &[&str]) -> bool {
+pub(crate) fn has(norm: &str, needles: &[&str]) -> bool {
     needles.iter().any(|n| norm.contains(n))
 }
 
@@ -442,7 +442,8 @@ const ALREADY_PAID: &[&str] = &[
     "already paid",
     "already been paid",
 ];
-const INSUFFICIENT: &[&str] = &["недостаточно", "не хватает", "insufficient", "not enough"];
+pub(crate) const INSUFFICIENT: &[&str] =
+    &["недостаточно", "не хватает", "insufficient", "not enough"];
 /// Только явные фразы успешной оплаты: голое «Счёт оплачен» может означать и «оплачен
 /// кем-то раньше» — тогда `Unknown`, и движок идёт в сверку.
 const PAID_NOW: &[&str] = &[
@@ -459,6 +460,9 @@ const PAID_NOW: &[&str] = &[
     "payment successful",
     "payment was successful",
     "payment completed",
+    // «Списано: 10 USDT» — деньги ушли с нашего баланса, значит платили мы.
+    "списано",
+    "debited",
 ];
 
 /// Классифицировать ответ на «Оплатить». Признак ровно одного класса — этот класс;

@@ -94,6 +94,9 @@ pub enum PayOutcome {
     },
 }
 
+/// Операция не выполнялась: деньги не двигались, движок может закрыть операцию как
+/// неуспешную и создать новую. Всё, что могло выполниться, сценарии возвращают не ошибкой,
+/// а исходом `Unknown` (`ActivationOutcome`, `IssueOutcome`, `PayOutcome`).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum BotError {
     /// Аккаунт на паузе FLOOD_WAIT; операция не выполнялась.
@@ -120,8 +123,9 @@ pub trait WalletBot: Send + Sync {
     /// Создать чек на `amount`: инлайн-режим, при неудаче — меню бота. Одна попытка.
     async fn issue_check(&self, amount: &Money, tag: &OpTag) -> Result<IssueOutcome, BotError>;
 
-    /// Сверка после `IssueOutcome::Unknown`: есть ли в «Избранном» / списке чеков чек этой
-    /// операции (по `random_id`, сумме и времени).
+    /// Сверка после `IssueOutcome::Unknown` или рестарта: чек этой операции между её меткой
+    /// в «Избранном» и следующей меткой (инлайн-сообщение или ответ меню). `None` — чека нет
+    /// или связать его с операцией нельзя: решает человек.
     async fn find_issued_check(
         &self,
         amount: &Money,

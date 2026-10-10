@@ -174,6 +174,22 @@ pub fn get_history(
     }
 }
 
+/// `messages.getHistory` без смещений: последние `limit` сообщений чата (сервер отдаёт их от
+/// новых к старым, порядок выравнивает [`crate::convert::history_page`]).
+pub fn get_recent(peer: tl::enums::InputPeer, limit: u32) -> tl::functions::messages::GetHistory {
+    let limit = i32::try_from(limit.clamp(1, MAX_HISTORY_LIMIT)).unwrap_or(1);
+    tl::functions::messages::GetHistory {
+        peer,
+        offset_id: 0,
+        offset_date: 0,
+        add_offset: 0,
+        limit,
+        max_id: 0,
+        min_id: 0,
+        hash: 0,
+    }
+}
+
 /// `messages.getMessages` по id (личные чаты и «Избранное»).
 pub fn get_messages(ids: &[i32]) -> tl::functions::messages::GetMessages {
     tl::functions::messages::GetMessages {
@@ -435,6 +451,19 @@ mod tests {
         );
         let req = get_history(tl::enums::InputPeer::PeerSelf, i32::MAX, 0);
         assert_eq!((req.offset_id, req.limit), (i32::MAX, 1));
+        let req = get_recent(tl::enums::InputPeer::PeerSelf, 30);
+        assert_eq!(
+            (
+                req.offset_id,
+                req.add_offset,
+                req.limit,
+                req.min_id,
+                req.max_id
+            ),
+            (0, 0, 30, 0, 0)
+        );
+        let req = get_recent(tl::enums::InputPeer::PeerSelf, 5000);
+        assert_eq!(req.limit, 100);
         let req = get_messages(&[5, 6]);
         assert_eq!(req.id.len(), 2);
     }

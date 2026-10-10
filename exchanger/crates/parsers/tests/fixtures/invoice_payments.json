@@ -5,6 +5,8 @@
     { "platform": "cryptobot", "text": "✅ Счёт успешно оплачен", "class": "paid" },
     { "platform": "xrocket", "text": "Invoice paid successfully", "class": "paid" },
     { "platform": "xrocket", "text": "Payment completed", "class": "paid" },
+    { "platform": "cryptobot", "text": "✅ Счёт IVAbCdEfGhIj оплачен.\n\nСписано: 10 USDT.", "class": "paid" },
+    { "platform": "xrocket", "text": "Invoice inv_AbCdEfGhIjKlMnO paid. Debited: 0.5 TONCOIN", "class": "paid" },
     { "platform": "cryptobot", "text": "Счёт уже оплачен", "class": "already_paid" },
     { "platform": "cryptobot", "text": "This invoice has already been paid", "class": "already_paid" },
     { "platform": "cryptobot", "text": "Срок действия счёта истёк", "class": "expired" },

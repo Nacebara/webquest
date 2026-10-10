@@ -241,6 +241,23 @@ impl Transport for SimTransport {
         Ok(messages)
     }
 
+    async fn recent(&self, chat: Chat, limit: u32) -> Result<Vec<RawMessage>, TransportError> {
+        let acc = self.account;
+        let mut st = self.world.lock();
+        let account = st.account(acc).map_err(|_| TransportError::NotAuthorized)?;
+        let limit = usize::try_from(limit).unwrap_or(usize::MAX);
+        let messages: Vec<RawMessage> = account
+            .chats
+            .get(&chat)
+            .map(|msgs| msgs[msgs.len().saturating_sub(limit)..].to_vec())
+            .unwrap_or_default();
+        let fault = st.take_fault(acc, Call::History);
+        if let Some(e) = before_effect(fault.as_ref()).or_else(|| after_effect(fault.as_ref())) {
+            return Err(e);
+        }
+        Ok(messages)
+    }
+
     fn subscribe(&self) -> broadcast::Receiver<RawMessage> {
         self.tx.subscribe()
     }
