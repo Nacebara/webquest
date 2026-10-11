@@ -5,7 +5,7 @@
 Источники правды, по старшинству:
 1. `docs/DESIGN-v0.2.md` — решения владельца (только юзербот, основной поток CryptoBot → xRocket, без паролей).
 2. Этот файл.
-3. `SPEC.md` — v0.1. Где он говорит про API кошельков, `startBot`, пароли чеков или «основной поток XR → CB», он устарел (HANDOVER §3).
+3. `SPEC.md` — v0.2 (справочник: эксплуатация, админка, статистика, риски, открытые вопросы).
 
 Если код и эти документы расходятся — остановись и спроси, не «чини» документ молча.
 
@@ -45,7 +45,7 @@ tgbot (клиентский бот) ← ui + botapi + engine;  ops (ops-бот) 
 app (бинарник exch) ← всё
 ```
 
-Есть: `domain`, `storage`, `app`, `parsers`, `userbot` (без `flows`), `mtproto`, `botapi`, `ui`. Нет: `userbot::flows`, `engine`, `tgbot`, `ops`. Пустые крейты заранее не создаём.
+Есть: `domain`, `storage`, `app`, `parsers`, `userbot` (с `flows` и `sim`), `mtproto`, `botapi`, `ui`, `engine`. Нет: `tgbot`, `ops`. Пустые крейты заранее не создаём.
 В `domain` нет tokio, sqlx, reqwest. `userbot` и `engine` не знают про grammers — только трейт `Transport`.
 
 ## Правила, которые нельзя нарушать

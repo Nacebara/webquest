@@ -76,7 +76,7 @@ XR → CB — то же зеркально (инлайн `@send 97.5usdt`, ме�
 |---|---|---|---|
 | Доменная модель | `crates/domain` | ✅ готово | `Money` и шаги округления; цены (`quote_check_exchange`, `quote_invoice_payment`, фиат, рычаг, лимиты, `max_order_effective`, `classify_funding`); FSM: 16 состояний, 31 переход, эффекты `Operation`/`Hold`/`Post`; шаблоны проводок; property-тесты по 10 000 случаев |
 | Схема БД | `schema.sql` = `migrations/0001_init.sql` | ✅ готово (v0.2) | Все таблицы: заявки, переходы с триггером-охраной, outbox `operations` с CHECK «одна попытка», леджер с проверкой баланса и append-only, holds, `wallet_available`, резервы, сверки, юзерботы, курсоры чатов, `wallet_messages`, персонал, баны, аудит, алерты, рассылки, `stats_daily` |
-| Хранилище | `crates/storage` | 🟡 частично | Есть: `orders` (вставка, `apply_event` с оптимистичной блокировкой и журналом), `ledger` (счета, проводки, балансы), `wallets`, `users`, `transitions`. **Нет:** operations, holds, wallet_messages, курсоры, сверки, settings, staff/bans, алерты |
+| Хранилище | `crates/storage` | ✅ для движка / 🟡 для ops | Есть: `orders` (вставка, `apply_event` с оптимистичной блокировкой и журналом, суммы заявки), `ledger`, `operations` (outbox: вставка с `random_id`, `claim_due` со `SKIP LOCKED`, `finish`/`release`/`retry`, `in_flight`), `holds` (резерв под advisory-блокировкой), `directions`, `settings`, `sessions` (шифрованная сессия юзербота), `wallet_messages`, `wallets`, `users`, `transitions`. **Нет:** курсоры чатов, сверки, staff/bans/аудит, алерты (нужны ops-боту, M5) |
 | Приложение | `crates/app` | 🟡 каркас | `exch run` (миграции, пульс БД), `exch migrate`, `exch check-config`; конфиг с секретами в `SecretString`; супервизор задач с backoff; SIGTERM. **Нет:** `exch login`, `exch selftest`, запуск юзерботов, ботов и движка |
 | Парсеры | `crates/parsers` | ✅ готово | Ссылки на чеки и счета во всех формах (антифишинг, тестнет, омоглифы), суммы и фиат, классификатор ответов на `/start` (12 классов, словари lovec), карточка счёта, ответ на оплату, баланс, созданный чек. Фикстуры — **синтетические**, по словарям lovec (настоящие тексты — M0) |
 | Контракты юзербота | `crates/userbot/src/transport.rs`, `wallet.rs` | ✅ готово | Трейт `Transport` (send_text, press, inline_query, send_inline, open_webapp, history, subscribe) и трейт `WalletBot` (activate_check, issue_check, find_issued_check, inspect_invoice, pay_invoice, balances) |
@@ -85,28 +85,17 @@ XR → CB — то же зеркально (инлайн `@send 97.5usdt`, ме�
 | MTProto-транспорт | `crates/mtproto` | ✅ офлайн / ❓ живьём | `GrammersTransport` на grammers `=0.10.0`: закреплённые боты, сверка при старте, ровно заданный `random_id`, без скрытых повторов, поток апдейтов, сторож и переподключение, шифрованная сессия (XChaCha20-Poly1305), помощник входа. Тесты против поддельного сервера MTProto. **Живьём не проверено ничего** (сеть к Telegram в среде разработки закрыта; список — в doc-комментарии `crates/mtproto/src/lib.rs`) |
 | Bot API клиент | `crates/botapi` | ✅ готово | Тонкий JSON-клиент по образцу lovec `bot_call`, типы Bot API 10.3 (`style`, `icon_custom_emoji_id`, `copy_text`, `sendRichMessage`), клавиатуры; HTTP за feature `client` |
 | Интерфейс клиента | `crates/ui` | ✅ готово | Все экраны (приветствие, курс и лимиты, обмен, инструкции, счёт, все шаги заявки, итоги, возвраты, ручной разбор, история, карточка заявки, помощь, поддержка, ошибки); главное меню; callback-данные; команды; тексты в `ui/ru.toml`; rich + HTML-фолбэк; 41 снимок `insta`; валидатор HTML |
-| Движок | `crates/engine` | ❌ нет | M3 |
+| Движок | `crates/engine` | ✅ обмен чеков / ❌ оплата счетов | `Engine::submit_check` (заявка + удержание резерва + операция активации — одной транзакцией), `process_due` (исполнитель outbox: итог юзербота → переход, проводка, следующая операция — одной транзакцией), решение после зачисления (выплата по рычагу, возврат вне лимитов, человек при стоп-кране), сверка выплат с неизвестным исходом (`find_issued_check`), `recover` после рестарта, `run` (LISTEN + тик). 10 сценариев на симуляторе и живом PostgreSQL. **Нет:** приём оплаты счёта (котировка, ожидание чека, недоплата/переплата), таймеры, сверка балансов, фоновый слушатель уведомлений |
 | Клиентский бот | `crates/tgbot` | ❌ нет | M4 |
 | Ops-бот | `crates/ops` | ❌ нет | M5 |
 | Деплой | — | ❌ нет | M5 |
-| Документы | `docs/`, `SPEC.md`, `diagrams/` | 🟡 | DESIGN-v0.2, LOVEC-PORTING, CLAUDE.md, этот файл — актуальны. SPEC и диаграммы 02/03/06/07/08 — v0.1 (раздел 3) |
+| Документы | `docs/`, `SPEC.md`, `diagrams/` | ✅ | SPEC v0.2 (10 октября), диаграммы 01–11 перерисованы (08 = 31 переход `ALLOWED`, проверено скриптом), DESIGN-v0.2, LOVEC-PORTING, CLAUDE.md, этот файл |
 
 ---
 
-## 3. Источники правды и что устарело
+## 3. Источники правды
 
-Старшинство: **DESIGN-v0.2.md → CLAUDE.md → HANDOVER.md → код и тесты → SPEC.md**.
-
-Устарело в `SPEC.md` (v0.1), задача D1:
-
-- §1.1, §2, §3, §10, §12, §14 — «приём юзерботом, выплата через API», токены `CRYPTOPAY_TOKEN`/`XROCKET_PAY_TOKEN`, крейт `wallets`, вехи M2 «API кошельков» и M6 «наш счёт через API»;
-- §2 — «основной поток XR → CB» и комиссии v0.1;
-- §4 и §6 — состояния и экраны пароля чека (`AWAITING_PASSWORD`, E-коды про пароль);
-- §4, §10 — активация через `startBot` (правильно: `sendMessage("/start <код>")`);
-- §4.x про оплату счёта — «автоматизация PIN отклонена» (правильно: PIN — через мини-приложение, сейчас `NeedsHuman`);
-- §14.2 — структура репозитория (правильная — в `CLAUDE.md`, «Карта крейтов»).
-
-Устарели диаграммы `diagrams/02`, `03`, `06`, `07` (API выплат, `payout_transfer`) и `08-state-order.puml` (36 переходов вместо 31, есть `AWAITING_PASSWORD`).
+Старшинство: **DESIGN-v0.2.md → CLAUDE.md → HANDOVER.md → код и тесты → SPEC.md**. SPEC переписан под v0.2 (10 октября 2026): только юзербот, основной поток CB → XR, без паролей, выплата — чек юзербота; изменения перечислены в его начале («Что изменилось в v0.2»).
 
 `schema_test.sql` частично v0.1. Его заменяют `crates/storage/tests/invariants.rs`; можно удалить вместе с упоминаниями.
 
@@ -143,10 +132,10 @@ cargo sqlx prepare --workspace --check -- --all-targets
 
 ### D. Документы (параллельно с кодом, не блокируют)
 
-**D1. SPEC v0.2.** Переписать разделы из раздела 3 под DESIGN-v0.2. Экономика без комиссий API; резервы `xr` ≈ 1 200 / `cb` ≈ 800 (пометить «ждёт подтверждения»); процессы без паролей; выплата и возврат — чек юзербота; переменные окружения — как в `.env.example`; вехи — как в этом разделе.
+**D1. SPEC v0.2.** ✅ Сделано 10 октября. Было: переписать разделы из раздела 3 под DESIGN-v0.2. Экономика без комиссий API; резервы `xr` ≈ 1 200 / `cb` ≈ 800 (пометить «ждёт подтверждения»); процессы без паролей; выплата и возврат — чек юзербота; переменные окружения — как в `.env.example`; вехи — как в этом разделе.
 *Готово, когда* в SPEC нет упоминаний Crypto Pay API, xRocket Pay API, `startBot`, `AWAITING_PASSWORD`, `CRYPTOPAY_TOKEN`, а комиссии совпадают с `directions`.
 
-**D2. Диаграммы.** Обновить 02/03/06/07 (выплата — `create_payout_check` юзерботом) и 08 (31 переход — сверить скриптом с `domain::fsm::ALLOWED`). Перерендерить PNG (PlantUML ≥ 1.2026 и Graphviz).
+**D2. Диаграммы.** ✅ Сделано 10 октября. Было: обновить 02/03/06/07 (выплата — `create_payout_check` юзерботом) и 08 (31 переход — сверить скриптом с `domain::fsm::ALLOWED`). Перерендерить PNG (PlantUML ≥ 1.2026 и Graphviz).
 *Готово, когда* переходы на диаграмме 08 совпадают с `ALLOWED` один в один.
 
 ### M2. Юзербот (сценарии, вход, запись ответов)
@@ -174,7 +163,7 @@ cargo sqlx prepare --workspace --check -- --all-targets
 
 ### M3. Движок (`crates/engine`) и недостающее хранилище
 
-**M3.1. Репозитории `storage`.**
+**M3.1. Репозитории `storage`.** ✅ Сделано (operations, holds, directions, settings; sessions и wallet_messages — для M2.2). Курсоры, сверки, алерты — вместе с M3.5 и M5.
 
 - `operations`: создать вместе с переходом заявки, в одной транзакции (`random_id` — в `request`); `dispatch` (status `dispatched`, `attempts + 1`, коммит **до** действия юзербота); `finish` (`succeeded`/`failed`/`unknown` + `response`, `external_id`); очередь `FOR UPDATE SKIP LOCKED` по `operations_due` + `LISTEN/NOTIFY`.
 - `holds`: place / shrink / consume / release под `pg_advisory_xact_lock` по кошельку; проверка `available ≥ amount`.
@@ -183,9 +172,9 @@ cargo sqlx prepare --workspace --check -- --all-targets
 
 *Готово, когда* есть тесты на живом PostgreSQL на каждый уникальный индекс и CHECK (второй settle на заявку, второй `activate_check` того же чека, вторая оплата счёта, `max_attempts > 1` у выплаты — всё отклоняется).
 
-**M3.2. FSM-драйвер.** `Engine::handle(order_id, Event)`: загрузить заявку `FOR UPDATE` → `domain::fsm::transition` → в одной транзакции применить эффекты (`Operation` → строка outbox, `Hold` → holds, `Post` → проводка по шаблону `domain::ledger`) и записать переход. Котировка (`domain::pricing`) фиксируется в `OrderPatch` при `Received`.
+**M3.2. FSM-драйвер.** ✅ Сделано: `engine::effects::transit`. `Engine::handle(order_id, Event)`: загрузить заявку `FOR UPDATE` → `domain::fsm::transition` → в одной транзакции применить эффекты (`Operation` → строка outbox, `Hold` → holds, `Post` → проводка по шаблону `domain::ledger`) и записать переход. Котировка (`domain::pricing`) фиксируется в `OrderPatch` при `Received`.
 
-**M3.3. Исполнитель операций (outbox-воркер).** Берёт `pending`, ставит `dispatched`, коммит, вызывает `WalletBot` по `platform`, пишет результат и шлёт событие в FSM. Таблица соответствия:
+**M3.3. Исполнитель операций (outbox-воркер).** ✅ Сделано: `engine::worker` (таблица ниже — в doc-комментарии модуля). Берёт `pending`, ставит `dispatched`, коммит, вызывает `WalletBot` по `platform`, пишет результат и шлёт событие в FSM. Таблица соответствия:
 
 | Результат | Событие |
 |---|---|
@@ -200,7 +189,7 @@ cargo sqlx prepare --workspace --check -- --all-targets
 | `NeedsHuman`, `PayOutcome::Unknown` | `InvoicePayNeedsHuman` |
 | `BotError::FloodWait` / `Unavailable` | операция не начиналась: назад в `pending` с `next_attempt_at` (не тратит попытку) |
 
-**M3.4. Восстановление после рестарта.** Операции в `dispatched` на старте: `activate_check` → догнать историю чата (`history` от курсора) и разобрать; выводящие деньги → **никогда не повторять**, только сверка (`find_issued_check`, статус счёта) → событие или `ManualReview`.
+**M3.4. Восстановление после рестарта.** ✅ Сделано: `Engine::recover`; crash-тест на 200 итераций со случайными сбоями — ещё нет. Операции в `dispatched` на старте: `activate_check` → догнать историю чата (`history` от курсора) и разобрать; выводящие деньги → **никогда не повторять**, только сверка (`find_issued_check`, статус счёта) → событие или `ManualReview`.
 
 **M3.5. Сверка и резервы.** Периодически `balances()` по каждому кошельку → сравнение с леджером (`reconciliations`, допуски из `settings.reconcile_tolerance`; при операциях в полёте — `skipped_inflight`). Расхождение выше `pause` → автопауза направлений, CRITICAL. Правило «не принимаем, если не можем выплатить» (`max_order_effective`), рычаг комиссии, автопауза при `critical`.
 
@@ -281,6 +270,18 @@ cargo sqlx prepare --workspace --check -- --all-targets
 - **Тексты ботов меняются.** Защита — `Unknown` → пауза, `wallet_messages` и быстрое добавление фикстур.
 - **Бан аккаунта юзербота.** Выделенные аккаунты, лимиты частоты, не писать людям; резервный аккаунт и процедура переключения `wallet_accounts.is_active`.
 - **grammers 0.10 живьём не проверен.** Сторож соединения и таймауты — на уровне приложения (см. `mtproto::transport`); первым делом — `exch selftest`.
+
+### 8.1. Что решить владельцу (найдено при переписывании SPEC v0.2)
+
+1. **PIN в мини-приложении против правил CryptoBot.** CryptoBot просит не вводить PIN в сторонних сервисах. Автоввод PIN — только если владелец явно принимает этот риск (SPEC, риск Р18); до этого оплату счёта CryptoBot делает оператор (`NeedsHuman`).
+2. **Ручная оплата и вывод с выделенного аккаунта.** Оператор платит руками из аккаунта юзербота, поставив юзербот на паузу, — это противоречит правилу «аккаунтами руками не пользуются». Нужно решение: отдельная процедура или отдельный аккаунт оператора.
+3. **Ребалансировка без API.** Вывод из CryptoBot тоже требует PIN. Варианты: ручной вывод в сеть с паузой юзербота или обмен чеками через личные аккаунты владельца (SPEC, вопрос В19).
+4. **Вывод прибыли.** В `operations.kind` нет вида «чек владельцу» — добавить в M8.
+5. **`startapp`-ссылки.** DESIGN-v0.2 считает, что `/start` работает и для них; в lovec это не проверялось (SPEC, В18). Проверить в M0.
+6. **Мульти-чеки.** Парсеры принимают `mci_`/`mc_`, а политики нет: брать одну долю или отказывать. Решить в M0.
+7. **Фиатные счета.** Без API курса — только если карточка счёта CryptoBot показывает сумму в USDT до оплаты; иначе отказ.
+8. **Пороги резервов** `xr` ≈ 1 200 / `cb` ≈ 800 и уровни low/critical/high — предложение, ждут подтверждения.
+9. **Ключи операций `open_invoice` и `read_balance`** (колонка `idempotency_key` NOT NULL) — формат определить вместе с оплатой счетов и сверкой (M3).
 
 ---
 
