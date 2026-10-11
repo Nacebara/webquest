@@ -241,6 +241,7 @@ impl Ui {
                 self.fill(&e.invoice_pending, &[("order", &self.order_id(order))]),
                 Keyboard::None,
             ),
+            UiError::InvoiceCheckBusy => (self.fill(&e.invoice_check_busy, &[]), Keyboard::None),
             UiError::InvoiceRefused(refusal) => (
                 self.fill(
                     &e.invoice_refused,

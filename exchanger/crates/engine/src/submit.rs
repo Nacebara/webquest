@@ -29,6 +29,9 @@ pub enum SubmitReject {
     DailyLimit,
     /// Чек пришёл для оплаты счёта, но котировка уже истекла: чек не открывали.
     QuoteExpired,
+    /// По счёту клиента ещё проверяется предыдущий чек: этот не открывали, чтобы он не ушёл
+    /// в обмен вместо оплаты счёта.
+    InvoiceBusy,
 }
 
 impl SubmitReject {
@@ -41,6 +44,7 @@ impl SubmitReject {
             SubmitReject::ServicePaused => "service_paused",
             SubmitReject::DailyLimit => "daily_limit",
             SubmitReject::QuoteExpired => "quote_expired",
+            SubmitReject::InvoiceBusy => "invoice_busy",
         }
     }
 }
@@ -78,12 +82,21 @@ impl Engine {
                 order: None,
             });
         }
-        let awaiting = {
+        let (awaiting, busy) = {
             let mut conn = self.pool.acquire().await?;
-            storage::orders::awaiting_funds(&mut conn, user_id, Some(link.platform)).await?
+            (
+                storage::orders::awaiting_funds(&mut conn, user_id, Some(link.platform)).await?,
+                storage::orders::invoice_checking(&mut conn, user_id, link.platform).await?,
+            )
         };
         if let Some(order) = awaiting {
             return self.fund_invoice(order.id, link).await;
+        }
+        if busy.is_some() {
+            return Ok(Submitted::Rejected {
+                reason: SubmitReject::InvoiceBusy,
+                order: None,
+            });
         }
         let direction = direction_for_check(link.platform);
         let asset = Asset::Usdt;

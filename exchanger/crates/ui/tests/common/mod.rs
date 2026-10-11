@@ -373,6 +373,7 @@ pub fn all_errors() -> Vec<(&'static str, UiError)> {
                 order: ORDER.to_owned(),
             },
         ),
+        ("invoice_check_busy", UiError::InvoiceCheckBusy),
         (
             "invoice_refused_paused",
             UiError::InvoiceRefused(InvoiceRefusal::Paused),

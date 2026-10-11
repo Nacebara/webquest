@@ -237,6 +237,8 @@ pub enum UiError {
     InvoicePending {
         order: String,
     },
+    /// По счёту ещё проверяется предыдущий чек; этот не открывали.
+    InvoiceCheckBusy,
     /// Счёт подходит, но взять его сейчас нельзя (лимиты, резерв, пауза).
     InvoiceRefused(InvoiceRefusal),
     /// E23.

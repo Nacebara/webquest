@@ -143,6 +143,9 @@ async fn submit_invoice(
     user: i64,
     link: &WalletLink,
 ) -> Result<(), TgBotError> {
+    // Каждая ссылка на счёт — действие юзербота (он открывает счёт): считается в лимите заявок
+    // и при отказе, иначе потоком неподходящих счетов можно занять аккаунт кошелька.
+    inner.limiter.record_order(user, Instant::now());
     let submitted = match inner.engine.submit_invoice(user, link).await {
         Ok(submitted) => submitted,
         Err(e) => {
@@ -157,7 +160,6 @@ async fn submit_invoice(
     };
     match submitted {
         InvoiceSubmitted::Quoted(order) => {
-            inner.limiter.record_order(user, Instant::now());
             tracing::info!(
                 order = order.id,
                 direction = order.direction.code(),
@@ -262,6 +264,7 @@ async fn submit(
                 SubmitReject::ServicePaused => UiError::Maintenance { until: None },
                 SubmitReject::DailyLimit => UiError::DailyLimit,
                 SubmitReject::QuoteExpired => UiError::QuoteExpired,
+                SubmitReject::InvoiceBusy => UiError::InvoiceCheckBusy,
                 SubmitReject::NotACheck | SubmitReject::AlreadyInWork => UiError::NotCheckOrInvoice,
             };
             inner.reply_error(chat, &error).await

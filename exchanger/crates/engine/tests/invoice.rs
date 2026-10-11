@@ -549,3 +549,34 @@ async fn excess_check_issued_with_a_timeout_is_found_not_repeated(pool: PgPool) 
     assert_eq!(e.ledger("liability:payable:USDT").await, dec!(0));
     e.assert_books_match().await;
 }
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn second_check_waits_while_the_first_is_checked(pool: PgPool) {
+    let e = setup(pool).await;
+    let inv = shop_invoice(&e, InvoiceSpec::crypto(CB, usdt(dec!(10))));
+    let order = quoted(&e, &inv).await;
+    pay_in(&e, &order, XR, dec!(7)).await;
+    // Первый чек ещё не зачислен: второй не уходит ни в счёт, ни в обмен.
+    let url = e.world.client_check(XR, usdt(dec!(3.30))).unwrap();
+    assert_eq!(
+        e.submit(&url).await,
+        Submitted::Rejected {
+            reason: SubmitReject::InvoiceBusy,
+            order: None
+        }
+    );
+    let mut conn = e.pool.acquire().await.unwrap();
+    let orders: i64 = sqlx::query_scalar("SELECT count(*) FROM orders")
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
+    assert_eq!(orders, 1);
+    drop(conn);
+    // После зачисления первого — второй чек идёт в тот же счёт.
+    e.drain().await;
+    pay_in(&e, &order, XR, dec!(3.30)).await;
+    e.drain().await;
+    let (o, _) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::Completed);
+    e.assert_books_match().await;
+}

@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id FROM orders\n         WHERE user_id = $1 AND direction IN ('pay_cb_invoice', 'pay_xr_invoice')\n           AND intake_platform = $2\n           AND state IN ('INTAKE_PENDING', 'INTAKE_UNKNOWN')\n         ORDER BY id LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2b5ce5c0d20ce36796b215c64881d6e28761d5c58e2413fd55ad651493ddd511"
+}

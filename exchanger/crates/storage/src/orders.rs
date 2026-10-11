@@ -364,6 +364,28 @@ pub async fn by_invoice(
     }
 }
 
+/// Заявка клиента на оплату счёта, по которой сейчас проверяется чек платформы `source`
+/// (`INTAKE_PENDING` / `INTAKE_UNKNOWN`).
+pub async fn invoice_checking(
+    conn: &mut PgConnection,
+    user_id: i64,
+    source: Platform,
+) -> Result<Option<i64>, StorageError> {
+    Ok(sqlx::query_scalar!(
+        r#"
+        SELECT id FROM orders
+         WHERE user_id = $1 AND direction IN ('pay_cb_invoice', 'pay_xr_invoice')
+           AND intake_platform = $2
+           AND state IN ('INTAKE_PENDING', 'INTAKE_UNKNOWN')
+         ORDER BY id LIMIT 1
+        "#,
+        user_id,
+        source.db_name(),
+    )
+    .fetch_optional(conn)
+    .await?)
+}
+
 /// Заявки, котировка которых истекла, пока они ждали чек.
 pub async fn expired_quotes(conn: &mut PgConnection) -> Result<Vec<i64>, StorageError> {
     Ok(sqlx::query_scalar!(
