@@ -594,6 +594,16 @@ impl Ui {
         self.plain(body, Keyboard::None)
     }
 
+    /// Прислали ссылку на счёт, а оплата счетов ещё не подключена: счёт не тронут, что
+    /// можно сделать сейчас.
+    pub fn invoice_soon(&self) -> Screen {
+        let body = self.fill(
+            &self.texts.misc.invoice_soon,
+            &[("exchange", &Frag::text(&self.texts.menu.exchange))],
+        );
+        self.plain(body, Keyboard::None)
+    }
+
     /// Отмена: заявки (до прихода денег) или шага диалога.
     pub fn cancelled(&self, order: Option<&str>) -> Screen {
         let m = &self.texts.misc;

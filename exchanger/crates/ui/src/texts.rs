@@ -410,6 +410,8 @@ pub struct MiscTexts {
     pub no_link: String,
     pub cancelled: String,
     pub cancelled_flow: String,
+    /// Ссылка на счёт, пока оплата счетов не подключена к движку.
+    pub invoice_soon: String,
 }
 
 /// Все тексты клиентского бота.
