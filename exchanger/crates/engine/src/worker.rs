@@ -10,7 +10,9 @@
 //! | чек `Issued` | `succeeded` | `PayoutConfirmed` / `RefundConfirmed` |
 //! | чек `InsufficientFunds` | `failed` | `PayoutFailed` / `RefundFailed` + пауза выплат с этого кошелька |
 //! | чек `Unknown` | `unknown` → сверка `find_issued_check` | нашли — `…Confirmed`; нет дольше `reconcile_grace` — `…Failed` (человек) |
-//! | счёт `Paid` | `succeeded` | `InvoicePaid` |
+//! | чек на переплату | как чек выплаты | заявка уже `COMPLETED`: проводка `excess_refund`; не вышло — человек (заявку не трогаем) |
+//! | активация по счёту | как активация | недоплата — снова `AWAITING_FUNDS`; хватает — `Settle(PayInvoice)` ([`crate::invoice`]) |
+//! | счёт `Paid` | `succeeded` | `InvoicePaid` (+ чек на переплату или `excess_kept`) |
 //! | счёт `Expired` | `failed` | `InvoiceUnpayable` → возврат |
 //! | счёт остальное | `failed` / `unknown` | `InvoicePayNeedsHuman` |
 //! | ошибка движка после действия | `unknown` | к человеку ([`Engine::park`]) |
@@ -21,7 +23,7 @@
 
 use chrono::Utc;
 use domain::Money;
-use domain::fsm::{Event, OpKind, OrderState, Settlement};
+use domain::fsm::{Event, Flow, OpKind, OrderState, Settlement};
 use serde_json::json;
 use sqlx::PgConnection;
 use storage::StorageError;
@@ -73,7 +75,10 @@ fn order_id(op: &OperationRow) -> Result<i64, EngineError> {
 fn is_money_out(kind: OpKind) -> bool {
     matches!(
         kind,
-        OpKind::CreatePayoutCheck | OpKind::CreateRefundCheck | OpKind::PayInvoice
+        OpKind::CreatePayoutCheck
+            | OpKind::CreateRefundCheck
+            | OpKind::CreateExcessCheck
+            | OpKind::PayInvoice
     )
 }
 
@@ -149,7 +154,7 @@ impl Engine {
                 let result = wallet.activate_check(param, &tag).await;
                 self.on_activation(op, result).await
             }
-            OpKind::CreatePayoutCheck | OpKind::CreateRefundCheck => {
+            OpKind::CreatePayoutCheck | OpKind::CreateRefundCheck | OpKind::CreateExcessCheck => {
                 let money = op_money(op)?;
                 let result = wallet.issue_check(&money, &tag).await;
                 self.on_issue(op, &money, result).await
@@ -332,24 +337,28 @@ impl Engine {
                     None,
                 )
                 .await?;
-                let patch = OrderPatch {
-                    intake_amount: Some(m.amount()),
-                    intake_asset: Some(m.asset()),
-                    ..OrderPatch::default()
-                };
-                let (order, _) = transit(
-                    &mut tx,
-                    &order,
-                    Event::CheckActivated { fully_funded: true },
-                    &patch,
-                    None,
-                    EffectCtx {
+                if order.direction.flow() == Flow::InvoicePayment {
+                    self.invoice_received(&mut tx, &order, op.id, &m).await?
+                } else {
+                    let patch = OrderPatch {
+                        intake_amount: Some(m.amount()),
                         intake_asset: Some(m.asset()),
-                        ..cause
-                    },
-                )
-                .await?;
-                self.settle(&mut tx, &order, &m).await?
+                        ..OrderPatch::default()
+                    };
+                    let (order, _) = transit(
+                        &mut tx,
+                        &order,
+                        Event::CheckActivated { fully_funded: true },
+                        &patch,
+                        None,
+                        EffectCtx {
+                            intake_asset: Some(m.asset()),
+                            ..cause
+                        },
+                    )
+                    .await?;
+                    self.settle(&mut tx, &order, &m).await?
+                }
             }
             ActivationOutcome::Rejected(reason) => {
                 let code = reject_code(reason);
@@ -548,6 +557,9 @@ impl Engine {
         check: &IssuedCheck,
         method: &str,
     ) -> Result<(), EngineError> {
+        if op.kind == OpKind::CreateExcessCheck {
+            return self.confirm_excess(op, check, method).await;
+        }
         let event = match op.kind {
             OpKind::CreateRefundCheck => Event::RefundConfirmed,
             _ => Event::PayoutConfirmed,
@@ -584,6 +596,76 @@ impl Engine {
         Ok(())
     }
 
+    /// Чек на переплату создан. Заявка уже `COMPLETED`: только итог операции, проводка
+    /// `excess_refund`, удержание на кошельке входа закрыто и ссылка для клиента.
+    async fn confirm_excess(
+        &self,
+        op: &OperationRow,
+        check: &IssuedCheck,
+        method: &str,
+    ) -> Result<(), EngineError> {
+        let money = op_money(op)?;
+        let id = order_id(op)?;
+        let mut tx = self.pool.begin().await?;
+        let order = storage::orders::get(&mut tx, id, true).await?;
+        storage::operations::finish(
+            &mut tx,
+            op.id,
+            OpStatus::Succeeded,
+            &json!({ "url": check.url, "method": method }),
+            Some(&check.param),
+            None,
+        )
+        .await?;
+        storage::ledger::post(
+            &mut tx,
+            &domain::ledger::excess_refund(op.platform, money.asset(), money.amount())?,
+            storage::ledger::PostingRefs {
+                order_id: Some(id),
+                operation_id: Some(op.id),
+                ..Default::default()
+            },
+        )
+        .await?;
+        storage::holds::close(&mut tx, id, true).await?;
+        storage::orders::set_check_url(&mut tx, id, &check.url).await?;
+        tx.commit().await?;
+        tracing::info!(order = id, op = op.id, "excess refund check issued");
+        self.notify(&order);
+        Ok(())
+    }
+
+    /// Чек на переплату не создан или исход не доказан. Заявка уже закрыта — долг клиенту
+    /// остаётся в леджере (`liability:payable`), удержание держит деньги; решает человек.
+    async fn fail_excess(
+        &self,
+        op: &OperationRow,
+        status: OpStatus,
+        reason: &str,
+        pause: bool,
+    ) -> Result<(), EngineError> {
+        let mut tx = self.pool.begin().await?;
+        storage::operations::finish(
+            &mut tx,
+            op.id,
+            status,
+            &json!({ "reason": reason }),
+            None,
+            Some(reason),
+        )
+        .await?;
+        if status == OpStatus::Unknown {
+            storage::operations::give_up(&mut tx, op.id, reason).await?;
+        }
+        if pause {
+            storage::directions::auto_pause_platform(&mut tx, op.platform, Side::Target, reason)
+                .await?;
+        }
+        tx.commit().await?;
+        tracing::error!(op = op.id, order = ?op.order_id, %reason, "excess refund needs a human");
+        Ok(())
+    }
+
     /// Чек не создан или исход не доказан: заявка к человеку. `status` — итог операции
     /// (`unknown` оставляет её блокировать новую выплату, пока оператор не разберётся).
     /// `pause` — выплаты с этого кошелька на паузу.
@@ -594,6 +676,9 @@ impl Engine {
         reason: &str,
         pause: bool,
     ) -> Result<(), EngineError> {
+        if op.kind == OpKind::CreateExcessCheck {
+            return self.fail_excess(op, status, reason, pause).await;
+        }
         let event = match op.kind {
             OpKind::CreateRefundCheck => Event::RefundFailed,
             _ => Event::PayoutFailed,
@@ -719,14 +804,30 @@ impl Engine {
             reason.as_deref(),
         )
         .await?;
-        let refund_amount = storage::orders::details(&mut tx, order.id)
-            .await?
-            .intake_amount;
+        let refund_amount = match event {
+            // Счёт оплачен: переплата, которую вернём чеком.
+            Event::InvoicePaid => self.excess_refund_amount(&mut tx, &order).await?,
+            // Счёт не оплатить: возврат всего пришедшего, вниз до шага платформы входа.
+            Event::InvoiceUnpayable => {
+                let d = storage::orders::details(&mut tx, order.id).await?;
+                let intake = d.intake_amount.ok_or_else(|| {
+                    EngineError::Invariant(format!("order {}: no intake amount", order.id))
+                })?;
+                let received = Money::new(intake, d.intake_asset.unwrap_or(order.asset))?;
+                match crate::settle::refund(&mut tx, &order, &received, "invoice_unpayable").await?
+                {
+                    Decision::Refund { amount, .. } => Some(amount),
+                    _ => Some(intake),
+                }
+            }
+            _ => None,
+        };
         let patch = OrderPatch {
             manual_reason: reason
                 .as_deref()
                 .filter(|_| event == Event::InvoicePayNeedsHuman),
-            refund_amount: refund_amount.filter(|_| event == Event::InvoiceUnpayable),
+            failure_code: (event == Event::InvoiceUnpayable).then_some("invoice_unpayable"),
+            refund_amount,
             ..OrderPatch::default()
         };
         let (order, _) = transit(
@@ -741,6 +842,9 @@ impl Engine {
             },
         )
         .await?;
+        if event == Event::InvoicePaid {
+            self.settle_excess(&mut tx, &order, op.id).await?;
+        }
         if outcome == PayOutcome::InsufficientFunds {
             storage::directions::auto_pause_platform(
                 &mut tx,
@@ -761,19 +865,20 @@ impl Engine {
             let mut conn = self.pool.acquire().await?;
             let mut out = Vec::new();
             for op in storage::operations::in_flight(&mut conn).await? {
-                if op.status != OpStatus::Unknown
-                    || !matches!(
-                        op.kind,
-                        OpKind::CreatePayoutCheck | OpKind::CreateRefundCheck
-                    )
-                {
+                if op.status != OpStatus::Unknown {
                     continue;
                 }
                 let order = storage::orders::get(&mut conn, order_id(&op)?, false).await?;
-                if matches!(
-                    order.state,
-                    OrderState::PayoutPending | OrderState::RefundPending
-                ) {
+                let waiting = match op.kind {
+                    OpKind::CreatePayoutCheck | OpKind::CreateRefundCheck => matches!(
+                        order.state,
+                        OrderState::PayoutPending | OrderState::RefundPending
+                    ),
+                    // Заявка уже закрыта; пока сверка не сдалась (`give_up`), чек ищем.
+                    OpKind::CreateExcessCheck => true,
+                    OpKind::ActivateCheck | OpKind::PayInvoice => false,
+                };
+                if waiting {
                     out.push(op);
                 }
             }
@@ -841,7 +946,7 @@ impl Engine {
                 }
                 Ok(())
             }
-            OpKind::CreatePayoutCheck | OpKind::CreateRefundCheck => {
+            OpKind::CreatePayoutCheck | OpKind::CreateRefundCheck | OpKind::CreateExcessCheck => {
                 let money = op_money(op)?;
                 self.on_issue(
                     op,

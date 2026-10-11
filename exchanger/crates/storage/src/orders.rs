@@ -3,8 +3,9 @@
 //! Эффекты перехода (операции outbox, удержания, проводки) возвращаются вызывающему коду:
 //! он выполняет их в той же транзакции, что и переход.
 
+use chrono::{DateTime, Utc};
 use domain::fsm::{self, Event, OrderState, Transition};
-use domain::{Asset, Decimal, Direction};
+use domain::{Asset, Decimal, Direction, Platform};
 use sqlx::PgConnection;
 
 use crate::error::{StorageError, unique_violation};
@@ -65,6 +66,14 @@ pub struct OrderPatch<'a> {
     pub payout_check_url: Option<&'a str>,
     pub failure_code: Option<&'a str>,
     pub manual_reason: Option<&'a str>,
+    /// Чек клиента для оплаты счёта: приходит после котировки, каждый следующий (при
+    /// недоплате) заменяет предыдущий — тот уже зачислен.
+    pub intake_start_param: Option<&'a str>,
+    /// Сумма счёта в активе (`A`).
+    pub invoice_amount: Option<Decimal>,
+    /// Сколько клиент должен прислать (`X`).
+    pub quote_amount_in: Option<Decimal>,
+    pub quote_expires_at: Option<DateTime<Utc>>,
 }
 
 /// Создать заявку в состоянии `NEW` и записать первый переход в журнал.
@@ -178,6 +187,10 @@ pub async fn apply_event(
                failure_code    = COALESCE($10, failure_code),
                manual_reason   = COALESCE($11, manual_reason),
                payout_check_url = COALESCE($14, payout_check_url),
+               intake_start_param = COALESCE($16, intake_start_param),
+               invoice_amount  = COALESCE($17, invoice_amount),
+               quote_amount_in = COALESCE($18, quote_amount_in),
+               quote_expires_at = COALESCE($19, quote_expires_at),
                received_at     = CASE WHEN $12 AND received_at IS NULL THEN now() ELSE received_at END,
                finished_at     = CASE WHEN $4 THEN now() ELSE finished_at END
          WHERE id = $1 AND version = $2 AND state = $13
@@ -198,9 +211,14 @@ pub async fn apply_event(
         order.state.as_db_str(),
         patch.payout_check_url,
         patch.intake_asset.map(|a| a.code()),
+        patch.intake_start_param,
+        patch.invoice_amount,
+        patch.quote_amount_in,
+        patch.quote_expires_at,
     )
     .fetch_optional(&mut *conn)
-    .await?
+    .await
+    .map_err(map_duplicate)?
     .ok_or(StorageError::Conflict {
         id: order.id,
         expected: order.version,
@@ -242,6 +260,8 @@ pub struct OrderDetails {
     pub payout_amount: Option<Decimal>,
     pub refund_amount: Option<Decimal>,
     pub invoice_amount: Option<Decimal>,
+    pub quote_amount_in: Option<Decimal>,
+    pub quote_expires_at: Option<DateTime<Utc>>,
     pub payout_check_url: Option<String>,
     pub failure_code: Option<String>,
     pub manual_reason: Option<String>,
@@ -251,8 +271,8 @@ pub async fn details(conn: &mut PgConnection, id: i64) -> Result<OrderDetails, S
     let r = sqlx::query!(
         r#"
         SELECT intake_start_param, invoice_start_param, intake_amount, intake_asset, fee_pct_applied,
-               fee_amount, payout_amount, refund_amount, invoice_amount, payout_check_url,
-               failure_code, manual_reason
+               fee_amount, payout_amount, refund_amount, invoice_amount, quote_amount_in,
+               quote_expires_at, payout_check_url, failure_code, manual_reason
           FROM orders WHERE id = $1
         "#,
         id
@@ -276,6 +296,8 @@ pub async fn details(conn: &mut PgConnection, id: i64) -> Result<OrderDetails, S
         payout_amount: r.payout_amount,
         refund_amount: r.refund_amount,
         invoice_amount: r.invoice_amount,
+        quote_amount_in: r.quote_amount_in,
+        quote_expires_at: r.quote_expires_at,
         payout_check_url: r.payout_check_url,
         failure_code: r.failure_code,
         manual_reason: r.manual_reason,
@@ -291,6 +313,84 @@ pub async fn is_new_user(conn: &mut PgConnection, user_id: i64) -> Result<bool, 
     .fetch_one(conn)
     .await?;
     Ok(!done)
+}
+
+/// Заявка клиента на оплату счёта, которая ждёт чек (`AWAITING_FUNDS`). `source` — платформа
+/// чека клиента; `None` — любая. Самая ранняя, если их несколько.
+pub async fn awaiting_funds(
+    conn: &mut PgConnection,
+    user_id: i64,
+    source: Option<Platform>,
+) -> Result<Option<OrderRow>, StorageError> {
+    let id = sqlx::query_scalar!(
+        r#"
+        SELECT id FROM orders
+         WHERE user_id = $1 AND state = 'AWAITING_FUNDS'
+           AND ($2::TEXT IS NULL OR intake_platform = $2)
+         ORDER BY id LIMIT 1
+        "#,
+        user_id,
+        source.map(Platform::db_name),
+    )
+    .fetch_optional(&mut *conn)
+    .await?;
+    match id {
+        Some(id) => Ok(Some(get(conn, id, false).await?)),
+        None => Ok(None),
+    }
+}
+
+/// Живая или успешно закрытая заявка по чужому счёту (повторная ссылка на счёт).
+pub async fn by_invoice(
+    conn: &mut PgConnection,
+    platform: Platform,
+    param: &str,
+) -> Result<Option<OrderRow>, StorageError> {
+    let id = sqlx::query_scalar!(
+        r#"
+        SELECT id FROM orders
+         WHERE invoice_platform = $1 AND invoice_start_param = $2
+           AND (NOT is_terminal OR state = 'COMPLETED')
+         ORDER BY id DESC LIMIT 1
+        "#,
+        platform.db_name(),
+        param,
+    )
+    .fetch_optional(&mut *conn)
+    .await?;
+    match id {
+        Some(id) => Ok(Some(get(conn, id, false).await?)),
+        None => Ok(None),
+    }
+}
+
+/// Заявки, котировка которых истекла, пока они ждали чек.
+pub async fn expired_quotes(conn: &mut PgConnection) -> Result<Vec<i64>, StorageError> {
+    Ok(sqlx::query_scalar!(
+        r#"
+        SELECT id FROM orders
+         WHERE state = 'AWAITING_FUNDS' AND quote_expires_at <= now()
+         ORDER BY id
+        "#
+    )
+    .fetch_all(conn)
+    .await?)
+}
+
+/// Ссылка на чек, созданный после завершения заявки (переплата по оплаченному счёту).
+pub async fn set_check_url(
+    conn: &mut PgConnection,
+    id: i64,
+    url: &str,
+) -> Result<(), StorageError> {
+    sqlx::query!(
+        "UPDATE orders SET payout_check_url = $2 WHERE id = $1",
+        id,
+        url
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
 }
 
 fn parse_state(s: &str) -> Result<OrderState, StorageError> {

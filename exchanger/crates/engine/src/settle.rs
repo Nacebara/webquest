@@ -100,7 +100,7 @@ pub(crate) async fn decide(
 /// Возврат всей суммы чеком на платформе входа: вниз до шага платформы (остаток — в доход,
 /// проводка `excess_kept` при подтверждении возврата). Меньше минимального чека платформы —
 /// создать нечего, к человеку.
-async fn refund(
+pub(crate) async fn refund(
     conn: &mut PgConnection,
     order: &OrderRow,
     received: &Money,
@@ -126,7 +126,7 @@ async fn refund(
 
 /// Комиссия по рычагу резерва целевого кошелька; без заданного целевого резерва — базовая.
 /// Удержание самой заявки (`own_hold`) — не расход резерва: оно ещё не сжато до выплаты.
-async fn fee_pct(
+pub(crate) async fn fee_pct(
     conn: &mut PgConnection,
     dir: &storage::directions::DirectionRow,
     wallet: i16,

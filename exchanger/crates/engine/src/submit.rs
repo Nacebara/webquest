@@ -27,6 +27,8 @@ pub enum SubmitReject {
     ServicePaused,
     /// Суточный лимит клиента исчерпан (`settings.daily_limit_usd`).
     DailyLimit,
+    /// Чек пришёл для оплаты счёта, но котировка уже истекла: чек не открывали.
+    QuoteExpired,
 }
 
 impl SubmitReject {
@@ -38,6 +40,7 @@ impl SubmitReject {
             SubmitReject::NoReserve => "no_reserve",
             SubmitReject::ServicePaused => "service_paused",
             SubmitReject::DailyLimit => "daily_limit",
+            SubmitReject::QuoteExpired => "quote_expired",
         }
     }
 }
@@ -62,7 +65,8 @@ pub fn direction_for_check(platform: Platform) -> Direction {
 }
 
 impl Engine {
-    /// Клиент `user_id` (уже есть в `users`) прислал ссылку на чек.
+    /// Клиент `user_id` (уже есть в `users`) прислал ссылку на чек. Если у клиента есть счёт,
+    /// который ждёт чек этой платформы, чек идёт в оплату счёта (SPEC §4, П3), иначе — обмен.
     pub async fn submit_check(
         &self,
         user_id: i64,
@@ -73,6 +77,13 @@ impl Engine {
                 reason: SubmitReject::NotACheck,
                 order: None,
             });
+        }
+        let awaiting = {
+            let mut conn = self.pool.acquire().await?;
+            storage::orders::awaiting_funds(&mut conn, user_id, Some(link.platform)).await?
+        };
+        if let Some(order) = awaiting {
+            return self.fund_invoice(order.id, link).await;
         }
         let direction = direction_for_check(link.platform);
         let asset = Asset::Usdt;
@@ -188,7 +199,7 @@ impl Engine {
 
 /// Суточный лимит из `settings.daily_limit_usd` (`{"default": 1000, "new_user": 200}`);
 /// `None` — не задан.
-async fn daily_limit(
+pub(crate) async fn daily_limit(
     conn: &mut sqlx::PgConnection,
     new_user: bool,
 ) -> Result<Option<domain::Decimal>, EngineError> {
@@ -196,10 +207,25 @@ async fn daily_limit(
         return Ok(None);
     };
     let key = if new_user { "new_user" } else { "default" };
-    let limit = value.get(key).and_then(|v| match v {
+    Ok(value.get(key).and_then(decimal_of))
+}
+
+/// Число из настройки: JSON-число или строка.
+pub(crate) fn decimal_of(v: &serde_json::Value) -> Option<domain::Decimal> {
+    match v {
         serde_json::Value::Number(n) => n.to_string().parse().ok(),
         serde_json::Value::String(s) => s.parse().ok(),
         _ => None,
-    });
-    Ok(limit)
+    }
+}
+
+/// Числовая настройка (`quote_ttl_seconds`, `min_refund_amount`); `None` — не задана.
+pub(crate) async fn setting_decimal(
+    conn: &mut sqlx::PgConnection,
+    key: &str,
+) -> Result<Option<domain::Decimal>, EngineError> {
+    Ok(storage::settings::get(conn, key)
+        .await?
+        .as_ref()
+        .and_then(decimal_of))
 }

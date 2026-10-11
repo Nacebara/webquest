@@ -22,6 +22,9 @@ pub(crate) struct EffectCtx {
     pub hold: Option<(i16, Decimal)>,
     /// Актив, в котором реально пришли деньги (если не совпал с активом заявки).
     pub intake_asset: Option<Asset>,
+    /// Сколько пришло этим чеком. Оплата счёта может собираться из нескольких чеков: в
+    /// `intake_amount` заявки — сумма всех, а проводка `intake` — только этого.
+    pub intake_delta: Option<Decimal>,
 }
 
 fn need(value: Option<Decimal>, what: &str, order: &OrderRow) -> Result<Decimal, EngineError> {
@@ -89,7 +92,7 @@ async fn post(
         PostingKind::Intake => ledger::intake(
             source,
             ctx.intake_asset.unwrap_or(asset),
-            need(d.intake_amount, "intake amount", order)?,
+            need(ctx.intake_delta.or(d.intake_amount), "intake amount", order)?,
         )?,
         PostingKind::Payout => ledger::payout(
             target,
@@ -117,12 +120,18 @@ async fn post(
             }
             ledger::refund(source, asset, refund)?
         }
-        PostingKind::InvoicePaid => ledger::invoice_paid(
-            target,
-            asset,
-            need(d.intake_amount, "intake amount", order)?,
-            need(d.invoice_amount, "invoice amount", order)?,
-        )?,
+        PostingKind::InvoicePaid => {
+            // Клиент платит по котировке `X`; переплата сверх неё остаётся долгом клиенту —
+            // её закроет чек на излишек или проводка `excess_kept`.
+            let intake = need(d.intake_amount, "intake amount", order)?;
+            let client_paid = d.quote_amount_in.map_or(intake, |x| x.min(intake));
+            ledger::invoice_paid(
+                target,
+                asset,
+                client_paid,
+                need(d.invoice_amount, "invoice amount", order)?,
+            )?
+        }
         PostingKind::ManualClose => {
             return Err(EngineError::Invariant(format!(
                 "order {}: manual close posting is done by the operator tool",
@@ -143,7 +152,7 @@ async fn post(
     Ok(())
 }
 
-async fn create_op(
+pub(crate) async fn create_op(
     conn: &mut PgConnection,
     order: &OrderRow,
     d: &OrderDetails,
@@ -166,6 +175,13 @@ async fn create_op(
             Some(need(d.refund_amount, "refund amount", order)?),
             "refund",
         ),
+        // Переплата по оплаченному счёту: сумма — в `refund_amount` завершённой заявки.
+        OpKind::CreateExcessCheck => (
+            source,
+            None,
+            Some(need(d.refund_amount, "excess refund amount", order)?),
+            "excess",
+        ),
         OpKind::PayInvoice => (
             target,
             d.invoice_start_param.as_deref(),
@@ -184,7 +200,9 @@ async fn create_op(
         .ok_or(EngineError::NoWalletAccount(platform))?;
     // Возврат — в том активе, в котором пришли деньги.
     let asset = match kind {
-        OpKind::CreateRefundCheck => d.intake_asset.unwrap_or(order.asset),
+        OpKind::CreateRefundCheck | OpKind::CreateExcessCheck => {
+            d.intake_asset.unwrap_or(order.asset)
+        }
         _ => order.asset,
     };
     let n = storage::operations::count_for_order(&mut *conn, order.id, kind).await? + 1;
@@ -207,7 +225,7 @@ async fn create_op(
     .await?;
     // Деньги для возврата уже лежат на кошельке входа — удерживаем их, чтобы встречные
     // заявки не заняли их под свои выплаты.
-    if let (OpKind::CreateRefundCheck, Some(refund)) = (kind, amount) {
+    if let (OpKind::CreateRefundCheck | OpKind::CreateExcessCheck, Some(refund)) = (kind, amount) {
         storage::holds::lock_wallet(&mut *conn, wallet).await?;
         storage::holds::place_unchecked(&mut *conn, order.id, wallet, asset, refund).await?;
     }

@@ -203,12 +203,12 @@ pub async fn count_for_order(
 }
 
 /// Виды операций, которые выполняет движок. Остальные (`withdrawal`, `read_balance`,
-/// `open_invoice`, `create_excess_check`) берут другие исполнители — движок их не трогает
-/// и не падает на них.
-const ENGINE_KINDS: [&str; 4] = [
+/// `open_invoice`) берут другие исполнители — движок их не трогает и не падает на них.
+const ENGINE_KINDS: [&str; 5] = [
     "activate_check",
     "create_payout_check",
     "create_refund_check",
+    "create_excess_check",
     "pay_invoice",
 ];
 
@@ -227,7 +227,7 @@ pub async fn claim_due(
            SET status = 'dispatched', attempts = o.attempts + 1, dispatched_at = now()
           FROM (SELECT id FROM operations
                  WHERE status = 'pending' AND next_attempt_at <= now()
-                   AND kind = ANY($2) AND money_role IN ('intake', 'settle')
+                   AND kind = ANY($2) AND money_role IN ('intake', 'settle', 'excess_refund')
                  ORDER BY next_attempt_at, id
                  LIMIT $1
                  FOR UPDATE SKIP LOCKED) due
@@ -251,6 +251,7 @@ pub async fn claim_due(
 }
 
 /// Операции в работе или с неизвестным исходом (восстановление после рестарта, сверка).
+/// Без тех, по которым автоматика сдалась ([`give_up`]): их разбирает человек.
 pub async fn in_flight(conn: &mut PgConnection) -> Result<Vec<OperationRow>, StorageError> {
     let rows = sqlx::query_as!(
         RawRow,
@@ -259,8 +260,8 @@ pub async fn in_flight(conn: &mut PgConnection) -> Result<Vec<OperationRow>, Sto
                idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
                external_id, dispatched_at, releases, first_released_at
           FROM operations
-         WHERE status IN ('dispatched', 'unknown')
-           AND kind = ANY($1) AND money_role IN ('intake', 'settle')
+         WHERE status IN ('dispatched', 'unknown') AND finished_at IS NULL
+           AND kind = ANY($1) AND money_role IN ('intake', 'settle', 'excess_refund')
          ORDER BY id
         "#,
         &ENGINE_KINDS.map(str::to_owned),
@@ -348,6 +349,23 @@ pub async fn finish(
     } else {
         Err(StorageError::OperationState(id))
     }
+}
+
+/// Исход остаётся неизвестным, но автоматика больше не сверяет: операция ждёт человека
+/// (`finished_at` отмечает, когда сдались). Статус `unknown` по-прежнему держит уникальные
+/// индексы — повторной выплаты не будет.
+pub async fn give_up(conn: &mut PgConnection, id: i64, reason: &str) -> Result<(), StorageError> {
+    sqlx::query!(
+        r#"
+        UPDATE operations SET last_error = $2, finished_at = now()
+         WHERE id = $1 AND status = 'unknown'
+        "#,
+        id,
+        reason
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
 }
 
 /// Действие не выполнялось: назад в `pending` на `at`, попытка не считается.

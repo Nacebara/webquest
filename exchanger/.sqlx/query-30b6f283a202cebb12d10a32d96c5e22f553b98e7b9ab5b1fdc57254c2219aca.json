@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE operations SET last_error = $2, finished_at = now()\n         WHERE id = $1 AND status = 'unknown'\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "30b6f283a202cebb12d10a32d96c5e22f553b98e7b9ab5b1fdc57254c2219aca"
+}

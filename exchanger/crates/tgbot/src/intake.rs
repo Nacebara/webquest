@@ -167,6 +167,7 @@ async fn submit(
                 },
                 SubmitReject::ServicePaused => UiError::Maintenance { until: None },
                 SubmitReject::DailyLimit => UiError::DailyLimit,
+                SubmitReject::QuoteExpired => UiError::QuoteExpired,
                 SubmitReject::NotACheck | SubmitReject::AlreadyInWork => UiError::NotCheckOrInvoice,
             };
             inner.reply_error(chat, &error).await

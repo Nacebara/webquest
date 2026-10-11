@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,\n               idempotency_key, start_param, amount, asset, request, attempts, max_attempts,\n               external_id, dispatched_at, releases, first_released_at\n          FROM operations\n         WHERE status IN ('dispatched', 'unknown')\n           AND kind = ANY($1) AND money_role IN ('intake', 'settle')\n         ORDER BY id\n        ",
+  "query": "\n        SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,\n               idempotency_key, start_param, amount, asset, request, attempts, max_attempts,\n               external_id, dispatched_at, releases, first_released_at\n          FROM operations\n         WHERE status IN ('dispatched', 'unknown') AND finished_at IS NULL\n           AND kind = ANY($1) AND money_role IN ('intake', 'settle', 'excess_refund')\n         ORDER BY id\n        ",
   "describe": {
     "columns": [
       {
@@ -228,5 +228,5 @@
       true
     ]
   },
-  "hash": "3975eeca86cc50464aed300e52d01f9f6882d0c9051b9970d65b442c57a2083e"
+  "hash": "ff1858020b56adbfb4cfabbfa39083cf170f14feb940a14ede58df7be3b1c64a"
 }

@@ -291,7 +291,7 @@ async fn act(e: &common::Env, op: &storage::operations::OperationRow) {
                 .activate_check(op.start_param.as_deref().unwrap(), &tag)
                 .await;
         }
-        OpKind::CreatePayoutCheck | OpKind::CreateRefundCheck => {
+        OpKind::CreatePayoutCheck | OpKind::CreateRefundCheck | OpKind::CreateExcessCheck => {
             let _ = wallet.issue_check(&usdt(op.amount.unwrap()), &tag).await;
         }
         OpKind::PayInvoice => {}

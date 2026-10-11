@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id FROM orders\n         WHERE user_id = $1 AND state = 'AWAITING_FUNDS'\n           AND ($2::TEXT IS NULL OR intake_platform = $2)\n         ORDER BY id LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "55e2687e89896e2e85f0f61d73206c9f6c91223ecff41161b5b74ec2ce33b8fe"
+}

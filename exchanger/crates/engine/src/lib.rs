@@ -15,6 +15,7 @@
 //! ([`effects`]); выплата — одна попытка, неясный исход — сверка или `MANUAL_REVIEW`.
 
 mod effects;
+mod invoice;
 mod settle;
 mod submit;
 mod worker;
@@ -30,6 +31,9 @@ use storage::StorageError;
 use tokio::sync::broadcast;
 use userbot::WalletBot;
 
+pub use invoice::{
+    InvoiceIssue, InvoiceReject, InvoiceSubmitted, direction_for_invoice, payable_amount,
+};
 pub use submit::{SubmitReject, Submitted};
 
 /// Настройки движка.
@@ -224,6 +228,7 @@ impl Engine {
                 () = cancel.cancelled() => break,
                 _ = tick.tick() => {}
                 _ = housekeeping.tick() => {
+                    self.expire_quotes().await?;
                     self.resolve_unknown().await?;
                     self.recover_dispatched(Some(self.cfg.stale_after)).await?;
                 }

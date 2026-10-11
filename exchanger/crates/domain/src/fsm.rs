@@ -251,6 +251,9 @@ pub enum OpKind {
     CreatePayoutCheck,
     /// Создать чек возврата на платформе входа. Одна попытка.
     CreateRefundCheck,
+    /// Создать чек на переплату по оплаченному счёту (платформа входа). Одна попытка.
+    /// Не эффект перехода: движок создаёт её вместе с `InvoicePaid` (SPEC §4, П6).
+    CreateExcessCheck,
 }
 
 impl OpKind {
@@ -260,6 +263,7 @@ impl OpKind {
             OpKind::PayInvoice => "pay_invoice",
             OpKind::CreatePayoutCheck => "create_payout_check",
             OpKind::CreateRefundCheck => "create_refund_check",
+            OpKind::CreateExcessCheck => "create_excess_check",
         }
     }
 
@@ -270,6 +274,7 @@ impl OpKind {
             OpKind::PayInvoice,
             OpKind::CreatePayoutCheck,
             OpKind::CreateRefundCheck,
+            OpKind::CreateExcessCheck,
         ]
         .into_iter()
         .find(|k| k.as_db_str() == s)
@@ -286,6 +291,8 @@ impl OpKind {
 pub enum MoneyRole {
     Intake,
     Settle,
+    /// Возврат переплаты по оплаченному счёту.
+    ExcessRefund,
 }
 
 impl MoneyRole {
@@ -293,14 +300,19 @@ impl MoneyRole {
         match self {
             MoneyRole::Intake => "intake",
             MoneyRole::Settle => "settle",
+            MoneyRole::ExcessRefund => "excess_refund",
         }
     }
 
     /// Обратно из `operations.money_role`.
     pub fn from_db_str(s: &str) -> Option<Self> {
-        [MoneyRole::Intake, MoneyRole::Settle]
-            .into_iter()
-            .find(|r| r.as_db_str() == s)
+        [
+            MoneyRole::Intake,
+            MoneyRole::Settle,
+            MoneyRole::ExcessRefund,
+        ]
+        .into_iter()
+        .find(|r| r.as_db_str() == s)
     }
 }
 
@@ -793,8 +805,10 @@ mod tests {
             OpKind::PayInvoice,
             OpKind::CreatePayoutCheck,
             OpKind::CreateRefundCheck,
+            OpKind::CreateExcessCheck,
         ] {
             assert!(!kind.retry_is_safe(), "{kind:?}");
+            assert_eq!(OpKind::from_db_str(kind.as_db_str()), Some(kind));
         }
         assert!(OpKind::ActivateCheck.retry_is_safe());
     }

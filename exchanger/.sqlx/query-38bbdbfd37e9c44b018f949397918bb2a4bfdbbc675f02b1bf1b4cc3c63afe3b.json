@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE operations o\n           SET status = 'dispatched', attempts = o.attempts + 1, dispatched_at = now()\n          FROM (SELECT id FROM operations\n                 WHERE status = 'pending' AND next_attempt_at <= now()\n                   AND kind = ANY($2) AND money_role IN ('intake', 'settle')\n                 ORDER BY next_attempt_at, id\n                 LIMIT $1\n                 FOR UPDATE SKIP LOCKED) due\n         WHERE o.id = due.id\n        RETURNING o.id, o.order_id, o.kind, o.money_role, o.platform, o.wallet_account_id,\n                  o.status, o.idempotency_key, o.start_param, o.amount, o.asset, o.request,\n                  o.attempts, o.max_attempts, o.external_id, o.dispatched_at,\n                  o.releases, o.first_released_at\n        ",
+  "query": "\n        UPDATE operations o\n           SET status = 'dispatched', attempts = o.attempts + 1, dispatched_at = now()\n          FROM (SELECT id FROM operations\n                 WHERE status = 'pending' AND next_attempt_at <= now()\n                   AND kind = ANY($2) AND money_role IN ('intake', 'settle', 'excess_refund')\n                 ORDER BY next_attempt_at, id\n                 LIMIT $1\n                 FOR UPDATE SKIP LOCKED) due\n         WHERE o.id = due.id\n        RETURNING o.id, o.order_id, o.kind, o.money_role, o.platform, o.wallet_account_id,\n                  o.status, o.idempotency_key, o.start_param, o.amount, o.asset, o.request,\n                  o.attempts, o.max_attempts, o.external_id, o.dispatched_at,\n                  o.releases, o.first_released_at\n        ",
   "describe": {
     "columns": [
       {
@@ -229,5 +229,5 @@
       true
     ]
   },
-  "hash": "239cc55b1f544dad15dfa31abe288ee3a8f8efb258318dd794c38b87737f7781"
+  "hash": "38bbdbfd37e9c44b018f949397918bb2a4bfdbbc675f02b1bf1b4cc3c63afe3b"
 }
