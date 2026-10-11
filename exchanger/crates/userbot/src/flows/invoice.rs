@@ -25,11 +25,18 @@ fn is_invoice_reply(platform: domain::Platform, m: &RawMessage) -> bool {
 }
 
 /// Открыть счёт и дождаться карточки. Ничего не платит: любая неудача — «не выполнялось».
+/// Открытая карточка: наша команда, ответ бота и признак «команду отправил прошлый вызов».
+struct Opened {
+    cmd: RawMessage,
+    card: RawMessage,
+    earlier_call: bool,
+}
+
 async fn open_card<T: Transport>(
     conv: &mut Conv<'_, T>,
     param: &str,
     random_id: i64,
-) -> Result<(RawMessage, RawMessage), BotError> {
+) -> Result<Opened, BotError> {
     let platform = conv.platform();
     let chat = Chat::WalletBot(platform);
     conv.wait_quarantine(chat).await;
@@ -38,6 +45,13 @@ async fn open_card<T: Transport>(
         .send(chat, &format!("/start {param}"), random_id, Pace::Bot)
         .await
     {
+        Ok(sent) if sent.earlier_call => {
+            return Ok(Opened {
+                card: sent.msg.clone(),
+                cmd: sent.msg,
+                earlier_call: true,
+            });
+        }
         Ok(sent) => sent,
         Err(SendError::NotSent(e)) => return Err(e),
         Err(SendError::Unknown(detail)) => {
@@ -52,7 +66,11 @@ async fn open_card<T: Transport>(
         })
         .await;
     match card {
-        Some(card) => Ok((sent.msg, card)),
+        Some(card) => Ok(Opened {
+            cmd: sent.msg,
+            card,
+            earlier_call: false,
+        }),
         None => {
             conv.quarantine(chat);
             Err(BotError::Unavailable(
@@ -67,10 +85,10 @@ pub(crate) async fn inspect<T: Transport>(
     param: &str,
 ) -> Result<InvoiceInfo, BotError> {
     let mut conv = Conv::open(w, None).await;
-    let (_, card) = open_card(&mut conv, param, rid::new_random_id()).await?;
+    let opened = open_card(&mut conv, param, rid::new_random_id()).await?;
     Ok(InvoiceInfo {
         param: param.to_owned(),
-        card: parse_invoice_card(w.platform, &card.text),
+        card: parse_invoice_card(w.platform, &opened.card.text),
     })
 }
 
@@ -100,12 +118,20 @@ pub(crate) async fn pay<T: Transport>(
     let platform = w.platform;
     let chat = Chat::WalletBot(platform);
     let mut conv = Conv::open(w, Some(&tag.key)).await;
-    let (cmd, card_msg) = open_card(
+    let opened = open_card(
         &mut conv,
         param,
         rid::derive(tag.random_id, rid::INVOICE_OPEN),
     )
     .await?;
+    // Эту оплату уже начинал прошлый вызов: «Оплатить» могли нажать. Второго нажатия нет.
+    if opened.earlier_call {
+        tracing::warn!(op = %tag.key, "invoice payment was started earlier, not pressing again");
+        return Ok(PayOutcome::Unknown {
+            detail: "payment was started earlier; check the invoice status".to_owned(),
+        });
+    }
+    let (cmd, card_msg) = (opened.cmd, opened.card);
 
     let card = parse_invoice_card(platform, &card_msg.text);
     match card.status {

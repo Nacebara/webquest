@@ -52,6 +52,19 @@ pub(crate) async fn run<T: Transport>(
         )
         .await
     {
+        // Метка уже стояла: эту операцию начинал прошлый вызов, и чек мог быть создан.
+        // Ничего не создаём — только сверка. Так `issue_check` безопасен даже при повторном
+        // вызове с тем же `OpTag` (движок так не делает, но защита — здесь, а не только там).
+        Ok(sent) if sent.earlier_call => {
+            tracing::warn!(op = %tag.key, "operation marker already exists, reconciling instead of issuing");
+            return Ok(match find_with(&conv, amount, tag).await {
+                Ok(Some((check, method))) => IssueOutcome::Issued { check, method },
+                Ok(None) => unknown("operation was started earlier and no check was found"),
+                Err(e) => unknown(format!(
+                    "operation was started earlier; reconciliation failed: {e}"
+                )),
+            });
+        }
         Ok(sent) => sent.msg,
         Err(SendError::NotSent(e)) => return Err(e),
         // Чек ещё не создавался: операцию можно закрыть как невыполненную.
@@ -446,8 +459,17 @@ pub(crate) async fn find<T: Transport>(
     amount: &Money,
     tag: &OpTag,
 ) -> Result<Option<IssuedCheck>, BotError> {
-    let platform = w.platform;
     let conv = Conv::open(w, Some(&tag.key)).await;
+    Ok(find_with(&conv, amount, tag).await?.map(|(check, _)| check))
+}
+
+/// [`find`] внутри уже открытого разговора (ворота аккаунта уже взяты).
+async fn find_with<T: Transport>(
+    conv: &Conv<'_, T>,
+    amount: &Money,
+    tag: &OpTag,
+) -> Result<Option<(IssuedCheck, IssueMethod)>, BotError> {
+    let platform = conv.platform();
     let unavailable = |e: TransportError| BotError::Unavailable(format!("history: {e}"));
     let saved = conv
         .recent(Chat::SavedMessages)
@@ -465,10 +487,10 @@ pub(crate) async fn find<T: Transport>(
         .map_or(i32::MAX, |m| m.id);
     let in_window = |m: &RawMessage| m.id > from && m.id < until;
 
-    let mut found: Vec<IssuedCheck> = Vec::new();
-    let mut add = |check: IssuedCheck| {
-        if !found.iter().any(|c| c.param == check.param) {
-            found.push(check);
+    let mut found: Vec<(IssuedCheck, IssueMethod)> = Vec::new();
+    let mut add = |check: IssuedCheck, method: IssueMethod| {
+        if !found.iter().any(|(c, _)| c.param == check.param) {
+            found.push((check, method));
         }
     };
     for m in saved
@@ -476,7 +498,7 @@ pub(crate) async fn find<T: Transport>(
         .filter(|m| in_window(m) && m.via_bot == Some(platform))
     {
         match check_in(platform, m, amount) {
-            Ok(check) => add(check),
+            Ok(check) => add(check, IssueMethod::Inline),
             Err(e) => {
                 tracing::warn!(op = %tag.key, error = %e, "inline message without a matching check")
             }
@@ -491,7 +513,7 @@ pub(crate) async fn find<T: Transport>(
             screens::classify_check_creation(platform, &m.text, &m.button_urls())
         {
             match check_in(platform, m, amount) {
-                Ok(check) => add(check),
+                Ok(check) => add(check, IssueMethod::Menu),
                 Err(e) => {
                     tracing::warn!(op = %tag.key, error = %e, "menu reply without a matching check")
                 }

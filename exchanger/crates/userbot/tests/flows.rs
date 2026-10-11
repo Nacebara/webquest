@@ -1010,3 +1010,71 @@ async fn balances_come_from_the_wallet_screen() {
     assert!(balances.contains(&usdt(dec!(12.5))), "{balances:?}");
     assert!(balances.contains(&ton(dec!(3))), "{balances:?}");
 }
+
+// ============================== повторный вызов той же операции ==============================
+
+#[tokio::test(start_paused = true)]
+async fn issuing_again_with_the_same_tag_never_creates_a_second_check() {
+    let e = env();
+    e.fund(XR, dec!(100));
+    let t = tag("ord-1-payout-1");
+    let wallet = e.wallet(XR);
+    let IssueOutcome::Issued { check, .. } = wallet.issue_check(&usdt(dec!(10)), &t).await.unwrap()
+    else {
+        panic!("first call issues")
+    };
+    // При повторе инлайн отказывает: раньше сценарий ушёл бы в меню и создал второй чек.
+    e.world.inject(
+        e.ub,
+        Call::InlineQuery,
+        Fault::Rpc {
+            code: 400,
+            name: "BOT_INLINE_DISABLED".to_owned(),
+        },
+        1,
+    );
+    let again = wallet.issue_check(&usdt(dec!(10)), &t).await.unwrap();
+    match again {
+        IssueOutcome::Issued { check: same, .. } => assert_eq!(same.param, check.param),
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
+    assert_eq!(e.balance(XR), dec!(90));
+}
+
+#[tokio::test(start_paused = true)]
+async fn repeating_an_unknown_issue_reconciles_instead_of_issuing() {
+    let e = env();
+    e.fund(CB, dec!(100));
+    let t = tag("ord-2-payout-1");
+    let wallet = e.menu_only(CB);
+    e.transport.fault_on_text("40", Fault::NoReply);
+    let first = wallet.issue_check(&usdt(dec!(40)), &t).await.unwrap();
+    assert!(matches!(first, IssueOutcome::Unknown { .. }), "{first:?}");
+    // Повтор той же операции ничего не создаёт: бот так и не сообщил о чеке — исход неизвестен.
+    let again = wallet.issue_check(&usdt(dec!(40)), &t).await.unwrap();
+    assert!(matches!(again, IssueOutcome::Unknown { .. }), "{again:?}");
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
+    assert_eq!(e.balance(CB), dec!(60));
+}
+
+#[tokio::test(start_paused = true)]
+async fn paying_again_with_the_same_tag_never_presses_twice() {
+    let e = env();
+    e.fund(XR, dec!(25));
+    let code = shop_invoice(&e, XR, usdt(dec!(10)));
+    let t = tag("ord-1-pay-1");
+    let wallet = e.wallet(XR);
+    let first = wallet
+        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &t)
+        .await
+        .unwrap();
+    assert_eq!(first, PayOutcome::Paid);
+    let again = wallet
+        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &t)
+        .await
+        .unwrap();
+    assert!(matches!(again, PayOutcome::Unknown { .. }), "{again:?}");
+    assert_eq!(e.world.invoice(&code).unwrap().payments.len(), 1);
+    assert_eq!(e.balance(XR), dec!(15));
+}

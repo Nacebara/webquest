@@ -36,6 +36,10 @@ pub(crate) struct Sent {
     /// Команда найдена в истории после `RANDOM_ID_DUPLICATE` (ушла раньше, в прошлом вызове
     /// или до сбоя): ответ мог прийти до подписки — сначала смотрим историю.
     pub located: bool,
+    /// `RANDOM_ID_DUPLICATE` на самой первой отправке этого вызова: команду отправил ПРОШЛЫЙ
+    /// вызов с тем же `random_id`, то есть операцию уже начинали. Для выдачи чека и оплаты
+    /// счёта это значит «ничего не создавать, только сверить».
+    pub earlier_call: bool,
 }
 
 pub(crate) struct Conv<'a, T: Transport> {
@@ -190,6 +194,7 @@ impl<'a, T: Transport> Conv<'a, T> {
     ) -> Result<Sent, SendError> {
         self.pace(kind).await.map_err(SendError::NotSent)?;
         let first = self.w.transport.send_text(chat, text, random_id).await;
+        let earlier_call = matches!(first, Err(TransportError::RandomIdDuplicate));
         let result = match first {
             Err(e) if e.outcome_unknown() => {
                 tracing::warn!(account = self.w.gate.label(), error = %e, "send outcome unknown, resending with the same random_id");
@@ -216,9 +221,14 @@ impl<'a, T: Transport> Conv<'a, T> {
                 Ok(Sent {
                     msg,
                     located: false,
+                    earlier_call: false,
                 })
             }
-            Err(TransportError::RandomIdDuplicate) => self.locate(chat, text).await,
+            Err(TransportError::RandomIdDuplicate) => {
+                let mut sent = self.locate(chat, text).await?;
+                sent.earlier_call = earlier_call;
+                Ok(sent)
+            }
             Err(e) => Err(SendError::NotSent(self.not_sent(e))),
         }
     }
@@ -232,7 +242,11 @@ impl<'a, T: Transport> Conv<'a, T> {
         match recent.into_iter().rev().find(|m| m.out && m.text == text) {
             Some(msg) => {
                 self.record(&msg, true).await;
-                Ok(Sent { msg, located: true })
+                Ok(Sent {
+                    msg,
+                    located: true,
+                    earlier_call: false,
+                })
             }
             None => Err(SendError::Unknown(
                 "RANDOM_ID_DUPLICATE, but the message is not in recent history".to_owned(),
