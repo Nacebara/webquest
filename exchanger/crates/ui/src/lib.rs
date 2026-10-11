@@ -29,7 +29,7 @@ pub use emoji::{Emoji, EmojiError, EmojiSet};
 pub use fmt::{Clock, TimeFormat};
 pub use model::{
     Breakdown, DirectionStatus, DirectionTerms, Excess, FiatAmount, HistoryRow, InvoiceProblem,
-    InvoiceQuote, OrderCard, OrderRef, RefundReason, Terms, UiError,
+    InvoiceQuote, InvoiceRefusal, OrderCard, OrderRef, RefundReason, Terms, UiError,
 };
 pub use screen::{Keyboard, MenuAction, Screen, normalize_menu_text};
 pub use screens::{Ui, UiConfig, inline_command, menu_command, wallet_bot_url};

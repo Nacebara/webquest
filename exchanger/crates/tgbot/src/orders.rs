@@ -11,7 +11,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use domain::fsm::OrderState;
+use domain::fsm::{Flow, OrderState};
 use domain::{Decimal, Money};
 use engine::OrderUpdate;
 use storage::client::{OrderView, ProgressMessage};
@@ -19,7 +19,7 @@ use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
-use ui::{Breakdown, OrderCard, OrderRef, RefundReason, Screen, Ui, UiError};
+use ui::{Breakdown, Excess, InvoiceQuote, OrderCard, OrderRef, RefundReason, Screen, Ui, UiError};
 
 use crate::api::Edited;
 use crate::{Inner, TgBotError};
@@ -45,6 +45,8 @@ pub(crate) struct Extra {
     pub max_amount: Option<Decimal>,
     /// Сколько можно принять сейчас (отказ «нет резерва»).
     pub room: Option<Decimal>,
+    /// Меньше этой переплаты по счёту не возвращаем (`settings.min_refund_amount`).
+    pub min_refund: Option<Decimal>,
 }
 
 /// Настройки рендера, не зависящие от заявки.
@@ -115,6 +117,9 @@ fn refund_reason(view: &OrderView, extra: &Extra) -> RefundReason {
         (Some("above_maximum" | "above_reserved_amount"), _, Some(max)) => {
             RefundReason::AboveMaximum { max }
         }
+        (Some("quote_expired"), _, _) => RefundReason::Underpaid,
+        (Some("client_cancelled"), _, _) => RefundReason::ClientRequest,
+        (Some("invoice_unpayable"), _, _) => RefundReason::InvoiceExpired,
         _ => RefundReason::Operator,
     }
 }
@@ -150,9 +155,73 @@ fn card_plain(ui: &Ui, view: &OrderView) -> Screen {
     }
 }
 
+/// Котировка заявки на оплату счёта.
+pub(crate) fn quote(view: &OrderView) -> Option<InvoiceQuote> {
+    Some(InvoiceQuote {
+        order: OrderRef {
+            id: view.public_id.clone(),
+            direction: view.direction,
+        },
+        invoice_amount: money(view, view.invoice_amount)?,
+        fiat: None,
+        description: None,
+        fee_pct: view.fee_pct_applied?.normalize(),
+        fee: money(view, view.fee_amount)?,
+        to_pay: money(view, view.quote_amount_in)?,
+        expires_at: view.quote_expires_at?,
+    })
+}
+
+/// Экраны, свои у оплаты счёта (S5–S7). `None` — общий экран заявки.
+fn render_invoice(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Extra) -> Option<Screen> {
+    let q = quote(view)?;
+    let got = money(view, view.intake_amount);
+    match view.state {
+        OrderState::AwaitingFunds if view.last_check_rejected => Some(ui.invoice_check_rejected(
+            &q,
+            &intake_failure(view.failure_code.as_deref(), cfg.bind_username),
+        )),
+        OrderState::AwaitingFunds => Some(match got {
+            Some(got) => {
+                let rest = Money::new(q.to_pay.amount() - got.amount(), got.asset()).ok()?;
+                ui.invoice_underpaid(&q, &got, &rest)
+            }
+            None => ui.invoice_quote(&q),
+        }),
+        OrderState::Received | OrderState::InvoicePayPending => Some(ui.invoice_paying(&q)),
+        OrderState::Completed => {
+            let excess = got
+                .map(|g| g.amount() - q.to_pay.amount())
+                .filter(|e| *e > Decimal::ZERO);
+            let excess = match (excess, money(view, view.refund_amount)) {
+                (None, _) => None,
+                (Some(_), Some(refund)) => Some(Excess::Refund(refund)),
+                (Some(amount), None) => Some(Excess::Kept {
+                    amount: money(view, Some(amount))?,
+                    min_refund: money(view, extra.min_refund)?,
+                }),
+            };
+            Some(ui.invoice_paid(
+                &q,
+                excess.as_ref(),
+                view.payout_check_url.as_deref(),
+                view.finished_at.unwrap_or(view.state_since),
+            ))
+        }
+        OrderState::Expired => Some(ui.error(&UiError::QuoteExpired)),
+        OrderState::Cancelled => Some(ui.cancelled(Some(&view.public_id))),
+        _ => None,
+    }
+}
+
 /// Экран сообщения заявки для текущего состояния. Только обычный HTML и инлайн-кнопки:
 /// сообщение правится `editMessageText`.
 pub(crate) fn render(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Extra) -> Screen {
+    if view.direction.flow() == Flow::InvoicePayment
+        && let Some(screen) = render_invoice(ui, cfg, view, extra)
+    {
+        return screen;
+    }
     let order = OrderRef {
         id: view.public_id.clone(),
         direction: view.direction,
@@ -235,6 +304,12 @@ impl Inner {
             }
             OrderState::Rejected => {
                 extra.room = self.terms().await?.room.get(&view.direction).copied();
+            }
+            OrderState::Completed if view.direction.flow() == Flow::InvoicePayment => {
+                let mut conn = self.pool.acquire().await?;
+                extra.min_refund = storage::settings::get(&mut conn, "min_refund_amount")
+                    .await?
+                    .and_then(|v| v.to_string().trim_matches('"').parse().ok());
             }
             _ => {}
         }
@@ -362,6 +437,26 @@ pub(crate) async fn ensure_message(
     }
 }
 
+/// «Пришлю чек»: сообщение заявки на оплату счёта — экраном ожидания чека (S6).
+pub(crate) async fn show_awaiting(inner: &Arc<Inner>, view: &OrderView) -> Result<(), TgBotError> {
+    if view.state != OrderState::AwaitingFunds || view.intake_amount.is_some() {
+        return ensure_message(inner, view.id, Create::UnlessRejected).await;
+    }
+    let (Some(q), Some(p)) = (quote(view), view.progress) else {
+        return Ok(());
+    };
+    let _guard = inner.locks.lock(view.id).await;
+    let screen = inner.ui.invoice_awaiting(&q);
+    match inner.api.edit_html(p.chat_id, p.message_id, &screen).await {
+        Ok(_) => {
+            inner.remember_rendered(view, digest(&screen));
+            Ok(())
+        }
+        Err(e) if e.is_forbidden() => Ok(()),
+        Err(e) => Err(e.into()),
+    }
+}
+
 /// Сверить сообщения заявок с состоянием: после старта — все свежие, в фоне — только те,
 /// сообщение которых так и не ушло.
 async fn resync(inner: &Arc<Inner>, missing_only: bool) {
@@ -477,6 +572,9 @@ mod tests {
             payout_amount: Some(dec!(97.5)),
             refund_amount: None,
             invoice_amount: None,
+            quote_amount_in: None,
+            quote_expires_at: None,
+            last_check_rejected: false,
             payout_check_url: None,
             failure_code: None,
             created_at: at,
@@ -484,6 +582,101 @@ mod tests {
             state_since: at,
             progress: None,
         }
+    }
+
+    /// Заявка на оплату счёта CryptoBot 10 USDT: прислать 10,30 чеком xRocket.
+    fn invoice_view(state: OrderState) -> OrderView {
+        OrderView {
+            direction: Direction::PayCbInvoice,
+            intake_amount: None,
+            fee_pct_applied: Some(dec!(3)),
+            fee_amount: Some(dec!(0.30)),
+            payout_amount: Some(dec!(10)),
+            invoice_amount: Some(dec!(10)),
+            quote_amount_in: Some(dec!(10.30)),
+            quote_expires_at: Some(view(state).created_at + chrono::Duration::minutes(15)),
+            ..view(state)
+        }
+    }
+
+    fn html(screen: &Screen) -> &str {
+        &screen.html
+    }
+
+    #[test]
+    fn invoice_states_have_their_own_screens() {
+        let ui = ui();
+        let extra = Extra {
+            min_refund: Some(dec!(0.5)),
+            ..Extra::default()
+        };
+        let quote = render(
+            &ui,
+            &cfg(),
+            &invoice_view(OrderState::AwaitingFunds),
+            &extra,
+        );
+        assert!(html(&quote).contains("10.30 USDT"), "{}", quote.html);
+        assert!(
+            buttons(&quote).iter().any(|b| matches!(
+                b,
+                botapi::InlineButtonAction::CallbackData(d) if d.starts_with("pay_check:")
+            )),
+            "{:?}",
+            buttons(&quote)
+        );
+
+        let underpaid = OrderView {
+            intake_amount: Some(dec!(7)),
+            ..invoice_view(OrderState::AwaitingFunds)
+        };
+        let screen = render(&ui, &cfg(), &underpaid, &extra);
+        assert!(html(&screen).contains("3.30 USDT"), "{}", screen.html);
+
+        let rejected = OrderView {
+            last_check_rejected: true,
+            failure_code: Some("check_already_activated".into()),
+            ..invoice_view(OrderState::AwaitingFunds)
+        };
+        let screen = render(&ui, &cfg(), &rejected, &extra);
+        assert!(
+            html(&screen).contains("Чек уже кто-то забрал"),
+            "{}",
+            screen.html
+        );
+        assert!(html(&screen).contains("Жду чек"), "{}", screen.html);
+
+        let paying = render(
+            &ui,
+            &cfg(),
+            &invoice_view(OrderState::InvoicePayPending),
+            &extra,
+        );
+        assert!(html(&paying).contains("Оплачиваю счёт"), "{}", paying.html);
+
+        let paid_with_excess = OrderView {
+            intake_amount: Some(dec!(15)),
+            refund_amount: Some(dec!(4.70)),
+            payout_check_url: Some("https://t.me/xrocket?start=t_abcdefghijklmno".into()),
+            ..invoice_view(OrderState::Completed)
+        };
+        let screen = render(&ui, &cfg(), &paid_with_excess, &extra);
+        assert!(html(&screen).contains("Счёт оплачен"), "{}", screen.html);
+        assert!(html(&screen).contains("4.70 USDT"), "{}", screen.html);
+        assert!(buttons(&screen).iter().any(|b| matches!(
+            b,
+            botapi::InlineButtonAction::Url(u) if u.contains("t_abcdefghijklmno")
+        )));
+
+        let kept = OrderView {
+            intake_amount: Some(dec!(10.50)),
+            ..invoice_view(OrderState::Completed)
+        };
+        let screen = render(&ui, &cfg(), &kept, &extra);
+        assert!(html(&screen).contains("0.20 USDT"), "{}", screen.html);
+
+        let expired = render(&ui, &cfg(), &invoice_view(OrderState::Expired), &extra);
+        assert!(html(&expired).contains("Время вышло"), "{}", expired.html);
     }
 
     fn cfg() -> RenderCfg<'static> {
@@ -587,7 +780,7 @@ mod tests {
         let extra = Extra {
             min_amount: Some(dec!(2)),
             max_amount: Some(dec!(100)),
-            room: None,
+            ..Extra::default()
         };
         assert_eq!(
             refund_reason(&v, &extra),

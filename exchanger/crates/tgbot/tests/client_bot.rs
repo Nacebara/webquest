@@ -26,7 +26,7 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use ui::{EmojiSet, Ui, UiConfig};
 use userbot::flows::FlowConfig;
-use userbot::sim::{AccountId, SimWorld};
+use userbot::sim::{AccountId, InvoiceSpec, SimInvoiceStatus, SimWebAppPayer, SimWorld};
 use userbot::{AccountGate, UserbotWallet, WalletBot};
 
 const CB: Platform = Platform::CryptoBot;
@@ -138,6 +138,27 @@ impl FakeTelegram {
                 "chat": { "id": CLIENT, "type": "private", "first_name": "Client" },
                 "from": { "id": CLIENT, "is_bot": false, "first_name": "Client", "language_code": "ru" },
                 "text": text,
+            }
+        }));
+    }
+
+    /// Клиент нажимает инлайн-кнопку `data` под сообщением `message_id`.
+    fn client_presses(&self, message_id: i64, data: &str) {
+        let mut s = self.lock();
+        let id = s.next_update;
+        s.next_update += 1;
+        s.updates.push(json!({
+            "update_id": id,
+            "callback_query": {
+                "id": format!("cb{id}"),
+                "from": { "id": CLIENT, "is_bot": false, "first_name": "Client" },
+                "message": {
+                    "message_id": message_id,
+                    "date": 0,
+                    "chat": { "id": CLIENT, "type": "private" },
+                },
+                "chat_instance": "1",
+                "data": data,
             }
         }));
     }
@@ -333,7 +354,7 @@ async fn env(pool: PgPool) -> Env {
             .set_balance(ub, platform, Asset::Usdt, dec!(1000))
             .unwrap();
     }
-    for d in [Direction::CbToXrCheck, Direction::XrToCbCheck] {
+    for d in Direction::ALL {
         storage::directions::set_open(&mut tx, d, true)
             .await
             .unwrap();
@@ -351,9 +372,12 @@ async fn env(pool: PgPool) -> Env {
     let transport = Arc::new(world.transport(ub));
     let gate = Arc::new(AccountGate::new("ub-1"));
     let mut wallets: HashMap<Platform, Arc<dyn WalletBot>> = HashMap::new();
+    world.set_pin(ub, "2580").unwrap();
     for platform in [CB, XR] {
         let w = Arc::new(
-            UserbotWallet::new(platform, transport.clone(), gate.clone()).with_config(fast()),
+            UserbotWallet::new(platform, transport.clone(), gate.clone())
+                .with_config(fast())
+                .with_payer(Arc::new(SimWebAppPayer::new(world.clone(), "2580"))),
         );
         wallets.insert(platform, w.clone() as Arc<dyn WalletBot>);
         engine = engine.with_wallet(w);
@@ -437,6 +461,25 @@ impl Env {
         out
     }
 
+    /// Единственная заявка клиента и её сообщение — когда бот записал id сообщения в БД
+    /// (фейковый сервер видит `sendMessage` раньше, чем бот получает ответ).
+    async fn order_message(&self) -> (i64, i64, String) {
+        for _ in 0..500 {
+            let row: Option<(i64, Option<i32>, String)> = sqlx::query_as(
+                "SELECT id, progress_message_id, public_id FROM orders WHERE user_id = $1 ORDER BY id LIMIT 1",
+            )
+            .bind(CLIENT)
+            .fetch_optional(&self.pool)
+            .await
+            .unwrap();
+            if let Some((id, Some(message), public_id)) = row {
+                return (id, i64::from(message), public_id);
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        panic!("order message id was never stored");
+    }
+
     async fn ledger(&self, code: &str) -> Decimal {
         sqlx::query_scalar::<_, Option<Decimal>>(
             "SELECT SUM(e.amount) FROM ledger_entries e JOIN ledger_accounts a ON a.id = e.account_id WHERE a.code = $1",
@@ -477,11 +520,10 @@ async fn check_link_gets_one_message_that_ends_with_the_payout(pool: PgPool) {
             c.method == "sendMessage" && c.chat() == Some(CLIENT)
         })
         .await;
+    let (order_id, message, _) = e.order_message().await;
     let orders = e.orders().await;
     assert_eq!(orders.len(), 1, "одна заявка");
-    let (order_id, _, chat, message, _) = orders[0].clone();
-    assert_eq!(chat, Some(CLIENT), "id сообщения заявки сохранён");
-    let message = i64::from(message.expect("id сообщения заявки сохранён"));
+    assert_eq!(orders[0].2, Some(CLIENT), "чат сообщения заявки сохранён");
 
     e.drain().await;
     let (_, state, _, _, payout_url) = e.orders().await[0].clone();
@@ -600,4 +642,106 @@ async fn text_without_a_link_gets_a_hint_and_no_order(pool: PgPool) {
     bot.stop().await;
     assert!(e.orders().await.is_empty());
     assert!(e.world.checks_created_by(e.ub).is_empty());
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn invoice_link_gets_a_quote_and_the_check_pays_it(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let shop = e.world.add_account("shop");
+    let inv = e
+        .world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))).by(shop))
+        .unwrap();
+    e.fake.client_writes(&inv.url);
+
+    let quote = e
+        .fake
+        .wait_for("quote", |c| {
+            c.method == "sendMessage" && c.contains("10.30 USDT")
+        })
+        .await;
+    let (_, message, public_id) = e.order_message().await;
+    assert_eq!(e.orders().await[0].1, OrderState::AwaitingFunds);
+    assert!(
+        quote.contains(&format!("pay_check:{public_id}")),
+        "{:?}",
+        quote.body
+    );
+
+    // «Пришлю чек» → то же сообщение показывает ожидание чека.
+    e.fake
+        .client_presses(message, &format!("pay_check:{public_id}"));
+    e.fake
+        .wait_for("awaiting", |c| {
+            c.method == "editMessageText"
+                && c.message_id() == Some(message)
+                && c.contains("Жду чек")
+        })
+        .await;
+
+    // Чек xRocket идёт в эту заявку, счёт оплачивается.
+    let check = e.world.client_check(XR, usdt(dec!(10.30))).unwrap();
+    e.fake.client_writes(&check);
+    e.fake
+        .wait_for("checking", |c| {
+            c.method == "editMessageText"
+                && c.message_id() == Some(message)
+                && !c.contains("Жду чек")
+        })
+        .await;
+    e.drain().await;
+    e.fake
+        .wait_for("paid", |c| {
+            c.method == "editMessageText"
+                && c.message_id() == Some(message)
+                && c.contains("Счёт оплачен")
+        })
+        .await;
+    bot.stop().await;
+
+    assert_eq!(e.orders().await.len(), 1, "чек не стал отдельной заявкой");
+    assert_eq!(
+        e.fake.calls_of("sendMessage").len(),
+        1,
+        "одно сообщение на заявку"
+    );
+    let paid = e.world.invoice(&inv.code).unwrap();
+    assert_eq!(paid.status, SimInvoiceStatus::Paid);
+    assert_eq!(paid.payments.len(), 1);
+    e.assert_books_match().await;
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn cancel_button_closes_the_quote(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let shop = e.world.add_account("shop");
+    let inv = e
+        .world
+        .create_invoice(InvoiceSpec::crypto(XR, usdt(dec!(20))).by(shop))
+        .unwrap();
+    e.fake.client_writes(&inv.url);
+    e.fake
+        .wait_for("quote", |c| {
+            c.method == "sendMessage" && c.contains("20.40 USDT")
+        })
+        .await;
+    let (_, message, public_id) = e.order_message().await;
+    e.fake
+        .client_presses(message, &format!("cancel:{public_id}"));
+    e.fake
+        .wait_for("cancelled", |c| {
+            c.method == "editMessageText"
+                && c.message_id() == Some(message)
+                && c.contains("отменена")
+        })
+        .await;
+    bot.stop().await;
+    assert_eq!(e.orders().await[0].1, OrderState::Cancelled);
+    assert_eq!(
+        e.world.invoice(&inv.code).unwrap().status,
+        SimInvoiceStatus::Active,
+        "счёт не тронут"
+    );
 }

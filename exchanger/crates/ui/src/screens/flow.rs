@@ -11,7 +11,7 @@ use super::Ui;
 use crate::callback::Callback;
 use crate::fmt::{self, TimeFormat};
 use crate::html::{Frag, clip};
-use crate::model::{Breakdown, Excess, InvoiceQuote, OrderRef, RefundReason};
+use crate::model::{Breakdown, Excess, InvoiceQuote, OrderRef, RefundReason, UiError};
 use crate::screen::{Keyboard, Screen};
 
 /// Сколько символов описания счёта от продавца показываем.
@@ -228,11 +228,24 @@ impl Ui {
         self.plain(body, self.order_keyboard(&q.order))
     }
 
-    /// S7 «Счёт оплачен» и судьба переплаты.
+    /// S6 после чека, который кошелёк не принял: что случилось и что заявка ждёт дальше.
+    pub fn invoice_check_rejected(&self, q: &InvoiceQuote, error: &UiError) -> Screen {
+        let error = self.error(error);
+        let awaiting = self.invoice_awaiting(q);
+        Screen {
+            html: format!("{}\n\n{}", error.html, awaiting.html),
+            rich_html: None,
+            keyboard: awaiting.keyboard,
+        }
+    }
+
+    /// S7 «Счёт оплачен» и судьба переплаты. `excess_check` — чек на переплату, когда он
+    /// уже создан: под сообщением появляются «Забрать чек» и «Скопировать ссылку».
     pub fn invoice_paid(
         &self,
         q: &InvoiceQuote,
         excess: Option<&Excess>,
+        excess_check: Option<&str>,
         finished_at: DateTime<Utc>,
     ) -> Screen {
         let t = &self.texts.invoice;
@@ -262,7 +275,11 @@ impl Ui {
                 ("time", &self.at(finished_at, TimeFormat::Time)),
             ],
         );
-        self.plain(body, self.order_keyboard(&q.order))
+        let keyboard = match excess_check {
+            Some(url) => Keyboard::inline_rows(vec![self.claim_row(url)]),
+            None => self.order_keyboard(&q.order),
+        };
+        self.plain(body, keyboard)
     }
 
     /// S8 ручная проверка. `amount` — сколько у нас денег клиента; `None` — исход приёма

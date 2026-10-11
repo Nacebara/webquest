@@ -98,6 +98,17 @@ pub enum Excess {
     Kept { amount: Money, min_refund: Money },
 }
 
+/// Почему не берём подходящий счёт прямо сейчас. Денег клиента у нас нет.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InvoiceRefusal {
+    Paused,
+    Maintenance,
+    DailyLimit,
+    NoReserve { max: Money },
+    BelowMinimum { min: Money },
+    AboveMaximum { max: Money },
+}
+
 /// Причина возврата (S9).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RefundReason {
@@ -115,6 +126,10 @@ pub enum RefundReason {
 /// Почему не можем оплатить счёт (E17).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InvoiceProblem {
+    /// В фиате: сумма в USDT плавает, такие пока не оплачиваем.
+    Fiat,
+    /// Кошелёк не показал счёт.
+    Unavailable,
     Reusable,
     AlreadyPaid,
     Expired,
@@ -214,6 +229,16 @@ pub enum UiError {
         to_pay: Money,
         source: Platform,
     },
+    /// Этот счёт уже в работе.
+    InvoiceInWork {
+        order: String,
+    },
+    /// У клиента уже есть счёт, который ждёт чек.
+    InvoicePending {
+        order: String,
+    },
+    /// Счёт подходит, но взять его сейчас нельзя (лимиты, резерв, пауза).
+    InvoiceRefused(InvoiceRefusal),
     /// E23.
     QuoteExpired,
     /// E24.

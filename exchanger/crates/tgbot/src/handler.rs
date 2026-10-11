@@ -347,12 +347,42 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
                 .await
         }
         Callback::PlainView => plain_view(inner, chat, user, message).await,
-        // Кнопки потока оплаты счёта: сам поток ещё не подключён, таких сообщений бот не
-        // отправляет. Подписки «сообщить, когда заработает» пока нет — только ответ на нажатие.
-        Callback::Cancel(Some(_))
-        | Callback::PayByCheck(_)
-        | Callback::Refund(_)
-        | Callback::Notify(_) => Ok(()),
+        Callback::PayByCheck(id) => match inner.own_order(user, &id).await? {
+            Some(view) => crate::orders::show_awaiting(inner, &view).await,
+            None => Ok(()),
+        },
+        // «Отмена» по котировке и «Вернуть деньги» при недоплате: движок закрывает заявку
+        // (денег нет — отмена, часть пришла — возврат), сообщение заявки обновит подписка.
+        Callback::Cancel(Some(id)) | Callback::Refund(id) => {
+            if let Some(view) = inner.own_order(user, &id).await? {
+                let closed = inner.engine.cancel_invoice(user, view.id).await?;
+                tracing::info!(order = view.id, closed, "client asked to cancel");
+                if !closed {
+                    // Отменять поздно: показать, что с заявкой сейчас.
+                    crate::orders::ensure_message(
+                        inner,
+                        view.id,
+                        crate::orders::Create::UnlessRejected,
+                    )
+                    .await?;
+                }
+            }
+            Ok(())
+        }
+        // Подписки «сообщить, когда заработает» пока нет — только ответ на нажатие.
+        Callback::Notify(_) => Ok(()),
+    }
+}
+
+impl Inner {
+    /// Заявка клиента по публичному номеру из кнопки. Чужую не отдаёт.
+    async fn own_order(
+        &self,
+        user: i64,
+        public_id: &str,
+    ) -> Result<Option<storage::client::OrderView>, TgBotError> {
+        let mut conn = self.pool.acquire().await?;
+        Ok(storage::client::order_view_for_user(&mut conn, user, public_id).await?)
     }
 }
 

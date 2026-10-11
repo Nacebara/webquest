@@ -337,13 +337,29 @@ pub struct ErrorTexts {
     pub unsupported_asset: String,
     pub invoice_paid_elsewhere: String,
     pub rate_moved: String,
+    pub invoice_in_work: String,
+    pub invoice_pending: String,
+    pub invoice_refused: String,
     pub quote_expired: String,
     pub internal: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct InvoiceRefusalTexts {
+    pub paused: String,
+    pub maintenance: String,
+    pub daily_limit: String,
+    pub no_reserve: String,
+    pub below_minimum: String,
+    pub above_maximum: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct InvoiceProblemTexts {
+    pub fiat: String,
+    pub unavailable: String,
     pub reusable: String,
     pub already_paid: String,
     pub expired: String,
@@ -440,6 +456,7 @@ pub struct Texts {
     pub refund_reasons: RefundReasonTexts,
     pub errors: ErrorTexts,
     pub invoice_problems: InvoiceProblemTexts,
+    pub invoice_refusals: InvoiceRefusalTexts,
     pub history: HistoryTexts,
     pub card: CardTexts,
     pub help: HelpTexts,

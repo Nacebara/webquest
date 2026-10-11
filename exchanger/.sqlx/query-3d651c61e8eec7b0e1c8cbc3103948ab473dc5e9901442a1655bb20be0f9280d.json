@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.state,\n               o.intake_amount, o.fee_pct_applied, o.fee_amount, o.payout_amount,\n               o.refund_amount, o.invoice_amount, o.payout_check_url, o.failure_code,\n               o.created_at, o.finished_at,\n               COALESCE((SELECT max(t.at) FROM order_transitions t\n                          WHERE t.order_id = o.id AND t.to_state = o.state),\n                        o.created_at) AS \"state_since!\",\n               o.progress_chat_id, o.progress_message_id\n          FROM orders o\n         WHERE o.public_id = $1 AND o.user_id = $2\n        ",
+  "query": "\n        SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.state,\n               o.intake_amount, o.fee_pct_applied, o.fee_amount, o.payout_amount,\n               o.refund_amount, o.invoice_amount, o.quote_amount_in, o.quote_expires_at,\n               COALESCE((SELECT t.data->>'event' = 'CheckRejected' FROM order_transitions t\n                          WHERE t.order_id = o.id ORDER BY t.id DESC LIMIT 1),\n                        FALSE) AS \"last_check_rejected!\",\n               o.payout_check_url, o.failure_code, o.created_at, o.finished_at,\n               COALESCE((SELECT max(t.at) FROM order_transitions t\n                          WHERE t.order_id = o.id AND t.to_state = o.state),\n                        o.created_at) AS \"state_since!\",\n               o.progress_chat_id, o.progress_message_id\n          FROM orders o\n         WHERE o.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -137,6 +137,34 @@
       },
       {
         "ordinal": 12,
+        "name": "quote_amount_in",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "quote_amount_in"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "quote_expires_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "quote_expires_at"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "last_check_rejected!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 15,
         "name": "payout_check_url",
         "type_info": "Text",
         "origin": {
@@ -147,7 +175,7 @@
         }
       },
       {
-        "ordinal": 13,
+        "ordinal": 16,
         "name": "failure_code",
         "type_info": "Text",
         "origin": {
@@ -158,7 +186,7 @@
         }
       },
       {
-        "ordinal": 14,
+        "ordinal": 17,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -169,7 +197,7 @@
         }
       },
       {
-        "ordinal": 15,
+        "ordinal": 18,
         "name": "finished_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -180,13 +208,13 @@
         }
       },
       {
-        "ordinal": 16,
+        "ordinal": 19,
         "name": "state_since!",
         "type_info": "Timestamptz",
         "origin": "Expression"
       },
       {
-        "ordinal": 17,
+        "ordinal": 20,
         "name": "progress_chat_id",
         "type_info": "Int8",
         "origin": {
@@ -197,7 +225,7 @@
         }
       },
       {
-        "ordinal": 18,
+        "ordinal": 21,
         "name": "progress_message_id",
         "type_info": "Int4",
         "origin": {
@@ -210,7 +238,6 @@
     ],
     "parameters": {
       "Left": [
-        "Text",
         "Int8"
       ]
     },
@@ -229,6 +256,9 @@
       true,
       true,
       true,
+      null,
+      true,
+      true,
       false,
       true,
       null,
@@ -236,5 +266,5 @@
       true
     ]
   },
-  "hash": "ec71007371239ac11569deafc2284249cca96819b0b86253961f82b80261dfb1"
+  "hash": "3d651c61e8eec7b0e1c8cbc3103948ab473dc5e9901442a1655bb20be0f9280d"
 }

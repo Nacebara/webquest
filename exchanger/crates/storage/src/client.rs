@@ -35,6 +35,11 @@ pub struct OrderView {
     pub payout_amount: Option<Decimal>,
     pub refund_amount: Option<Decimal>,
     pub invoice_amount: Option<Decimal>,
+    /// Оплата счёта: сколько прислать (`X`) и до какого времени держится цена.
+    pub quote_amount_in: Option<Decimal>,
+    pub quote_expires_at: Option<DateTime<Utc>>,
+    /// Последний переход — «чек не принят» (оплата счёта ждёт другой чек).
+    pub last_check_rejected: bool,
     /// Ссылка на чек выплаты или возврата.
     pub payout_check_url: Option<String>,
     pub failure_code: Option<String>,
@@ -155,6 +160,9 @@ struct ViewRow {
     payout_amount: Option<Decimal>,
     refund_amount: Option<Decimal>,
     invoice_amount: Option<Decimal>,
+    quote_amount_in: Option<Decimal>,
+    quote_expires_at: Option<DateTime<Utc>>,
+    last_check_rejected: bool,
     payout_check_url: Option<String>,
     failure_code: Option<String>,
     created_at: DateTime<Utc>,
@@ -179,6 +187,9 @@ impl ViewRow {
             payout_amount: self.payout_amount,
             refund_amount: self.refund_amount,
             invoice_amount: self.invoice_amount,
+            quote_amount_in: self.quote_amount_in,
+            quote_expires_at: self.quote_expires_at,
+            last_check_rejected: self.last_check_rejected,
             payout_check_url: self.payout_check_url,
             failure_code: self.failure_code,
             created_at: self.created_at,
@@ -199,8 +210,11 @@ pub async fn order_view(
         r#"
         SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.state,
                o.intake_amount, o.fee_pct_applied, o.fee_amount, o.payout_amount,
-               o.refund_amount, o.invoice_amount, o.payout_check_url, o.failure_code,
-               o.created_at, o.finished_at,
+               o.refund_amount, o.invoice_amount, o.quote_amount_in, o.quote_expires_at,
+               COALESCE((SELECT t.data->>'event' = 'CheckRejected' FROM order_transitions t
+                          WHERE t.order_id = o.id ORDER BY t.id DESC LIMIT 1),
+                        FALSE) AS "last_check_rejected!",
+               o.payout_check_url, o.failure_code, o.created_at, o.finished_at,
                COALESCE((SELECT max(t.at) FROM order_transitions t
                           WHERE t.order_id = o.id AND t.to_state = o.state),
                         o.created_at) AS "state_since!",
@@ -226,8 +240,11 @@ pub async fn order_view_for_user(
         r#"
         SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.state,
                o.intake_amount, o.fee_pct_applied, o.fee_amount, o.payout_amount,
-               o.refund_amount, o.invoice_amount, o.payout_check_url, o.failure_code,
-               o.created_at, o.finished_at,
+               o.refund_amount, o.invoice_amount, o.quote_amount_in, o.quote_expires_at,
+               COALESCE((SELECT t.data->>'event' = 'CheckRejected' FROM order_transitions t
+                          WHERE t.order_id = o.id ORDER BY t.id DESC LIMIT 1),
+                        FALSE) AS "last_check_rejected!",
+               o.payout_check_url, o.failure_code, o.created_at, o.finished_at,
                COALESCE((SELECT max(t.at) FROM order_transitions t
                           WHERE t.order_id = o.id AND t.to_state = o.state),
                         o.created_at) AS "state_since!",

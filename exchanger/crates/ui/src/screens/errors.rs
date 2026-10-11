@@ -6,7 +6,7 @@ use crate::callback::Callback;
 use crate::emoji::Emoji;
 use crate::fmt::TimeFormat;
 use crate::html::{Frag, clip};
-use crate::model::{InvoiceProblem, UiError};
+use crate::model::{InvoiceProblem, InvoiceRefusal, UiError};
 use crate::screen::{Keyboard, Screen};
 
 /// Сколько символов чужого текста (имя бота, причина бана) показываем.
@@ -17,6 +17,8 @@ impl Ui {
     fn invoice_problem(&self, problem: InvoiceProblem) -> &str {
         let p = &self.texts.invoice_problems;
         match problem {
+            InvoiceProblem::Fiat => &p.fiat,
+            InvoiceProblem::Unavailable => &p.unavailable,
             InvoiceProblem::Reusable => &p.reusable,
             InvoiceProblem::AlreadyPaid => &p.already_paid,
             InvoiceProblem::Expired => &p.expired,
@@ -24,6 +26,24 @@ impl Ui {
             InvoiceProblem::UnsupportedAsset => &p.unsupported_asset,
             InvoiceProblem::ExpiresSoon => &p.expires_soon,
             InvoiceProblem::Unreadable => &p.unreadable,
+        }
+    }
+
+    fn invoice_refusal(&self, refusal: &InvoiceRefusal) -> Frag {
+        let r = &self.texts.invoice_refusals;
+        match refusal {
+            InvoiceRefusal::Paused => self.fill(&r.paused, &[]),
+            InvoiceRefusal::Maintenance => self.fill(&r.maintenance, &[]),
+            InvoiceRefusal::DailyLimit => self.fill(&r.daily_limit, &[]),
+            InvoiceRefusal::NoReserve { max } => {
+                self.fill(&r.no_reserve, &[("max", &self.money(max))])
+            }
+            InvoiceRefusal::BelowMinimum { min } => {
+                self.fill(&r.below_minimum, &[("min", &self.money(min))])
+            }
+            InvoiceRefusal::AboveMaximum { max } => {
+                self.fill(&r.above_maximum, &[("max", &self.money(max))])
+            }
         }
     }
 
@@ -210,6 +230,21 @@ impl Ui {
                 self.fill(
                     &e.rate_moved,
                     &[("x", &self.money(to_pay)), ("src", &self.wallet(*source))],
+                ),
+                Keyboard::None,
+            ),
+            UiError::InvoiceInWork { order } => (
+                self.fill(&e.invoice_in_work, &[("order", &self.order_id(order))]),
+                Keyboard::None,
+            ),
+            UiError::InvoicePending { order } => (
+                self.fill(&e.invoice_pending, &[("order", &self.order_id(order))]),
+                Keyboard::None,
+            ),
+            UiError::InvoiceRefused(refusal) => (
+                self.fill(
+                    &e.invoice_refused,
+                    &[("why", &self.invoice_refusal(refusal))],
                 ),
                 Keyboard::None,
             ),

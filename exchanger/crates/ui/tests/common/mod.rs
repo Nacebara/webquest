@@ -6,8 +6,8 @@ use domain::{Asset, Decimal, Direction, Money, OrderState, Platform};
 use rust_decimal_macros::dec;
 use ui::{
     Breakdown, DirectionStatus, DirectionTerms, Emoji, EmojiSet, Excess, FiatAmount, HistoryRow,
-    InvoiceProblem, InvoiceQuote, OrderCard, OrderRef, RefundReason, Screen, Terms, Ui, UiConfig,
-    UiError,
+    InvoiceProblem, InvoiceQuote, InvoiceRefusal, OrderCard, OrderRef, RefundReason, Screen, Terms,
+    Ui, UiConfig, UiError,
 };
 
 pub const ORDER: &str = "A1B2C3D4E5";
@@ -353,6 +353,54 @@ pub fn all_errors() -> Vec<(&'static str, UiError)> {
                 source: Platform::XRocket,
             },
         ),
+        (
+            "invoice_fiat",
+            UiError::InvoiceUnsuitable(InvoiceProblem::Fiat),
+        ),
+        (
+            "invoice_unavailable",
+            UiError::InvoiceUnsuitable(InvoiceProblem::Unavailable),
+        ),
+        (
+            "invoice_in_work",
+            UiError::InvoiceInWork {
+                order: ORDER.to_owned(),
+            },
+        ),
+        (
+            "invoice_pending",
+            UiError::InvoicePending {
+                order: ORDER.to_owned(),
+            },
+        ),
+        (
+            "invoice_refused_paused",
+            UiError::InvoiceRefused(InvoiceRefusal::Paused),
+        ),
+        (
+            "invoice_refused_maintenance",
+            UiError::InvoiceRefused(InvoiceRefusal::Maintenance),
+        ),
+        (
+            "invoice_refused_daily_limit",
+            UiError::InvoiceRefused(InvoiceRefusal::DailyLimit),
+        ),
+        (
+            "invoice_refused_no_reserve",
+            UiError::InvoiceRefused(InvoiceRefusal::NoReserve {
+                max: usdt(dec!(55)),
+            }),
+        ),
+        (
+            "invoice_refused_below_minimum",
+            UiError::InvoiceRefused(InvoiceRefusal::BelowMinimum { min: usdt(dec!(2)) }),
+        ),
+        (
+            "invoice_refused_above_maximum",
+            UiError::InvoiceRefused(InvoiceRefusal::AboveMaximum {
+                max: usdt(dec!(100)),
+            }),
+        ),
         ("quote_expired", UiError::QuoteExpired),
         ("internal", UiError::Internal),
     ]
@@ -432,15 +480,29 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
         ("invoice_paying", ui.invoice_paying(&quote(None, false))),
         (
             "invoice_paid",
-            ui.invoice_paid(&quote(None, false), None, at(12, 40)),
+            ui.invoice_paid(&quote(None, false), None, None, at(12, 40)),
         ),
         (
             "invoice_paid_excess_refund",
             ui.invoice_paid(
                 &quote(None, false),
                 Some(&Excess::Refund(usdt(dec!(5)))),
+                None,
                 at(12, 40),
             ),
+        ),
+        (
+            "invoice_paid_excess_check",
+            ui.invoice_paid(
+                &quote(None, false),
+                Some(&Excess::Refund(usdt(dec!(5)))),
+                Some(CHECK_URL),
+                at(12, 40),
+            ),
+        ),
+        (
+            "invoice_check_rejected",
+            ui.invoice_check_rejected(&quote(None, false), &UiError::AlreadyActivated),
         ),
         (
             "invoice_paid_excess_kept",
@@ -450,6 +512,7 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
                     amount: usdt(dec!(0.4)),
                     min_refund: usdt(dec!(1)),
                 }),
+                None,
                 at(12, 40),
             ),
         ),

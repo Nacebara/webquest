@@ -2,15 +2,17 @@
 //!
 //! - первая корректная ссылка на **чек** уходит в `Engine::submit_check`; принято — одно
 //!   сообщение заявки, отказ — экран ошибки (где деньги и что делать);
-//! - ссылка на **счёт** — экран «оплата счетов скоро» (в движке ещё нет оплаты счетов);
+//! - ссылка на **счёт** уходит в `Engine::submit_invoice`: котировка — одно сообщение заявки
+//!   (дальше клиент присылает чек, и он идёт в эту заявку), отказ — экран ошибки;
 //! - чужой бот, тестнет, ссылка не на чек — экран ошибки, движок не вызывается.
 
 use std::sync::Arc;
 use std::time::Instant;
 
-use engine::{SubmitReject, Submitted};
+use engine::{InvoiceIssue, InvoiceReject, InvoiceSubmitted, SubmitReject, Submitted};
 use parsers::{LinkError, LinkKind, WalletLink};
 use ui::UiError;
+use ui::{InvoiceProblem, InvoiceRefusal};
 
 use crate::limits::wait_secs;
 use crate::orders::{Create, ensure_message};
@@ -68,17 +70,109 @@ pub(crate) async fn process(
         }
         return submit(inner, chat, user, link).await;
     }
-    if found
+    let invoice = found
         .iter()
-        .any(|r| matches!(r, Ok(l) if l.kind == LinkKind::Invoice))
-    {
-        return inner.reply(chat, &inner.ui.invoice_soon()).await;
+        .filter_map(|r| r.as_ref().ok())
+        .find(|l| l.kind == LinkKind::Invoice);
+    if let Some(link) = invoice {
+        if let Err(wait) = inner
+            .limiter
+            .order_allowed(user, limits.orders_per_10min, now)
+        {
+            return rate_limited(inner, chat, user, wait).await;
+        }
+        return submit_invoice(inner, chat, user, link).await;
     }
     let error = found
         .iter()
         .find_map(|r| r.as_ref().err())
         .map_or(UiError::NotCheckOrInvoice, link_error);
     inner.reply_error(chat, &error).await
+}
+
+/// Отказ по счёту → экран. Денег клиента у нас нет.
+fn invoice_error(reason: &InvoiceReject) -> UiError {
+    let usdt = |x: domain::Decimal| {
+        domain::Money::new(x, domain::Asset::Usdt)
+            .unwrap_or_else(|_| domain::Money::zero(domain::Asset::Usdt))
+    };
+    let order = |o: &str| {
+        if o.is_empty() {
+            "—".to_owned()
+        } else {
+            o.to_owned()
+        }
+    };
+    match reason {
+        InvoiceReject::NotAnInvoice => UiError::NotCheckOrInvoice,
+        InvoiceReject::AlreadyInWork { order: o } => UiError::InvoiceInWork { order: order(o) },
+        InvoiceReject::AlreadyPaid { .. } => {
+            UiError::InvoiceUnsuitable(InvoiceProblem::AlreadyPaid)
+        }
+        InvoiceReject::PendingInvoice { order: o } => UiError::InvoicePending { order: order(o) },
+        InvoiceReject::DirectionClosed => UiError::InvoiceRefused(InvoiceRefusal::Paused),
+        InvoiceReject::ServicePaused => UiError::InvoiceRefused(InvoiceRefusal::Maintenance),
+        InvoiceReject::NoReserve { max } => {
+            UiError::InvoiceRefused(InvoiceRefusal::NoReserve { max: usdt(*max) })
+        }
+        InvoiceReject::DailyLimit => UiError::InvoiceRefused(InvoiceRefusal::DailyLimit),
+        InvoiceReject::BelowMinimum { min } => {
+            UiError::InvoiceRefused(InvoiceRefusal::BelowMinimum { min: usdt(*min) })
+        }
+        InvoiceReject::AboveMaximum { max } => {
+            UiError::InvoiceRefused(InvoiceRefusal::AboveMaximum { max: usdt(*max) })
+        }
+        InvoiceReject::Unsuitable(issue) => UiError::InvoiceUnsuitable(match issue {
+            InvoiceIssue::Reusable => InvoiceProblem::Reusable,
+            InvoiceIssue::AlreadyPaid => InvoiceProblem::AlreadyPaid,
+            InvoiceIssue::Expired => InvoiceProblem::Expired,
+            InvoiceIssue::NoAmount => InvoiceProblem::NoAmount,
+            InvoiceIssue::UnsupportedAsset => InvoiceProblem::UnsupportedAsset,
+            InvoiceIssue::Fiat => InvoiceProblem::Fiat,
+            InvoiceIssue::Unreadable => InvoiceProblem::Unreadable,
+        }),
+        InvoiceReject::WalletUnavailable => UiError::InvoiceUnsuitable(InvoiceProblem::Unavailable),
+    }
+}
+
+/// Ссылка на чужой счёт: юзербот открывает его (несколько секунд), котировка — сообщение
+/// заявки.
+async fn submit_invoice(
+    inner: &Arc<Inner>,
+    chat: i64,
+    user: i64,
+    link: &WalletLink,
+) -> Result<(), TgBotError> {
+    let submitted = match inner.engine.submit_invoice(user, link).await {
+        Ok(submitted) => submitted,
+        Err(e) => {
+            tracing::error!(user, error = %e, "invoice submission failed");
+            return inner
+                .reply_error(
+                    chat,
+                    &UiError::InvoiceUnsuitable(InvoiceProblem::Unavailable),
+                )
+                .await;
+        }
+    };
+    match submitted {
+        InvoiceSubmitted::Quoted(order) => {
+            inner.limiter.record_order(user, Instant::now());
+            tracing::info!(
+                order = order.id,
+                direction = order.direction.code(),
+                "invoice quoted"
+            );
+            if let Err(e) = ensure_message(inner, order.id, Create::Always).await {
+                tracing::warn!(order = order.id, error = %e, "order message not sent yet");
+            }
+            Ok(())
+        }
+        InvoiceSubmitted::Rejected(reason) => {
+            tracing::info!(user, reason = reason.code(), "invoice rejected");
+            inner.reply_error(chat, &invoice_error(&reason)).await
+        }
+    }
 }
 
 async fn rate_limited(
