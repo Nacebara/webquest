@@ -172,9 +172,7 @@ impl<'a, T: Transport> Conv<'a, T> {
                 tracing::error!(account = self.w.gate.label(), rpc = %name, "account restricted");
                 BotError::AccountRestricted
             }
-            TransportError::NotAuthorized => {
-                BotError::Unavailable("account is not authorized".to_owned())
-            }
+            TransportError::NotAuthorized => BotError::NotAuthorized,
             other => BotError::Transport(other),
         }
     }

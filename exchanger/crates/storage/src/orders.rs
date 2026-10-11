@@ -55,6 +55,8 @@ pub struct OrderRow {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct OrderPatch<'a> {
     pub intake_amount: Option<Decimal>,
+    /// Актив, в котором реально пришли деньги.
+    pub intake_asset: Option<Asset>,
     pub fee_pct_applied: Option<Decimal>,
     pub fee_amount: Option<Decimal>,
     pub payout_amount: Option<Decimal>,
@@ -168,6 +170,7 @@ pub async fn apply_event(
         UPDATE orders
            SET state           = $3,
                intake_amount   = COALESCE($5, intake_amount),
+               intake_asset    = COALESCE($15, intake_asset),
                fee_pct_applied = COALESCE($6, fee_pct_applied),
                fee_amount      = COALESCE($7, fee_amount),
                payout_amount   = COALESCE($8, payout_amount),
@@ -194,6 +197,7 @@ pub async fn apply_event(
         mark_received,
         order.state.as_db_str(),
         patch.payout_check_url,
+        patch.intake_asset.map(|a| a.code()),
     )
     .fetch_optional(&mut *conn)
     .await?
@@ -232,6 +236,7 @@ pub struct OrderDetails {
     pub intake_start_param: Option<String>,
     pub invoice_start_param: Option<String>,
     pub intake_amount: Option<Decimal>,
+    pub intake_asset: Option<Asset>,
     pub fee_pct_applied: Option<Decimal>,
     pub fee_amount: Option<Decimal>,
     pub payout_amount: Option<Decimal>,
@@ -245,7 +250,7 @@ pub struct OrderDetails {
 pub async fn details(conn: &mut PgConnection, id: i64) -> Result<OrderDetails, StorageError> {
     let r = sqlx::query!(
         r#"
-        SELECT intake_start_param, invoice_start_param, intake_amount, fee_pct_applied,
+        SELECT intake_start_param, invoice_start_param, intake_amount, intake_asset, fee_pct_applied,
                fee_amount, payout_amount, refund_amount, invoice_amount, payout_check_url,
                failure_code, manual_reason
           FROM orders WHERE id = $1
@@ -259,6 +264,13 @@ pub async fn details(conn: &mut PgConnection, id: i64) -> Result<OrderDetails, S
         intake_start_param: r.intake_start_param,
         invoice_start_param: r.invoice_start_param,
         intake_amount: r.intake_amount,
+        intake_asset: r
+            .intake_asset
+            .map(|a| {
+                a.parse()
+                    .map_err(|_| StorageError::corrupt("orders.intake_asset", &a))
+            })
+            .transpose()?,
         fee_pct_applied: r.fee_pct_applied,
         fee_amount: r.fee_amount,
         payout_amount: r.payout_amount,
@@ -294,4 +306,26 @@ fn map_duplicate(err: sqlx::Error) -> StorageError {
         }
         _ => StorageError::Db(err),
     }
+}
+
+/// Объём клиента за последние 24 часа: пришедшие суммы и удержания ещё не оплаченных заявок
+/// (без отказов). Для лимитов `daily_limit_usd` и «новый клиент» (SPEC §3.4).
+pub async fn user_volume_24h(
+    conn: &mut PgConnection,
+    user_id: i64,
+) -> Result<Decimal, StorageError> {
+    let v = sqlx::query_scalar!(
+        r#"
+        SELECT COALESCE(SUM(COALESCE(o.intake_amount, h.amount, 0)), 0) AS "v!"
+          FROM orders o
+          LEFT JOIN holds h ON h.order_id = o.id AND h.state = 'active'
+         WHERE o.user_id = $1
+           AND o.created_at > now() - interval '24 hours'
+           AND o.state NOT IN ('REJECTED', 'INTAKE_FAILED', 'EXPIRED', 'CANCELLED')
+        "#,
+        user_id
+    )
+    .fetch_one(conn)
+    .await?;
+    Ok(v)
 }

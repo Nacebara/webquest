@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE operations\n           SET status = 'pending', attempts = attempts - 1, next_attempt_at = $2, last_error = $3,\n               releases = releases + 1, first_released_at = COALESCE(first_released_at, now())\n         WHERE id = $1 AND status = 'dispatched'\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6b7e6f81cfc907079e6f0d0c9a559addf5a15774d36ce976c96f5dd3926bf539"
+}

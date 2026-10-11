@@ -41,8 +41,18 @@ pub struct EngineConfig {
     pub unavailable_backoff: Duration,
     /// Через сколько повторить активацию с неизвестным исходом.
     pub activation_retry_backoff: Duration,
-    /// Сколько операций брать за один проход.
+    /// Сколько операций выполнять за один проход (берутся по одной).
     pub batch: i64,
+    /// Сколько ждать появления чека при сверке выплаты с неизвестным исходом, прежде чем
+    /// отдать заявку человеку (бот мог ещё не дописать кнопку или ответ меню).
+    pub reconcile_grace: Duration,
+    /// Сколько операция может не выполняться (кошелёк недоступен, сверка не удаётся),
+    /// прежде чем заявка уйдёт к человеку, а направления платформы — на паузу.
+    pub escalate_after: Duration,
+    /// Операция `dispatched` дольше этого — осиротела (ошибка или падение посреди работы).
+    pub stale_after: Duration,
+    /// Как часто повторять сверку выплат с неизвестным исходом и искать осиротевшие.
+    pub housekeeping_every: Duration,
 }
 
 impl Default for EngineConfig {
@@ -52,6 +62,10 @@ impl Default for EngineConfig {
             unavailable_backoff: Duration::from_secs(30),
             activation_retry_backoff: Duration::from_secs(30),
             batch: 16,
+            reconcile_grace: Duration::from_secs(600),
+            escalate_after: Duration::from_secs(1800),
+            stale_after: Duration::from_secs(900),
+            housekeeping_every: Duration::from_secs(30),
         }
     }
 }
@@ -80,6 +94,9 @@ pub enum EngineError {
     Pricing(#[from] domain::pricing::PricingError),
     #[error(transparent)]
     Money(#[from] domain::money::MoneyError),
+    /// Движок уже работает в другом процессе (advisory-блокировка лидера занята).
+    #[error("another engine instance is running")]
+    AnotherInstance,
     /// Нарушено ожидание кода: данные заявки не сходятся с её состоянием.
     #[error("invariant violated: {0}")]
     Invariant(String),
@@ -174,21 +191,38 @@ impl Engine {
         Ok(())
     }
 
-    /// Рабочий цикл до отмены: восстановление, затем исполнитель операций.
+    /// Рабочий цикл до отмены: блокировка лидера, восстановление, затем исполнитель
+    /// операций и периодическая уборка (сверка неизвестных выплат, осиротевшие операции).
+    ///
+    /// Второй процесс с тем же `DATABASE_URL` получит [`EngineError::AnotherInstance`]: два
+    /// движка приняли бы живые операции друг друга за прерванные.
     pub async fn run(
         &self,
         cancel: tokio_util::sync::CancellationToken,
     ) -> Result<(), EngineError> {
+        let mut leader = self.pool.acquire().await?;
+        let locked: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock($1, $2)")
+            .bind(LEADER_LOCK.0)
+            .bind(LEADER_LOCK.1)
+            .fetch_one(&mut *leader)
+            .await?;
+        if !locked {
+            return Err(EngineError::AnotherInstance);
+        }
         self.recover().await?;
         let mut listener = sqlx::postgres::PgListener::connect_with(&self.pool).await?;
         listener.listen("exch_operations").await?;
         let mut tick = tokio::time::interval(Duration::from_secs(1));
+        let mut housekeeping = tokio::time::interval(self.cfg.housekeeping_every);
         loop {
             while self.process_due().await? > 0 {}
-            self.resolve_unknown().await?;
             tokio::select! {
-                () = cancel.cancelled() => return Ok(()),
+                () = cancel.cancelled() => break,
                 _ = tick.tick() => {}
+                _ = housekeeping.tick() => {
+                    self.resolve_unknown().await?;
+                    self.recover_dispatched(Some(self.cfg.stale_after)).await?;
+                }
                 note = listener.recv() => {
                     if let Err(e) = note {
                         tracing::warn!(error = %e, "LISTEN connection lost, polling");
@@ -196,5 +230,15 @@ impl Engine {
                 }
             }
         }
+        // Блокировка уходит вместе с соединением; явно — чтобы не ждать его закрытия.
+        let _ = sqlx::query("SELECT pg_advisory_unlock($1, $2)")
+            .bind(LEADER_LOCK.0)
+            .bind(LEADER_LOCK.1)
+            .execute(&mut *leader)
+            .await;
+        Ok(())
     }
 }
+
+/// Ключ advisory-блокировки лидера движка.
+const LEADER_LOCK: (i32, i32) = (7002, 1);

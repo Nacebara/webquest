@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COALESCE(SUM(COALESCE(o.intake_amount, h.amount, 0)), 0) AS \"v!\"\n          FROM orders o\n          LEFT JOIN holds h ON h.order_id = o.id AND h.state = 'active'\n         WHERE o.user_id = $1\n           AND o.created_at > now() - interval '24 hours'\n           AND o.state NOT IN ('REJECTED', 'INTAKE_FAILED', 'EXPIRED', 'CANCELLED')\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b8716e63a3845a084ed288328d3186d9e16c0a55db148dfd580eb0d85a7a265e"
+}

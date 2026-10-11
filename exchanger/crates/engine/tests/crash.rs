@@ -132,6 +132,11 @@ async fn two_hundred_orders_with_faults_and_crashes_keep_money_exact(pool: PgPoo
             e.engine.recover().await.unwrap();
         }
         e.world.clear_faults(e.ub);
+        // «Оператор» снимает автопаузы, чтобы прогон продолжал гонять заявки.
+        sqlx::query("UPDATE directions SET auto_paused = FALSE, pause_reason = NULL")
+            .execute(&e.pool)
+            .await
+            .unwrap();
     }
     e.engine.recover().await.unwrap();
     e.engine.resolve_unknown().await.unwrap();

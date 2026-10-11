@@ -13,7 +13,7 @@ use domain::{Asset, Decimal, Platform};
 use serde_json::Value;
 use sqlx::PgConnection;
 
-use crate::error::StorageError;
+use crate::error::{StorageError, unique_violation};
 
 /// Статус операции (`operations.status`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,6 +88,9 @@ pub struct OperationRow {
     pub max_attempts: i32,
     pub external_id: Option<String>,
     pub dispatched_at: Option<DateTime<Utc>>,
+    /// Сколько раз возвращалась в очередь невыполненной и когда впервые.
+    pub releases: i32,
+    pub first_released_at: Option<DateTime<Utc>>,
 }
 
 struct RawRow {
@@ -107,6 +110,8 @@ struct RawRow {
     max_attempts: i32,
     external_id: Option<String>,
     dispatched_at: Option<DateTime<Utc>>,
+    releases: i32,
+    first_released_at: Option<DateTime<Utc>>,
 }
 
 impl TryFrom<RawRow> for OperationRow {
@@ -144,6 +149,8 @@ impl TryFrom<RawRow> for OperationRow {
             max_attempts: r.max_attempts,
             external_id: r.external_id,
             dispatched_at: r.dispatched_at,
+            releases: r.releases,
+            first_released_at: r.first_released_at,
         })
     }
 }
@@ -195,8 +202,20 @@ pub async fn count_for_order(
     Ok(n)
 }
 
-/// Забрать до `limit` созревших операций: `pending` → `dispatched`, `attempts + 1`.
-/// Коммитить сразу: действие юзербота — только после коммита.
+/// Виды операций, которые выполняет движок. Остальные (`withdrawal`, `read_balance`,
+/// `open_invoice`, `create_excess_check`) берут другие исполнители — движок их не трогает
+/// и не падает на них.
+const ENGINE_KINDS: [&str; 4] = [
+    "activate_check",
+    "create_payout_check",
+    "create_refund_check",
+    "pay_invoice",
+];
+
+/// Забрать до `limit` созревших операций движка: `pending` → `dispatched`, `attempts + 1`.
+/// Коммитить сразу: действие юзербота — только после коммита. Движок берёт по одной
+/// (`limit = 1`) непосредственно перед действием, чтобы падение не оставило «взятыми»
+/// операции, к которым он ещё не приступал.
 pub async fn claim_due(
     conn: &mut PgConnection,
     limit: i64,
@@ -208,15 +227,18 @@ pub async fn claim_due(
            SET status = 'dispatched', attempts = o.attempts + 1, dispatched_at = now()
           FROM (SELECT id FROM operations
                  WHERE status = 'pending' AND next_attempt_at <= now()
+                   AND kind = ANY($2) AND money_role IN ('intake', 'settle')
                  ORDER BY next_attempt_at, id
                  LIMIT $1
                  FOR UPDATE SKIP LOCKED) due
          WHERE o.id = due.id
         RETURNING o.id, o.order_id, o.kind, o.money_role, o.platform, o.wallet_account_id,
                   o.status, o.idempotency_key, o.start_param, o.amount, o.asset, o.request,
-                  o.attempts, o.max_attempts, o.external_id, o.dispatched_at
+                  o.attempts, o.max_attempts, o.external_id, o.dispatched_at,
+                  o.releases, o.first_released_at
         "#,
         limit,
+        &ENGINE_KINDS.map(str::to_owned),
     )
     .fetch_all(conn)
     .await?;
@@ -235,11 +257,13 @@ pub async fn in_flight(conn: &mut PgConnection) -> Result<Vec<OperationRow>, Sto
         r#"
         SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,
                idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
-               external_id, dispatched_at
+               external_id, dispatched_at, releases, first_released_at
           FROM operations
          WHERE status IN ('dispatched', 'unknown')
+           AND kind = ANY($1) AND money_role IN ('intake', 'settle')
          ORDER BY id
-        "#
+        "#,
+        &ENGINE_KINDS.map(str::to_owned),
     )
     .fetch_all(conn)
     .await?;
@@ -252,7 +276,7 @@ pub async fn get(conn: &mut PgConnection, id: i64) -> Result<OperationRow, Stora
         r#"
         SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,
                idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
-               external_id, dispatched_at
+               external_id, dispatched_at, releases, first_released_at
           FROM operations WHERE id = $1
         "#,
         id
@@ -273,7 +297,7 @@ pub async fn for_order(
         r#"
         SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,
                idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
-               external_id, dispatched_at
+               external_id, dispatched_at, releases, first_released_at
           FROM operations WHERE order_id = $1 ORDER BY id
         "#,
         order_id
@@ -313,7 +337,11 @@ pub async fn finish(
         done,
     )
     .execute(conn)
-    .await?
+    .await
+    .map_err(|e| match unique_violation(&e) {
+        Some("operations_check_issued_once") => StorageError::CheckAlreadyUsed(id),
+        _ => StorageError::Db(e),
+    })?
     .rows_affected();
     if updated == 1 {
         Ok(())
@@ -332,7 +360,8 @@ pub async fn release(
     let updated = sqlx::query!(
         r#"
         UPDATE operations
-           SET status = 'pending', attempts = attempts - 1, next_attempt_at = $2, last_error = $3
+           SET status = 'pending', attempts = attempts - 1, next_attempt_at = $2, last_error = $3,
+               releases = releases + 1, first_released_at = COALESCE(first_released_at, now())
          WHERE id = $1 AND status = 'dispatched'
         "#,
         id,
@@ -372,4 +401,31 @@ pub async fn retry(
     .await?
     .rows_affected();
     Ok(updated == 1)
+}
+
+/// Отложить взятую операцию, не выполняя её и не считая это сбоем (стоп-кран выплат).
+pub async fn postpone(
+    conn: &mut PgConnection,
+    id: i64,
+    at: DateTime<Utc>,
+    reason: &str,
+) -> Result<(), StorageError> {
+    let updated = sqlx::query!(
+        r#"
+        UPDATE operations
+           SET status = 'pending', attempts = attempts - 1, next_attempt_at = $2, last_error = $3
+         WHERE id = $1 AND status = 'dispatched'
+        "#,
+        id,
+        at,
+        reason,
+    )
+    .execute(conn)
+    .await?
+    .rows_affected();
+    if updated == 1 {
+        Ok(())
+    } else {
+        Err(StorageError::OperationState(id))
+    }
 }

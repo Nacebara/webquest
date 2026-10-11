@@ -122,3 +122,25 @@ pub async fn active(
     .await?;
     Ok(row.map(|r| (r.wallet_account_id, r.asset, r.amount)))
 }
+
+/// Удержать под возврат деньги, которые уже пришли на этот кошелёк по этой заявке. Без
+/// проверки свободного остатка: деньги физически здесь, и если их успели занять другие
+/// заявки, это их ошибка, а не повод не вернуть клиенту его деньги.
+pub async fn place_unchecked(
+    conn: &mut PgConnection,
+    order_id: i64,
+    wallet_account_id: i16,
+    asset: Asset,
+    amount: Decimal,
+) -> Result<(), StorageError> {
+    sqlx::query!(
+        "INSERT INTO holds (order_id, wallet_account_id, asset, amount) VALUES ($1, $2, $3, $4)",
+        order_id,
+        wallet_account_id,
+        asset.code(),
+        amount,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}

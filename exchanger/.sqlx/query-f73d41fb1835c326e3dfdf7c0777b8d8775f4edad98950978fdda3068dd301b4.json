@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,\n               idempotency_key, start_param, amount, asset, request, attempts, max_attempts,\n               external_id, dispatched_at\n          FROM operations\n         WHERE status IN ('dispatched', 'unknown')\n         ORDER BY id\n        ",
+  "query": "\n        SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,\n               idempotency_key, start_param, amount, asset, request, attempts, max_attempts,\n               external_id, dispatched_at, releases, first_released_at\n          FROM operations WHERE id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -178,10 +178,34 @@
             "name": "dispatched_at"
           }
         }
+      },
+      {
+        "ordinal": 16,
+        "name": "releases",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "releases"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "first_released_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "first_released_at"
+          }
+        }
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Int8"
+      ]
     },
     "nullable": [
       false,
@@ -199,8 +223,10 @@
       false,
       false,
       true,
+      true,
+      false,
       true
     ]
   },
-  "hash": "58693b881d711e772bccf0b181661db39b10de25afb2e99f1706290a2cdddf73"
+  "hash": "f73d41fb1835c326e3dfdf7c0777b8d8775f4edad98950978fdda3068dd301b4"
 }

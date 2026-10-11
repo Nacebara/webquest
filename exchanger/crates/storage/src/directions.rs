@@ -121,3 +121,53 @@ pub async fn reserve_target(
     .await?;
     Ok(target)
 }
+
+/// Сторона направления, с которой связан кошелёк платформы.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    /// Платформа, где принимаем чек клиента.
+    Source,
+    /// Платформа, где выплачиваем (создаём чек или оплачиваем счёт).
+    Target,
+}
+
+/// Автопауза всех направлений, у которых `platform` стоит на стороне `side`. Возвращает,
+/// сколько направлений встало на паузу.
+pub async fn auto_pause_platform(
+    conn: &mut PgConnection,
+    platform: domain::Platform,
+    side: Side,
+    reason: &str,
+) -> Result<u64, StorageError> {
+    let column_is_source = side == Side::Source;
+    let n = sqlx::query!(
+        r#"
+        UPDATE directions SET auto_paused = TRUE, pause_reason = $3, updated_at = now()
+         WHERE (CASE WHEN $2 THEN source_platform ELSE target_platform END) = $1
+           AND NOT auto_paused
+        "#,
+        platform.db_name(),
+        column_is_source,
+        reason
+    )
+    .execute(conn)
+    .await?
+    .rows_affected();
+    Ok(n)
+}
+
+/// Минимальная сумма чека актива на платформе (`platform_assets.min_check`).
+pub async fn min_check(
+    conn: &mut PgConnection,
+    platform: domain::Platform,
+    asset: domain::Asset,
+) -> Result<Decimal, StorageError> {
+    let min = sqlx::query_scalar!(
+        "SELECT min_check FROM platform_assets WHERE platform = $1 AND asset = $2",
+        platform.db_name(),
+        asset.code()
+    )
+    .fetch_one(conn)
+    .await?;
+    Ok(min)
+}

@@ -23,6 +23,10 @@ pub enum SubmitReject {
     DirectionClosed,
     /// Резерва на стороне выплаты не хватает даже на минимальную заявку.
     NoReserve,
+    /// Сервис на обслуживании или выплаты остановлены стоп-краном.
+    ServicePaused,
+    /// Суточный лимит клиента исчерпан (`settings.daily_limit_usd`).
+    DailyLimit,
 }
 
 impl SubmitReject {
@@ -32,6 +36,8 @@ impl SubmitReject {
             SubmitReject::AlreadyInWork => "already_in_work",
             SubmitReject::DirectionClosed => "direction_closed",
             SubmitReject::NoReserve => "no_reserve",
+            SubmitReject::ServicePaused => "service_paused",
+            SubmitReject::DailyLimit => "daily_limit",
         }
     }
 }
@@ -95,24 +101,38 @@ impl Engine {
 
         let dir = storage::directions::get(&mut tx, direction).await?;
         let target = direction.target();
-        let hold = if dir.accepting() {
+        let paused = storage::settings::flag_on(&mut tx, "maintenance").await?
+            || storage::settings::flag_on(&mut tx, "kill_switch_payouts").await?;
+        let hold = if paused {
+            Err(SubmitReject::ServicePaused)
+        } else if dir.accepting() {
             let (wallet, _) = storage::wallets::active(&mut tx, target)
                 .await?
                 .ok_or(EngineError::NoWalletAccount(target))?;
             storage::holds::lock_wallet(&mut tx, wallet).await?;
             let available = storage::holds::available(&mut tx, wallet, asset).await?;
-            let max_amount = if storage::orders::is_new_user(&mut tx, user_id).await? {
+            let new_user = storage::orders::is_new_user(&mut tx, user_id).await?;
+            let per_order = if new_user {
                 dir.new_user_max_amount
             } else {
                 dir.max_amount
             };
+            // Суточный лимит клиента: сколько уже пришло и удержано за 24 часа (USDT ≈ USD).
+            let daily = daily_limit(&mut tx, new_user).await?;
+            let used = storage::orders::user_volume_24h(&mut tx, user_id).await?;
+            let left = daily.map(|d| d - used);
+            let max_amount = left.map_or(per_order, |l| per_order.min(l));
             let limits = Limits {
                 min_amount: dir.min_amount,
                 max_amount,
             };
-            match max_order_effective(limits, available, self.cfg.reserve_safety) {
-                Some(amount) => Ok((wallet, amount)),
-                None => Err(SubmitReject::NoReserve),
+            if max_amount < dir.min_amount {
+                Err(SubmitReject::DailyLimit)
+            } else {
+                match max_order_effective(limits, available, self.cfg.reserve_safety) {
+                    Some(amount) => Ok((wallet, amount)),
+                    None => Err(SubmitReject::NoReserve),
+                }
             }
         } else {
             Err(SubmitReject::DirectionClosed)
@@ -164,4 +184,22 @@ impl Engine {
         }
         Ok(result)
     }
+}
+
+/// Суточный лимит из `settings.daily_limit_usd` (`{"default": 1000, "new_user": 200}`);
+/// `None` — не задан.
+async fn daily_limit(
+    conn: &mut sqlx::PgConnection,
+    new_user: bool,
+) -> Result<Option<domain::Decimal>, EngineError> {
+    let Some(value) = storage::settings::get(conn, "daily_limit_usd").await? else {
+        return Ok(None);
+    };
+    let key = if new_user { "new_user" } else { "default" };
+    let limit = value.get(key).and_then(|v| match v {
+        serde_json::Value::Number(n) => n.to_string().parse().ok(),
+        serde_json::Value::String(s) => s.parse().ok(),
+        _ => None,
+    });
+    Ok(limit)
 }

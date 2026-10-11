@@ -23,6 +23,9 @@ pub enum StorageError {
     /// Индекс `ledger_tx_once_per_operation`: повторная обработка ответа не задвоит леджер.
     #[error("operation {0} has already been posted")]
     AlreadyPosted(i64),
+    /// Индекс `operations_check_issued_once`: этот чек уже закрывает другую операцию.
+    #[error("operation {0}: this check already settles another operation")]
+    CheckAlreadyUsed(i64),
     /// Итог операции уже записан или она не в том статусе.
     #[error("operation {0} is not in a state that allows this change")]
     OperationState(i64),

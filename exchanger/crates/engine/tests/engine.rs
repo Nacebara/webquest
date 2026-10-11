@@ -182,16 +182,15 @@ async fn payout_timeout_is_reconciled_to_exactly_one_check(pool: PgPool) {
     let e = env(pool).await;
     let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
     let order = accepted(e.submit(&url).await);
-    // Активация проходит обычным путём; сбои — только на выдаче чека.
-    assert_eq!(e.engine.process_due().await.unwrap(), 1);
     // Чек создан, ответ потерян, повтор не дошёл, история на время недоступна.
     e.world
         .inject(e.ub, Call::SendInline, Fault::TimeoutAfterEffect, 1);
     e.world
         .inject(e.ub, Call::SendInline, Fault::Disconnected, 1);
-    // Первое чтение истории — проверка «чистого чата» перед выдачей: пропускаем его.
+    // Первые два чтения истории — проверки «чистого чата» перед активацией и перед выдачей:
+    // пропускаем их, сбой — на поиске чека.
     e.world
-        .inject(e.ub, Call::History, Fault::DelayReply(Duration::ZERO), 1);
+        .inject(e.ub, Call::History, Fault::DelayReply(Duration::ZERO), 2);
     e.world.inject(e.ub, Call::History, Fault::Disconnected, 3);
     e.drain().await;
 
@@ -332,5 +331,385 @@ async fn restart_mid_payout_is_reconciled_not_repeated(pool: PgPool) {
         1,
         "чек не создан второй раз"
     );
+    e.assert_books_match().await;
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn daily_limit_caps_a_new_client(pool: PgPool) {
+    let e = env(pool).await;
+    let mut conn = e.pool.acquire().await.unwrap();
+    storage::settings::set(
+        &mut conn,
+        "daily_limit_usd",
+        &serde_json::json!({ "default": 1000, "new_user": 200 }),
+        None,
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    // Каждая заявка нового клиента удерживает до 100; третья не помещается в 200 за сутки.
+    for _ in 0..2 {
+        let url = e.world.client_check(CB, usdt(dec!(50))).unwrap();
+        accepted(e.submit(&url).await);
+    }
+    let url = e.world.client_check(CB, usdt(dec!(50))).unwrap();
+    assert!(matches!(
+        e.submit(&url).await,
+        Submitted::Rejected {
+            reason: SubmitReject::DailyLimit,
+            ..
+        }
+    ));
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn kill_switch_stops_new_checks_and_queued_payouts(pool: PgPool) {
+    let e = env(pool).await;
+    // Движок, который берёт по одной операции за вызов, с теми же юзерботами.
+    let mut one = engine::Engine::new(
+        e.pool.clone(),
+        engine::EngineConfig {
+            batch: 1,
+            unavailable_backoff: Duration::ZERO,
+            ..engine::EngineConfig::default()
+        },
+    );
+    for w in e.wallets.values() {
+        one = one.with_wallet(w.clone() as std::sync::Arc<dyn WalletBot>);
+    }
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    assert_eq!(one.process_due().await.unwrap(), 1, "только активация");
+    let (now, _) = e.order(order.id).await;
+    assert_eq!(now.state, OrderState::PayoutPending);
+
+    let set = |on: bool| {
+        let pool = e.pool.clone();
+        async move {
+            let mut conn = pool.acquire().await.unwrap();
+            storage::settings::set(
+                &mut conn,
+                "kill_switch_payouts",
+                &serde_json::json!({ "on": on }),
+                None,
+            )
+            .await
+            .unwrap();
+        }
+    };
+    set(true).await;
+    // Выплата в очереди не выполняется, попытка не тратится; новые чеки не принимаются.
+    assert_eq!(one.process_due().await.unwrap(), 1);
+    assert!(e.world.checks_created_by(e.ub).is_empty());
+    let payout = e.ops(order.id).await.pop().unwrap();
+    assert_eq!((payout.status, payout.attempts), (OpStatus::Pending, 0));
+    let url = e.world.client_check(CB, usdt(dec!(10))).unwrap();
+    assert!(matches!(
+        e.submit(&url).await,
+        Submitted::Rejected {
+            reason: SubmitReject::ServicePaused,
+            ..
+        }
+    ));
+
+    set(false).await;
+    one.process_due().await.unwrap();
+    let (now, _) = e.order(order.id).await;
+    assert_eq!(now.state, OrderState::Completed);
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
+}
+
+// ============================== находки проверки денежного ядра ==============================
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_second_engine_refuses_to_run(pool: PgPool) {
+    let e = env(pool).await;
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let first = {
+        let cancel = cancel.clone();
+        let engine = engine::Engine::new(e.pool.clone(), engine::EngineConfig::default());
+        tokio::spawn(async move { engine.run(cancel).await })
+    };
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let second = engine::Engine::new(e.pool.clone(), engine::EngineConfig::default());
+    let refused = second.run(tokio_util::sync::CancellationToken::new()).await;
+    assert!(
+        matches!(refused, Err(engine::EngineError::AnotherInstance)),
+        "{refused:?}"
+    );
+    cancel.cancel();
+    first.await.unwrap().unwrap();
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn operation_of_another_wallet_account_goes_to_a_human(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(CB, usdt(dec!(20))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    // Аккаунт CryptoBot заменили запасным, пока активация ждала в очереди.
+    let mut conn = e.pool.acquire().await.unwrap();
+    let spare = storage::wallets::ensure_userbot(&mut conn, "ub-2", "+00******02")
+        .await
+        .unwrap();
+    sqlx::query("UPDATE wallet_accounts SET is_active = FALSE WHERE platform = 'cryptobot'")
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO wallet_accounts (platform, label, userbot_id) VALUES ('cryptobot', 'cb-2', $1)")
+        .bind(spare)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    drop(conn);
+    e.drain().await;
+    let (order, d) = e.order(order.id).await;
+    assert_eq!(order.state, OrderState::ManualReview);
+    assert!(
+        d.manual_reason
+            .unwrap()
+            .contains("belongs to wallet account")
+    );
+    assert_eq!(
+        e.world.balance(e.ub, CB, Asset::Usdt),
+        dec!(1000),
+        "чек не активировали"
+    );
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn refund_money_is_held_on_the_source_wallet(pool: PgPool) {
+    let e = env(pool).await;
+    // Выше лимита нового клиента (100): возврат 150 на CryptoBot.
+    let url = e.world.client_check(CB, usdt(dec!(150))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    let mut conn = e.pool.acquire().await.unwrap();
+    // Только активация: выплату-возврат пока не выполняем.
+    let op = storage::operations::claim_due(&mut conn, 1)
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
+    storage::operations::release(&mut conn, op.id, chrono::Utc::now(), "test")
+        .await
+        .unwrap();
+    drop(conn);
+    let mut one = engine::Engine::new(
+        e.pool.clone(),
+        engine::EngineConfig {
+            batch: 1,
+            ..engine::EngineConfig::default()
+        },
+    );
+    for w in e.wallets.values() {
+        one = one.with_wallet(w.clone() as std::sync::Arc<dyn WalletBot>);
+    }
+    one.process_due().await.unwrap();
+    let (now, _) = e.order(order.id).await;
+    assert_eq!(now.state, OrderState::RefundPending);
+    let mut conn = e.pool.acquire().await.unwrap();
+    let (cb, _) = storage::wallets::active(&mut conn, CB)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        storage::holds::available(&mut conn, cb, Asset::Usdt)
+            .await
+            .unwrap(),
+        dec!(1000),
+        "150 пришли, но удержаны под возврат"
+    );
+    drop(conn);
+    e.drain().await;
+    let (now, _) = e.order(order.id).await;
+    assert_eq!(now.state, OrderState::Refunded);
+    let mut conn = e.pool.acquire().await.unwrap();
+    assert_eq!(
+        storage::holds::active(&mut conn, order.id).await.unwrap(),
+        None
+    );
+    assert_eq!(
+        storage::holds::available(&mut conn, cb, Asset::Usdt)
+            .await
+            .unwrap(),
+        dec!(1000)
+    );
+    drop(conn);
+    e.assert_books_match().await;
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_repeated_already_activated_reply_never_writes_the_money_off(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(CB, usdt(dec!(40))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    // Первая попытка: чек зачислен, бот промолчал. Вторая — новым random_id (как после
+    // потери дедупликации) получила бы «уже активирован»: эмулируем вторую попытку напрямую.
+    e.world.inject(e.ub, Call::SendText, Fault::NoReply, 1);
+    let mut conn = e.pool.acquire().await.unwrap();
+    let op = storage::operations::claim_due(&mut conn, 1)
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
+    drop(conn);
+    let tag = userbot::OpTag {
+        key: op.idempotency_key.clone(),
+        random_id: op.random_id,
+    };
+    let first = e.wallets[&CB]
+        .activate_check(op.start_param.as_deref().unwrap(), &tag)
+        .await
+        .unwrap();
+    assert!(matches!(first, userbot::ActivationOutcome::Unknown { .. }));
+    let mut conn = e.pool.acquire().await.unwrap();
+    assert!(
+        storage::operations::retry(&mut conn, op.id, chrono::Utc::now(), "test")
+            .await
+            .unwrap()
+    );
+    // Вторая попытка с другим random_id: Telegram не узнает повтор, бот скажет «уже активирован».
+    sqlx::query(
+        "UPDATE operations SET request = jsonb_set(request, '{random_id}', '777') WHERE id = $1",
+    )
+    .bind(op.id)
+    .execute(&mut *conn)
+    .await
+    .unwrap();
+    drop(conn);
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    e.drain().await;
+    let (order, d) = e.order(order.id).await;
+    assert_eq!(order.state, OrderState::ManualReview, "не IntakeFailed");
+    assert!(
+        d.manual_reason
+            .unwrap()
+            .contains("earlier attempt may have won")
+    );
+    assert_eq!(
+        e.world.balance(e.ub, CB, Asset::Usdt),
+        dec!(1040),
+        "деньги у нас"
+    );
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn one_check_never_settles_two_operations(pool: PgPool) {
+    let e = env(pool).await;
+    let mut conn = e.pool.acquire().await.unwrap();
+    let mut ids = Vec::new();
+    for check in ["CQaaaaaaaaaa", "CQbbbbbbbbbb"] {
+        let o = storage::orders::insert(
+            &mut conn,
+            &storage::orders::NewOrder {
+                user_id: CLIENT,
+                direction: Direction::CbToXrCheck,
+                asset: Asset::Usdt,
+                intake_start_param: Some(check),
+                invoice_start_param: None,
+            },
+        )
+        .await
+        .unwrap();
+        let (xr, _) = storage::wallets::active(&mut conn, XR)
+            .await
+            .unwrap()
+            .unwrap();
+        let id = storage::operations::insert(
+            &mut conn,
+            &storage::operations::NewOperation {
+                order_id: o.id,
+                kind: domain::fsm::OpKind::CreatePayoutCheck,
+                role: domain::fsm::MoneyRole::Settle,
+                platform: XR,
+                wallet_account_id: xr,
+                idempotency_key: &format!("ord-{}-payout-1", o.id),
+                start_param: None,
+                amount: Some(dec!(10)),
+                asset: Asset::Usdt,
+                random_id: 1 + o.id,
+            },
+        )
+        .await
+        .unwrap();
+        ids.push(id);
+    }
+    sqlx::query("UPDATE operations SET status = 'dispatched'")
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    let ok = storage::operations::finish(
+        &mut conn,
+        ids[0],
+        OpStatus::Succeeded,
+        &serde_json::json!({}),
+        Some("t_AbCdEfGhIjKlMnO"),
+        None,
+    )
+    .await;
+    assert!(ok.is_ok());
+    let twice = storage::operations::finish(
+        &mut conn,
+        ids[1],
+        OpStatus::Succeeded,
+        &serde_json::json!({}),
+        Some("t_AbCdEfGhIjKlMnO"),
+        None,
+    )
+    .await;
+    assert!(
+        matches!(twice, Err(storage::StorageError::CheckAlreadyUsed(_))),
+        "{twice:?}"
+    );
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn restricted_account_pauses_the_platform_and_calls_a_human(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(CB, usdt(dec!(20))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::Rpc {
+            code: 400,
+            name: "PEER_FLOOD".to_owned(),
+        },
+        1,
+    );
+    e.drain().await;
+    let (order, d) = e.order(order.id).await;
+    assert_eq!(order.state, OrderState::ManualReview);
+    assert!(d.manual_reason.unwrap().contains("cannot act"));
+    let mut conn = e.pool.acquire().await.unwrap();
+    for dir in [Direction::CbToXrCheck, Direction::XrToCbCheck] {
+        let d = storage::directions::get(&mut conn, dir).await.unwrap();
+        assert!(d.auto_paused, "{dir:?}");
+    }
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn settlement_error_keeps_the_intake_and_calls_a_human(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(CB, usdt(dec!(30))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    // Невозможный целевой резерв ломает расчёт комиссии.
+    let mut conn = e.pool.acquire().await.unwrap();
+    let (xr, _) = storage::wallets::active(&mut conn, XR)
+        .await
+        .unwrap()
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO reserve_thresholds (wallet_account_id, asset, target, low, critical, high) VALUES ($1, 'USDT', 0, 0, 0, 0)",
+    )
+    .bind(xr)
+    .execute(&mut *conn)
+    .await
+    .unwrap();
+    drop(conn);
+    e.drain().await;
+    let (order, d) = e.order(order.id).await;
+    assert_eq!(order.state, OrderState::ManualReview);
+    assert_eq!(d.intake_amount, Some(dec!(30)), "зачисление не откатилось");
+    assert!(d.manual_reason.unwrap().contains("settlement failed"));
     e.assert_books_match().await;
 }

@@ -108,6 +108,9 @@ pub enum BotError {
     /// Кошелёк сообщил об ограничении аккаунта — направление на паузу (SPEC §4, П15).
     #[error("wallet account restricted")]
     AccountRestricted,
+    /// Сессия аккаунта недействительна (разлогинен, отозвана) — нужен новый `exch login`.
+    #[error("wallet account is not authorized")]
+    NotAuthorized,
     #[error(transparent)]
     Transport(#[from] TransportError),
 }

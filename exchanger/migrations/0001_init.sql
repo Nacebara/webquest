@@ -7,7 +7,8 @@
 --   I1. Один чек (start_param) — не больше одной незавершённой заявки.
 --   I2. На заявку — не больше одной «расчётной» операции (выплата,
 --       возврат или оплата счёта) в статусах pending/dispatched/unknown/succeeded.
---   I3. Ключ идемпотентности операции уникален глобально (= spend_id/transferId).
+--   I3. Ключ операции уникален глобально (`ord-<id>-<вид>-<n>`, он же метка в «Избранном»);
+--       один созданный чек закрывает не больше одной операции.
 --   I4. Каждая проводка сбалансирована по каждому активу (сумма = 0).
 --   I5. Леджер и журнал переходов — только добавление (UPDATE/DELETE запрещены).
 --   I6. Каждый сырой ответ бота кошелька сохраняется один раз.
@@ -191,6 +192,7 @@ CREATE TABLE orders (
     intake_platform     TEXT NOT NULL CHECK (intake_platform IN ('cryptobot', 'xrocket')),
     intake_start_param  TEXT,                                 -- 'CQ…' / 'mc_…' — ценность до активации, в логах маскируется
     intake_amount       NUMERIC(38,18) CHECK (intake_amount > 0),          -- сколько реально пришло
+    intake_asset        TEXT REFERENCES assets(code),                      -- в каком активе пришло (может не совпасть с asset)
 
     -- Чужой счёт, который мы оплачиваем (для invoice_payment)
     invoice_platform    TEXT CHECK (invoice_platform IN ('cryptobot', 'xrocket')),
@@ -359,6 +361,8 @@ CREATE TABLE operations (
     attempts            INTEGER NOT NULL DEFAULT 0,
     max_attempts        INTEGER NOT NULL DEFAULT 8,
     next_attempt_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    releases            INTEGER NOT NULL DEFAULT 0,  -- сколько раз возвращалась в очередь невыполненной
+    first_released_at   TIMESTAMPTZ,                 -- когда впервые; долго не выполняется — к человеку
     last_error          TEXT,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     dispatched_at       TIMESTAMPTZ,
@@ -384,6 +388,11 @@ CREATE UNIQUE INDEX operations_check_once
 CREATE UNIQUE INDEX operations_invoice_pay_once
     ON operations (platform, start_param)
     WHERE kind = 'pay_invoice' AND status IN ('pending', 'dispatched', 'unknown', 'succeeded');
+-- I3: один созданный чек (код CQ…/t_…) закрывает не больше одной операции выплаты или возврата.
+CREATE UNIQUE INDEX operations_check_issued_once
+    ON operations (platform, external_id)
+    WHERE kind IN ('create_payout_check', 'create_refund_check', 'create_excess_check')
+      AND external_id IS NOT NULL;
 -- Очередь outbox-воркера.
 CREATE INDEX operations_due ON operations (next_attempt_at) WHERE status = 'pending';
 CREATE INDEX operations_inflight ON operations (status) WHERE status IN ('dispatched', 'unknown');

@@ -68,6 +68,10 @@ pub(crate) async fn transit(
             }
         }
     }
+    // Возврат сделан: удержание под него на кошельке входа больше не нужно.
+    if event == Event::RefundConfirmed {
+        storage::holds::close(&mut *conn, order.id, true).await?;
+    }
     Ok((updated, ops))
 }
 
@@ -94,11 +98,25 @@ async fn post(
             need(d.payout_amount, "payout amount", order)?,
             need(d.fee_amount, "fee amount", order)?,
         )?,
-        PostingKind::Refund => ledger::refund(
-            source,
-            asset,
-            need(d.refund_amount, "refund amount", order)?,
-        )?,
+        PostingKind::Refund => {
+            // Возврат — в активе прихода; остаток от округления до шага платформы — в доход.
+            let asset = d.intake_asset.unwrap_or(asset);
+            let refund = need(d.refund_amount, "refund amount", order)?;
+            let intake = need(d.intake_amount, "intake amount", order)?;
+            if intake > refund {
+                storage::ledger::post(
+                    &mut *conn,
+                    &ledger::excess_kept(asset, intake - refund)?,
+                    PostingRefs {
+                        order_id: Some(order.id),
+                        memo: Some("refund rounding remainder"),
+                        ..Default::default()
+                    },
+                )
+                .await?;
+            }
+            ledger::refund(source, asset, refund)?
+        }
         PostingKind::InvoicePaid => ledger::invoice_paid(
             target,
             asset,
@@ -164,10 +182,15 @@ async fn create_op(
     let (wallet, _) = storage::wallets::active(&mut *conn, platform)
         .await?
         .ok_or(EngineError::NoWalletAccount(platform))?;
+    // Возврат — в том активе, в котором пришли деньги.
+    let asset = match kind {
+        OpKind::CreateRefundCheck => d.intake_asset.unwrap_or(order.asset),
+        _ => order.asset,
+    };
     let n = storage::operations::count_for_order(&mut *conn, order.id, kind).await? + 1;
     let key = format!("ord-{}-{label}-{n}", order.id);
     let id = storage::operations::insert(
-        conn,
+        &mut *conn,
         &NewOperation {
             order_id: order.id,
             kind,
@@ -177,10 +200,16 @@ async fn create_op(
             idempotency_key: &key,
             start_param,
             amount,
-            asset: order.asset,
+            asset,
             random_id: userbot::flows::rid::new_random_id(),
         },
     )
     .await?;
+    // Деньги для возврата уже лежат на кошельке входа — удерживаем их, чтобы встречные
+    // заявки не заняли их под свои выплаты.
+    if let (OpKind::CreateRefundCheck, Some(refund)) = (kind, amount) {
+        storage::holds::lock_wallet(&mut *conn, wallet).await?;
+        storage::holds::place_unchecked(&mut *conn, order.id, wallet, asset, refund).await?;
+    }
     Ok(id)
 }

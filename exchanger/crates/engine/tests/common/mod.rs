@@ -72,6 +72,7 @@ pub async fn env_with(pool: PgPool, flow: FlowConfig) -> Env {
         EngineConfig {
             unavailable_backoff: Duration::ZERO,
             activation_retry_backoff: Duration::ZERO,
+            reconcile_grace: Duration::ZERO,
             ..EngineConfig::default()
         },
     );
@@ -108,6 +109,15 @@ pub async fn env_with(pool: PgPool, flow: FlowConfig) -> Env {
             .await
             .unwrap();
     }
+    // Суточный лимит клиента в сценариях не мешает (его проверяет отдельный тест).
+    storage::settings::set(
+        &mut tx,
+        "daily_limit_usd",
+        &serde_json::json!({ "default": 1_000_000, "new_user": 1_000_000 }),
+        None,
+    )
+    .await
+    .unwrap();
     storage::users::upsert(&mut tx, CLIENT, &storage::users::Profile::default())
         .await
         .unwrap();

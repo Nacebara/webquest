@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE operations o\n           SET status = 'dispatched', attempts = o.attempts + 1, dispatched_at = now()\n          FROM (SELECT id FROM operations\n                 WHERE status = 'pending' AND next_attempt_at <= now()\n                 ORDER BY next_attempt_at, id\n                 LIMIT $1\n                 FOR UPDATE SKIP LOCKED) due\n         WHERE o.id = due.id\n        RETURNING o.id, o.order_id, o.kind, o.money_role, o.platform, o.wallet_account_id,\n                  o.status, o.idempotency_key, o.start_param, o.amount, o.asset, o.request,\n                  o.attempts, o.max_attempts, o.external_id, o.dispatched_at\n        ",
+  "query": "\n        SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,\n               idempotency_key, start_param, amount, asset, request, attempts, max_attempts,\n               external_id, dispatched_at, releases, first_released_at\n          FROM operations\n         WHERE status IN ('dispatched', 'unknown')\n           AND kind = ANY($1) AND money_role IN ('intake', 'settle')\n         ORDER BY id\n        ",
   "describe": {
     "columns": [
       {
@@ -178,11 +178,33 @@
             "name": "dispatched_at"
           }
         }
+      },
+      {
+        "ordinal": 16,
+        "name": "releases",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "releases"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "first_released_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "first_released_at"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Int8"
+        "TextArray"
       ]
     },
     "nullable": [
@@ -201,8 +223,10 @@
       false,
       false,
       true,
+      true,
+      false,
       true
     ]
   },
-  "hash": "c9b9bc991fd6b52f871141e507162990755b55daf569098c38ece5c20abdfb9b"
+  "hash": "3975eeca86cc50464aed300e52d01f9f6882d0c9051b9970d65b442c57a2083e"
 }
