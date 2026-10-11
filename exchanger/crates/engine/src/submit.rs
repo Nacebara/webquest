@@ -1,0 +1,167 @@
+//! Приём чека клиента (SPEC §4, П1–П2): проверки → заявка → удержание резерва целевого
+//! кошелька → операция активации. Всё одной транзакцией: если что-то не прошло, нет ни
+//! заявки в работе, ни удержания, ни операции.
+
+use domain::fsm::Event;
+use domain::pricing::{Limits, max_order_effective};
+use domain::{Asset, Direction, Platform};
+use parsers::{LinkKind, WalletLink};
+use storage::StorageError;
+use storage::orders::{NewOrder, OrderPatch, OrderRow};
+
+use crate::effects::{EffectCtx, transit};
+use crate::{Engine, EngineError};
+
+/// Почему чек не взят в работу. Деньги клиента остались в чеке.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubmitReject {
+    /// Ссылка на счёт, а не на чек.
+    NotACheck,
+    /// Этот чек уже в работе в другой заявке.
+    AlreadyInWork,
+    /// Направление закрыто или на автопаузе.
+    DirectionClosed,
+    /// Резерва на стороне выплаты не хватает даже на минимальную заявку.
+    NoReserve,
+}
+
+impl SubmitReject {
+    pub const fn code(self) -> &'static str {
+        match self {
+            SubmitReject::NotACheck => "not_a_check",
+            SubmitReject::AlreadyInWork => "already_in_work",
+            SubmitReject::DirectionClosed => "direction_closed",
+            SubmitReject::NoReserve => "no_reserve",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Submitted {
+    /// Заявка в работе: чек уходит на активацию.
+    Accepted(OrderRow),
+    /// Отказ. `order` — запись отказа для истории (если заявка успела создаться).
+    Rejected {
+        reason: SubmitReject,
+        order: Option<OrderRow>,
+    },
+}
+
+/// Направление обмена по платформе чека: чек CryptoBot меняем на чек xRocket и наоборот.
+pub fn direction_for_check(platform: Platform) -> Direction {
+    match platform {
+        Platform::CryptoBot => Direction::CbToXrCheck,
+        Platform::XRocket => Direction::XrToCbCheck,
+    }
+}
+
+impl Engine {
+    /// Клиент `user_id` (уже есть в `users`) прислал ссылку на чек.
+    pub async fn submit_check(
+        &self,
+        user_id: i64,
+        link: &WalletLink,
+    ) -> Result<Submitted, EngineError> {
+        if link.kind != LinkKind::Check {
+            return Ok(Submitted::Rejected {
+                reason: SubmitReject::NotACheck,
+                order: None,
+            });
+        }
+        let direction = direction_for_check(link.platform);
+        let asset = Asset::Usdt;
+        let mut tx = self.pool.begin().await?;
+        let order = match storage::orders::insert(
+            &mut tx,
+            &NewOrder {
+                user_id,
+                direction,
+                asset,
+                intake_start_param: Some(&link.param),
+                invoice_start_param: None,
+            },
+        )
+        .await
+        {
+            Ok(order) => order,
+            Err(StorageError::DuplicateLiveCheck) => {
+                return Ok(Submitted::Rejected {
+                    reason: SubmitReject::AlreadyInWork,
+                    order: None,
+                });
+            }
+            Err(e) => return Err(e.into()),
+        };
+
+        let dir = storage::directions::get(&mut tx, direction).await?;
+        let target = direction.target();
+        let hold = if dir.accepting() {
+            let (wallet, _) = storage::wallets::active(&mut tx, target)
+                .await?
+                .ok_or(EngineError::NoWalletAccount(target))?;
+            storage::holds::lock_wallet(&mut tx, wallet).await?;
+            let available = storage::holds::available(&mut tx, wallet, asset).await?;
+            let max_amount = if storage::orders::is_new_user(&mut tx, user_id).await? {
+                dir.new_user_max_amount
+            } else {
+                dir.max_amount
+            };
+            let limits = Limits {
+                min_amount: dir.min_amount,
+                max_amount,
+            };
+            match max_order_effective(limits, available, self.cfg.reserve_safety) {
+                Some(amount) => Ok((wallet, amount)),
+                None => Err(SubmitReject::NoReserve),
+            }
+        } else {
+            Err(SubmitReject::DirectionClosed)
+        };
+
+        let result = match hold {
+            Ok(hold) => {
+                let (order, _) = transit(
+                    &mut tx,
+                    &order,
+                    Event::LinkAccepted,
+                    &OrderPatch::default(),
+                    None,
+                    EffectCtx {
+                        hold: Some(hold),
+                        ..EffectCtx::default()
+                    },
+                )
+                .await?;
+                Submitted::Accepted(order)
+            }
+            Err(reason) => {
+                let patch = OrderPatch {
+                    failure_code: Some(reason.code()),
+                    ..OrderPatch::default()
+                };
+                let (order, _) = transit(
+                    &mut tx,
+                    &order,
+                    Event::Rejected,
+                    &patch,
+                    Some(reason.code()),
+                    EffectCtx::default(),
+                )
+                .await?;
+                Submitted::Rejected {
+                    reason,
+                    order: Some(order),
+                }
+            }
+        };
+        tx.commit().await?;
+        match &result {
+            Submitted::Accepted(order)
+            | Submitted::Rejected {
+                order: Some(order), ..
+            } => self.notify(order),
+            Submitted::Rejected { order: None, .. } => {}
+        }
+        Ok(result)
+    }
+}

@@ -614,6 +614,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "engine"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "domain",
+ "parsers",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "userbot",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

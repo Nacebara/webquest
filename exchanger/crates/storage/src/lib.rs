@@ -15,6 +15,7 @@ pub mod holds;
 pub mod ledger;
 pub mod operations;
 pub mod orders;
+pub mod settings;
 pub mod transitions;
 pub mod users;
 pub mod wallets;

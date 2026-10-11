@@ -1,0 +1,30 @@
+[package]
+name = "engine"
+description = "Движок заявок: FSM-драйвер, исполнитель операций юзербота, сверка и восстановление (HANDOVER §5, M3)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono.workspace = true
+domain.workspace = true
+parsers = { path = "../parsers" }
+rust_decimal.workspace = true
+serde_json = "1"
+sqlx.workspace = true
+storage.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+userbot = { path = "../userbot" }
+
+[dev-dependencies]
+async-trait = "0.1.92"
+rust_decimal_macros.workspace = true
+userbot = { path = "../userbot", features = ["sim"] }
+
+[lints]
+workspace = true
