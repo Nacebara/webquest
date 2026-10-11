@@ -270,6 +270,7 @@ pub fn all_errors() -> Vec<(&'static str, UiError)> {
                 until: Some(at(13, 30)),
             },
         ),
+        ("daily_limit", UiError::DailyLimit),
         (
             "rate_limited",
             UiError::RateLimited {
@@ -475,6 +476,7 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
         ("no_link", ui.no_link()),
         ("cancelled_order", ui.cancelled(Some(ORDER))),
         ("cancelled_flow", ui.cancelled(None)),
+        ("invoice_soon", ui.invoice_soon()),
     ];
     let mut out: Vec<(String, Screen)> = screens
         .drain(..)

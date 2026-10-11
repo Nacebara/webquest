@@ -10,6 +10,7 @@ use std::time::Duration;
 use sqlx::migrate::Migrator;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 
+pub mod client;
 pub mod directions;
 pub mod error;
 pub mod holds;

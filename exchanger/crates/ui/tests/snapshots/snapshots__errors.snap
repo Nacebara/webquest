@@ -215,6 +215,17 @@ expression: errors.trim_end()
 <tg-emoji emoji-id="5368000000000000008">🛠</tg-emoji> Бот на обслуживании до <tg-time unix="1791379800" format="t">16:30 МСК</tg-time>. Чек я не открывал — деньги в нём.
 --- keyboard: none
 
+## daily_limit
+### plain
+--- html
+⏸ На сегодня лимит обменов исчерпан. Чек я не открывал — деньги в нём. Пришлите его завтра или напишите в /help.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> На сегодня лимит обменов исчерпан. Чек я не открывал — деньги в нём. Пришлите его завтра или напишите в /help.
+--- keyboard: none
+
 ## rate_limited
 ### plain
 --- html

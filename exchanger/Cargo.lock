@@ -2773,6 +2773,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "tgbot"
+version = "0.1.0"
+dependencies = [
+ "botapi",
+ "chrono",
+ "domain",
+ "engine",
+ "parsers",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "secrecy",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "ui",
+ "userbot",
+]
+
+[[package]]
 name = "thiserror"
 version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"

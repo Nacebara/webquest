@@ -134,6 +134,7 @@ impl Ui {
                 };
                 (body, Keyboard::None)
             }
+            UiError::DailyLimit => (self.fill(&e.daily_limit, &[]), Keyboard::None),
             UiError::RateLimited { retry_after_secs } => (
                 self.fill(
                     &e.rate_limited,

@@ -177,6 +177,8 @@ pub enum UiError {
     Maintenance {
         until: Option<DateTime<Utc>>,
     },
+    /// Суточный лимит обменов клиента исчерпан (`settings.daily_limit_usd`).
+    DailyLimit,
     /// E14.
     RateLimited {
         retry_after_secs: u64,
