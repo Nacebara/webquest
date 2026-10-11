@@ -11,8 +11,12 @@ use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 
+use std::sync::Arc;
+
 use app::config::Config;
+use app::login::MtprotoAuthenticator;
 use app::supervisor::{self, RestartPolicy, supervise};
+use app::telegram::TelegramSettings;
 
 /// Сколько ждать задачи после SIGTERM (Docker даёт 90 с, SPEC §12, шаг 6).
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(60);
@@ -35,6 +39,32 @@ enum Command {
     Migrate,
     /// Проверить переменные окружения; значения секретов не печатаются.
     CheckConfig,
+    /// Войти аккаунтом юзербота и привязать его к кошельку платформы. Телефон, код и пароль
+    /// 2FA спрашиваются в терминале и никуда не сохраняются, сессия — только зашифрованной.
+    Login {
+        /// Метка аккаунта: a-z, 0-9, '-', '_' (например, ub-1).
+        #[arg(long)]
+        label: String,
+        /// Кошелёк какой платформы — баланс этого аккаунта: cryptobot или xrocket.
+        #[arg(long, value_parser = parse_platform)]
+        platform: domain::Platform,
+    },
+    /// Записывать ответы ботов кошельков в файл JSON lines (для фикстур парсеров), ничего
+    /// не отправляя. В файле — живые ссылки на чеки: хранить вне репозитория.
+    Record {
+        #[arg(long)]
+        label: String,
+        #[arg(long)]
+        out: PathBuf,
+        /// Сначала записать столько последних сообщений каждого чата.
+        #[arg(long, default_value_t = 0)]
+        history: u32,
+    },
+}
+
+fn parse_platform(s: &str) -> Result<domain::Platform, String> {
+    domain::Platform::from_db_name(s)
+        .ok_or_else(|| format!("unknown platform {s}: use cryptobot or xrocket"))
 }
 
 fn main() -> ExitCode {
@@ -67,7 +97,13 @@ fn main() -> ExitCode {
         match cli.command {
             Command::Run => run().await,
             Command::Migrate => migrate().await,
-            Command::CheckConfig => check_config(),
+            Command::CheckConfig => check_config().await,
+            Command::Login { label, platform } => login(label, platform).await,
+            Command::Record {
+                label,
+                out,
+                history,
+            } => record(label, out, history).await,
         }
     });
     match result {
@@ -106,9 +142,9 @@ async fn migrate() -> anyhow::Result<()> {
     connect_and_migrate(&cfg).await.map(|_| ())
 }
 
-fn check_config() -> anyhow::Result<()> {
+async fn check_config() -> anyhow::Result<()> {
     let cfg = load_config()?;
-    tracing::info!(owner_tg_id = cfg.owner_tg_id, tz_owner = %cfg.tz_owner, "configuration is valid for M1");
+    tracing::info!(owner_tg_id = cfg.owner_tg_id, tz_owner = %cfg.tz_owner, "configuration is valid");
     for p in cfg.pending() {
         tracing::warn!(
             var = p.var,
@@ -116,24 +152,122 @@ fn check_config() -> anyhow::Result<()> {
             "not set yet, required from this milestone"
         );
     }
+    if let Err(e) = TelegramSettings::from_config(&cfg) {
+        tracing::warn!(error = %e, "userbots cannot connect yet");
+    }
+    // Аккаунты и кошельки — только метки, маски телефонов и статусы, без секретов.
+    let pool = storage::connect(cfg.database_url.expose_secret())
+        .await
+        .context("cannot connect to PostgreSQL")?;
+    let mut conn = pool.acquire().await?;
+    for acc in storage::sessions::list(&mut conn).await? {
+        tracing::info!(
+            account = %acc.label,
+            phone = %acc.phone_masked,
+            status = acc.status.db_name(),
+            has_session = acc.has_session,
+            tg_user_id = acc.tg_user_id,
+            "userbot account"
+        );
+    }
+    for w in storage::wallets::list(&mut conn).await? {
+        tracing::info!(
+            wallet = %w.label,
+            platform = w.platform.db_name(),
+            active = w.is_active,
+            account = %w.userbot_label,
+            "wallet"
+        );
+    }
+    Ok(())
+}
+
+async fn login(label: String, platform: domain::Platform) -> anyhow::Result<()> {
+    let cfg = load_config()?;
+    let tg = TelegramSettings::from_config(&cfg)?;
+    let pool = connect_and_migrate(&cfg).await?;
+    let mut auth = MtprotoAuthenticator {
+        cfg: tg.mtproto(&label),
+        key: tg.session_key(),
+        prompt: mtproto::TerminalPrompt,
+    };
+    let target = app::login::LoginTarget { label, platform };
+    app::login::run_login(&pool, &target, &mut auth).await?;
+    Ok(())
+}
+
+async fn record(label: String, out: PathBuf, history: u32) -> anyhow::Result<()> {
+    let cfg = load_config()?;
+    let tg = TelegramSettings::from_config(&cfg)?;
+    let pool = connect_and_migrate(&cfg).await?;
+    let transport = app::runtime::connect_account(&pool, &tg, &label).await?;
+    let log = app::wallet_log::WalletLog::new(pool.clone(), tg.bots().clone());
+    let mut file = app::record::open_output(&out)
+        .await
+        .with_context(|| format!("cannot open {}", out.display()))?;
+    let rx = userbot::Transport::subscribe(transport.as_ref());
+    let backfilled =
+        app::record::backfill(transport.as_ref(), history, &mut file, &log, &label).await?;
+    tracing::info!(account = %label, backfilled, "recording: nothing is sent, Ctrl-C to stop");
+    let cancel = CancellationToken::new();
+    let stop = cancel.clone();
+    tokio::spawn(async move {
+        shutdown_signal().await;
+        stop.cancel();
+    });
+    let stats = app::record::record_stream(rx, &mut file, &log, &label, &cancel).await?;
+    tracing::info!(account = %label, written = stats.written, lagged = stats.lagged, "recording stopped");
     Ok(())
 }
 
 async fn run() -> anyhow::Result<()> {
     let cfg = load_config()?;
     let pool = connect_and_migrate(&cfg).await?;
-    tracing::info!(
-        "warming up: client intake stays closed until wallets and bots are connected (M2-M5)"
-    );
 
     let cancel = CancellationToken::new();
     let mut tasks: JoinSet<Result<(), supervisor::GaveUp>> = JoinSet::new();
-    tasks.spawn(supervise(
-        "heartbeat",
-        cancel.clone(),
-        RestartPolicy::default(),
-        move |token| heartbeat(pool.clone(), token),
-    ));
+    {
+        let pool = pool.clone();
+        tasks.spawn(supervise(
+            "heartbeat",
+            cancel.clone(),
+            RestartPolicy::default(),
+            move |token| heartbeat(pool.clone(), token),
+        ));
+    }
+
+    // Юзерботы и движок: без них процесс только держит пульс и миграции.
+    match TelegramSettings::from_config(&cfg) {
+        Err(e) => {
+            tracing::warn!(error = %e, "userbots are not configured: the engine is not started")
+        }
+        Ok(tg) => {
+            let log = Arc::new(app::wallet_log::WalletLog::new(
+                pool.clone(),
+                tg.bots().clone(),
+            ));
+            let userbots = app::runtime::connect_userbots(&pool, &tg, &log).await?;
+            if userbots.is_empty() {
+                tracing::warn!(
+                    "no active wallet accounts: run `exch login` first; the engine is not started"
+                );
+            } else {
+                let engine = Arc::new(app::runtime::engine(&pool, &userbots));
+                engine.ensure_ledger_accounts().await?;
+                tasks.spawn(supervise(
+                    "engine",
+                    cancel.clone(),
+                    RestartPolicy::default(),
+                    move |token| {
+                        let engine = engine.clone();
+                        async move { engine.run(token).await.map_err(anyhow::Error::from) }
+                    },
+                ));
+                // Клиентский бот (крейт tgbot) запускается здесь, рядом с движком: он
+                // подписывается на `engine.subscribe()` и подаёт ссылки в `submit_check`.
+            }
+        }
+    }
 
     let outcome = tokio::select! {
         () = shutdown_signal() => {

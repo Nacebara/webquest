@@ -5,11 +5,13 @@
 //! - [`session_store`] — сессия MTProto в `userbot_accounts` (только шифротекст);
 //! - [`wallet_log`] — журнал сообщений ботов кошельков в `wallet_messages`;
 //! - [`telegram`] — настройки подключения юзерботов из окружения;
-//! - [`login`] — `exch login`; [`record`] — `exch record`.
+//! - [`login`] — `exch login`; [`record`] — `exch record`;
+//! - [`runtime`] — подключение юзерботов и сборка движка для `exch run`.
 
 pub mod config;
 pub mod login;
 pub mod record;
+pub mod runtime;
 pub mod session_store;
 pub mod supervisor;
 pub mod telegram;
