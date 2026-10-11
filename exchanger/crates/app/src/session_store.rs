@@ -7,7 +7,7 @@
 
 use async_trait::async_trait;
 use mtproto::{SealedSession, SessionStore, StoreError};
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretBox};
 use storage::PgPool;
 use storage::sessions::{self, StoredSession};
 
@@ -17,9 +17,15 @@ use crate::config;
 /// номер и повторный `exch login` (сессия, зашифрованная старым ключом, не расшифруется).
 pub const SESSION_KEY_VERSION: i16 = 1;
 
-/// Ключ шифрования сессий для `mtproto` из ключа конфигурации.
+/// Ключ шифрования сессий для `mtproto` из ключа конфигурации. Байты копируются сразу в новую
+/// кучу `SecretBox` (стирается при drop), без копии на стеке.
 pub fn session_key(key: &config::SessionKey) -> mtproto::SessionKey {
-    mtproto::SessionKey::from_bytes(SESSION_KEY_VERSION, key.secret().expose_secret())
+    mtproto::SessionKey::new(SESSION_KEY_VERSION, copy_key(key.secret()))
+}
+
+/// Копия ключа в новом `SecretBox`.
+pub fn copy_key(key: &SecretBox<[u8; 32]>) -> SecretBox<[u8; 32]> {
+    SecretBox::init_with_mut(|k: &mut [u8; 32]| k.copy_from_slice(key.expose_secret()))
 }
 
 /// Строка БД из зашифрованной сессии.
