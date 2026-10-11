@@ -116,6 +116,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
+ "botapi",
  "clap",
  "domain",
  "dotenvy",
@@ -126,11 +127,13 @@ dependencies = [
  "serde_json",
  "sqlx",
  "storage",
+ "tgbot",
  "thiserror",
  "tokio",
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "ui",
  "userbot",
 ]
 

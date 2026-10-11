@@ -140,6 +140,10 @@ impl Engine {
         &self.pool
     }
 
+    pub fn config(&self) -> &EngineConfig {
+        &self.cfg
+    }
+
     /// Поток изменений заявок.
     pub fn subscribe(&self) -> broadcast::Receiver<OrderUpdate> {
         self.updates.subscribe()

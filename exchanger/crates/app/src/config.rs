@@ -44,6 +44,8 @@ pub struct Config {
     pub xrocket_peer_id: Option<i64>,
     pub healthcheck_url: Option<String>,
     pub tz_owner: String,
+    /// `@username` оператора для экрана «Поддержка» клиентского бота.
+    pub support_contact: Option<String>,
 }
 
 /// Переменная, которая понадобится в одной из следующих вех.
@@ -90,6 +92,7 @@ impl Config {
             xrocket_peer_id: parse_num("XROCKET_PEER_ID", get("XROCKET_PEER_ID"))?,
             healthcheck_url: get("HEALTHCHECK_URL"),
             tz_owner: get("TZ_OWNER").unwrap_or_else(|| "UTC".to_owned()),
+            support_contact: get("SUPPORT_CONTACT"),
         })
     }
 

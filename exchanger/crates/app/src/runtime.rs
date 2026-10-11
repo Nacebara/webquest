@@ -104,6 +104,25 @@ pub async fn connect_userbots(
     Ok(out)
 }
 
+/// Клиентский бот поверх того же движка, который крутит `Engine::run`.
+pub fn client_bot(
+    pool: &PgPool,
+    token: secrecy::SecretString,
+    engine: Arc<engine::Engine>,
+    support_contact: Option<String>,
+) -> anyhow::Result<tgbot::ClientBot> {
+    let api = botapi::BotApi::new(token).context("cannot build the Bot API client")?;
+    let ui = ui::Ui::builtin(ui::EmojiSet::plain(), ui::UiConfig::default())
+        .context("built-in client texts are invalid")?;
+    let cfg = tgbot::ClientBotConfig {
+        support_contact,
+        // Бот показывает пределы заявки так же, как их считает движок при приёме.
+        reserve_safety: engine.config().reserve_safety,
+        ..tgbot::ClientBotConfig::default()
+    };
+    Ok(tgbot::ClientBot::new(api, ui, engine, pool.clone(), cfg))
+}
+
 /// Движок с кошельками подключённых юзерботов.
 pub fn engine(pool: &PgPool, userbots: &[Userbot]) -> engine::Engine {
     let mut engine = engine::Engine::new(pool.clone(), engine::EngineConfig::default());

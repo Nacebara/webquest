@@ -254,17 +254,42 @@ async fn run() -> anyhow::Result<()> {
             } else {
                 let engine = Arc::new(app::runtime::engine(&pool, &userbots));
                 engine.ensure_ledger_accounts().await?;
-                tasks.spawn(supervise(
-                    "engine",
-                    cancel.clone(),
-                    RestartPolicy::default(),
-                    move |token| {
-                        let engine = engine.clone();
-                        async move { engine.run(token).await.map_err(anyhow::Error::from) }
-                    },
-                ));
-                // Клиентский бот (крейт tgbot) запускается здесь, рядом с движком: он
-                // подписывается на `engine.subscribe()` и подаёт ссылки в `submit_check`.
+                {
+                    let engine = engine.clone();
+                    tasks.spawn(supervise(
+                        "engine",
+                        cancel.clone(),
+                        RestartPolicy::default(),
+                        move |token| {
+                            let engine = engine.clone();
+                            async move { engine.run(token).await.map_err(anyhow::Error::from) }
+                        },
+                    ));
+                }
+                // Клиентский бот — рядом с движком: подаёт ссылки в `submit_check` и правит
+                // сообщения заявок по `engine.subscribe()`.
+                match cfg.client_bot_token.clone() {
+                    None => {
+                        tracing::warn!("CLIENT_BOT_TOKEN is not set: the client bot is not started")
+                    }
+                    Some(token) => {
+                        let bot = app::runtime::client_bot(
+                            &pool,
+                            token,
+                            engine,
+                            cfg.support_contact.clone(),
+                        )?;
+                        tasks.spawn(supervise(
+                            "client-bot",
+                            cancel.clone(),
+                            RestartPolicy::default(),
+                            move |token| {
+                                let bot = bot.clone();
+                                async move { bot.run(token).await.map_err(anyhow::Error::from) }
+                            },
+                        ));
+                    }
+                }
             }
         }
     }

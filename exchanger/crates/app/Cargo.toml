@@ -19,6 +19,8 @@ anyhow.workspace = true
 # Реализации трейтов mtproto::SessionStore и userbot::MessageLog (оба на async-trait).
 async-trait = "0.1.92"
 base64.workspace = true
+# Клиентский бот в `exch run`: HTTP-клиент Bot API и экраны.
+botapi = { path = "../botapi" }
 clap.workspace = true
 domain.workspace = true
 dotenvy.workspace = true
@@ -30,12 +32,14 @@ serde_json = "1"
 # Уже в дереве через storage; напрямую — ради типа ошибки пула соединений.
 sqlx.workspace = true
 storage.workspace = true
+tgbot = { path = "../tgbot" }
 thiserror.workspace = true
 # fs, io-util — запись файла `exch record` без блокировки рантайма.
 tokio = { workspace = true, features = ["fs", "io-util"] }
 tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+ui = { path = "../ui" }
 userbot = { path = "../userbot" }
 
 [dev-dependencies]
