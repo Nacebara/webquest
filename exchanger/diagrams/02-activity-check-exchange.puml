@@ -1,119 +1,141 @@
 @startuml activity-check-exchange
-' Обмен чека (на примере xRocket -> CryptoBot; обратное направление симметрично)
+' Обмен чека CryptoBot -> xRocket — основной поток (DESIGN-v0.2, Р1).
+' Обратное направление симметрично: вход @xrocket, выплата чеком @send.
+' Всё делает юзербот; выплата — чек, который юзербот создаёт сам (create_payout_check, одна попытка).
 skinparam shadowing false
 skinparam ActivityBackgroundColor #FFFFFF
-title Обмен чека xRocket → CryptoBot (обратное направление симметрично)
+title Обмен чека CryptoBot → xRocket (основной поток; обратное направление симметрично)
 
 |Клиент|
 start
-:Присылает ссылку на чек
-t.me/xrocket?start=mc_…;
+:Присылает чек CryptoBot:
+ссылку t.me/send?start=CQ…,
+пересланное сообщение-чек
+или инлайн @send 100usdt в чате бота;
 
 |Бот / ядро|
-:Разобрать ссылку
-(канонический бот, start-параметр);
-if (Ссылка валидна и бот канонический?) then (нет)
-  :Ответ «не похоже на чек»
-  деньги не тронуты;
+:Разобрать ссылку (parsers::links):
+официальный бот, не тестнет, код чека;
+if (Ссылка подходит?) then (нет)
+  :«Это не чек» / «поддельный бот» /
+  «тестовая сеть» — деньги не тронуты;
   stop
 endif
-if (Клиент забанен / лимит частоты?) then (да)
-  :Отказ с причиной
-  деньги не тронуты;
+if (Бан / лимит частоты / дневной лимит?) then (да)
+  :Отказ с причиной,
+  чек не открываем;
   stop
 endif
 if (Направление открыто и
-резерв выплаты ≥ max_order?) then (нет)
-  :«Направление на паузе / лимит»
-  чек НЕ активируем;
+max_order_eff(xr) ≥ min_amount?) then (нет)
+  :«Направление на паузе» / «могу принять
+  не больше N» — чек НЕ активируем;
   stop
 endif
 :BEGIN TX
-order = NEW → INTAKE_PENDING
-operation(activate_check) в outbox
-hold резерва max_order
+NEW → INTAKE_PENDING (LinkAccepted)
+hold(xr, max_order_eff)
+operation(activate_check, random_id)
 COMMIT;
-:Прогресс-сообщение «Проверяю чек…»;
+:Сообщение заявки «Проверяю чек…»;
+:Outbox: operation → dispatched (COMMIT);
 
-|Юзербот|
-:Очередь аккаунта xRocket
-(1 действие за раз, rate-limit);
-:messages.startBot(@xrocket, mc_…)
-сохранить сырые ответы;
-if (Капча / пароль?) then (капча)
-  :Решить кнопочную капчу
-  (по фикстурам) или → MANUAL;
-elseif (пароль) then
-  |Клиент|
-  :Вводит пароль чека
-  (TTL 10 мин);
-  |Юзербот|
-  :Отправить пароль боту xRocket;
-else (нет)
-endif
+|Юзербот CryptoBot|
+:Очередь аккаунта: одно действие в полёте,
+не чаще 1 действия в 1,5 с;
+:Подписка на поток, затем
+sendMessage(@send, "/start CQ…",
+no_webpage, сохранённый random_id);
+:Ждать ответ: FIFO, 30 с, учитывать правки,
+каждое сообщение → wallet_messages до разбора;
 
 |Бот / ядро|
-:Парсер ответа (версия формата);
-switch (Результат активации)
-case (Получено X актива)
+switch (Ответ (parsers::replies))
+case («Вы получили 100 USDT»)
   :BEGIN TX
   INTAKE_PENDING → RECEIVED
-  проводка: Дт xr:personal / Кт payable (на всю сумму)
+  проводка intake: Дт asset:cb / Кт payable
   COMMIT;
-case (Истёк / уже активирован\n/ не для нас / Premium / подписка)
-  :INTAKE_PENDING → INTAKE_FAILED
-  снять hold;
-  :«Чек не принят: причина
-  деньги у вас / у отправителя»;
+case (уже активирован / не найден / не для нас\n/ пароль / капча / подписка / Premium)
+  :INTAKE_PENDING → INTAKE_FAILED,
+  hold снят;
+  :«Чек не принят: причина.
+  Деньги остались в чеке»;
   stop
-case (Незнакомый ответ / таймаут)
+case (нет ответа 30 с / незнакомый текст)
   :→ INTAKE_UNKNOWN
-  автопауза направления
-  CRITICAL владельцу;
-  :Сверка: повторный /start
-  (идемпотентно) + баланс;
+  (незнакомый текст — автопауза
+  направления и CRITICAL);
+  :Сверка: догон истории чата
+  и баланс cb;
   if (Деньги пришли?) then (да)
     :→ RECEIVED;
+  elseif (Точно не пришли?) then (да)
+    :→ INTAKE_FAILED;
+    stop
   else (неясно)
     :→ MANUAL_REVIEW;
     stop
   endif
 endswitch
 
-if (Сумма > лимита / актив не поддержан?) then (да)
+if (Сумма вне лимитов / актив не USDT?) then (да)
   :BEGIN TX RECEIVED → REFUND_PENDING
-  operation(refund_transfer, transferId) в outbox
-  снять hold; COMMIT;
+  operation(create_refund_check) на CryptoBot,
+  hold снят; COMMIT
+  (возврат — чек CryptoBot, П8);
   stop
 endif
+:Котировка: 100 − 2,5 % = 97,50;
+:BEGIN TX
+RECEIVED → PAYOUT_PENDING (Settle(Payout))
+hold → 97,50
+operation(create_payout_check, random_id,
+max_attempts = 1)
+COMMIT;
+:Outbox: operation → dispatched (COMMIT);
+
+|Юзербот xRocket|
+:inline_query(@xrocket, "97.5")
+→ результат USDT ровно на 97,50;
+if (Ошибка ДО отправки результата?) then (да)
+  :Запасной путь — меню:
+  /cheques → «Персональный» →
+  «Создать чек» → USDT → 97.5;
+else (нет)
+  :send_inline в «Избранное»
+  с сохранённым random_id;
+endif
+:Ссылка t.me/xrocket?start=t_…
+из URL-кнопки сообщения-чека;
 
 |Бот / ядро|
-:BEGIN TX
-hold → точная сумма выплаты
-operation(payout_transfer, spend_id) в outbox
-RECEIVED → PAYOUT_PENDING
-COMMIT;
-:Outbox-воркер: transfer
-(user_id, USDT, payout, spend_id=ord-<id>-payout);
-switch (Ответ Crypto Pay)
-case (ok)
-  :PAYOUT_PENDING → COMPLETED
-  Дт payable / Кт cb:app, Кт revenue;
-case (таймаут / 5xx)
-  :Повтор с тем же spend_id
-  backoff + jitter; затем getTransfers(spend_id);
-case (USER_NOT_FOUND)
-  :Фолбэк: createCheck(pin_to_user_id)
-  ссылку — клиенту;
-case (неизвестная ошибка)
-  :operation → unknown,
-  заявка → MANUAL_REVIEW,
-  возврат запрещён до разбора;
+switch (Результат issue_check)
+case (Issued)
+  :BEGIN TX
+  PAYOUT_PENDING → COMPLETED
+  Дт payable 100 / Кт asset:xr 97,50
+  / Кт revenue:fee 2,50; hold consumed,
+  payout_check_url
+  COMMIT;
+case (Unknown: сбой ПОСЛЕ отправки)
+  :Повторно чек НЕ создаём,
+  find_issued_check: «Избранное»
+  и список чеков бота;
+  if (Чек найден однозначно?) then (да)
+    :→ COMPLETED (PayoutConfirmed);
+  else (нет / неясно)
+    :→ MANUAL_REVIEW (PayoutFailed);
+    stop
+  endif
+case (InsufficientFunds)
+  :→ MANUAL_REVIEW (PayoutFailed),
+  автопауза направления;
   stop
 endswitch
 
 |Клиент|
-:Видит итог с разбивкой:
-получено / комиссия / выплачено;
+:«Ваш чек xRocket на 97.50 USDT»
+[Забрать чек] [Скопировать ссылку];
 stop
 @enduml
