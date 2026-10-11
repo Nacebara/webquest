@@ -1,4 +1,5 @@
-//! PostgreSQL-хранилище: подключение, миграции, заявки, леджер (SPEC §10.7).
+//! PostgreSQL-хранилище: подключение, миграции, заявки, леджер, аккаунты юзерботов и журнал
+//! сообщений ботов кошельков (SPEC §10.7).
 //!
 //! Функции принимают `&mut PgConnection`, чтобы вызывающий код сам держал транзакцию:
 //! переход заявки, операции outbox и проводки коммитятся вместе (SPEC §10.5.3).
@@ -15,9 +16,11 @@ pub mod holds;
 pub mod ledger;
 pub mod operations;
 pub mod orders;
+pub mod sessions;
 pub mod settings;
 pub mod transitions;
 pub mod users;
+pub mod wallet_messages;
 pub mod wallets;
 
 pub use error::StorageError;

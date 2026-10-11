@@ -35,6 +35,12 @@ pub enum StorageError {
         available: domain::Decimal,
         needed: domain::Decimal,
     },
+    /// Нет аккаунта юзербота с такой меткой (`userbot_accounts.label`).
+    #[error("userbot account {0} is not registered: run `exch login --label {0}` first")]
+    UnknownUserbot(String),
+    /// Уникальность `userbot_accounts.tg_user_id`: этот аккаунт Telegram уже под другой меткой.
+    #[error("Telegram account {0} is already registered under another userbot label")]
+    TelegramAccountInUse(i64),
     #[error("unexpected value in {column}: {value}")]
     Corrupt { column: &'static str, value: String },
 }

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE userbot_accounts\n        SET status = $2,\n            last_ok_at = CASE WHEN $2 = 'active' THEN now() ELSE last_ok_at END\n        WHERE label = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1437b97c2d28e40b46885bf11ce1261560695e52a8715e96f5d4963ff0bc54c4"
+}

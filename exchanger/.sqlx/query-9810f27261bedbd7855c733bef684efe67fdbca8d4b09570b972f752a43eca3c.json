@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE userbot_accounts\n        SET session_ciphertext = $2, session_nonce = $3, key_version = $4\n        WHERE label = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Bytea",
+        "Bytea",
+        "Int2"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9810f27261bedbd7855c733bef684efe67fdbca8d4b09570b972f752a43eca3c"
+}
