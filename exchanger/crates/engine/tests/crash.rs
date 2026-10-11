@@ -89,6 +89,7 @@ async fn two_hundred_orders_with_faults_and_crashes_keep_money_exact(pool: PgPoo
             min_interval: Duration::ZERO,
             bot_actions_per_minute: 1_000_000,
             late_reply_quarantine: Duration::from_millis(20),
+            unanswered_block: Duration::from_millis(150),
             xrocket_not_found_retry: Some(Duration::from_millis(5)),
             ..FlowConfig::default()
         },

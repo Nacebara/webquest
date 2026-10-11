@@ -182,11 +182,16 @@ async fn payout_timeout_is_reconciled_to_exactly_one_check(pool: PgPool) {
     let e = env(pool).await;
     let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
     let order = accepted(e.submit(&url).await);
+    // Активация проходит обычным путём; сбои — только на выдаче чека.
+    assert_eq!(e.engine.process_due().await.unwrap(), 1);
     // Чек создан, ответ потерян, повтор не дошёл, история на время недоступна.
     e.world
         .inject(e.ub, Call::SendInline, Fault::TimeoutAfterEffect, 1);
     e.world
         .inject(e.ub, Call::SendInline, Fault::Disconnected, 1);
+    // Первое чтение истории — проверка «чистого чата» перед выдачей: пропускаем его.
+    e.world
+        .inject(e.ub, Call::History, Fault::DelayReply(Duration::ZERO), 1);
     e.world.inject(e.ub, Call::History, Fault::Disconnected, 3);
     e.drain().await;
 

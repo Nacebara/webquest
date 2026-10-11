@@ -40,6 +40,7 @@ pub fn fast() -> FlowConfig {
         min_interval: Duration::ZERO,
         bot_actions_per_minute: 10_000,
         late_reply_quarantine: Duration::from_millis(100),
+        unanswered_block: Duration::from_millis(500),
         xrocket_not_found_retry: Some(Duration::from_millis(10)),
         ..FlowConfig::default()
     }
