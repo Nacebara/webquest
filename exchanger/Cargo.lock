@@ -114,17 +114,24 @@ name = "app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "base64 0.22.1",
  "clap",
  "domain",
  "dotenvy",
+ "engine",
+ "mtproto",
+ "rust_decimal_macros",
  "secrecy",
+ "serde_json",
+ "sqlx",
  "storage",
  "thiserror",
  "tokio",
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "userbot",
 ]
 
 [[package]]
