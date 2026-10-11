@@ -333,3 +333,72 @@ async fn message_of_unknown_userbot_is_rejected(pool: PgPool) {
         Err(StorageError::Db(_))
     ));
 }
+
+/// Списки аккаунтов и кошельков для `exch check-config` и `exch run`: по порядку id, без
+/// байтов сессии, с привязкой кошелька к метке аккаунта.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn accounts_and_wallets_are_listed(pool: PgPool) {
+    let mut conn = pool.acquire().await.unwrap();
+    assert!(sessions::list(&mut conn).await.unwrap().is_empty());
+    assert!(wallets::list(&mut conn).await.unwrap().is_empty());
+
+    let both = userbot(&pool, "ub-both").await;
+    let spare = userbot(&pool, "ub-spare").await;
+    sessions::save_session(&mut conn, "ub-both", &sample_session(3))
+        .await
+        .unwrap();
+    sessions::set_tg_user(&mut conn, "ub-both", 7001)
+        .await
+        .unwrap();
+    sessions::set_status(&mut conn, "ub-both", UserbotStatus::Active)
+        .await
+        .unwrap();
+    let cb = wallets::ensure_wallet(&mut conn, Platform::CryptoBot, both)
+        .await
+        .unwrap();
+    let xr = wallets::ensure_wallet(&mut conn, Platform::XRocket, both)
+        .await
+        .unwrap();
+
+    let accounts = sessions::list(&mut conn).await.unwrap();
+    assert_eq!(
+        accounts
+            .iter()
+            .map(|a| (
+                a.id,
+                a.label.as_str(),
+                a.status,
+                a.has_session,
+                a.tg_user_id
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            (both, "ub-both", UserbotStatus::Active, true, Some(7001)),
+            (spare, "ub-spare", UserbotStatus::New, false, None),
+        ]
+    );
+    assert_eq!(accounts[0].phone_masked, "+31******01");
+
+    let list = wallets::list(&mut conn).await.unwrap();
+    assert_eq!(
+        list,
+        vec![
+            wallets::WalletRow {
+                wallet_id: cb,
+                platform: Platform::CryptoBot,
+                label: "cb".into(),
+                is_active: true,
+                userbot_id: both,
+                userbot_label: "ub-both".into(),
+            },
+            wallets::WalletRow {
+                wallet_id: xr,
+                platform: Platform::XRocket,
+                label: "xr".into(),
+                is_active: true,
+                userbot_id: both,
+                userbot_label: "ub-both".into(),
+            },
+        ]
+    );
+}
