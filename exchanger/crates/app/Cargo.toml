@@ -16,20 +16,32 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+# Реализации трейтов mtproto::SessionStore и userbot::MessageLog (оба на async-trait).
+async-trait = "0.1.92"
 base64.workspace = true
 clap.workspace = true
 domain.workspace = true
 dotenvy.workspace = true
+engine = { path = "../engine" }
+mtproto = { path = "../mtproto" }
 secrecy.workspace = true
+# JSON колонок wallet_messages и строк файла `exch record`.
+serde_json = "1"
+# Уже в дереве через storage; напрямую — ради типа ошибки пула соединений.
+sqlx.workspace = true
 storage.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
+# fs, io-util — запись файла `exch record` без блокировки рантайма.
+tokio = { workspace = true, features = ["fs", "io-util"] }
 tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+userbot = { path = "../userbot" }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["test-util"] }
+rust_decimal_macros.workspace = true
+tokio ={ workspace = true, features = ["test-util"] }
+userbot = { path = "../userbot", features = ["sim"] }
 
 [lints]
 workspace = true

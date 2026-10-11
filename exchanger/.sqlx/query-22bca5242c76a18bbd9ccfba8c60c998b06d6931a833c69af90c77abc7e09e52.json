@@ -1,0 +1,81 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, label, tg_user_id, phone_masked, status,\n               session_ciphertext IS NOT NULL AS \"has_session!\"\n        FROM userbot_accounts ORDER BY id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "userbot_accounts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "userbot_accounts",
+            "name": "label"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "tg_user_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "userbot_accounts",
+            "name": "tg_user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "phone_masked",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "userbot_accounts",
+            "name": "phone_masked"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "userbot_accounts",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "has_session!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "22bca5242c76a18bbd9ccfba8c60c998b06d6931a833c69af90c77abc7e09e52"
+}

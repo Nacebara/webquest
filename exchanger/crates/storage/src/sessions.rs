@@ -109,6 +109,32 @@ pub async fn find(
     .transpose()
 }
 
+/// Все аккаунты по порядку id (`exch check-config`, запуск юзерботов в `exch run`).
+pub async fn list(conn: &mut PgConnection) -> Result<Vec<UserbotAccount>, StorageError> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT id, label, tg_user_id, phone_masked, status,
+               session_ciphertext IS NOT NULL AS "has_session!"
+        FROM userbot_accounts ORDER BY id
+        "#,
+    )
+    .fetch_all(conn)
+    .await?;
+    rows.into_iter()
+        .map(|r| {
+            Ok(UserbotAccount {
+                id: r.id,
+                label: r.label,
+                tg_user_id: r.tg_user_id,
+                phone_masked: r.phone_masked,
+                status: UserbotStatus::from_db_name(&r.status)
+                    .ok_or_else(|| StorageError::corrupt("userbot_accounts.status", &r.status))?,
+                has_session: r.has_session,
+            })
+        })
+        .collect()
+}
+
 /// Зашифрованная сессия аккаунта. `None` — нет аккаунта с такой меткой или входа ещё не было.
 pub async fn load_session(
     conn: &mut PgConnection,

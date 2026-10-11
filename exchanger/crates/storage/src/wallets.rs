@@ -53,6 +53,45 @@ pub async fn wallet_binding(
     Ok(row)
 }
 
+/// Кошелёк сервиса и аккаунт юзербота, чей это баланс.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WalletRow {
+    pub wallet_id: i16,
+    pub platform: Platform,
+    /// `wallet_accounts.label`: `cb`, `xr`, `cb-reserve`…
+    pub label: String,
+    pub is_active: bool,
+    pub userbot_id: i16,
+    pub userbot_label: String,
+}
+
+/// Все кошельки с их аккаунтами по порядку id (`exch check-config`, запуск `exch run`).
+pub async fn list(conn: &mut PgConnection) -> Result<Vec<WalletRow>, StorageError> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT w.id, w.platform, w.label, w.is_active, w.userbot_id, u.label AS userbot_label
+        FROM wallet_accounts w JOIN userbot_accounts u ON u.id = w.userbot_id
+        ORDER BY w.id
+        "#,
+    )
+    .fetch_all(conn)
+    .await?;
+    rows.into_iter()
+        .map(|r| {
+            Ok(WalletRow {
+                wallet_id: r.id,
+                platform: Platform::from_db_name(&r.platform).ok_or_else(|| {
+                    StorageError::corrupt("wallet_accounts.platform", &r.platform)
+                })?,
+                label: r.label,
+                is_active: r.is_active,
+                userbot_id: r.userbot_id,
+                userbot_label: r.userbot_label,
+            })
+        })
+        .collect()
+}
+
 /// Активный кошелёк платформы (метка `cb` / `xr`) — баланс аккаунта `userbot_id`.
 pub async fn ensure_wallet(
     conn: &mut PgConnection,
