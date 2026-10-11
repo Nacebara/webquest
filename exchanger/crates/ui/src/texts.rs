@@ -320,6 +320,7 @@ pub struct ErrorTexts {
     pub captcha: String,
     pub password: String,
     pub multi_check: String,
+    pub check_used: String,
     pub below_minimum: String,
     pub above_maximum: String,
     pub paused: String,

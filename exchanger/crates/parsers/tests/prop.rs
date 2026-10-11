@@ -116,9 +116,24 @@ fn wallet_link() -> impl Strategy<Value = WalletLink> {
         "[A-Za-z0-9_-]{10}".prop_map(link(Platform::CryptoBot, LinkKind::Check, "CQ")),
         "[A-Za-z0-9]{6,32}".prop_map(link(Platform::CryptoBot, LinkKind::Invoice, "IV")),
         "[A-Za-z0-9_-]{15}".prop_map(link(Platform::XRocket, LinkKind::Check, "t_")),
-        "[A-Za-z0-9_-]{15}".prop_map(link(Platform::XRocket, LinkKind::Check, "mci_")),
-        "[A-Za-z0-9_-]{15}".prop_map(link(Platform::XRocket, LinkKind::Check, "mc_")),
         "[A-Za-z0-9]{6,32}".prop_map(link(Platform::XRocket, LinkKind::Invoice, "inv_")),
+    ]
+}
+
+/// Мульти-чек xRocket (`mci_` + 15, `mc_` + 15, `mc_` + 10) — для отрисовки в формах ссылок.
+/// Это не `WalletLink`, который вернёт парсер: такие чеки не принимаем (DESIGN-v0.2 Р8).
+fn xrocket_multi_check() -> impl Strategy<Value = WalletLink> {
+    let multi = |prefix: &'static str| {
+        move |tail: String| WalletLink {
+            platform: Platform::XRocket,
+            kind: LinkKind::Check,
+            param: format!("{prefix}{tail}"),
+        }
+    };
+    prop_oneof![
+        "[A-Za-z0-9_-]{15}".prop_map(multi("mci_")),
+        "[A-Za-z0-9_-]{15}".prop_map(multi("mc_")),
+        "[A-Za-z0-9_-]{10}".prop_map(multi("mc_")),
     ]
 }
 
@@ -295,8 +310,21 @@ proptest! {
     #[test]
     fn bare_check_codes_round_trip(link in wallet_link(), pad in select(vec!["", " ", "\n", "  "])) {
         let text = format!("{pad}{}{pad}", link.param);
-        let want = (link.kind == LinkKind::Check).then(|| link.clone());
+        let want = (link.kind == LinkKind::Check).then(|| Ok(link.clone()));
         prop_assert_eq!(parse_bare_code(&text), want);
+    }
+
+    /// Мульти-чек xRocket ни в одной форме не становится чеком: всегда `MultiCheck`, голым
+    /// кодом — тоже.
+    #[test]
+    fn xrocket_multi_checks_never_parse_as_checks(
+        link in xrocket_multi_check(),
+        form in 0..FORMS,
+        alias in any::<bool>(),
+    ) {
+        let url = render(&link, form, alias);
+        prop_assert_eq!(parse_url(&url), Err(LinkError::MultiCheck), "{}", url);
+        prop_assert_eq!(parse_bare_code(&link.param), Some(Err(LinkError::MultiCheck)));
     }
 
     #[test]

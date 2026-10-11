@@ -32,6 +32,7 @@ fn link_error(e: &LinkError) -> UiError {
         LinkError::ForeignBot(bot) => UiError::ForeignBot { bot: bot.clone() },
         LinkError::Testnet => UiError::Testnet,
         LinkError::NotCheckOrInvoice | LinkError::NotWalletLink => UiError::NotCheckOrInvoice,
+        LinkError::MultiCheck => UiError::MultiCheck,
     }
 }
 
@@ -265,6 +266,8 @@ async fn submit(
                 SubmitReject::DailyLimit => UiError::DailyLimit,
                 SubmitReject::QuoteExpired => UiError::QuoteExpired,
                 SubmitReject::InvoiceBusy => UiError::InvoiceCheckBusy,
+                SubmitReject::MultiCheck => UiError::MultiCheck,
+                SubmitReject::CheckUsed => UiError::CheckUsed,
                 SubmitReject::NotACheck | SubmitReject::AlreadyInWork => UiError::NotCheckOrInvoice,
             };
             inner.reply_error(chat, &error).await

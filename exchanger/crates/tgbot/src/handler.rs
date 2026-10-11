@@ -275,9 +275,9 @@ async fn message_update(inner: &Arc<Inner>, message: &Message) -> Result<(), TgB
     if let Some(command) = Command::parse(text, inner.bot_username()) {
         // Диплинк `t.me/<бот>?start=CQ…` — это чек.
         if let Command::Start(Some(payload)) = &command
-            && let Some(link) = parse_bare_code(payload)
+            && let Some(found) = parse_bare_code(payload)
         {
-            return intake::process(inner, chat, from.id, &[Ok(link)]).await;
+            return intake::process(inner, chat, from.id, &[found]).await;
         }
         return inner.command(chat, from.id, command).await;
     }
@@ -289,9 +289,9 @@ async fn message_update(inner: &Arc<Inner>, message: &Message) -> Result<(), TgB
 
     let mut found = extract_from_message(text, &message.entity_urls(), &message.button_urls());
     if found.is_empty()
-        && let Some(link) = parse_bare_code(text)
+        && let Some(bare) = parse_bare_code(text)
     {
-        found.push(Ok(link));
+        found.push(bare);
     }
     if found.is_empty() {
         return inner.reply(chat, &inner.ui.no_link()).await;

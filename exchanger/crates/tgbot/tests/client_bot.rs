@@ -745,3 +745,30 @@ async fn cancel_button_closes_the_quote(pool: PgPool) {
         "счёт не тронут"
     );
 }
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn xrocket_multi_check_is_refused_and_never_opened(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let multi = e
+        .world
+        .create_check(userbot::sim::CheckSpec::new(XR, usdt(dec!(5))).multi(2))
+        .unwrap();
+    e.fake
+        .client_writes(&format!("Держи мульти-чек {}", multi.url));
+    e.fake
+        .wait_for("multi-check refusal", |c| {
+            c.method == "sendMessage" && c.contains("мульти-чек xRocket")
+        })
+        .await;
+    bot.stop().await;
+    assert!(e.orders().await.is_empty());
+    assert!(
+        e.world
+            .messages(e.ub, userbot::Chat::WalletBot(XR))
+            .iter()
+            .all(|m| !m.out),
+        "юзербот ничего не отправлял боту xRocket"
+    );
+    assert!(e.world.check(&multi.code).unwrap().claimed_by.is_empty());
+}

@@ -372,6 +372,10 @@ impl Engine {
             Err(EngineError::Storage(StorageError::DuplicateLiveCheck)) => {
                 return rejected(SubmitReject::AlreadyInWork);
             }
+            // Этот чек мы уже открывали раньше.
+            Err(EngineError::Storage(StorageError::CheckActivatedBefore)) => {
+                return rejected(SubmitReject::CheckUsed);
+            }
             Err(e) => return Err(e),
         };
         tx.commit().await?;

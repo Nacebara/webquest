@@ -179,11 +179,37 @@ pub async fn insert(conn: &mut PgConnection, op: &NewOperation<'_>) -> Result<i6
         max_attempts,
     )
     .fetch_one(&mut *conn)
-    .await?;
+    .await
+    .map_err(|e| match unique_violation(&e) {
+        Some("operations_check_once") => StorageError::CheckActivatedBefore,
+        _ => StorageError::Db(e),
+    })?;
     sqlx::query!("SELECT pg_notify('exch_operations', $1)", id.to_string())
         .execute(&mut *conn)
         .await?;
     Ok(id)
+}
+
+/// Открывали ли мы уже этот чек: есть активация, которая прошла, идёт или с неясным исходом
+/// (то же условие, что у индекса `operations_check_once`).
+pub async fn check_activated_before(
+    conn: &mut PgConnection,
+    platform: Platform,
+    start_param: &str,
+) -> Result<bool, StorageError> {
+    Ok(sqlx::query_scalar!(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM operations
+             WHERE kind = 'activate_check' AND platform = $1 AND start_param = $2
+               AND status IN ('pending', 'dispatched', 'unknown', 'succeeded')
+        ) AS "taken!"
+        "#,
+        platform.db_name(),
+        start_param,
+    )
+    .fetch_one(conn)
+    .await?)
 }
 
 /// Сколько операций этого вида уже было у заявки (для номера в ключе).

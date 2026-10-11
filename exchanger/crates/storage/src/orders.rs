@@ -33,7 +33,7 @@ pub struct NewOrder<'a> {
     pub user_id: i64,
     pub direction: Direction,
     pub asset: Asset,
-    /// `CQ…` / `mc_…` — для обмена чека. Клиент платит только чеком (v0.2).
+    /// `CQ…` / `t_…` — для обмена чека. Клиент платит только чеком (v0.2).
     pub intake_start_param: Option<&'a str>,
     /// `IV…` / `inv_…` — для оплаты чужого счёта.
     pub invoice_start_param: Option<&'a str>,

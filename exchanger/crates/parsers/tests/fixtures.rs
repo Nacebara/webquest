@@ -122,6 +122,7 @@ impl LinkCase {
             }
             Some("testnet") => LinkError::Testnet,
             Some("not_check_or_invoice") => LinkError::NotCheckOrInvoice,
+            Some("multi_check") => LinkError::MultiCheck,
             other => panic!("fixture needs ok or a known err, got {other:?}"),
         })
     }
@@ -150,6 +151,8 @@ fn links_fixtures() {
 struct BareCase {
     input: String,
     ok: Option<LinkOk>,
+    /// Только `multi_check`: голый код мульти-чека xRocket.
+    err: Option<String>,
 }
 
 #[test]
@@ -157,7 +160,12 @@ fn bare_code_fixtures() {
     let cases: Vec<BareCase> = load(include_str!("fixtures/bare_codes.json"));
     let mut report = Report::default();
     for c in cases.iter() {
-        let want = c.ok.as_ref().map(LinkOk::link);
+        let want = match (&c.ok, c.err.as_deref()) {
+            (Some(ok), None) => Some(Ok(ok.link())),
+            (None, Some("multi_check")) => Some(Err(LinkError::MultiCheck)),
+            (None, None) => None,
+            other => panic!("bare code fixture {:?}: bad expectation {other:?}", c.input),
+        };
         report.check("parse_bare_code", &c.input, parse_bare_code(&c.input), want);
     }
     report.finish("bare_codes.json", cases.len());

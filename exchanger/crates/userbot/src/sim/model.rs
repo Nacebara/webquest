@@ -39,7 +39,9 @@ pub struct CheckSpec {
     pub creator: Option<AccountId>,
     /// Персональный чек: активировать может только этот аккаунт.
     pub for_user: Option<AccountId>,
-    /// Число активаций; больше 1 — мульти-чек (у xRocket код `mci_…`).
+    /// Число активаций; больше 1 — мульти-чек (у xRocket код `mci_…`, у CryptoBot — `CQ…`).
+    /// Настоящий xRocket активирует мульти-чеки только в своём приложении (DESIGN-v0.2 Р8);
+    /// симулятор отвечает на `/start mci_…`, но exch такой `/start` не отправляет никогда.
     pub activations: u32,
     pub captcha: bool,
     /// Пароль чека (только CryptoBot).

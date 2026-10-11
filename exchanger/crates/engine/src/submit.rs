@@ -32,6 +32,11 @@ pub enum SubmitReject {
     /// По счёту клиента ещё проверяется предыдущий чек: этот не открывали, чтобы он не ушёл
     /// в обмен вместо оплаты счёта.
     InvoiceBusy,
+    /// Мульти-чек xRocket: активируется только в приложении xRocket (DESIGN-v0.2 Р8).
+    MultiCheck,
+    /// Этот чек мы уже открывали (другая заявка — живая или закрытая). Второй `/start` не
+    /// отправляем: у мульти-чека CryptoBot наша доля уже получена.
+    CheckUsed,
 }
 
 impl SubmitReject {
@@ -45,6 +50,8 @@ impl SubmitReject {
             SubmitReject::DailyLimit => "daily_limit",
             SubmitReject::QuoteExpired => "quote_expired",
             SubmitReject::InvoiceBusy => "invoice_busy",
+            SubmitReject::MultiCheck => "xrocket_multi_check",
+            SubmitReject::CheckUsed => "check_used",
         }
     }
 }
@@ -76,19 +83,40 @@ impl Engine {
         user_id: i64,
         link: &WalletLink,
     ) -> Result<Submitted, EngineError> {
-        if link.kind != LinkKind::Check {
-            return Ok(Submitted::Rejected {
-                reason: SubmitReject::NotACheck,
+        let rejected = |reason| {
+            Ok(Submitted::Rejected {
+                reason,
                 order: None,
-            });
+            })
+        };
+        if link.kind != LinkKind::Check {
+            return rejected(SubmitReject::NotACheck);
         }
-        let (awaiting, busy) = {
+        // Парсер такие ссылки чеком не отдаёт; здесь — вторая линия: `/start` мульти-чека
+        // xRocket боту не уходит никогда.
+        if link.platform == Platform::XRocket && parsers::links::is_xrocket_multi_check(&link.param)
+        {
+            return rejected(SubmitReject::MultiCheck);
+        }
+        let (live, used, awaiting, busy) = {
             let mut conn = self.pool.acquire().await?;
             (
+                storage::client::live_order_for_check(&mut conn, link.platform, &link.param)
+                    .await?,
+                storage::operations::check_activated_before(&mut conn, link.platform, &link.param)
+                    .await?,
                 storage::orders::awaiting_funds(&mut conn, user_id, Some(link.platform)).await?,
                 storage::orders::invoice_checking(&mut conn, user_id, link.platform).await?,
             )
         };
+        // Чек сейчас в живой заявке — «уже в работе» (с её номером); открывали раньше —
+        // второй раз не открываем.
+        if live.is_some() {
+            return rejected(SubmitReject::AlreadyInWork);
+        }
+        if used {
+            return rejected(SubmitReject::CheckUsed);
+        }
         if let Some(order) = awaiting {
             return self.fund_invoice(order.id, link).await;
         }
@@ -164,7 +192,7 @@ impl Engine {
 
         let result = match hold {
             Ok(hold) => {
-                let (order, _) = transit(
+                let accepted = transit(
                     &mut tx,
                     &order,
                     Event::LinkAccepted,
@@ -175,8 +203,16 @@ impl Engine {
                         ..EffectCtx::default()
                     },
                 )
-                .await?;
-                Submitted::Accepted(order)
+                .await;
+                match accepted {
+                    Ok((order, _)) => Submitted::Accepted(order),
+                    // Тот же чек одновременно открыли в другой заявке: транзакция откатится,
+                    // этой заявки не будет.
+                    Err(EngineError::Storage(StorageError::CheckActivatedBefore)) => {
+                        return rejected(SubmitReject::CheckUsed);
+                    }
+                    Err(e) => return Err(e),
+                }
             }
             Err(reason) => {
                 let patch = OrderPatch {

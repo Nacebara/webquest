@@ -23,6 +23,11 @@ pub enum StorageError {
     /// Индекс `ledger_tx_once_per_operation`: повторная обработка ответа не задвоит леджер.
     #[error("operation {0} has already been posted")]
     AlreadyPosted(i64),
+    /// Индекс `operations_check_once`: этот чек клиента уже открывали (активация была или
+    /// идёт). Второй `/start` того же чека не отправляем — у мульти-чека CryptoBot наша доля
+    /// уже получена, у обычного чека ответ всё равно «уже активирован».
+    #[error("this check has already been activated by us")]
+    CheckActivatedBefore,
     /// Индекс `operations_check_issued_once`: этот чек уже закрывает другую операцию.
     #[error("operation {0}: this check already settles another operation")]
     CheckAlreadyUsed(i64),

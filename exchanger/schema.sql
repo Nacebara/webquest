@@ -190,7 +190,7 @@ CREATE TABLE orders (
     -- Вход: чек клиента (или наш счёт для оплаты клиентом)
     intake_method       TEXT CHECK (intake_method IN ('check')),            -- v0.2: клиент платит только чеком
     intake_platform     TEXT NOT NULL CHECK (intake_platform IN ('cryptobot', 'xrocket')),
-    intake_start_param  TEXT,                                 -- 'CQ…' / 'mc_…' — ценность до активации, в логах маскируется
+    intake_start_param  TEXT,                                 -- 'CQ…' / 't_…' — ценность до активации, в логах маскируется
     intake_amount       NUMERIC(38,18) CHECK (intake_amount > 0),          -- сколько реально пришло
     intake_asset        TEXT REFERENCES assets(code),                      -- в каком активе пришло (может не совпасть с asset)
 

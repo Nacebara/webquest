@@ -165,8 +165,10 @@ pub enum UiError {
     Captcha,
     /// DESIGN-v0.2 Р3: чеки с паролем не принимаем.
     PasswordProtected,
-    /// E08.
+    /// E08: мульти-чек xRocket — активируется только в приложении xRocket.
     MultiCheck,
+    /// Этот чек мы уже открывали (в том числе свою долю мульти-чека CryptoBot).
+    CheckUsed,
     /// E09: после активации — возврат.
     BelowMinimum {
         amount_in: Money,

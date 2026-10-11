@@ -7,7 +7,7 @@
     },
     {
       "text": "🚀 Rocket-чек на 400 TON\nhttps://t.me/xrocket?start=mci_fdraQh70UOwz3nu",
-      "expect": [ { "ok": { "platform": "xrocket", "kind": "check", "param": "mci_fdraQh70UOwz3nu" } } ]
+      "expect": [ { "err": "multi_check" } ]
     },
     {
       "text": "жми",
@@ -43,7 +43,11 @@
     },
     {
       "text": "Мультичек на 1500 USDT https://t.me/xrocket?start=mc_ABCDEFGHIJ",
-      "expect": [ { "err": "not_check_or_invoice" } ]
+      "expect": [ { "err": "multi_check" } ]
+    },
+    {
+      "text": "Мульти-чек xRocket и обычный чек CryptoBot: https://t.me/xrocket?start=mc_VhxQyBOeQXDmHAX https://t.me/send?start=CQAbCdEfGhIj",
+      "expect": [ { "err": "multi_check" }, { "ok": { "platform": "cryptobot", "kind": "check", "param": "CQAbCdEfGhIj" } } ]
     },
     {
       "text": "https://evil.com/t.me/send?start=CQAbCdEfGhIj xt.me/send?start=CQAbCdEfGhIj",

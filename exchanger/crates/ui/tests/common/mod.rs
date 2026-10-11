@@ -374,6 +374,7 @@ pub fn all_errors() -> Vec<(&'static str, UiError)> {
             },
         ),
         ("invoice_check_busy", UiError::InvoiceCheckBusy),
+        ("check_used", UiError::CheckUsed),
         (
             "invoice_refused_paused",
             UiError::InvoiceRefused(InvoiceRefusal::Paused),

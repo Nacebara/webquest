@@ -1,5 +1,5 @@
 {
-  "about": "Ссылки на чеки и счета: все формы SPEC §1.2 и DESIGN-v0.2 §3, алиасы ботов, тестнет, омоглифы, чужие боты. Коды CQAbCdEfGhIj, t_ABCDEFGHIJKLMNO, mc_VhxQyBOeQXDmHAX, mci_fdraQh70UOwz3nu, t_val6vkkTbAbxd06 — из тестов и аудитов lovec; коды счетов — синтетические. err: not_wallet_link | foreign_bot (с полем bot) | testnet | not_check_or_invoice.",
+  "about": "Ссылки на чеки и счета: все формы SPEC §1.2 и DESIGN-v0.2 §3, алиасы ботов, тестнет, омоглифы, чужие боты. Коды CQAbCdEfGhIj, t_ABCDEFGHIJKLMNO, mc_VhxQyBOeQXDmHAX, mci_fdraQh70UOwz3nu, t_val6vkkTbAbxd06 — из тестов и аудитов lovec; коды счетов — синтетические. err: not_wallet_link | foreign_bot (с полем bot) | testnet | not_check_or_invoice | multi_check (мульти-чек xRocket: активируется только в приложении xRocket, DESIGN-v0.2 Р8).",
   "cases": [
     { "input": "https://t.me/send?start=CQAbCdEfGhIj", "ok": { "platform": "cryptobot", "kind": "check", "param": "CQAbCdEfGhIj" } },
     { "input": "http://t.me/send?start=CQAbCdEfGhIj", "ok": { "platform": "cryptobot", "kind": "check", "param": "CQAbCdEfGhIj" } },
@@ -21,18 +21,18 @@
 
     { "input": "https://t.me/xrocket?start=t_ABCDEFGHIJKLMNO", "ok": { "platform": "xrocket", "kind": "check", "param": "t_ABCDEFGHIJKLMNO" } },
     { "input": "https://t.me/xrocket?start=t_val6vkkTbAbxd06", "ok": { "platform": "xrocket", "kind": "check", "param": "t_val6vkkTbAbxd06" } },
-    { "input": "https://t.me/xrocket?start=mci_fdraQh70UOwz3nu", "ok": { "platform": "xrocket", "kind": "check", "param": "mci_fdraQh70UOwz3nu" } },
-    { "input": "https://t.me/xrocket?start=mc_VhxQyBOeQXDmHAX", "ok": { "platform": "xrocket", "kind": "check", "param": "mc_VhxQyBOeQXDmHAX" } },
-    { "input": "https://t.me/xrocket/app?startapp=mci_fdraQh70UOwz3nu", "ok": { "platform": "xrocket", "kind": "check", "param": "mci_fdraQh70UOwz3nu" } },
+    { "input": "https://t.me/xrocket?start=mci_fdraQh70UOwz3nu", "err": "multi_check" },
+    { "input": "https://t.me/xrocket?start=mc_VhxQyBOeQXDmHAX", "err": "multi_check" },
+    { "input": "https://t.me/xrocket/app?startapp=mci_fdraQh70UOwz3nu", "err": "multi_check" },
     { "input": "https://t.me/tonRocketBot?start=t_ABCDEFGHIJKLMNO", "ok": { "platform": "xrocket", "kind": "check", "param": "t_ABCDEFGHIJKLMNO" } },
     { "input": "https://t.me/xRocket?start=t_ABCDEFGHIJKLMNO", "ok": { "platform": "xrocket", "kind": "check", "param": "t_ABCDEFGHIJKLMNO" } },
     { "input": "https://xrocket.t.me/?start=t_ABCDEFGHIJKLMNO", "ok": { "platform": "xrocket", "kind": "check", "param": "t_ABCDEFGHIJKLMNO" } },
-    { "input": "tg://resolve?domain=xrocket&start=mc_VhxQyBOeQXDmHAX", "ok": { "platform": "xrocket", "kind": "check", "param": "mc_VhxQyBOeQXDmHAX" } },
-    { "input": "tg://resolve?start=mci_fdraQh70UOwz3nu&domain=tonRocketBot", "ok": { "platform": "xrocket", "kind": "check", "param": "mci_fdraQh70UOwz3nu" } },
+    { "input": "tg://resolve?domain=xrocket&start=mc_VhxQyBOeQXDmHAX", "err": "multi_check" },
+    { "input": "tg://resolve?start=mci_fdraQh70UOwz3nu&domain=tonRocketBot", "err": "multi_check" },
     { "input": "https://t.me/xrocket?start=inv_C9QiNcpEbXyZ", "ok": { "platform": "xrocket", "kind": "invoice", "param": "inv_C9QiNcpEbXyZ" } },
 
-    { "input": "https://t.me/xrocket?start=mc_ABCDEFGHIJ", "err": "not_check_or_invoice" },
-    { "input": "https://t.me/xrocket/app?startapp=mc_ABCDEFGHIJ", "err": "not_check_or_invoice" },
+    { "input": "https://t.me/xrocket?start=mc_ABCDEFGHIJ", "err": "multi_check" },
+    { "input": "https://t.me/xrocket/app?startapp=mc_ABCDEFGHIJ", "err": "multi_check" },
     { "input": "https://t.me/send?start=r-12345", "err": "not_check_or_invoice" },
     { "input": "https://t.me/send?start=pay", "err": "not_check_or_invoice" },
     { "input": "https://t.me/send", "err": "not_check_or_invoice" },

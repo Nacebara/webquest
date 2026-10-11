@@ -91,6 +91,7 @@ impl Ui {
             UiError::Captcha => (self.fill(&e.captcha, &[]), Keyboard::None),
             UiError::PasswordProtected => (self.fill(&e.password, &[]), Keyboard::None),
             UiError::MultiCheck => (self.fill(&e.multi_check, &[]), Keyboard::None),
+            UiError::CheckUsed => (self.fill(&e.check_used, &[]), Keyboard::None),
             UiError::BelowMinimum {
                 amount_in,
                 min,

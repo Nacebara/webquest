@@ -1,7 +1,9 @@
 //! Ссылки на чеки и счета (SPEC §1.2; форматы — lovec `bots.rs`, `links.rs`).
 //!
-//! Коды: CryptoBot чек `CQ` + 10 = 12 символов, счёт `IV…`; xRocket чек `t_` + 15 = 17,
-//! мульти-чек `mci_` + 15 = 19 и `mc_` + 15 = 18, счёт `inv_…`. Боты: `send` = `CryptoBot`,
+//! Коды: CryptoBot чек `CQ` + 10 = 12 символов (мульти-чек CryptoBot — тот же `CQ…`,
+//! активируется как обычный), счёт `IV…`; xRocket чек `t_` + 15 = 17, счёт `inv_…`.
+//! Мульти-чек xRocket (`mci_` + 15, `mc_` + 15, `mc_` + 10) активируется только в приложении
+//! xRocket — не принимаем ([`LinkError::MultiCheck`], DESIGN-v0.2 Р8). Боты: `send` = `CryptoBot`,
 //! `xrocket` = `tonRocketBot`; тестнет `CryptoTestnetBot`, `xrocket_testnet_bot` — не принимаем.
 //! Формы: `https://t.me/<bot>?start=<p>`, без схемы, `telegram.me`, `telegram.dog`, `www.`,
 //! `https://<bot>.t.me/?start=`, `t.me/<bot>/app?startapp=<p>`, `tg://resolve?domain=<bot>&start=<p>`
@@ -34,7 +36,7 @@ pub enum LinkKind {
 pub struct WalletLink {
     pub platform: Platform,
     pub kind: LinkKind,
-    /// Параметр `start`: `CQxxxxxxxxxx`, `t_…`, `mci_…`, `mc_…`, `IV…`, `inv_…`.
+    /// Параметр `start`: `CQxxxxxxxxxx`, `t_…`, `IV…`, `inv_…`.
     pub param: String,
 }
 
@@ -61,6 +63,9 @@ pub enum LinkError {
     /// Ссылка на бота кошелька, но не чек и не счёт (реферальная, меню и т. п.).
     #[error("wallet bot link is neither a check nor an invoice")]
     NotCheckOrInvoice,
+    /// Мульти-чек xRocket: активируется только в приложении xRocket, юзербот его не откроет.
+    #[error("xRocket multi-checks are activated only in the xRocket app")]
+    MultiCheck,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -97,13 +102,13 @@ struct Marker {
     tail: Tail,
 }
 
-/// Таблица кодов (lovec `bots.rs:65-86`, DESIGN-v0.2 §3). `mc_` + 10 (13 символов) сюда
-/// намеренно не входит: такие чеки xRocket активируются только через веб-приложение, `/start`
-/// для них не работает (AUDIT-2.md:1776) — это `NotCheckOrInvoice`.
+/// Таблица кодов (lovec `bots.rs:65-86`, DESIGN-v0.2 §3). Мульти-чеков xRocket здесь нет:
+/// они активируются только в приложении xRocket, `/start` для них не работает (решение
+/// владельца Р8, для `mc_` + 10 — ещё и AUDIT-2.md:1776); см. [`is_xrocket_multi_check`].
 ///
 /// Длина кода счёта в источниках не зафиксирована, поэтому для `IV…` и `inv_…` принимаем
 /// диапазон; карточка счёта всё равно проверяется после `/start` (SPEC §1.4).
-const MARKERS: [Marker; 6] = [
+const MARKERS: [Marker; 4] = [
     Marker {
         platform: Platform::CryptoBot,
         kind: LinkKind::Check,
@@ -120,18 +125,6 @@ const MARKERS: [Marker; 6] = [
         platform: Platform::XRocket,
         kind: LinkKind::Check,
         prefix: "t_",
-        tail: Tail::CheckExact(15),
-    },
-    Marker {
-        platform: Platform::XRocket,
-        kind: LinkKind::Check,
-        prefix: "mci_",
-        tail: Tail::CheckExact(15),
-    },
-    Marker {
-        platform: Platform::XRocket,
-        kind: LinkKind::Check,
-        prefix: "mc_",
         tail: Tail::CheckExact(15),
     },
     Marker {
@@ -184,11 +177,22 @@ pub fn classify_start_param(platform: Platform, param: &str) -> Option<LinkKind>
         .map(|m| m.kind)
 }
 
+/// Мульти-чек xRocket: `mci_` + 15, `mc_` + 15 или `mc_` + 10 символов. Такие чеки
+/// активируются только в приложении xRocket — юзербот их не открывает (DESIGN-v0.2 Р8).
+pub fn is_xrocket_multi_check(param: &str) -> bool {
+    let tail = |t: &str, lens: &[usize]| lens.contains(&t.len()) && t.bytes().all(is_param_byte);
+    param.strip_prefix("mci_").is_some_and(|t| tail(t, &[15]))
+        || param
+            .strip_prefix("mc_")
+            .is_some_and(|t| tail(t, &[10, 15]))
+}
+
 /// Похож ли параметр на код чека или счёта хоть какой-то платформы.
 fn is_wallet_code(param: &str) -> bool {
-    Platform::ALL
-        .into_iter()
-        .any(|p| classify_start_param(p, param).is_some())
+    is_xrocket_multi_check(param)
+        || Platform::ALL
+            .into_iter()
+            .any(|p| classify_start_param(p, param).is_some())
 }
 
 /// Платформа официального бота по имени (без `@`, без учёта регистра, только ASCII).
@@ -288,8 +292,8 @@ struct Target {
 ///
 /// Порядок решений: не ссылка Telegram → `NotWalletLink`; не-ASCII или похожее на официальное
 /// имя → `ForeignBot`; тестнет → `Testnet`; чужой бот → `ForeignBot`, если в ссылке код чека
-/// или счёта, иначе `NotWalletLink`; официальный бот без кода своей платформы →
-/// `NotCheckOrInvoice`.
+/// или счёта, иначе `NotWalletLink`; мульти-чек xRocket → `MultiCheck`; официальный бот без
+/// кода своей платформы → `NotCheckOrInvoice`.
 pub fn parse_url(url: &str) -> Result<WalletLink, LinkError> {
     let s = url.trim();
     if s.is_empty()
@@ -338,6 +342,9 @@ fn judge(target: Target) -> Result<WalletLink, LinkError> {
     let StartParam::One(param) = start else {
         return Err(LinkError::NotCheckOrInvoice);
     };
+    if platform == Platform::XRocket && is_xrocket_multi_check(&param) {
+        return Err(LinkError::MultiCheck);
+    }
     let kind = classify_start_param(platform, &param).ok_or(LinkError::NotCheckOrInvoice)?;
     Ok(WalletLink {
         platform,
@@ -516,11 +523,12 @@ fn percent_decode(s: &str) -> String {
 // Голый код и сообщение целиком
 // ---------------------------------------------------------------------------------------------
 
-/// Голый код без ссылки (`CQ…`, `t_…`, `mci_…`, `mc_…`): клиент мог прислать только его.
+/// Голый код без ссылки (`CQ…`, `t_…`): клиент мог прислать только его. Голый код
+/// мульти-чека xRocket (`mci_…`, `mc_…`) — `Some(Err(MultiCheck))`: клиенту есть что сказать.
 ///
 /// Текст — ровно один код чека (пробелы, кавычки и знаки препинания по краям не мешают).
 /// Коды счетов голыми не принимаем: `IV…` слишком легко спутать с обычным словом.
-pub fn parse_bare_code(text: &str) -> Option<WalletLink> {
+pub fn parse_bare_code(text: &str) -> Option<Result<WalletLink, LinkError>> {
     let code = text.trim().trim_matches(|c: char| {
         c.is_whitespace()
             || matches!(
@@ -528,11 +536,16 @@ pub fn parse_bare_code(text: &str) -> Option<WalletLink> {
                 '.' | ',' | ';' | ':' | '!' | '?' | '(' | ')' | '«' | '»' | '"' | '\'' | '`'
             )
     });
+    if is_xrocket_multi_check(code) {
+        return Some(Err(LinkError::MultiCheck));
+    }
     Platform::ALL.into_iter().find_map(|platform| {
-        (classify_start_param(platform, code) == Some(LinkKind::Check)).then(|| WalletLink {
-            platform,
-            kind: LinkKind::Check,
-            param: code.to_owned(),
+        (classify_start_param(platform, code) == Some(LinkKind::Check)).then(|| {
+            Ok(WalletLink {
+                platform,
+                kind: LinkKind::Check,
+                param: code.to_owned(),
+            })
         })
     })
 }
@@ -590,7 +603,7 @@ fn candidate_ranges(text: &str) -> Vec<Range<usize>> {
 fn informativeness(r: &Result<WalletLink, LinkError>) -> u8 {
     match r {
         Ok(_) => 3,
-        Err(LinkError::ForeignBot(_) | LinkError::Testnet) => 2,
+        Err(LinkError::ForeignBot(_) | LinkError::Testnet | LinkError::MultiCheck) => 2,
         Err(LinkError::NotCheckOrInvoice) => 1,
         Err(LinkError::NotWalletLink) => 0,
     }
@@ -749,7 +762,7 @@ mod tests {
 
     #[test]
     fn xrocket_checks_in_every_form() {
-        for code in [T, MCI, MC] {
+        for code in [T] {
             let forms = [
                 format!("https://t.me/xrocket?start={code}"),
                 format!("t.me/xRocket?start={code}"),
@@ -804,9 +817,6 @@ mod tests {
             // Код xRocket у бота CryptoBot и наоборот.
             "https://t.me/send?start=t_ABCDEFGHIJKLMNO",
             "https://t.me/xrocket?start=CQAbCdEfGhIj",
-            // mc_ + 10: только веб-приложение xRocket, /start не работает.
-            "https://t.me/xrocket?start=mc_ABCDEFGHIJ",
-            "https://t.me/xrocket/app?startapp=mc_ABCDEFGHIJ",
             // t_ длиной 16 встречался в логах lovec — не наш формат.
             "https://t.me/xrocket?start=t_ABCDEFGHIJKLMN",
             // Недопустимые символы в параметре.
@@ -929,14 +939,48 @@ mod tests {
         }
     }
 
+    /// Мульти-чеки xRocket активируются только в приложении xRocket (DESIGN-v0.2 Р8): в любой
+    /// форме ссылки — `MultiCheck`, у чужого бота — подделка, у CryptoBot — не его код.
+    #[test]
+    fn xrocket_multi_checks_are_refused_in_every_form() {
+        for code in [MCI, MC, "mc_ABCDEFGHIJ"] {
+            let forms = [
+                format!("https://t.me/xrocket?start={code}"),
+                format!("t.me/xRocket?start={code}"),
+                format!("https://t.me/tonRocketBot?start={code}"),
+                format!("https://xrocket.t.me/?start={code}"),
+                format!("https://t.me/xrocket/app?startapp={code}"),
+                format!("tg://resolve?domain=xrocket&start={code}"),
+                format!("tg://resolve?start={code}&domain=tonRocketBot"),
+            ];
+            for url in forms {
+                assert_eq!(parse_url(&url), Err(LinkError::MultiCheck), "{url}");
+            }
+            assert_eq!(
+                parse_url(&format!("https://t.me/xrocket_bot?start={code}")),
+                Err(LinkError::ForeignBot("xrocket_bot".into()))
+            );
+            assert_eq!(
+                parse_url(&format!("https://t.me/send?start={code}")),
+                Err(LinkError::NotCheckOrInvoice)
+            );
+        }
+        // Похожие, но не мульти-чеки: другая длина хвоста.
+        for code in ["mci_ABCDEFGHIJ", "mc_ABCDEFGHIJK", "mci_fdraQh70UOwz3nuX"] {
+            assert_eq!(
+                parse_url(&format!("https://t.me/xrocket?start={code}")),
+                Err(LinkError::NotCheckOrInvoice),
+                "{code}"
+            );
+        }
+    }
+
     #[test]
     fn canonical_url_round_trips() {
         for (platform, kind, param) in [
             (Platform::CryptoBot, LinkKind::Check, CQ),
             (Platform::CryptoBot, LinkKind::Invoice, "IVdixIeFSdqP"),
             (Platform::XRocket, LinkKind::Check, T),
-            (Platform::XRocket, LinkKind::Check, MCI),
-            (Platform::XRocket, LinkKind::Check, MC),
             (Platform::XRocket, LinkKind::Invoice, "inv_C9QiNcpEbXyZ"),
         ] {
             let link = WalletLink {
@@ -950,19 +994,25 @@ mod tests {
 
     #[test]
     fn bare_codes() {
-        assert_eq!(parse_bare_code(CQ), cb_check().ok());
-        assert_eq!(parse_bare_code(&format!("  «{CQ}».\n")), cb_check().ok());
-        assert_eq!(parse_bare_code(&format!("`{CQ}`")), cb_check().ok());
-        for code in [T, MCI, MC] {
+        assert_eq!(parse_bare_code(CQ), Some(cb_check()));
+        assert_eq!(parse_bare_code(&format!("  «{CQ}».\n")), Some(cb_check()));
+        assert_eq!(parse_bare_code(&format!("`{CQ}`")), Some(cb_check()));
+        assert_eq!(
+            parse_bare_code(T),
+            Some(ok(Platform::XRocket, LinkKind::Check, T))
+        );
+        // Мульти-чек xRocket голым кодом — тоже отказ с объяснением, а не «нет ссылки».
+        for code in [MCI, MC, "mc_ABCDEFGHIJ"] {
             assert_eq!(
                 parse_bare_code(code),
-                ok(Platform::XRocket, LinkKind::Check, code).ok()
+                Some(Err(LinkError::MultiCheck)),
+                "{code}"
             );
         }
         for text in [
             "",
             "CQabc",
-            "mc_ABCDEFGHIJ",
+            "mc_ABCDEFGHI",
             "IVdixIeFSdqP",
             "inv_C9QiNcpEbXyZ",
             "вот чек CQAbCdEfGhIj",
@@ -1005,7 +1055,7 @@ mod tests {
             vec![
                 ok(Platform::XRocket, LinkKind::Check, T),
                 cb_check(),
-                ok(Platform::XRocket, LinkKind::Check, MCI),
+                Err(LinkError::MultiCheck),
             ]
         );
     }

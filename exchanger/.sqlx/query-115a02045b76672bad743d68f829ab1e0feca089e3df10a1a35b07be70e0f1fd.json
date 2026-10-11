@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS (\n            SELECT 1 FROM operations\n             WHERE kind = 'activate_check' AND platform = $1 AND start_param = $2\n               AND status IN ('pending', 'dispatched', 'unknown', 'succeeded')\n        ) AS \"taken!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "taken!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "115a02045b76672bad743d68f829ab1e0feca089e3df10a1a35b07be70e0f1fd"
+}
