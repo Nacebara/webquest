@@ -26,7 +26,7 @@ cargo fmt --all
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features      # нужен DATABASE_URL; sqlx::test создаёт БД на тест
 cargo sqlx prepare --workspace -- --all-targets   # после изменения SQL-запросов; коммитить .sqlx/
-cargo run --bin exch -- --help             # CLI: run | migrate | check-config (login, selftest — впереди)
+cargo run --bin exch -- --help             # CLI: run | migrate | check-config | login | record (selftest — впереди)
 ```
 
 `--all-features` обязателен: тесты симулятора кошельков — за feature `sim`.
@@ -45,7 +45,7 @@ tgbot (клиентский бот) ← ui + botapi + engine;  ops (ops-бот) 
 app (бинарник exch) ← всё
 ```
 
-Есть: `domain`, `storage`, `app`, `parsers`, `userbot` (с `flows` и `sim`), `mtproto`, `botapi`, `ui`, `engine`. Нет: `tgbot`, `ops`. Пустые крейты заранее не создаём.
+Есть: `domain`, `storage`, `app`, `parsers`, `userbot` (с `flows` и `sim`), `mtproto`, `botapi`, `ui`, `engine`, `tgbot`. Нет: `ops`. Пустые крейты заранее не создаём.
 В `domain` нет tokio, sqlx, reqwest. `userbot` и `engine` не знают про grammers — только трейт `Transport`.
 
 ## Правила, которые нельзя нарушать
