@@ -109,10 +109,22 @@ impl Engine {
                 storage::orders::invoice_checking(&mut conn, user_id, link.platform).await?,
             )
         };
-        // Чек сейчас в живой заявке — «уже в работе» (с её номером); открывали раньше —
-        // второй раз не открываем.
-        if live.is_some() {
-            return rejected(SubmitReject::AlreadyInWork);
+        // Чек сейчас в живой заявке:
+        // - заявка этого клиента — «уже в работе» (с её номером);
+        // - заявка другого клиента (вторая доля мульти-чека CryptoBot из канала) — для этого
+        //   клиента чек уже открыт через нас: `check_used`, без чужого номера;
+        // - собственный счёт клиента, который ждёт деньги, а этот чек кошелёк не принял
+        //   (последний чек заявки остаётся в её `intake_start_param`) — снова в счёт: неуспешная
+        //   активация чек не занимает. Прошедшую активацию отсечёт `used` ниже.
+        if let Some(live) = &live {
+            let own_invoice = awaiting.as_ref().is_some_and(|o| o.id == live.order_id);
+            if !own_invoice {
+                return rejected(if live.user_id == user_id {
+                    SubmitReject::AlreadyInWork
+                } else {
+                    SubmitReject::CheckUsed
+                });
+            }
         }
         if used {
             return rejected(SubmitReject::CheckUsed);

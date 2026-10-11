@@ -598,15 +598,30 @@ fn candidate_ranges(text: &str) -> Vec<Range<usize>> {
     out
 }
 
-/// Насколько результат информативен: распознанная ссылка лучше предупреждения о подделке или
-/// тестнете, а оно лучше «не чек» и «не ссылка кошелька».
+/// Насколько результат информативен: распознанная ссылка лучше мульти-чека xRocket
+/// (официальный бот, свой код — отказ по правилу, а не подделка), тот лучше предупреждения о
+/// подделке или тестнете, а оно лучше «не чек» и «не ссылка кошелька». Приклеенный к
+/// `domain=` текст делает из официального имени «чужое»: обрезанная версия должна
+/// выигрывать и у мульти-чека, как выигрывает у чека.
 fn informativeness(r: &Result<WalletLink, LinkError>) -> u8 {
     match r {
-        Ok(_) => 3,
-        Err(LinkError::ForeignBot(_) | LinkError::Testnet | LinkError::MultiCheck) => 2,
+        Ok(_) => 4,
+        Err(LinkError::MultiCheck) => 3,
+        Err(LinkError::ForeignBot(_) | LinkError::Testnet) => 2,
         Err(LinkError::NotCheckOrInvoice) => 1,
         Err(LinkError::NotWalletLink) => 0,
     }
+}
+
+/// Что сказать клиенту, если в сообщении нет ни чека, ни счёта: самая содержательная из
+/// ошибок (при равенстве — более ранняя). `None` — ошибок нет.
+pub fn most_informative_error(found: &[Result<WalletLink, LinkError>]) -> Option<&LinkError> {
+    found
+        .iter()
+        .filter(|r| r.is_err())
+        .enumerate()
+        .max_by_key(|(i, r)| (informativeness(r), std::cmp::Reverse(*i)))
+        .and_then(|(_, r)| r.as_ref().err())
 }
 
 /// Разобрать кандидата из текста. К ссылке в тексте часто приклеен следующий текст:
@@ -1135,6 +1150,50 @@ mod tests {
             parse_url(&format!("https://t.me/send?start={CQ}.x")),
             Err(LinkError::NotCheckOrInvoice)
         );
+        // Мульти-чек xRocket с приклеенным к имени бота текстом — объяснение про мульти-чек, а
+        // не «подделка» (целиком имя бота `xrocket.Спасибо` — чужое).
+        for text in [
+            format!("tg://resolve?start={MCI}&domain=xrocket.Спасибо"),
+            format!("tg://resolve?start={MC}&domain=xrocket.Thanks"),
+            format!("https://t.me/xrocket?start={MCI}.Спасибо"),
+        ] {
+            assert_eq!(
+                extract_from_message(&text, &[], &[]),
+                vec![Err(LinkError::MultiCheck)],
+                "{text}"
+            );
+        }
+        // А подделка остаётся подделкой.
+        assert_eq!(
+            extract_from_message(&format!("t.me/xrocket_bot?start={MCI}.x"), &[], &[]),
+            vec![Err(LinkError::ForeignBot("xrocket_bot".into()))]
+        );
+    }
+
+    #[test]
+    fn most_informative_error_wins_over_the_first() {
+        let found = extract_from_message(
+            &format!("Кошелёк: t.me/xrocket — мультичек: https://t.me/xrocket?start={MCI}"),
+            &[],
+            &[],
+        );
+        assert_eq!(
+            found,
+            vec![
+                Err(LinkError::NotCheckOrInvoice),
+                Err(LinkError::MultiCheck)
+            ]
+        );
+        assert_eq!(most_informative_error(&found), Some(&LinkError::MultiCheck));
+        // При равенстве — более ранняя.
+        let tie = vec![
+            Err(LinkError::Testnet),
+            Err(LinkError::ForeignBot("x".into())),
+        ];
+        assert_eq!(most_informative_error(&tie), Some(&LinkError::Testnet));
+        // Чек в списке — не ошибка; ошибок нет — None.
+        assert_eq!(most_informative_error(&[cb_check()]), None);
+        assert_eq!(most_informative_error(&[]), None);
     }
 
     #[test]

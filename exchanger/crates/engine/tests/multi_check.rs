@@ -256,3 +256,86 @@ async fn an_earlier_check_of_a_live_invoice_is_not_opened_again(pool: PgPool) {
     assert_eq!(starts(&e, XR).len(), 2, "третьего /start нет");
     e.assert_books_match().await;
 }
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_multi_check_in_another_clients_live_order_is_check_used_not_their_order(pool: PgPool) {
+    let e = env(pool).await;
+    let multi = e
+        .world
+        .create_check(CheckSpec::new(CB, usdt(dec!(10))).multi(3))
+        .unwrap();
+    // Клиент A прислал — заявка ещё в работе (ничего не обработано).
+    accepted(e.submit(&multi.url).await);
+    let link = parsers::links::parse_url(&multi.url).unwrap();
+    // Тот же клиент повторно — «уже в работе» (его заявка).
+    assert_eq!(
+        e.engine.submit_check(CLIENT, &link).await.unwrap(),
+        Submitted::Rejected {
+            reason: SubmitReject::AlreadyInWork,
+            order: None
+        }
+    );
+    // Другой клиент из того же канала — не «уже в работе» с чужим номером, а `check_used`.
+    let other = CLIENT + 1;
+    {
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::users::upsert(&mut conn, other, &storage::users::Profile::default())
+            .await
+            .unwrap();
+    }
+    assert_eq!(
+        e.engine.submit_check(other, &link).await.unwrap(),
+        Submitted::Rejected {
+            reason: SubmitReject::CheckUsed,
+            order: None
+        }
+    );
+    e.drain().await;
+    assert_eq!(starts(&e, CB).len(), 1);
+    assert_eq!(count(&e.pool, "SELECT count(*) FROM orders").await, 1);
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_check_the_wallet_refused_can_be_sent_again_to_the_invoice(pool: PgPool) {
+    let e = env(pool).await;
+    {
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::directions::set_open(&mut conn, Direction::PayXrInvoice, true)
+            .await
+            .unwrap();
+    }
+    let shop = e.world.add_account("shop");
+    let inv = e
+        .world
+        .create_invoice(InvoiceSpec::crypto(XR, usdt(dec!(10))).by(shop))
+        .unwrap();
+    let link = parsers::links::parse_url(&inv.url).unwrap();
+    let order = match e.engine.submit_invoice(CLIENT, &link).await.unwrap() {
+        InvoiceSubmitted::Quoted(order) => order,
+        other => panic!("{other:?}"),
+    };
+    // Чек CryptoBot, которого кошелёк (пока) не знает: «не найден» — заявка снова ждёт.
+    let url = "https://t.me/send?start=CQAbCdEfGhIj";
+    match e.submit(url).await {
+        Submitted::Accepted(o) => assert_eq!(o.id, order.id),
+        other => panic!("{other:?}"),
+    }
+    e.drain().await;
+    let (o, _) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::AwaitingFunds);
+    // Тот же чек ещё раз — снова в этот счёт, а не «уже в работе» против своей же заявки.
+    match e.submit(url).await {
+        Submitted::Accepted(o) => {
+            assert_eq!(o.id, order.id);
+            assert_eq!(o.state, OrderState::IntakePending);
+        }
+        other => panic!("{other:?}"),
+    }
+    let activations = e
+        .ops(order.id)
+        .await
+        .into_iter()
+        .filter(|op| op.kind == OpKind::ActivateCheck)
+        .count();
+    assert_eq!(activations, 2);
+}

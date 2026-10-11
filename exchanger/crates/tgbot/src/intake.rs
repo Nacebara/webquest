@@ -84,9 +84,9 @@ pub(crate) async fn process(
         }
         return submit_invoice(inner, chat, user, link).await;
     }
-    let error = found
-        .iter()
-        .find_map(|r| r.as_ref().err())
+    // Ни чека, ни счёта: объяснить самую содержательную ошибку (мульти-чек xRocket, подделку),
+    // а не первую попавшуюся («не чек» у ссылки на кошелёк без кода).
+    let error = parsers::links::most_informative_error(found)
         .map_or(UiError::NotCheckOrInvoice, link_error);
     inner.reply_error(chat, &error).await
 }
@@ -235,9 +235,20 @@ async fn submit(
                 let mut conn = inner.pool.acquire().await?;
                 storage::client::live_order_for_check(&mut conn, link.platform, &link.param).await?
             };
-            // Заявка успела закончиться между проверками — номер неизвестен.
-            let order = live.map_or_else(|| "—".to_owned(), |o| o.public_id);
-            inner.reply_error(chat, &UiError::Duplicate { order }).await
+            match live {
+                // Чужая заявка (тот же чек прислал другой клиент одновременно): её номер не
+                // показываем — для этого клиента чек уже открыт через нас.
+                Some(o) if o.user_id != user => inner.reply_error(chat, &UiError::CheckUsed).await,
+                Some(o) => {
+                    let order = o.public_id;
+                    inner.reply_error(chat, &UiError::Duplicate { order }).await
+                }
+                // Заявка успела закончиться между проверками — номер неизвестен.
+                None => {
+                    let order = "—".to_owned();
+                    inner.reply_error(chat, &UiError::Duplicate { order }).await
+                }
+            }
         }
         Submitted::Rejected {
             reason,
