@@ -43,6 +43,8 @@ pub(crate) async fn run<T: Transport>(
     tag: &OpTag,
 ) -> Result<IssueOutcome, BotError> {
     let mut conv = Conv::open(w, Some(&tag.key)).await;
+    // Запасной путь — меню в чате бота: проверяем «чистоту» чата до метки, пока ничего не начато.
+    conv.ensure_clear(Chat::WalletBot(w.platform), None).await?;
     let marker = match conv
         .send(
             Chat::SavedMessages,
@@ -508,7 +510,20 @@ async fn find_with<T: Transport>(
         .recent(Chat::WalletBot(platform))
         .await
         .map_err(unavailable)?;
-    for m in bot.iter().filter(|m| !m.out && in_window(m)) {
+    // Ответ меню засчитывается, только если перед ним (без других наших сообщений между)
+    // стоит НАШЕ сообщение из окна этой операции — её сумма. Поздний «Чек создан» на сумму
+    // другой операции так не попадёт в чужое окно.
+    let ours_before = |m: &RawMessage| {
+        bot.iter()
+            .filter(|o| o.out && o.id < m.id)
+            .map(|o| o.id)
+            .max()
+            .is_some_and(|o| o > from && o < until)
+    };
+    for m in bot
+        .iter()
+        .filter(|m| !m.out && in_window(m) && ours_before(m))
+    {
         if let CheckCreationReply::Created(_) =
             screens::classify_check_creation(platform, &m.text, &m.button_urls())
         {

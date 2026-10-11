@@ -57,6 +57,10 @@ pub struct FlowConfig {
     /// После команды без ответа чат столько ждёт поздний ответ, прежде чем принять следующую
     /// команду: поздний ответ не должен достаться чужой операции.
     pub late_reply_quarantine: Duration,
+    /// Сколько ждать ответа на прошлую команду в чате, прежде чем всё же отправить новую.
+    /// Пока ответа нет, новая команда в этот чат не уходит (операция возвращается движку):
+    /// иначе поздний ответ на прошлую команду достался бы новой.
+    pub unanswered_block: Duration,
     /// xRocket иногда отвечает «не найден» на свежий чек: один повтор `/start` через это
     /// время (lovec `ledger.rs:19-20`). `None` — без повтора.
     pub xrocket_not_found_retry: Option<Duration>,
@@ -73,6 +77,7 @@ impl Default for FlowConfig {
             min_interval: Duration::from_millis(1500),
             bot_actions_per_minute: 8,
             late_reply_quarantine: Duration::from_secs(30),
+            unanswered_block: Duration::from_secs(600),
             xrocket_not_found_retry: Some(Duration::from_secs(2)),
             inline_checks: true,
             scan_depth: 100,

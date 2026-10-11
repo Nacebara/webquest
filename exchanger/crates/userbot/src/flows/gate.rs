@@ -38,6 +38,8 @@ pub(crate) struct GateState {
     bot_actions: VecDeque<Instant>,
     flood_until: Option<Instant>,
     quarantine: HashMap<Chat, Instant>,
+    /// Чаты, где последняя наша команда ещё без ответа: (id команды, с какого момента видим).
+    unanswered: HashMap<Chat, (i32, Instant)>,
 }
 
 impl AccountGate {
@@ -126,6 +128,20 @@ impl GateState {
 
     pub(crate) fn set_quarantine(&mut self, chat: Chat, wait: Duration) {
         self.quarantine.insert(chat, Instant::now() + wait);
+    }
+
+    /// С какого момента команда `cmd_id` в `chat` видится без ответа (отсчёт с первого раза).
+    pub(crate) fn unanswered_since(&mut self, chat: Chat, cmd_id: i32) -> Instant {
+        let now = Instant::now();
+        let entry = self.unanswered.entry(chat).or_insert((cmd_id, now));
+        if entry.0 != cmd_id {
+            *entry = (cmd_id, now);
+        }
+        entry.1
+    }
+
+    pub(crate) fn clear_unanswered(&mut self, chat: Chat) {
+        self.unanswered.remove(&chat);
     }
 }
 

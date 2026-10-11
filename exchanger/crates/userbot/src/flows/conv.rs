@@ -4,16 +4,27 @@
 //! с самого начала — ответ, пришедший раньше, чем вернулся вызов отправки, не теряется.
 //! Всё, что приходит, сначала уходит в журнал, потом разбирается.
 //!
-//! Ответ на команду — сообщение бота (не наше) в том же чате с id **больше** id команды:
-//! новое или правка такого сообщения. Правка более старого сообщения ответом не считается
-//! (это может быть поздний ответ на прошлую операцию). Если за `reply_timeout` ответа нет,
-//! смотрим историю чата после id команды, а чат уходит в карантин: следующая команда в нём
-//! ждёт, пока поздний ответ на эту не перестанет быть возможным.
+//! Ответ на команду — сообщение бота (не наше) в том же чате **в окне команды**: id больше id
+//! команды и меньше id нашего следующего сообщения в этом чате. Новое сообщение или правка
+//! такого. Окна разных команд не пересекаются, поэтому один ответ не может достаться двум
+//! операциям: ни поздний ответ на прошлую команду, ни ответ на следующую.
+//!
+//! «Чистый чат»: первая команда операции в чат бота уходит, только если на нашу прошлую
+//! команду в этом чате уже есть ответ (по истории Telegram, а не по таймеру в памяти — это
+//! переживает рестарт). Иначе ждём `late_reply_quarantine`, затем операция возвращается
+//! движку (`BotError::Unavailable`, ничего не выполнялось). Через `unanswered_block` чат
+//! считается свободным. Исключение — повтор той же команды (тот же текст): это повтор
+//! операции с тем же `random_id`, её ответ ищется в её же окне.
 
 use tokio::sync::MutexGuard;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 use tokio::time::Instant;
+
+use std::collections::HashSet;
+
+use parsers::ActivationReply;
+use parsers::replies::classify_activation;
 
 use super::UserbotWallet;
 use super::gate::{GateState, Pace};
@@ -49,6 +60,8 @@ pub(crate) struct Conv<'a, T: Transport> {
     /// Всё, что пришло в поток за время операции, в порядке прихода (версии правок — отдельно).
     seen: Vec<RawMessage>,
     op: Option<String>,
+    /// Чаты, проверенные на «чистоту» в этой операции.
+    cleared: HashSet<Chat>,
 }
 
 impl<'a, T: Transport> Conv<'a, T> {
@@ -62,6 +75,7 @@ impl<'a, T: Transport> Conv<'a, T> {
             rx,
             seen: Vec::new(),
             op: op.map(str::to_owned),
+            cleared: HashSet::new(),
         }
     }
 
@@ -177,6 +191,91 @@ impl<'a, T: Transport> Conv<'a, T> {
         }
     }
 
+    /// Сообщение бота, которое отвечает на команду (не уведомление, не перевод, не «обработка»).
+    fn answers(platform: domain::Platform, m: &RawMessage) -> bool {
+        !m.out
+            && !matches!(
+                classify_activation(platform, &m.text),
+                ActivationReply::ClaimNotice
+                    | ActivationReply::IncomingTransfer { .. }
+                    | ActivationReply::InProgress
+            )
+    }
+
+    /// Проверка «чистого чата» перед первой командой операции в чат бота. `next_text` —
+    /// текст, который собираемся отправить: если прошлая неотвеченная команда — та же самая,
+    /// это повтор операции, и отправка разрешена.
+    pub async fn ensure_clear(
+        &mut self,
+        chat: Chat,
+        next_text: Option<&str>,
+    ) -> Result<(), BotError> {
+        let Chat::WalletBot(platform) = chat else {
+            return Ok(());
+        };
+        if self.cleared.contains(&chat) {
+            return Ok(());
+        }
+        self.wait_quarantine(chat).await;
+        loop {
+            let msgs = self
+                .recent(chat)
+                .await
+                .map_err(|e| BotError::Unavailable(format!("history: {e}")))?;
+            let Some(i) = msgs.iter().rposition(|m| m.out) else {
+                break;
+            };
+            let last = &msgs[i];
+            let answered = msgs[i + 1..].iter().any(|m| Self::answers(platform, m));
+            if answered || next_text == Some(last.text.as_str()) {
+                break;
+            }
+            let since = self.gate.unanswered_since(chat, last.id);
+            let waited = since.elapsed();
+            let block = self.w.cfg.unanswered_block;
+            if waited >= block {
+                tracing::warn!(
+                    account = self.w.gate.label(),
+                    ?chat,
+                    command = last.id,
+                    "previous command has no reply for too long; the chat is used again"
+                );
+                break;
+            }
+            let wait = self.w.cfg.late_reply_quarantine.min(block - waited);
+            let deadline = Instant::now() + wait;
+            let mut pos = self.mark().await;
+            let mut got = false;
+            'wait: loop {
+                while pos < self.seen.len() {
+                    let m = &self.seen[pos];
+                    pos += 1;
+                    if m.chat == chat && m.id > last.id && Self::answers(platform, m) {
+                        got = true;
+                        break 'wait;
+                    }
+                }
+                if !self.recv_until(deadline).await {
+                    break;
+                }
+            }
+            if !got {
+                tracing::info!(
+                    account = self.w.gate.label(),
+                    ?chat,
+                    command = last.id,
+                    "previous command still has no reply"
+                );
+                return Err(BotError::Unavailable(
+                    "previous command in this chat has no reply yet".to_owned(),
+                ));
+            }
+        }
+        self.gate.clear_unanswered(chat);
+        self.cleared.insert(chat);
+        Ok(())
+    }
+
     /// Команда в `chat` осталась без ответа: поздний ответ не должен достаться следующей.
     pub fn quarantine(&mut self, chat: Chat) {
         let wait = self.w.cfg.late_reply_quarantine;
@@ -192,6 +291,9 @@ impl<'a, T: Transport> Conv<'a, T> {
         random_id: i64,
         kind: Pace,
     ) -> Result<Sent, SendError> {
+        self.ensure_clear(chat, Some(text))
+            .await
+            .map_err(SendError::NotSent)?;
         self.pace(kind).await.map_err(SendError::NotSent)?;
         let first = self.w.transport.send_text(chat, text, random_id).await;
         let earlier_call = matches!(first, Err(TransportError::RandomIdDuplicate));
@@ -317,6 +419,7 @@ impl<'a, T: Transport> Conv<'a, T> {
             mark,
             deadline,
             history_first,
+            true,
             candidate,
             accept,
         )
@@ -333,10 +436,21 @@ impl<'a, T: Transport> Conv<'a, T> {
         accept: impl FnMut(&RawMessage) -> bool,
     ) -> Option<RawMessage> {
         let candidate = move |m: &RawMessage| m.chat == chat && m.id == msg_id;
-        self.wait_where(chat, msg_id - 1, mark, deadline, false, candidate, accept)
-            .await
+        self.wait_where(
+            chat,
+            msg_id - 1,
+            mark,
+            deadline,
+            false,
+            false,
+            candidate,
+            accept,
+        )
+        .await
     }
 
+    /// `bounded` — окно команды: сообщения после нашего следующего сообщения в этом чате
+    /// не рассматриваются (ответы на следующую команду и поздние ответы — не наши).
     #[allow(clippy::too_many_arguments)]
     async fn wait_where(
         &mut self,
@@ -345,22 +459,36 @@ impl<'a, T: Transport> Conv<'a, T> {
         mark: usize,
         deadline: Instant,
         history_first: bool,
+        bounded: bool,
         candidate: impl Fn(&RawMessage) -> bool,
         mut accept: impl FnMut(&RawMessage) -> bool,
     ) -> Option<RawMessage> {
+        let next_out = |msgs: &[RawMessage]| {
+            msgs.iter()
+                .filter(|m| bounded && m.chat == chat && m.out && m.id > history_after)
+                .map(|m| m.id)
+                .min()
+        };
         if history_first {
-            for m in self.history_after(chat, history_after).await {
-                if candidate(&m) && accept(&m) {
+            let msgs = self.history_after(chat, history_after).await;
+            let upper = next_out(&msgs);
+            for m in msgs {
+                if upper.is_none_or(|u| m.id < u) && candidate(&m) && accept(&m) {
                     return Some(self.accepted(m).await);
                 }
             }
         }
+        let mut upper: Option<i32> = None;
         let mut pos = mark.min(self.seen.len());
         loop {
             while pos < self.seen.len() {
                 let m = self.seen[pos].clone();
                 pos += 1;
-                if candidate(&m) && accept(&m) {
+                if bounded && m.chat == chat && m.out && m.id > history_after {
+                    upper = Some(upper.map_or(m.id, |u| u.min(m.id)));
+                    continue;
+                }
+                if upper.is_none_or(|u| m.id < u) && candidate(&m) && accept(&m) {
                     return Some(self.accepted(m).await);
                 }
             }
@@ -368,8 +496,13 @@ impl<'a, T: Transport> Conv<'a, T> {
                 break;
             }
         }
-        for m in self.history_after(chat, history_after).await {
-            if candidate(&m) && accept(&m) {
+        let msgs = self.history_after(chat, history_after).await;
+        let upper = match (upper, next_out(&msgs)) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        };
+        for m in msgs {
+            if upper.is_none_or(|u| m.id < u) && candidate(&m) && accept(&m) {
                 return Some(self.accepted(m).await);
             }
         }

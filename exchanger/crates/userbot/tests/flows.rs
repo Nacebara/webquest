@@ -53,6 +53,7 @@ struct Scripted {
     account: AccountId,
     on_text: Mutex<Vec<(String, Fault)>>,
     on_press: Mutex<Vec<(String, Fault)>>,
+    on_recent: Mutex<Vec<(Chat, Fault)>>,
 }
 
 impl Scripted {
@@ -65,6 +66,10 @@ impl Scripted {
             .lock()
             .unwrap()
             .push((data_contains.to_owned(), fault));
+    }
+
+    fn fault_on_recent(&self, chat: Chat, fault: Fault) {
+        self.on_recent.lock().unwrap().push((chat, fault));
     }
 
     fn arm(&self, rules: &Mutex<Vec<(String, Fault)>>, hit: impl Fn(&str) -> bool, call: Call) {
@@ -134,6 +139,16 @@ impl Transport for Scripted {
     }
 
     async fn recent(&self, chat: Chat, limit: u32) -> Result<Vec<RawMessage>, TransportError> {
+        let fault = {
+            let mut rules = self.on_recent.lock().unwrap();
+            rules
+                .iter()
+                .position(|(c, _)| *c == chat)
+                .map(|i| rules.remove(i).1)
+        };
+        if let Some(fault) = fault {
+            self.world.inject(self.account, Call::History, fault, 1);
+        }
         self.inner.recent(chat, limit).await
     }
 
@@ -163,6 +178,7 @@ fn env() -> Env {
         account: ub,
         on_text: Mutex::new(Vec::new()),
         on_press: Mutex::new(Vec::new()),
+        on_recent: Mutex::new(Vec::new()),
     });
     Env {
         world,
@@ -392,7 +408,19 @@ async fn silence_unknown_text_and_old_message_edit_give_unknown() {
         .unwrap();
     assert_eq!(out, ActivationOutcome::Unknown { raw: None });
 
+    // Чат занят: на прошлую команду нет ответа — новая команда не уходит, ничего не выполнено.
     let url = e.world.client_check(CB, usdt(dec!(2))).unwrap();
+    let refused = wallet
+        .activate_check(param(&url), &tag("ord-2-intake-1"))
+        .await;
+    assert!(
+        matches!(refused, Err(BotError::Unavailable(_))),
+        "{refused:?}"
+    );
+    assert_eq!(e.sent_texts(Chat::WalletBot(CB)).len(), 1);
+    // Через `unanswered_block` чат снова свободен.
+    tokio::time::advance(FlowConfig::default().unanswered_block).await;
+
     e.world.inject(
         e.ub,
         Call::SendText,
@@ -674,7 +702,8 @@ async fn unknown_issue_is_never_retried_and_find_recovers_the_check() {
         .inject(e.ub, Call::SendInline, Fault::TimeoutAfterEffect, 1);
     e.world
         .inject(e.ub, Call::SendInline, Fault::Disconnected, 1);
-    e.world.inject(e.ub, Call::History, Fault::Disconnected, 1);
+    e.transport
+        .fault_on_recent(Chat::SavedMessages, Fault::Disconnected);
     let wallet = e.wallet(CB);
     let out = wallet.issue_check(&usdt(dec!(25)), &t).await.unwrap();
     assert!(matches!(out, IssueOutcome::Unknown { .. }), "{out:?}");
@@ -1051,6 +1080,13 @@ async fn repeating_an_unknown_issue_reconciles_instead_of_issuing() {
     e.transport.fault_on_text("40", Fault::NoReply);
     let first = wallet.issue_check(&usdt(dec!(40)), &t).await.unwrap();
     assert!(matches!(first, IssueOutcome::Unknown { .. }), "{first:?}");
+    // Пока на сумму нет ответа, чат бота занят: повтор даже не начинается.
+    let refused = wallet.issue_check(&usdt(dec!(40)), &t).await;
+    assert!(
+        matches!(refused, Err(BotError::Unavailable(_))),
+        "{refused:?}"
+    );
+    tokio::time::advance(FlowConfig::default().unanswered_block).await;
     // Повтор той же операции ничего не создаёт: бот так и не сообщил о чеке — исход неизвестен.
     let again = wallet.issue_check(&usdt(dec!(40)), &t).await.unwrap();
     assert!(matches!(again, IssueOutcome::Unknown { .. }), "{again:?}");
@@ -1077,4 +1113,74 @@ async fn paying_again_with_the_same_tag_never_presses_twice() {
     assert!(matches!(again, PayOutcome::Unknown { .. }), "{again:?}");
     assert_eq!(e.world.invoice(&code).unwrap().payments.len(), 1);
     assert_eq!(e.balance(XR), dec!(15));
+}
+
+// ============================== окно ответа (находки проверки денежного ядра) ==============================
+
+/// A промолчал, B выиграл 300, затем повтор A с тем же `random_id`: ответ B лежит в истории
+/// после команды A, но вне её окна (после команды B) — A не должен его забрать.
+#[tokio::test(start_paused = true)]
+async fn retried_activation_never_takes_the_next_orders_reply() {
+    let e = env();
+    let wallet = e.wallet(CB);
+    let a = e.world.client_check(CB, usdt(dec!(5))).unwrap();
+    let ta = tag("ord-1-intake-1");
+    e.world.inject(e.ub, Call::SendText, Fault::NoReply, 1);
+    let out = wallet.activate_check(param(&a), &ta).await.unwrap();
+    assert_eq!(out, ActivationOutcome::Unknown { raw: None });
+
+    // B: чат занят неотвеченной командой A — сначала отказ, через `unanswered_block` проходит.
+    let b = e.world.client_check(CB, usdt(dec!(300))).unwrap();
+    let tb = tag("ord-2-intake-1");
+    assert!(matches!(
+        wallet.activate_check(param(&b), &tb).await,
+        Err(BotError::Unavailable(_))
+    ));
+    tokio::time::advance(FlowConfig::default().unanswered_block).await;
+    let out = wallet.activate_check(param(&b), &tb).await.unwrap();
+    assert_eq!(out, ActivationOutcome::Received(usdt(dec!(300))));
+
+    let retry = wallet.activate_check(param(&a), &ta).await.unwrap();
+    assert!(
+        matches!(retry, ActivationOutcome::Unknown { .. }),
+        "A must not adopt B's reply: {retry:?}"
+    );
+    assert_eq!(
+        e.balance(CB),
+        dec!(305),
+        "both checks are really in the wallet"
+    );
+}
+
+/// Ответ на A пришёл через 55 с — позже таймаута и карантина. B ждёт его и не забирает себе;
+/// повтор A находит свой ответ в своём окне.
+#[tokio::test(start_paused = true)]
+async fn very_late_reply_is_kept_out_of_the_next_operation() {
+    let e = env();
+    let wallet = e.wallet(CB);
+    let a = e.world.client_check(CB, usdt(dec!(300))).unwrap();
+    let ta = tag("ord-1-intake-1");
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::DelayReply(Duration::from_secs(55)),
+        1,
+    );
+    let out = wallet.activate_check(param(&a), &ta).await.unwrap();
+    assert!(matches!(out, ActivationOutcome::Unknown { .. }), "{out:?}");
+
+    let b = e.world.client_check(CB, usdt(dec!(2))).unwrap();
+    let out = wallet
+        .activate_check(param(&b), &tag("ord-2-intake-1"))
+        .await
+        .unwrap();
+    assert_eq!(
+        out,
+        ActivationOutcome::Received(usdt(dec!(2))),
+        "B gets its own reply"
+    );
+
+    let retry = wallet.activate_check(param(&a), &ta).await.unwrap();
+    assert_eq!(retry, ActivationOutcome::Received(usdt(dec!(300))));
+    assert_eq!(e.balance(CB), dec!(302));
 }
