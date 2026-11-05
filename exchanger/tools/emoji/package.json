@@ -1,0 +1,9 @@
+{
+  "name": "exch-emoji-tools",
+  "private": true,
+  "description": "Сборка премиум-эмодзи exch: icons.js → TGS (tgs.js), эталонные кадры (frames.js), проверки (check.js)",
+  "dependencies": {
+    "opentype.js": "1.3.4",
+    "sharp": "0.33.5"
+  }
+}

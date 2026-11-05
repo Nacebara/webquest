@@ -1,0 +1,54 @@
+# Эмодзи exch
+
+Собственное семейство премиум-эмодзи бота: векторные TGS (Lottie), чёткие в любом размере.
+Готовые файлы лежат в `assets/emoji/{color,mono}/*.tgs` и коммитятся. Ставит их в набор
+(`uploadStickerFile` → `createNewStickerSet` / `addStickerToSet`) отдельная команда бота.
+Её ещё нет.
+
+| Набор | Что это | В Telegram |
+|---|---|---|
+| `color` (45) | Плитки и статусы: обмен, готово, ошибка, ждём, возврат, тревога, шаги, шкалы | без перекраски |
+| `mono` (65) | Линейные значки для кнопок и строк: клиентские и админские | `needs_repainting`: цвет текста темы |
+
+Анимированных 17: `swap` (пол-оборота с пружинкой), `process`, `wait`, `done`, `err`, `refund`,
+`manual`, `invoice`, `sending`, `usdt`, `fast`, `alarm`, `live`, `confetti`, `step_now`,
+`dot_wait`, `seg_now`. Остальные — секундная петля одинаковых кадров. Telegram ждёт анимацию.
+
+## Правила рисования
+
+- Значок — SVG 24×24 в `icons.js`. Анимированный — функция `svg(t)`, `t` от 0 до 1, где `t = null` —
+  статичный вид. Кадры `t = 0` и `t = 1` должны совпадать: петля без скачка.
+- Цвет только сплошной. Полупрозрачный цвет на тёмной теме выглядит грязным пятном.
+  Исчезающее сжимается или истончается, а не тает.
+- Анимация — один слой с преобразованием группы. Маски (трек-матт) и прозрачность групп
+  rlottie смешивает по-своему, и сверка их ловит.
+- Нельзя: `text`, `image`, `mask`, `filter`, `stroke-dashoffset`, `ellipse`, `line`, `polygon`
+  (конвертер их не знает). Пунктир — `stroke-dasharray`, бегущая дуга — пунктир длиннее пути.
+- У каждого значка есть подпись в `LABELS`: её показывают превью и админка.
+
+## Сборка и проверка
+
+```bash
+cd tools/emoji && npm ci && cd ../..
+python3 -m venv /tmp/emoji-venv && /tmp/emoji-venv/bin/pip install rlottie-python pillow numpy
+
+node tools/emoji/check.js                         # петли бесшовны, подписи есть, нет запрещённого
+node tools/emoji/tgs.js assets/emoji              # все значки; или: … assets/emoji swap,done
+node tools/emoji/frames.js /tmp/emoji-ref 256     # эталонные кадры (librsvg)
+/tmp/emoji-venv/bin/python -I tools/emoji/verify_tgs.py assets/emoji /tmp/emoji-ref
+/tmp/emoji-venv/bin/python -I tools/emoji/preview.py assets/emoji /tmp/emoji-preview.png
+```
+
+`verify_tgs.py` рисует каждый TGS движком rlottie, как Telegram, и сравнивает с эталоном
+на тёмном и светлом фоне. Он проверяет и требования Telegram: 512×512, 60 кадров/с, не
+дольше 3 с, файл до 64 КБ.
+
+Пороги сверки не ослаблять. Если значок не проходит, меняйте рисунок.
+`preview.py` — лист для глаз: обе темы, 64 px и 20 px (размер в тексте), кадры петли.
+Для `EXCH_JSON=1` рядом с каждым `.tgs` пишется `.json` (Lottie для веб-превью, lottie-web).
+
+Конвертер и сверка перенесены из инструментов «Реборна». Отличия:
+- толщина обводки анимируется;
+- `verify_tgs.py` проверяет обе темы.
+
+Добавлены `check.js` и `preview.py`.
