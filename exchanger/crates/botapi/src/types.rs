@@ -184,7 +184,7 @@ impl Message {
             .iter()
             .flat_map(|m| m.inline_keyboard.iter().flatten())
             .filter_map(|b| match &b.action {
-                InlineButtonAction::Url(url) => Some(url.clone()),
+                InlineButtonAction::Url(url) | InlineButtonAction::WebApp(url) => Some(url.clone()),
                 _ => None,
             })
             .collect()

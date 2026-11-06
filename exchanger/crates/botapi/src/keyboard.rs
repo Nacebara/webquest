@@ -42,6 +42,9 @@ pub enum InlineButtonAction {
     CopyText(String),
     /// Недоступная кнопка (Bot API 10.3): видна, но не нажимается.
     Disabled,
+    /// Мини-приложение (`web_app.url`). Во входящих сообщениях: продавец может поставить
+    /// в кнопку оплаты счёт CryptoBot в виде мини-приложения — ссылку берём оттуда.
+    WebApp(String),
     /// Входящая кнопка с действием, которое этот клиент не моделирует.
     Other,
 }
@@ -109,6 +112,12 @@ struct CopyTextButton {
     text: String,
 }
 
+/// `{"url": "…"}` внутри `web_app`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct WebAppInfo {
+    url: String,
+}
+
 /// Кнопка как она лежит в JSON: все действия — необязательные поля.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct WireInlineButton {
@@ -125,6 +134,8 @@ struct WireInlineButton {
     copy_text: Option<CopyTextButton>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     disabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    web_app: Option<WebAppInfo>,
 }
 
 impl From<WireInlineButton> for InlineKeyboardButton {
@@ -137,6 +148,8 @@ impl From<WireInlineButton> for InlineKeyboardButton {
             InlineButtonAction::CopyText(copy.text)
         } else if w.disabled == Some(true) {
             InlineButtonAction::Disabled
+        } else if let Some(app) = w.web_app {
+            InlineButtonAction::WebApp(app.url)
         } else {
             InlineButtonAction::Other
         };
@@ -162,6 +175,7 @@ impl From<InlineKeyboardButton> for WireInlineButton {
             InlineButtonAction::CallbackData(data) => w.callback_data = Some(data),
             InlineButtonAction::CopyText(text) => w.copy_text = Some(CopyTextButton { text }),
             InlineButtonAction::Disabled => w.disabled = Some(true),
+            InlineButtonAction::WebApp(url) => w.web_app = Some(WebAppInfo { url }),
             // Отправлять такую кнопку незачем; без действия Telegram её отвергнет.
             InlineButtonAction::Other => {}
         }

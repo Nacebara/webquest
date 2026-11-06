@@ -8,6 +8,8 @@
 //! Формы: `https://t.me/<bot>?start=<p>`, без схемы, `telegram.me`, `telegram.dog`, `www.`,
 //! `https://<bot>.t.me/?start=`, `t.me/<bot>/app?startapp=<p>`, `tg://resolve?domain=<bot>&start=<p>`
 //! (и с `start` раньше `domain`), `?ref=…&start=<p>`. Имя бота — без учёта регистра, только ASCII.
+//! Счёт CryptoBot — ещё в двух формах Crypto Pay: мини-приложение `t.me/CryptoBot/app?startapp=invoice-IV…`
+//! и веб-версия `https://app.send.tg/invoices/IV…` (`app.cr.bot`): продавцы ставят их в кнопки.
 //!
 //! Разбор — через `url::Url`, не регуляркой по всему тексту (SPEC §1.2, п. 2). Регулярка нужна
 //! только в [`extract_from_message`], чтобы найти в тексте кандидатов; каждый кандидат потом
@@ -189,11 +191,28 @@ pub fn is_xrocket_multi_check(param: &str) -> bool {
 
 /// Похож ли параметр на код чека или счёта хоть какой-то платформы.
 fn is_wallet_code(param: &str) -> bool {
+    let param = app_param(param);
     is_xrocket_multi_check(param)
         || Platform::ALL
             .into_iter()
             .any(|p| classify_start_param(p, param).is_some())
 }
+
+/// Префикс параметра мини-приложения CryptoBot для счёта: Crypto Pay отдаёт продавцу
+/// `mini_app_invoice_url` вида `https://t.me/CryptoBot/app?startapp=invoice-IV…&mode=compact`.
+const APP_INVOICE_PREFIX: &str = "invoice-";
+
+/// Параметр без префикса мини-приложения: `invoice-IVabc…` → `IVabc…`; остальное как есть.
+fn app_param(param: &str) -> &str {
+    param
+        .strip_prefix(APP_INVOICE_PREFIX)
+        .filter(|code| classify_start_param(Platform::CryptoBot, code) == Some(LinkKind::Invoice))
+        .unwrap_or(param)
+}
+
+/// Веб-версия счёта CryptoBot (`web_app_invoice_url` Crypto Pay): `https://app.send.tg/invoices/IV…`;
+/// у нового домена кошелька — `app.cr.bot`. Только точное совпадение хоста.
+const CRYPTOBOT_WEB_APP_HOSTS: [&str; 2] = ["app.send.tg", "app.cr.bot"];
 
 /// Платформа официального бота по имени (без `@`, без учёта регистра, только ASCII).
 pub fn official_platform(bot: &str) -> Option<Platform> {
@@ -342,6 +361,11 @@ fn judge(target: Target) -> Result<WalletLink, LinkError> {
     let StartParam::One(param) = start else {
         return Err(LinkError::NotCheckOrInvoice);
     };
+    // Мини-приложение CryptoBot: `startapp=invoice-IV…` — тот же счёт, что `start=IV…`.
+    let param = match platform {
+        Platform::CryptoBot => app_param(&param).to_owned(),
+        Platform::XRocket => param,
+    };
     if platform == Platform::XRocket && is_xrocket_multi_check(&param) {
         return Err(LinkError::MultiCheck);
     }
@@ -398,6 +422,26 @@ fn tg_target(s: &str) -> Result<Target, LinkError> {
     Ok(Target { bot, start })
 }
 
+/// `https://app.send.tg/invoices/IV…` → счёт CryptoBot; другие пути веб-кошелька — не ссылка.
+fn web_app_invoice(url: &Url) -> Result<Target, LinkError> {
+    let segments: Vec<String> = url
+        .path_segments()
+        .map(|it| it.map(percent_decode).filter(|s| !s.is_empty()).collect())
+        .unwrap_or_default();
+    match segments.as_slice() {
+        [section, code]
+            if section == "invoices"
+                && classify_start_param(Platform::CryptoBot, code) == Some(LinkKind::Invoice) =>
+        {
+            Ok(Target {
+                bot: "CryptoBot".to_owned(),
+                start: StartParam::One(code.clone()),
+            })
+        }
+        _ => Err(LinkError::NotWalletLink),
+    }
+}
+
 /// Хосты Telegram, на которых имя бота — первый сегмент пути.
 const WEB_HOSTS: [&str; 3] = ["t.me", "telegram.me", "telegram.dog"];
 
@@ -425,6 +469,9 @@ fn web_target(s: &str) -> Result<Target, LinkError> {
         return Err(LinkError::NotWalletLink);
     }
     let host = url.host_str().ok_or(LinkError::NotWalletLink)?;
+    if CRYPTOBOT_WEB_APP_HOSTS.contains(&host) {
+        return web_app_invoice(&url);
+    }
     let base = WEB_HOSTS
         .iter()
         .find(|h| host == **h || host.strip_suffix(**h).is_some_and(|p| p.ends_with('.')))
@@ -797,6 +844,46 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn cryptopay_invoice_urls_of_every_kind() {
+        let iv = ok(Platform::CryptoBot, LinkKind::Invoice, "IVa7C3pBK3Tw");
+        for url in [
+            // bot_invoice_url, mini_app_invoice_url, web_app_invoice_url (Crypto Pay).
+            "https://t.me/CryptoBot?start=IVa7C3pBK3Tw",
+            "https://t.me/CryptoBot/app?startapp=invoice-IVa7C3pBK3Tw&mode=compact",
+            "https://t.me/send/app?startapp=invoice-IVa7C3pBK3Tw",
+            "https://app.send.tg/invoices/IVa7C3pBK3Tw",
+            "https://app.cr.bot/invoices/IVa7C3pBK3Tw/",
+            "app.send.tg/invoices/IVa7C3pBK3Tw",
+        ] {
+            assert_eq!(parse_url(url), iv, "{url}");
+        }
+        for url in [
+            // Чек или кошелёк по веб-ссылке — не счёт; чужие хосты и пути — не наши.
+            "https://app.send.tg/invoices/CQAbCdEfGhIj",
+            "https://app.send.tg/wallet",
+            "https://app.send.tg/invoices/IVa7C3pBK3Tw/pay",
+            "https://app.send.tg.evil.com/invoices/IVa7C3pBK3Tw",
+            "https://evil.app.send.tg/invoices/IVa7C3pBK3Tw",
+            "https://app.send.tg:8443/invoices/IVa7C3pBK3Tw",
+        ] {
+            assert_eq!(parse_url(url), Err(LinkError::NotWalletLink), "{url}");
+        }
+        // Префикс мини-приложения — только для счёта CryptoBot.
+        assert_eq!(
+            parse_url("https://t.me/CryptoBot/app?startapp=invoice-CQAbCdEfGhIj"),
+            Err(LinkError::NotCheckOrInvoice)
+        );
+        assert_eq!(
+            parse_url("https://t.me/xrocket/app?startapp=invoice-IVa7C3pBK3Tw"),
+            Err(LinkError::NotCheckOrInvoice)
+        );
+        assert!(matches!(
+            parse_url("https://t.me/CryptoB0t/app?startapp=invoice-IVa7C3pBK3Tw"),
+            Err(LinkError::ForeignBot(_))
+        ));
     }
 
     #[test]

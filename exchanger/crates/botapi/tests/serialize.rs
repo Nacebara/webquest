@@ -251,7 +251,12 @@ fn inline_button_round_trip_and_tolerant_parsing() {
     ]]}))
     .unwrap();
     let buttons: Vec<_> = foreign.buttons().collect();
-    assert_eq!(buttons[0].action, InlineButtonAction::Other);
+    assert_eq!(foreign.buttons().count(), 3);
+    // Мини-приложение: ссылку берём (так продавцы ставят счёт CryptoBot в кнопку «Оплатить»).
+    assert_eq!(
+        buttons[0].action,
+        InlineButtonAction::WebApp("https://app.send.tg".into())
+    );
     assert_eq!(buttons[1].style, None);
     assert_eq!(
         buttons[2].action,

@@ -142,6 +142,27 @@ impl FakeTelegram {
         }));
     }
 
+    /// Клиент пересылает сообщение бота-магазина: текст без ссылки, ссылка — в кнопке
+    /// `{"text": …, "url": …}` или `{"text": …, "web_app": {"url": …}}`.
+    fn client_forwards(&self, text: &str, button: Value) {
+        let mut s = self.lock();
+        let id = s.next_update;
+        s.next_update += 1;
+        s.updates.push(json!({
+            "update_id": id,
+            "message": {
+                "message_id": id,
+                "date": 0,
+                "chat": { "id": CLIENT, "type": "private", "first_name": "Client" },
+                "from": { "id": CLIENT, "is_bot": false, "first_name": "Client", "language_code": "ru" },
+                "forward_origin": { "type": "user", "date": 0,
+                    "sender_user": { "id": 777, "is_bot": true, "first_name": "Shop", "username": "shop_bot" } },
+                "text": text,
+                "reply_markup": { "inline_keyboard": [[ button ]] },
+            }
+        }));
+    }
+
     /// Клиент нажимает инлайн-кнопку `data` под сообщением `message_id`.
     fn client_presses(&self, message_id: i64, data: &str) {
         let mut s = self.lock();
@@ -707,6 +728,57 @@ async fn invoice_link_gets_a_quote_and_the_check_pays_it(pool: PgPool) {
     assert_eq!(paid.status, SimInvoiceStatus::Paid);
     assert_eq!(paid.payments.len(), 1);
     e.assert_books_match().await;
+}
+
+/// Магазин присылает счёт кнопкой «Оплатить» (обычная ссылка, мини-приложение CryptoBot,
+/// веб-версия счёта); клиент пересылает сообщение — бот берёт счёт из кнопки.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn invoice_in_a_forwarded_shop_button_gets_a_quote(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let shop = e.world.add_account("shop");
+    let inv = e
+        .world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))).by(shop))
+        .unwrap();
+    e.fake.client_forwards(
+        "Пополнение баланса на 10 USDT. Нажмите «Оплатить».",
+        json!({
+            "text": "Оплатить",
+            "web_app": { "url": format!("https://t.me/CryptoBot/app?startapp=invoice-{}&mode=compact", inv.code) }
+        }),
+    );
+    e.fake
+        .wait_for("quote", |c| {
+            c.method == "sendMessage" && c.contains("10.30 USDT")
+        })
+        .await;
+    bot.stop().await;
+    let orders = e.orders().await;
+    assert_eq!(orders.len(), 1);
+    assert_eq!(orders[0].1, OrderState::AwaitingFunds);
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn xrocket_invoice_in_a_url_button_is_read_too(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let shop = e.world.add_account("shop");
+    let inv = e
+        .world
+        .create_invoice(InvoiceSpec::crypto(XR, usdt(dec!(20))).by(shop))
+        .unwrap();
+    e.fake.client_forwards(
+        "Счёт на оплату",
+        json!({ "text": "💳 Оплатить", "url": inv.url }),
+    );
+    e.fake
+        .wait_for("quote", |c| {
+            c.method == "sendMessage" && c.contains("20.40 USDT")
+        })
+        .await;
+    bot.stop().await;
+    assert_eq!(e.orders().await.len(), 1);
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]

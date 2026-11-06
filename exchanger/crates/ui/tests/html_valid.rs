@@ -233,6 +233,8 @@ fn check_keyboard(name: &str, keyboard: &Keyboard) {
                         assert!(url.starts_with("https://"), "{name}: url {url}");
                     }
                     InlineButtonAction::Disabled => {}
+                    // Мини-приложений клиентский бот не открывает: такая кнопка — ошибка экрана.
+                    InlineButtonAction::WebApp(url) => panic!("{name}: web_app {url}"),
                     InlineButtonAction::Other => panic!("{name}: кнопка без действия"),
                 }
             }
