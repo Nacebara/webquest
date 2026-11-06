@@ -14,7 +14,7 @@ expression: "both(p, q)"
 <b>Через меню xRocket:</b>
 <code>/cheques</code> → «Персональный» → «Создать чек» → USDT → сумма → ссылку пришлите сюда.
 
-Чек — в USDT, для одного человека, без пароля, капчи и подписок.
+Чек — в USDT, для одного человека, без капчи и подписок.
 --- keyboard: inline
 [{"copy_text":{"text":"@xrocket 10"},"text":"📋 @xrocket 10"}]
 [{"text":"Открыть xRocket","url":"https://t.me/xrocket"}]
@@ -32,7 +32,7 @@ expression: "both(p, q)"
 <b>Через меню xRocket:</b>
 <code>/cheques</code> → «Персональный» → «Создать чек» → USDT → сумма → ссылку пришлите сюда.
 
-Чек — в USDT, для одного человека, без пароля, капчи и подписок.
+Чек — в USDT, для одного человека, без капчи и подписок.
 --- keyboard: inline
 [{"copy_text":{"text":"@xrocket 10"},"icon_custom_emoji_id":"5368000000000000013","text":"@xrocket 10"}]
 [{"text":"Открыть xRocket","url":"https://t.me/xrocket"}]

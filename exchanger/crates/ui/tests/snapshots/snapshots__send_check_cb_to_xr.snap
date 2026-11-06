@@ -9,7 +9,7 @@ expression: "both(p, q)"
 Комиссия 2,5 %, минимум <code>0.10</code> USDT. Взамен — чек xRocket.
 
 <blockquote>Быстрее всего: наберите в этом чате <code>@send 10usdt</code>, выберите чек и отправьте.</blockquote>
-Подойдёт чек в USDT для одного человека — без пароля, капчи и подписок.
+Подойдёт чек в USDT для одного человека — без капчи и подписок.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","text":"Как создать чек"}]
 [{"callback_data":"cancel","text":"Отмена"}]
@@ -21,7 +21,7 @@ expression: "both(p, q)"
 Комиссия 2,5 %, минимум <code>0.10</code> USDT. Взамен — чек xRocket.
 
 <blockquote>Быстрее всего: наберите в этом чате <code>@send 10usdt</code>, выберите чек и отправьте.</blockquote>
-Подойдёт чек в USDT для одного человека — без пароля, капчи и подписок.
+Подойдёт чек в USDT для одного человека — без капчи и подписок.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","text":"Как создать чек"}]
 [{"callback_data":"cancel","text":"Отмена"}]
