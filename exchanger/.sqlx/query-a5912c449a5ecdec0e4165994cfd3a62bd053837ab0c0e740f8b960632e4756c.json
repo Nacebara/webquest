@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE alerts SET acked_by = $2, acked_at = now() WHERE id = $1 AND acked_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a5912c449a5ecdec0e4165994cfd3a62bd053837ab0c0e740f8b960632e4756c"
+}

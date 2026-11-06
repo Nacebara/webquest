@@ -28,9 +28,29 @@ pub struct FeePolicy {
     pub fee_pct: Decimal,
     /// Минимальная комиссия в активе заявки.
     pub min_fee: Decimal,
+    /// Выгодный курс встречного потока на часть суммы (`crate::fees`); `None` — нет.
+    #[serde(default)]
+    pub discount: Option<Discount>,
+}
+
+/// Выгодный курс на первые `room` единиц суммы: на них — `fee_pct`, на остаток — обычная
+/// ставка. Дробить заявку бессмысленно, а перегнуть резерв в другую сторону нельзя.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Discount {
+    pub fee_pct: Decimal,
+    pub room: Decimal,
 }
 
 impl FeePolicy {
+    /// Один процент на всю сумму.
+    pub const fn flat(fee_pct: Decimal, min_fee: Decimal) -> Self {
+        Self {
+            fee_pct,
+            min_fee,
+            discount: None,
+        }
+    }
+
     fn validate(&self) -> Result<(), PricingError> {
         if self.fee_pct.is_sign_negative() || self.fee_pct >= HUNDRED {
             return Err(PricingError::InvalidParams("fee_pct must be in [0, 100)"));
@@ -38,7 +58,58 @@ impl FeePolicy {
         if self.min_fee.is_sign_negative() {
             return Err(PricingError::InvalidParams("min_fee must not be negative"));
         }
+        if let Some(d) = self.discount {
+            if d.fee_pct.is_sign_negative() || d.fee_pct > self.fee_pct {
+                return Err(PricingError::InvalidParams(
+                    "discount fee_pct must be in [0, fee_pct]",
+                ));
+            }
+            if d.room.is_sign_negative() {
+                return Err(PricingError::InvalidParams(
+                    "discount room must not be negative",
+                ));
+            }
+        }
         Ok(())
+    }
+
+    /// Процентная часть комиссии с суммы `amount` (без минимальной комиссии).
+    pub fn pct_fee(&self, amount: Decimal) -> Result<Decimal, PricingError> {
+        let (cheap, rest) = match self.discount {
+            Some(d) => {
+                let cheap = amount.min(d.room).max(Decimal::ZERO);
+                (Some((cheap, d.fee_pct)), amount - cheap)
+            }
+            None => (None, amount),
+        };
+        let part = |base: Decimal, pct: Decimal| {
+            base.checked_mul(pct)
+                .and_then(|x| x.checked_div(HUNDRED))
+                .ok_or(PricingError::Overflow)
+        };
+        let mut fee = part(rest, self.fee_pct)?;
+        if let Some((cheap, pct)) = cheap {
+            fee = fee
+                .checked_add(part(cheap, pct)?)
+                .ok_or(PricingError::Overflow)?;
+        }
+        Ok(fee)
+    }
+
+    /// Средний процент с суммы — для показа клиенту и записи в заявку (`fee_pct_applied`),
+    /// вверх до 0,01 п.п.
+    pub fn average_pct(&self, amount: Decimal) -> Result<Decimal, PricingError> {
+        if amount <= Decimal::ZERO {
+            return Ok(self.fee_pct);
+        }
+        let fee = self.pct_fee(amount)?;
+        let pct = fee
+            .checked_mul(HUNDRED)
+            .and_then(|x| x.checked_div(amount))
+            .ok_or(PricingError::Overflow)?;
+        Ok(pct
+            .round_dp_with_strategy(2, RoundingStrategy::ToPositiveInfinity)
+            .normalize())
     }
 }
 
@@ -100,11 +171,7 @@ pub fn quote_check_exchange(
     if amount_in <= Decimal::ZERO {
         return Err(PricingError::NothingToPayOut);
     }
-    let pct_fee = amount_in
-        .checked_mul(fee.fee_pct)
-        .and_then(|x| x.checked_div(HUNDRED))
-        .ok_or(PricingError::Overflow)?;
-    let fee_raw = pct_fee.max(fee.min_fee);
+    let fee_raw = fee.pct_fee(amount_in)?.max(fee.min_fee);
     let payout = step.floor(amount_in - fee_raw);
     if payout <= Decimal::ZERO {
         return Err(PricingError::NothingToPayOut);
@@ -137,8 +204,7 @@ pub fn quote_invoice_payment(
         ));
     }
     let by_pct = invoice_amount
-        .checked_mul(HUNDRED + fee.fee_pct)
-        .and_then(|x| x.checked_div(HUNDRED))
+        .checked_add(fee.pct_fee(invoice_amount)?)
         .ok_or(PricingError::Overflow)?;
     let by_min = invoice_amount
         .checked_add(fee.min_fee)
@@ -271,10 +337,7 @@ mod tests {
     }
 
     fn policy(pct: Decimal, min: Decimal) -> FeePolicy {
-        FeePolicy {
-            fee_pct: pct,
-            min_fee: min,
-        }
+        FeePolicy::flat(pct, min)
     }
 
     #[test]
@@ -454,6 +517,31 @@ mod tests {
             prop_assert!(q.client_pays - required < step.as_decimal(), "X is the smallest step multiple");
             prop_assert!(q.fee >= m);
             prop_assert_eq!(q.client_pays - q.fee, a);
+        }
+
+        #[test]
+        fn discount_is_never_dearer_and_splitting_gains_nothing(
+            a in amount(), b in amount(), p in pct(), cheap in pct(), room in amount(),
+        ) {
+            let cheap = cheap.min(p);
+            let with = |room: Decimal| FeePolicy {
+                discount: Some(Discount { fee_pct: cheap, room }),
+                ..policy(p, Decimal::ZERO)
+            };
+            let flat = policy(p, Decimal::ZERO).pct_fee(a).unwrap();
+            let all_cheap = policy(cheap, Decimal::ZERO).pct_fee(a).unwrap();
+            let fee = with(room).pct_fee(a).unwrap();
+            prop_assert!(fee <= flat && fee >= all_cheap);
+            // Две заявки подряд (вторая видит остаток объёма) стоят ровно как одна.
+            let one = with(room).pct_fee(a + b).unwrap();
+            let two = with(room).pct_fee(a).unwrap()
+                + with((room - a).max(Decimal::ZERO)).pct_fee(b).unwrap();
+            prop_assert_eq!(one, two);
+            // Котировка с выгодным курсом сходится так же, как без него.
+            if let Ok(q) = quote_check_exchange(a, with(room), Step::from_dp(2).unwrap()) {
+                prop_assert_eq!(q.payout + q.fee, a);
+                prop_assert!(q.fee >= fee);
+            }
         }
 
         #[test]

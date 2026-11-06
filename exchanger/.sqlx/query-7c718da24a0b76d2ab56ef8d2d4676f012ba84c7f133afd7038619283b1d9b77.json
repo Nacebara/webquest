@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE orders\n           SET intake_amount = $3, intake_asset = $4, received_at = COALESCE(received_at, now()),\n               version = version + 1, updated_at = now()\n         WHERE id = $1 AND version = $2 AND state = 'MANUAL_REVIEW'\n        RETURNING version\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Numeric",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7c718da24a0b76d2ab56ef8d2d4676f012ba84c7f133afd7038619283b1d9b77"
+}

@@ -163,7 +163,8 @@ impl Engine {
             Err(e) => return Err(e.into()),
         };
 
-        let dir = storage::directions::get(&mut tx, direction).await?;
+        let eff = storage::user_terms::effective(&mut tx, direction, user_id).await?;
+        let dir = &eff.dir;
         let target = direction.target();
         let paused = storage::settings::flag_on(&mut tx, "maintenance").await?
             || storage::settings::flag_on(&mut tx, "kill_switch_payouts").await?;
@@ -182,7 +183,7 @@ impl Engine {
                 dir.max_amount
             };
             // Суточный лимит клиента: сколько уже пришло и удержано за 24 часа (USDT ≈ USD).
-            let daily = daily_limit(&mut tx, new_user).await?;
+            let daily = daily_limit(&mut tx, user_id, new_user && eff.newcomer_limit).await?;
             let used = storage::orders::user_volume_24h(&mut tx, user_id).await?;
             let left = daily.map(|d| d - used);
             let max_amount = left.map_or(per_order, |l| per_order.min(l));
@@ -289,12 +290,18 @@ pub(crate) async fn spendable(
     Ok(available.min(headroom))
 }
 
-/// Суточный лимит из `settings.daily_limit_usd` (`{"default": 1000, "new_user": 200}`);
-/// `None` — не задан.
+/// Суточный лимит клиента: личный (`users.daily_limit_usd`, пульт), иначе общий из
+/// `settings.daily_limit_usd` (`{"default": 1000, "new_user": 200}`); `None` — не задан.
+/// `newcomer` — к клиенту применяется лимит нового клиента.
 pub(crate) async fn daily_limit(
     conn: &mut sqlx::PgConnection,
-    new_user: bool,
+    user_id: i64,
+    newcomer: bool,
 ) -> Result<Option<domain::Decimal>, EngineError> {
+    if let Some(personal) = storage::admin::daily_limit(&mut *conn, user_id).await? {
+        return Ok(Some(personal));
+    }
+    let new_user = newcomer;
     let Some(value) = storage::settings::get(conn, "daily_limit_usd").await? else {
         return Ok(None);
     };

@@ -12,6 +12,8 @@ chrono.workspace = true
 domain.workspace = true
 parsers = { path = "../parsers" }
 rust_decimal.workspace = true
+# Настройки встречного потока (settings.rebalance_promo) — типизированный JSON.
+serde.workspace = true
 serde_json = "1"
 sqlx.workspace = true
 storage.workspace = true

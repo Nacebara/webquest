@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT target, low, critical, high\n          FROM reserve_thresholds WHERE wallet_account_id = $1 AND asset = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "target",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "reserve_thresholds",
+            "name": "target"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "low",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "reserve_thresholds",
+            "name": "low"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "critical",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "reserve_thresholds",
+            "name": "critical"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "high",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "reserve_thresholds",
+            "name": "high"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int2",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4bfcbe2c09eef171ffc88e91bff1ad9d0889c80b3a31bc6369422ad12209acad"
+}

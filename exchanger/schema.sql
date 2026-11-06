@@ -153,6 +153,11 @@ CREATE TABLE directions (
     max_amount          NUMERIC(38,18) NOT NULL,
     new_user_max_amount NUMERIC(38,18) NOT NULL,
     fiat_buffer_pct     NUMERIC(9,6) NOT NULL DEFAULT 1,      -- только для счетов в фиате
+    -- Режим комиссии: 'flat' — fee_pct на любую сумму; 'tiers' — ступени по сумме заявки
+    -- (`domain::fees::FeeSchedule`, JSON [{"from": "0", "fee_pct": "2.5"}, …]). Ступени
+    -- хранятся и в режиме 'flat': переключение назад не стирает их.
+    fee_mode            TEXT NOT NULL DEFAULT 'flat' CHECK (fee_mode IN ('flat', 'tiers')),
+    fee_tiers           JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(fee_tiers) = 'array'),
     is_open             BOOLEAN NOT NULL DEFAULT FALSE,
     auto_paused         BOOLEAN NOT NULL DEFAULT FALSE,       -- пауза системой (резерв, парсер, сверка)
     pause_reason        TEXT,
@@ -161,7 +166,26 @@ CREATE TABLE directions (
     CHECK (source_platform <> target_platform),
     CHECK (max_amount >= min_amount),
     CHECK (new_user_max_amount <= max_amount),
-    CHECK (fee_floor_pct <= fee_pct AND fee_pct <= fee_cap_pct)
+    CHECK (fee_floor_pct <= fee_pct AND fee_pct <= fee_cap_pct),
+    CHECK (fee_mode = 'flat' OR jsonb_array_length(fee_tiers) > 0)
+);
+
+-- Личные условия клиента по направлению (пульт, карточка клиента). NULL — как у направления.
+-- Личная комиссия заменяет базовую, рычаг резерва действует поверх: пол и потолок сдвигаются
+-- на ту же разницу (`storage::user_terms::UserTerms::apply`).
+CREATE TABLE user_terms (
+    user_id             BIGINT NOT NULL REFERENCES users(tg_user_id),
+    direction           TEXT NOT NULL REFERENCES directions(code),
+    fee_pct             NUMERIC(9,6) CHECK (fee_pct >= 0 AND fee_pct < 20),
+    min_fee             NUMERIC(38,18) CHECK (min_fee >= 0),
+    min_amount          NUMERIC(38,18) CHECK (min_amount > 0),
+    max_amount          NUMERIC(38,18) CHECK (max_amount > 0),
+    newcomer_exempt     BOOLEAN NOT NULL DEFAULT FALSE,   -- лимит нового клиента не действует
+    note                TEXT,
+    updated_by          BIGINT REFERENCES staff(tg_user_id),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, direction),
+    CHECK (min_amount IS NULL OR max_amount IS NULL OR max_amount >= min_amount)
 );
 
 -- ---------------------------------------------------------------------
@@ -615,6 +639,7 @@ CREATE TABLE alerts (
     first_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
     sent_message_id     INTEGER,
+    delivered_at        TIMESTAMPTZ,                       -- когда пульт последний раз показал
     acked_by            BIGINT REFERENCES staff(tg_user_id),
     acked_at            TIMESTAMPTZ
 );
@@ -719,4 +744,10 @@ INSERT INTO settings (key, value) VALUES
     ('rebalance_whitelist',    '[]'),
     ('custom_emoji',           '{}'),
     ('emoji_style',            '"animated"'),
-    ('emoji_packs',            '{}');
+    ('emoji_packs',            '{}'),
+    -- Лимит нового клиента (`directions.new_user_max_amount`, `daily_limit_usd.new_user`).
+    ('newcomer_limit',         '{"on": true}'),
+    -- Встречный поток вместо ребалансировки через сеть (DESIGN-v0.2 Р15): mode off | hint | auto.
+    ('rebalance_promo',        '{"mode": "hint", "fee_pct": "0.3", "min_fee": "0.05", "trigger_pct": "30", "release_pct": "10"}'),
+    -- Где выгодный курс включён сейчас: {"<direction>": {"on": true, "by": "auto"|"manual", "since": "…", "staff": id}}.
+    ('rebalance_promo_active', '{}');

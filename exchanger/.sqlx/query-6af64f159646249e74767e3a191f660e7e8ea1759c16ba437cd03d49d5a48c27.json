@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT from_state AS \"from\", to_state AS \"to\", actor, reason, at\n          FROM order_transitions WHERE order_id = $1 ORDER BY id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "from",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_transitions",
+            "name": "from_state"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "to",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_transitions",
+            "name": "to_state"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "actor",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_transitions",
+            "name": "actor"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_transitions",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "order_transitions",
+            "name": "at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "6af64f159646249e74767e3a191f660e7e8ea1759c16ba437cd03d49d5a48c27"
+}

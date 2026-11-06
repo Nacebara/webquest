@@ -1,0 +1,81 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT u.id, u.label, u.status, u.flood_wait_until, u.last_ok_at,\n               (SELECT count(*) FROM operations op JOIN wallet_accounts w ON w.id = op.wallet_account_id\n                 WHERE w.userbot_id = u.id AND op.status IN ('dispatched', 'unknown')) AS \"in_flight!\"\n          FROM userbot_accounts u ORDER BY u.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "userbot_accounts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "userbot_accounts",
+            "name": "label"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "userbot_accounts",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "flood_wait_until",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "userbot_accounts",
+            "name": "flood_wait_until"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "last_ok_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "userbot_accounts",
+            "name": "last_ok_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "in_flight!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "6a465134d1b1adb06b080d8d55caab714e2f030707a4914c892744f6b0e04d73"
+}

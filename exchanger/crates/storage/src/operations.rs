@@ -377,6 +377,43 @@ pub async fn finish(
     }
 }
 
+/// Решение человека по операции с неясным или неудачным исходом (пульт): `failed` — «проверил,
+/// чек не создан / счёт не оплачен», `succeeded` — «выплачено, вот доказательство». Только из
+/// `unknown` или `failed`; иначе `OperationState`.
+pub async fn resolve_by_staff(
+    conn: &mut PgConnection,
+    id: i64,
+    status: OpStatus,
+    response: &Value,
+    external_id: Option<&str>,
+) -> Result<(), StorageError> {
+    debug_assert!(matches!(status, OpStatus::Succeeded | OpStatus::Failed));
+    let updated = sqlx::query!(
+        r#"
+        UPDATE operations
+           SET status = $2, response = $3, external_id = COALESCE($4, external_id),
+               finished_at = now()
+         WHERE id = $1 AND status IN ('unknown', 'failed')
+        "#,
+        id,
+        status.as_db_str(),
+        response,
+        external_id,
+    )
+    .execute(conn)
+    .await
+    .map_err(|e| match unique_violation(&e) {
+        Some("operations_check_issued_once") => StorageError::CheckAlreadyUsed(id),
+        _ => StorageError::Db(e),
+    })?
+    .rows_affected();
+    if updated == 1 {
+        Ok(())
+    } else {
+        Err(StorageError::OperationState(id))
+    }
+}
+
 /// Исход остаётся неизвестным, но автоматика больше не сверяет: операция ждёт человека
 /// (`finished_at` отмечает, когда сдались). Статус `unknown` по-прежнему держит уникальные
 /// индексы — повторной выплаты не будет.

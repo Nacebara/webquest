@@ -5,8 +5,8 @@
 //!   резерва — возврат всей суммы чеком на платформе входа;
 //! - иначе выплата: комиссия по рычагу резерва, выплата вниз до шага платформы.
 
-use domain::pricing::{self, FeePolicy, Lever, PricingError};
-use domain::{Asset, Decimal, Money, Step};
+use domain::pricing::{self, PricingError};
+use domain::{Decimal, Money, Step};
 use sqlx::PgConnection;
 use storage::orders::OrderRow;
 
@@ -36,20 +36,21 @@ pub(crate) async fn decide(
 ) -> Result<Decision, EngineError> {
     if storage::settings::flag_on(&mut *conn, "kill_switch_payouts").await? {
         return Ok(Decision::Manual {
-            reason: "kill switch: payouts are stopped".to_owned(),
+            reason: "стоп-кран: выплаты остановлены".to_owned(),
         });
     }
     if received.asset() != order.asset {
         return Ok(Decision::Manual {
             reason: format!(
-                "check in {} for a {} order",
+                "чек в {}, а заявка в {}",
                 received.asset().code(),
                 order.asset.code()
             ),
         });
     }
     let amount = received.amount();
-    let dir = storage::directions::get(&mut *conn, order.direction).await?;
+    let eff = storage::user_terms::effective(&mut *conn, order.direction, order.user_id).await?;
+    let dir = &eff.dir;
     let max = if storage::orders::is_new_user(&mut *conn, order.user_id).await? {
         dir.new_user_max_amount
     } else {
@@ -69,18 +70,15 @@ pub(crate) async fn decide(
     let held = storage::holds::active(&mut *conn, order.id)
         .await?
         .map_or(Decimal::ZERO, |(_, _, amount)| amount);
-    let fee_pct = fee_pct(&mut *conn, &dir, wallet, order.asset, held).await?;
+    // Чек уже зачислен на кошелёк входа: объём встречного потока — как до заявки.
+    let fee =
+        crate::fees::fee_decision(&mut *conn, &eff, wallet, order.asset, amount, amount, held)
+            .await?;
+    let fee_pct = fee.policy.average_pct(amount)?;
     let step = Step::from_decimal(
         storage::directions::payout_step(&mut *conn, target, order.asset).await?,
     )?;
-    let quote = match pricing::quote_check_exchange(
-        amount,
-        FeePolicy {
-            fee_pct,
-            min_fee: dir.min_fee,
-        },
-        step,
-    ) {
+    let quote = match pricing::quote_check_exchange(amount, fee.policy, step) {
         Ok(q) => q,
         Err(PricingError::NothingToPayOut) => {
             return refund(&mut *conn, order, received, "nothing_to_pay_out").await;
@@ -115,33 +113,11 @@ pub(crate) async fn refund(
     if amount <= Decimal::ZERO || amount < min {
         return Ok(Decision::Manual {
             reason: format!(
-                "refund of {} {} is below the minimum check {min} ({code})",
+                "возврат {} {} меньше минимального чека {min} ({code})",
                 received.amount(),
                 asset.code()
             ),
         });
     }
     Ok(Decision::Refund { code, amount })
-}
-
-/// Комиссия по рычагу резерва целевого кошелька; без заданного целевого резерва — базовая.
-/// Удержание самой заявки (`own_hold`) — не расход резерва: оно ещё не сжато до выплаты.
-pub(crate) async fn fee_pct(
-    conn: &mut PgConnection,
-    dir: &storage::directions::DirectionRow,
-    wallet: i16,
-    asset: Asset,
-    own_hold: Decimal,
-) -> Result<Decimal, EngineError> {
-    let Some(target) = storage::directions::reserve_target(&mut *conn, wallet, asset).await? else {
-        return Ok(dir.fee_pct);
-    };
-    let available = storage::holds::available(&mut *conn, wallet, asset).await? + own_hold;
-    let lever = Lever {
-        base_pct: dir.fee_pct,
-        k_pct: dir.skew_k_pct,
-        floor_pct: dir.fee_floor_pct,
-        cap_pct: dir.fee_cap_pct,
-    };
-    Ok(lever.effective_fee_pct(available, target)?)
 }

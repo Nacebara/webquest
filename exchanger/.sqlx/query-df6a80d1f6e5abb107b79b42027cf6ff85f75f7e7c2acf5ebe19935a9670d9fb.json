@@ -1,0 +1,125 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT direction, fee_pct, min_fee, min_amount, max_amount, newcomer_exempt, note,\n               updated_by, updated_at\n          FROM user_terms WHERE user_id = $1 AND direction = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "direction",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_terms",
+            "name": "direction"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "fee_pct",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "user_terms",
+            "name": "fee_pct"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "min_fee",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "user_terms",
+            "name": "min_fee"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "min_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "user_terms",
+            "name": "min_amount"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "max_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "user_terms",
+            "name": "max_amount"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "newcomer_exempt",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "user_terms",
+            "name": "newcomer_exempt"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "note",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_terms",
+            "name": "note"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_by",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "user_terms",
+            "name": "updated_by"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "user_terms",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "df6a80d1f6e5abb107b79b42027cf6ff85f75f7e7c2acf5ebe19935a9670d9fb"
+}

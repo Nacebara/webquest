@@ -227,7 +227,7 @@ async fn wallet_short_of_funds_goes_to_a_human_and_pauses_the_direction(pool: Pg
     e.drain().await;
     let (order, d) = e.order(order.id).await;
     assert_eq!(order.state, OrderState::ManualReview);
-    assert!(d.manual_reason.unwrap().contains("not enough funds"));
+    assert!(d.manual_reason.unwrap().contains("не хватает денег"));
     assert!(e.world.checks_created_by(e.ub).is_empty());
     let mut conn = e.pool.acquire().await.unwrap();
     let dir = storage::directions::get(&mut conn, Direction::CbToXrCheck)
@@ -295,7 +295,7 @@ async fn silent_activation_is_asked_again_with_the_same_random_id(pool: PgPool) 
     assert!(
         d.manual_reason
             .unwrap()
-            .contains("activation outcome unknown")
+            .contains("исход активации неизвестен")
     );
     let activation = &e.ops(order.id).await[0];
     assert_eq!(activation.status, OpStatus::Unknown);
@@ -500,7 +500,7 @@ async fn operation_of_another_wallet_account_goes_to_a_human(pool: PgPool) {
     assert!(
         d.manual_reason
             .unwrap()
-            .contains("belongs to wallet account")
+            .contains("принадлежит аккаунту кошелька")
     );
     assert_eq!(
         e.world.balance(e.ub, CB, Asset::Usdt),
@@ -616,7 +616,7 @@ async fn a_repeated_already_activated_reply_never_writes_the_money_off(pool: PgP
     assert!(
         d.manual_reason
             .unwrap()
-            .contains("earlier attempt may have won")
+            .contains("возможно, его забрала наша прежняя попытка")
     );
     assert_eq!(
         e.world.balance(e.ub, CB, Asset::Usdt),
@@ -712,7 +712,7 @@ async fn restricted_account_pauses_the_platform_and_calls_a_human(pool: PgPool) 
     e.drain().await;
     let (order, d) = e.order(order.id).await;
     assert_eq!(order.state, OrderState::ManualReview);
-    assert!(d.manual_reason.unwrap().contains("cannot act"));
+    assert!(d.manual_reason.unwrap().contains("не может действовать"));
     let mut conn = e.pool.acquire().await.unwrap();
     for dir in [Direction::CbToXrCheck, Direction::XrToCbCheck] {
         let d = storage::directions::get(&mut conn, dir).await.unwrap();
@@ -743,6 +743,6 @@ async fn settlement_error_keeps_the_intake_and_calls_a_human(pool: PgPool) {
     let (order, d) = e.order(order.id).await;
     assert_eq!(order.state, OrderState::ManualReview);
     assert_eq!(d.intake_amount, Some(dec!(30)), "зачисление не откатилось");
-    assert!(d.manual_reason.unwrap().contains("settlement failed"));
+    assert!(d.manual_reason.unwrap().contains("расчёт не удался"));
     e.assert_books_match().await;
 }

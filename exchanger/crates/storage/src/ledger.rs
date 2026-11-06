@@ -117,6 +117,21 @@ pub async fn post(
     Ok(tx_id)
 }
 
+/// Есть ли у заявки проводка этого вида (`intake` — деньги клиента у нас).
+pub async fn order_has(
+    conn: &mut PgConnection,
+    order_id: i64,
+    kind: domain::ledger::TxKind,
+) -> Result<bool, StorageError> {
+    Ok(sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM ledger_transactions WHERE order_id = $1 AND kind = $2) AS "exists!""#,
+        order_id,
+        kind.as_db_str()
+    )
+    .fetch_one(conn)
+    .await?)
+}
+
 /// Строка представления `wallet_available` (SPEC §3.2).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WalletBalance {

@@ -317,6 +317,40 @@ pub async fn details(conn: &mut PgConnection, id: i64) -> Result<OrderDetails, S
     })
 }
 
+/// Оператор подтвердил приход, которого автоматика не увидела: записать сумму прихода без
+/// смены состояния (заявка остаётся на разборе). Версия растёт — параллельное решение по той же
+/// заявке получит `Conflict`.
+pub async fn set_intake(
+    conn: &mut PgConnection,
+    order: &OrderRow,
+    intake_amount: Decimal,
+    intake_asset: Asset,
+) -> Result<OrderRow, StorageError> {
+    let version = sqlx::query_scalar!(
+        r#"
+        UPDATE orders
+           SET intake_amount = $3, intake_asset = $4, received_at = COALESCE(received_at, now()),
+               version = version + 1, updated_at = now()
+         WHERE id = $1 AND version = $2 AND state = 'MANUAL_REVIEW'
+        RETURNING version
+        "#,
+        order.id,
+        order.version,
+        intake_amount,
+        intake_asset.code(),
+    )
+    .fetch_optional(conn)
+    .await?
+    .ok_or(StorageError::Conflict {
+        id: order.id,
+        expected: order.version,
+    })?;
+    Ok(OrderRow {
+        version,
+        ..order.clone()
+    })
+}
+
 /// Клиент ещё не завершил ни одной заявки (для него — `new_user_max_amount`).
 pub async fn is_new_user(conn: &mut PgConnection, user_id: i64) -> Result<bool, StorageError> {
     let done = sqlx::query_scalar!(

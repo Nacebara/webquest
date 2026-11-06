@@ -1,0 +1,124 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.intake_amount,\n               o.payout_amount, o.manual_reason,\n               COALESCE((SELECT max(t.at) FROM order_transitions t\n                          WHERE t.order_id = o.id AND t.to_state = 'MANUAL_REVIEW'),\n                        o.updated_at) AS \"since!\",\n               (SELECT a.staff_id FROM admin_audit a\n                 WHERE a.target_type = 'order' AND a.target_id = o.id::TEXT\n                   AND a.action = 'order.take'\n                 ORDER BY a.id DESC LIMIT 1) AS taken_by\n          FROM orders o\n         WHERE o.state = 'MANUAL_REVIEW'\n         ORDER BY 9\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "public_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "public_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "direction",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "direction"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "asset",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "asset"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "intake_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "intake_amount"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "payout_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "payout_amount"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "manual_reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "manual_reason"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "since!",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 9,
+        "name": "taken_by",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "1cf39242b14d56be285425d3e9982c567223799e8851d2523c6ca32611bb58db"
+}

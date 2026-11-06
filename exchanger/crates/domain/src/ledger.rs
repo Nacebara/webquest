@@ -66,6 +66,8 @@ pub enum Revenue {
     Fee,
     Excess,
     FxBuffer,
+    /// Деньги клиента оставлены по решению владельца («Закрыть без выплаты», SPEC П9).
+    Retained,
 }
 
 impl Revenue {
@@ -74,6 +76,7 @@ impl Revenue {
             Revenue::Fee => "fee",
             Revenue::Excess => "excess",
             Revenue::FxBuffer => "fx_buffer",
+            Revenue::Retained => "retained",
         }
     }
 }
@@ -327,6 +330,19 @@ pub fn excess_kept(asset: Asset, amount: Decimal) -> Result<Posting, PostingErro
     )
 }
 
+/// «Закрыть без выплаты» по деньгам, которые пришли: Дт payable / Кт revenue:retained.
+/// Только владелец, с причиной (`ledger_transactions.memo` обязателен для этого вида).
+pub fn manual_close(asset: Asset, amount: Decimal) -> Result<Posting, PostingError> {
+    let a = positive(amount)?;
+    Posting::new(
+        TxKind::ManualClose,
+        vec![
+            line(AccountCode::payable(asset), asset, a),
+            line(AccountCode::revenue(Revenue::Retained, asset), asset, -a),
+        ],
+    )
+}
+
 /// Взнос оборотного капитала: Дт кошелёк / Кт equity:capital.
 pub fn capital_in(
     platform: Platform,
@@ -470,6 +486,7 @@ mod tests {
                 refund(p, Asset::Usdt, a),
                 excess_refund(p, Asset::Usdt, a),
                 excess_kept(Asset::Usdt, a),
+                manual_close(Asset::Usdt, a),
                 capital_in(p, Asset::Usdt, a),
                 invoice_paid(p, Asset::Usdt, big, small),
                 payout(p, Asset::Usdt, big + small, big, small),

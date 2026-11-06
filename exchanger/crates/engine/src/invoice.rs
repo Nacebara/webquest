@@ -21,7 +21,7 @@
 
 use chrono::Utc;
 use domain::fsm::{Event, Flow, MoneyRole, OpKind, OrderState, Settlement};
-use domain::pricing::{self, FeePolicy};
+use domain::pricing;
 use domain::{Asset, Decimal, Direction, Money, Platform, Step, ledger};
 use parsers::{InvoiceCard, InvoiceStatus, LinkKind, WalletLink};
 use sqlx::PgConnection;
@@ -30,7 +30,7 @@ use storage::ledger::PostingRefs;
 use storage::orders::{NewOrder, OrderPatch, OrderRow};
 
 use crate::effects::{EffectCtx, create_op, transit};
-use crate::settle::{Decision, fee_pct, refund};
+use crate::settle::{Decision, refund};
 use crate::submit::{SubmitReject, Submitted, daily_limit, setting_decimal, spendable};
 use crate::{Engine, EngineError};
 
@@ -267,33 +267,38 @@ impl Engine {
         if let Some(reason) = prechecks(&mut tx, user_id, direction, link).await? {
             return Ok(InvoiceSubmitted::Rejected(reason));
         }
-        let dir = storage::directions::get(&mut tx, direction).await?;
+        let eff = storage::user_terms::effective(&mut tx, direction, user_id).await?;
+        let dir = &eff.dir;
         let target = direction.target();
         let (wallet_id, _) = storage::wallets::active(&mut tx, target)
             .await?
             .ok_or(EngineError::NoWalletAccount(target))?;
         storage::holds::lock_wallet(&mut tx, wallet_id).await?;
         let available = spendable(&mut tx, &self.cfg, target, wallet_id, asset).await?;
-        let fee_pct = fee_pct(&mut tx, &dir, wallet_id, asset, Decimal::ZERO).await?;
+        let fee = crate::fees::fee_decision(
+            &mut tx,
+            &eff,
+            wallet_id,
+            asset,
+            amount,
+            Decimal::ZERO,
+            Decimal::ZERO,
+        )
+        .await?;
+        let fee_pct = fee.policy.average_pct(amount)?;
         // `X` клиент присылает чеком платформы входа: вверх до её шага.
         let step = Step::from_decimal(
             storage::directions::payout_step(&mut tx, direction.source(), asset).await?,
         )?;
-        let quote = pricing::quote_invoice_payment(
-            amount,
-            FeePolicy {
-                fee_pct,
-                min_fee: dir.min_fee,
-            },
-            step,
-        )?;
+        let quote = pricing::quote_invoice_payment(amount, fee.policy, step)?;
         let new_user = storage::orders::is_new_user(&mut tx, user_id).await?;
         let per_order = if new_user {
             dir.new_user_max_amount
         } else {
             dir.max_amount
         };
-        let daily_left = match daily_limit(&mut tx, new_user).await? {
+        let limited = new_user && eff.newcomer_limit;
+        let daily_left = match daily_limit(&mut tx, user_id, limited).await? {
             Some(limit) => Some(limit - storage::orders::user_volume_24h(&mut tx, user_id).await?),
             None => None,
         };
@@ -481,7 +486,7 @@ impl Engine {
             return Ok(order);
         }
         let manual = if storage::settings::flag_on(&mut *conn, "kill_switch_payouts").await? {
-            Some("kill switch: payouts are stopped".to_owned())
+            Some("стоп-кран: выплаты остановлены".to_owned())
         } else if !same_asset {
             Some(format!(
                 "check of {} {} for a {} invoice order",

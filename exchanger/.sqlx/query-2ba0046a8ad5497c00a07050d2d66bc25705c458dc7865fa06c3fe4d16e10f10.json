@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT m.entities->>'via_bot' AS via_bot, m.is_outgoing, m.text, m.received_at\n          FROM wallet_messages m JOIN operations op ON op.id = m.operation_id\n         WHERE op.order_id = $1\n         ORDER BY m.id DESC\n         LIMIT 12\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "via_bot",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "is_outgoing",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "wallet_messages",
+            "name": "is_outgoing"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "text",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "wallet_messages",
+            "name": "text"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "received_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "wallet_messages",
+            "name": "received_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2ba0046a8ad5497c00a07050d2d66bc25705c458dc7865fa06c3fe4d16e10f10"
+}

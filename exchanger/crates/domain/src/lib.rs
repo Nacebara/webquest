@@ -3,6 +3,7 @@
 
 pub mod asset;
 pub mod direction;
+pub mod fees;
 pub mod fsm;
 pub mod ledger;
 pub mod money;

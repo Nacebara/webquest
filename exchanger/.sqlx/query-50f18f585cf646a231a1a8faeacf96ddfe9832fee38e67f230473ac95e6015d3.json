@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE operations\n           SET status = $2, response = $3, external_id = COALESCE($4, external_id),\n               finished_at = now()\n         WHERE id = $1 AND status IN ('unknown', 'failed')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "50f18f585cf646a231a1a8faeacf96ddfe9832fee38e67f230473ac95e6015d3"
+}

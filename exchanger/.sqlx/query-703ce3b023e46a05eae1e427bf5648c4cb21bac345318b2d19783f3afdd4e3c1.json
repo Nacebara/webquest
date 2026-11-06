@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO alerts (level, topic, dedup_key, title, payload)\n        VALUES ($1, $2, $3, $4, $5)\n        ON CONFLICT (dedup_key) WHERE acked_at IS NULL DO UPDATE\n           SET count = alerts.count + 1, last_at = now(), payload = EXCLUDED.payload,\n               level = CASE\n                   WHEN array_position(ARRAY['info', 'notice', 'warn', 'critical'], EXCLUDED.level)\n                      > array_position(ARRAY['info', 'notice', 'warn', 'critical'], alerts.level)\n                   THEN EXCLUDED.level ELSE alerts.level END\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "703ce3b023e46a05eae1e427bf5648c4cb21bac345318b2d19783f3afdd4e3c1"
+}

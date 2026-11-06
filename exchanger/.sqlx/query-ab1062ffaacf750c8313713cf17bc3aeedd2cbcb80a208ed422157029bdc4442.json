@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE directions SET auto_paused = FALSE, pause_reason = NULL, updated_by = $2,\n                              updated_at = now()\n         WHERE code = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ab1062ffaacf750c8313713cf17bc3aeedd2cbcb80a208ed422157029bdc4442"
+}

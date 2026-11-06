@@ -20,6 +20,14 @@ pub async fn flag_on(conn: &mut PgConnection, key: &str) -> Result<bool, Storage
         .unwrap_or(false))
 }
 
+/// Флаг вида `{"on": …}` со значением по умолчанию, если настройки нет или она без `on`.
+pub async fn flag(conn: &mut PgConnection, key: &str, default: bool) -> Result<bool, StorageError> {
+    Ok(get(conn, key)
+        .await?
+        .and_then(|v| v.get("on").and_then(Value::as_bool))
+        .unwrap_or(default))
+}
+
 pub async fn set(
     conn: &mut PgConnection,
     key: &str,

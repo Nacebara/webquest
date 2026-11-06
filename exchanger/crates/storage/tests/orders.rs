@@ -48,10 +48,7 @@ async fn check_exchange_lifecycle_posts_balanced_ledger(pool: PgPool) {
 
     let quote = quote_check_exchange(
         dec!(100),
-        FeePolicy {
-            fee_pct: dec!(2.5),
-            min_fee: dec!(0.10),
-        },
+        FeePolicy::flat(dec!(2.5), dec!(0.10)),
         Step::from_dp(2).unwrap(),
     )
     .unwrap();

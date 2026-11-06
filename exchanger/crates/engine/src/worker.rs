@@ -102,7 +102,7 @@ impl Engine {
             done += 1;
             if let Err(e) = self.execute(&op).await {
                 tracing::error!(op = op.id, key = %op.idempotency_key, error = %e, "operation handling failed");
-                self.park(&op, &format!("engine error: {e}")).await;
+                self.park(&op, &format!("ошибка движка: {e}")).await;
             }
         }
         Ok(done)
@@ -121,7 +121,7 @@ impl Engine {
             self.park(
                 op,
                 &format!(
-                    "operation belongs to wallet account {:?}, active is {:?}",
+                    "операция принадлежит аккаунту кошелька {:?}, активен {:?}",
                     op.wallet_account_id, active
                 ),
             )
@@ -137,7 +137,7 @@ impl Engine {
                     &mut conn,
                     op.id,
                     at,
-                    "kill switch: payouts are stopped",
+                    "стоп-кран: выплаты остановлены",
                 )
                 .await?;
                 return Ok(());
@@ -181,9 +181,9 @@ impl Engine {
         });
         if fatal || stuck {
             let reason = if fatal {
-                format!("wallet account cannot act: {e}")
+                format!("аккаунт кошелька не может действовать: {e}")
             } else {
-                format!("wallet action not performed for too long: {e}")
+                format!("действие в кошельке слишком долго не выполняется: {e}")
             };
             {
                 let mut conn = self.pool.acquire().await?;
@@ -409,8 +409,8 @@ impl Engine {
                 )
                 .await?;
                 let reason = format!(
-                    "the client sent a check in {code}, not USDT: {amount} {code} is in the wallet and \
-                     not in the ledger; return it to the client by hand"
+                    "клиент прислал чек в {code}, а не в USDT: {amount} {code} в кошельке, но не в \
+                     леджере; верните их клиенту вручную"
                 );
                 let patch = OrderPatch {
                     manual_reason: Some(&reason),
@@ -450,9 +450,9 @@ impl Engine {
                 )
                 .await?;
                 let reason = if repeated_loss {
-                    "a repeated activation says the check is gone: our earlier attempt may have won; check the wallet"
+                    "повторная активация говорит, что чека уже нет: возможно, его забрала наша прежняя попытка — проверьте кошелёк"
                 } else {
-                    "activation outcome unknown: check the wallet chat and balance"
+                    "исход активации неизвестен: проверьте чат кошелька и баланс"
                 };
                 let patch = OrderPatch {
                     manual_reason: Some(reason),
@@ -473,7 +473,7 @@ impl Engine {
                         &mut tx,
                         op.platform,
                         Side::Source,
-                        "unrecognised wallet reply to a check activation",
+                        "незнакомый ответ кошелька на активацию чека",
                     )
                     .await?;
                     tracing::error!(
@@ -502,7 +502,7 @@ impl Engine {
             Ok(d) => d,
             Err(e @ (EngineError::Storage(_) | EngineError::Db(_))) => return Err(e),
             Err(e) => Decision::Manual {
-                reason: format!("settlement failed: {e}"),
+                reason: format!("расчёт не удался: {e}"),
             },
         };
         let (event, patch, reason) = match &decision {
@@ -568,7 +568,7 @@ impl Engine {
                 self.fail_issue(
                     op,
                     OpStatus::Failed,
-                    "wallet has not enough funds for the check",
+                    "в кошельке не хватает денег на чек",
                     true,
                 )
                 .await
@@ -777,7 +777,7 @@ impl Engine {
                 self.fail_issue(
                     op,
                     OpStatus::Unknown,
-                    "check issue outcome unknown and no check found: verify in the wallet",
+                    "исход создания чека неизвестен и чек не найден: проверьте в кошельке",
                     true,
                 )
                 .await
@@ -786,7 +786,7 @@ impl Engine {
                 self.fail_issue(
                     op,
                     OpStatus::Unknown,
-                    &format!("check issue outcome unknown, reconciliation impossible: {e}"),
+                    &format!("исход создания чека неизвестен, сверка невозможна: {e}"),
                     true,
                 )
                 .await
@@ -842,7 +842,7 @@ impl Engine {
                 OpStatus::Failed,
                 Event::InvoicePayNeedsHuman,
                 Some(format!(
-                    "the invoice now asks {} {}, not its amount: check it",
+                    "счёт теперь просит {} {}, а не свою сумму: проверьте его",
                     due.amount(),
                     due.asset().code()
                 )),
@@ -850,27 +850,27 @@ impl Engine {
             PayOutcome::Expired => (
                 OpStatus::Failed,
                 Event::InvoiceUnpayable,
-                Some("invoice expired".to_owned()),
+                Some("счёт истёк".to_owned()),
             ),
             PayOutcome::AlreadyPaid => (
                 OpStatus::Failed,
                 Event::InvoicePayNeedsHuman,
-                Some("invoice is already paid: find out by whom".to_owned()),
+                Some("счёт уже оплачен: выясните, кем".to_owned()),
             ),
             PayOutcome::InsufficientFunds => (
                 OpStatus::Failed,
                 Event::InvoicePayNeedsHuman,
-                Some("wallet has not enough funds for the invoice".to_owned()),
+                Some("в кошельке не хватает денег на счёт".to_owned()),
             ),
             PayOutcome::NeedsHuman { reason } => (
                 OpStatus::Failed,
                 Event::InvoicePayNeedsHuman,
-                Some(format!("pay manually: {reason}")),
+                Some(format!("оплатите вручную: {reason}")),
             ),
             PayOutcome::Unknown { detail } => (
                 OpStatus::Unknown,
                 Event::InvoicePayNeedsHuman,
-                Some(format!("payment outcome unknown: {detail}")),
+                Some(format!("исход оплаты неизвестен: {detail}")),
             ),
         };
         let mut tx = self.pool.begin().await?;
@@ -955,7 +955,7 @@ impl Engine {
                 &mut tx,
                 op.platform,
                 Side::Target,
-                "invoice wallet has not enough funds",
+                "в кошельке не хватает денег на оплату счёта",
             )
             .await?;
         }
@@ -996,7 +996,7 @@ impl Engine {
             };
             if let Err(e) = result {
                 tracing::error!(op = op.id, error = %e, "reconciliation failed");
-                self.park(&op, &format!("reconciliation failed: {e}")).await;
+                self.park(&op, &format!("сверка не удалась: {e}")).await;
             }
         }
         Ok(())
@@ -1032,7 +1032,8 @@ impl Engine {
             tracing::warn!(op = op.id, key = %op.idempotency_key, kind = op.kind.as_db_str(), "recovering an interrupted operation");
             if let Err(e) = self.recover_one(&op).await {
                 tracing::error!(op = op.id, error = %e, "recovery failed");
-                self.park(&op, &format!("recovery failed: {e}")).await;
+                self.park(&op, &format!("восстановление не удалось: {e}"))
+                    .await;
             }
         }
         Ok(())

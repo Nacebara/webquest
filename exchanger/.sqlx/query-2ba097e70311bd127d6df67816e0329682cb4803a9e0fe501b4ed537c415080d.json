@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT count(*) FILTER (WHERE state = 'COMPLETED') AS \"completed!\",\n               count(*) FILTER (WHERE state = 'REFUNDED')  AS \"refunded!\",\n               COALESCE(sum(intake_amount) FILTER (WHERE state = 'COMPLETED'), 0) AS \"turnover!\",\n               COALESCE(sum(fee_amount) FILTER (WHERE state = 'COMPLETED'), 0)    AS \"fees!\"\n          FROM orders WHERE finished_at >= $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "completed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "refunded!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "turnover!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "fees!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "2ba097e70311bd127d6df67816e0329682cb4803a9e0fe501b4ed537c415080d"
+}

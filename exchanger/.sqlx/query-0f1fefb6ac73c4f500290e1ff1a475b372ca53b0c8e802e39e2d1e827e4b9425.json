@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE directions\n           SET fee_pct = $2, min_fee = $3, skew_k_pct = $4, fee_floor_pct = $5, fee_cap_pct = $6,\n               min_amount = $7, max_amount = $8, new_user_max_amount = $9, fiat_buffer_pct = $10,\n               fee_mode = $11, fee_tiers = $12, updated_by = $13, updated_at = now()\n         WHERE code = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Text",
+        "Jsonb",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0f1fefb6ac73c4f500290e1ff1a475b372ca53b0c8e802e39e2d1e827e4b9425"
+}

@@ -25,6 +25,21 @@ pub(crate) struct EffectCtx {
     /// Сколько пришло этим чеком. Оплата счёта может собираться из нескольких чеков: в
     /// `intake_amount` заявки — сумма всех, а проводка `intake` — только этого.
     pub intake_delta: Option<Decimal>,
+    /// Кто сделал переход: `None` — система; сотрудник — решение с пульта.
+    pub actor: Option<Actor>,
+}
+
+impl EffectCtx {
+    fn actor(&self) -> Actor {
+        self.actor.unwrap_or(Actor::System)
+    }
+
+    fn created_by(&self) -> Option<String> {
+        match self.actor() {
+            Actor::Staff(id) => Some(format!("staff:{id}")),
+            _ => None,
+        }
+    }
 }
 
 fn need(value: Option<Decimal>, what: &str, order: &OrderRow) -> Result<Decimal, EngineError> {
@@ -42,8 +57,7 @@ pub(crate) async fn transit(
     ctx: EffectCtx,
 ) -> Result<(OrderRow, Vec<i64>), EngineError> {
     let (updated, transition) =
-        storage::orders::apply_event(&mut *conn, order, event, patch, Actor::System, reason)
-            .await?;
+        storage::orders::apply_event(&mut *conn, order, event, patch, ctx.actor(), reason).await?;
     let details = storage::orders::details(&mut *conn, order.id).await?;
     let mut ops = Vec::new();
     for effect in transition.effects {
@@ -65,7 +79,7 @@ pub(crate) async fn transit(
             Effect::Hold(HoldAction::Consume) => {
                 storage::holds::close(&mut *conn, order.id, true).await?;
             }
-            Effect::Post(kind) => post(&mut *conn, &updated, &details, kind, ctx).await?,
+            Effect::Post(kind) => post(&mut *conn, &updated, &details, kind, ctx, reason).await?,
             Effect::Operation { kind, role } => {
                 ops.push(create_op(&mut *conn, &updated, &details, kind, role).await?);
             }
@@ -84,7 +98,9 @@ async fn post(
     d: &OrderDetails,
     kind: PostingKind,
     ctx: EffectCtx,
+    reason: Option<&str>,
 ) -> Result<(), EngineError> {
+    let created_by = ctx.created_by();
     let source = order.direction.source();
     let target = order.direction.target();
     let asset = order.asset;
@@ -132,11 +148,30 @@ async fn post(
                 need(d.invoice_amount, "invoice amount", order)?,
             )?
         }
+        // «Закрыть без выплаты» (только владелец): пришедшие деньги клиента — в доход по его
+        // решению, с причиной. Ничего не пришло — проводить нечего.
         PostingKind::ManualClose => {
-            return Err(EngineError::Invariant(format!(
-                "order {}: manual close posting is done by the operator tool",
-                order.id
-            )));
+            let received =
+                storage::ledger::order_has(&mut *conn, order.id, ledger::TxKind::Intake).await?;
+            let (true, Some(amount)) = (received, d.intake_amount) else {
+                return Ok(());
+            };
+            let memo = reason.filter(|r| !r.trim().is_empty()).ok_or_else(|| {
+                EngineError::Invariant(format!("order {}: manual close needs a reason", order.id))
+            })?;
+            let posting = ledger::manual_close(d.intake_asset.unwrap_or(asset), amount)?;
+            storage::ledger::post(
+                conn,
+                &posting,
+                PostingRefs {
+                    order_id: Some(order.id),
+                    memo: Some(memo),
+                    created_by: created_by.as_deref(),
+                    ..Default::default()
+                },
+            )
+            .await?;
+            return Ok(());
         }
     };
     storage::ledger::post(
@@ -145,6 +180,7 @@ async fn post(
         PostingRefs {
             order_id: Some(order.id),
             operation_id: ctx.cause_op,
+            created_by: created_by.as_deref(),
             ..Default::default()
         },
     )

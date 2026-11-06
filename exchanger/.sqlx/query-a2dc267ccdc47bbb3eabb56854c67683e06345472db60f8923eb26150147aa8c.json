@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE staff SET max_manual_payout = $2 WHERE tg_user_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Numeric"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a2dc267ccdc47bbb3eabb56854c67683e06345472db60f8923eb26150147aa8c"
+}

@@ -15,7 +15,9 @@
 //! ([`effects`]); выплата — одна попытка, неясный исход — сверка или `MANUAL_REVIEW`.
 
 mod effects;
+pub mod fees;
 mod invoice;
+pub mod operator;
 mod settle;
 mod submit;
 mod worker;
@@ -34,6 +36,7 @@ use userbot::WalletBot;
 pub use invoice::{
     InvoiceIssue, InvoiceReject, InvoiceSubmitted, direction_for_invoice, payable_amount,
 };
+pub use operator::{OperatorDecision, OperatorError, OperatorRequest, Refusal};
 pub use submit::{SubmitReject, Submitted};
 
 /// Настройки движка.
@@ -198,6 +201,7 @@ impl Engine {
                 AccountCode::payable(asset),
                 AccountCode::revenue(Revenue::Fee, asset),
                 AccountCode::revenue(Revenue::Excess, asset),
+                AccountCode::revenue(Revenue::Retained, asset),
             ] {
                 storage::ledger::ensure_account(&mut tx, &code, asset, None).await?;
             }
@@ -235,6 +239,9 @@ impl Engine {
                 () = cancel.cancelled() => break,
                 _ = tick.tick() => {}
                 _ = housekeeping.tick() => {
+                    if let Err(e) = self.promo_tick().await {
+                        tracing::warn!(error = %e, "rebalance promo tick failed");
+                    }
                     self.expire_quotes().await?;
                     self.resolve_unknown().await?;
                     self.recover_dispatched(Some(self.cfg.stale_after)).await?;

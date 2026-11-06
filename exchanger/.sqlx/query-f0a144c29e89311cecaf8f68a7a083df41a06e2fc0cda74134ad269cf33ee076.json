@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS (\n            SELECT 1 FROM user_terms\n             WHERE user_id = $1\n               AND (fee_pct IS NOT NULL OR min_fee IS NOT NULL OR min_amount IS NOT NULL\n                    OR max_amount IS NOT NULL OR newcomer_exempt)\n        ) AS \"exists!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f0a144c29e89311cecaf8f68a7a083df41a06e2fc0cda74134ad269cf33ee076"
+}
