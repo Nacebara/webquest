@@ -85,8 +85,16 @@ section.view { display: grid; gap: 34px; padding-top: 26px; }
 h2 { font: 700 22px/1.15 var(--display); letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
 h2 small { font: 500 13px/1 var(--mono); color: var(--muted); letter-spacing: 0; margin-left: 8px; vertical-align: 3px; }
 .block > header p { margin: 0; color: var(--muted); }
-.grid { display: grid; gap: 22px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); align-items: start; }
-.grid.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); }
+.grid { display: grid; gap: 22px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 390px), 1fr)); align-items: start; }
+.grid.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); }
+.ctl { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.ctl table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 760px; }
+.ctl th, .ctl td { text-align: left; vertical-align: top; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+.ctl thead th { font: 600 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.ctl tbody th { font-weight: 600; white-space: nowrap; }
+.ctl td:last-child { color: var(--muted); }
+.ctl tr:last-child > * { border-bottom: 0; }
+.etile.big .ce { width: 88px; height: 88px; }
 figure.card { margin: 0; display: grid; gap: 10px; min-width: 0; }
 figcaption { display: grid; gap: 3px; padding-inline: 4px; }
 figcaption b { font: 600 15px/1.3 var(--body); }
@@ -104,7 +112,7 @@ figcaption span { color: var(--muted); font-size: 13.5px; }
 .chip.play { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
 /* ── Телефон ─────────────────────────────────────────── */
-.phone { border-radius: 22px; overflow: hidden; background: var(--tg-bg); color: var(--tg-fg); font: 15px/1.38 var(--tg-font); border: 1px solid var(--line); box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 12px 30px -18px rgba(10,20,40,.35); max-width: 420px; width: 100%; justify-self: center; display: flex; flex-direction: column; }
+.phone { border-radius: 22px; overflow: hidden; background: var(--tg-bg); color: var(--tg-fg); font: 16px/1.36 var(--tg-font); border: 1px solid var(--line); box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 12px 30px -18px rgba(10,20,40,.35); max-width: 390px; width: 100%; justify-self: center; display: flex; flex-direction: column; }
 .ph-head { background: var(--tg-head); color: var(--tg-head-fg); display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--tg-line); }
 .ph-head .back { color: var(--tg-link); font-size: 22px; line-height: 1; width: 14px; }
 .av { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none; background: linear-gradient(135deg, #1DBB80, #0C8A5C); }
@@ -118,6 +126,8 @@ figcaption span { color: var(--muted); font-size: 13.5px; }
 .msg { display: flex; flex-direction: column; gap: 4px; max-width: 88%; align-self: flex-start; min-width: 0; }
 .msg.user { align-self: flex-end; align-items: flex-end; }
 .msg.rich { max-width: 96%; width: 96%; }
+.msg.haskb { width: 88%; }
+.msg.rich.haskb { width: 96%; }
 .msg.big { max-width: none; }
 .bub { background: var(--tg-in); border-radius: 14px 14px 14px 5px; padding: 7px 10px 7px 11px; position: relative; overflow-wrap: anywhere; min-width: 0; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
 .msg.user .bub { background: var(--tg-out); border-radius: 14px 14px 5px 14px; }
@@ -134,14 +144,14 @@ figcaption span { color: var(--muted); font-size: 13.5px; }
 .bub a { color: var(--tg-link); text-decoration: none; }
 .bub blockquote { margin: 6px 0 2px; padding: 5px 26px 5px 10px; border-left: 3px solid var(--tg-link); background: var(--tg-quote); border-radius: 4px 8px 8px 4px; position: relative; }
 .bub blockquote.x::after { content: "⌄"; position: absolute; right: 8px; bottom: 4px; color: var(--tg-link); font-size: 14px; line-height: 1; }
-.bub blockquote.x.closed { max-height: 3.1em; overflow: hidden; }
+.bub blockquote.x.closed { max-height: 4.25em; overflow: hidden; }
 .bub mark { background: var(--tg-mark); color: inherit; border-radius: 3px; padding: 0 2px; }
 .bub .sp { background: repeating-linear-gradient(45deg, var(--tg-mut) 0 2px, transparent 2px 4px); color: transparent; border-radius: 3px; }
 .bub .line { display: block; }
 .edited { font-style: normal; }
 .kb { display: grid; gap: 4px; width: 100%; }
 .kb .row { display: flex; gap: 4px; }
-.btn { flex: 1 1 0; min-width: 0; background: var(--tg-btn); color: var(--tg-btn-fg); border-radius: 9px; padding: 9px 8px; font-size: 14px; font-weight: 500; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; position: relative; backdrop-filter: blur(6px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.15; }
+.btn { flex: 1 1 0; min-width: 0; background: var(--tg-btn); color: var(--tg-btn-fg); border-radius: 9px; padding: 10px 8px; font-size: 15px; font-weight: 500; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; position: relative; backdrop-filter: blur(6px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.15; }
 .btn span.t { overflow: hidden; text-overflow: ellipsis; }
 .btn.primary { background: var(--tg-primary); }
 .btn.success { background: var(--tg-success); }
@@ -153,7 +163,7 @@ figcaption span { color: var(--muted); font-size: 13.5px; }
 .sys { align-self: center; background: var(--tg-chip); color: #fff; font-size: 13px; font-weight: 500; padding: 4px 10px; border-radius: 999px; }
 .reply { background: var(--tg-kb); padding: 6px 6px 8px; display: grid; gap: 6px; border-top: 1px solid var(--tg-line); }
 .reply .row { display: flex; gap: 6px; }
-.key { flex: 1 1 0; min-width: 0; background: var(--tg-key); color: var(--tg-key-fg); border-radius: 8px; padding: 10px 6px; text-align: center; font-size: 14px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 1px 0 rgba(0,0,0,.12); white-space: nowrap; overflow: hidden; }
+.key { flex: 1 1 0; min-width: 0; background: var(--tg-key); color: var(--tg-key-fg); border-radius: 8px; padding: 11px 6px; text-align: center; font-size: 15px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 1px 0 rgba(0,0,0,.12); white-space: nowrap; overflow: hidden; }
 .key.primary { background: var(--tg-primary); color: #fff; }
 .key .ce { width: 18px; height: 18px; flex: none; }
 .inputbar { background: var(--tg-input); color: var(--tg-mut); padding: 11px 14px; font-size: 14.5px; border-top: 1px solid var(--tg-line); display: flex; justify-content: space-between; gap: 8px; }
@@ -233,13 +243,14 @@ figcaption span { color: var(--muted); font-size: 13.5px; }
 <div class="wrap">
   <header class="top">
     <div class="brand"><i class="ce" data-k="color/swap">🔁</i><h1>Макеты exch</h1></div>
-    <p class="lead">Клиентский бот и пульт для персонала. Эмодзи на странице — наши TGS: та же анимация, что покажет Telegram. Тексты укорочены: одна-две строки на шаг, детали спрятаны в раскрывающуюся цитату.</p>
+    <p class="lead">Версия 2. Клиент — ваш вариант B в трёх доработках и весь путь в том же стиле. Пульт — ваш вариант А, доработанный, с управлением аккаунтами юзерботов. Эмодзи на странице — наши TGS, как их покажет Telegram.</p>
   </header>
   <nav class="tabs" role="tablist" aria-label="Разделы">
     <a class="tab" role="tab" href="#client" data-view="client">Клиент <span class="n" id="n-client"></span></a>
     <a class="tab" role="tab" href="#admin" data-view="admin">Пульт <span class="n" id="n-admin"></span></a>
+    <a class="tab" role="tab" href="#control" data-view="control">Контроль <span class="n" id="n-control"></span></a>
     <a class="tab" role="tab" href="#emoji" data-view="emoji">Эмодзи <span class="n" id="n-emoji"></span></a>
-    <a class="tab" role="tab" href="#rules" data-view="rules">Правила</a>
+    <a class="tab" role="tab" href="#rules" data-view="rules">Как в Telegram</a>
     <span class="spacer"></span>
     <span class="seg" role="group" aria-label="Тема чатов">
       <button type="button" id="tg-auto" data-tg="auto" aria-pressed="true">Как у страницы</button>
@@ -250,6 +261,7 @@ figcaption span { color: var(--muted); font-size: 13.5px; }
   <main class="stage" id="stage">
     <section class="view" id="view-client" data-view="client"></section>
     <section class="view" id="view-admin" data-view="admin" hidden></section>
+    <section class="view" id="view-control" data-view="control" hidden></section>
     <section class="view" id="view-emoji" data-view="emoji" hidden></section>
     <section class="view" id="view-rules" data-view="rules" hidden></section>
   </main>
@@ -265,7 +277,7 @@ const LABELS = JSON.parse(document.getElementById('emoji-labels').textContent);
 const STR = {};
 const str = (k) => (STR[k] ||= JSON.stringify(EMOJI[k]));
 const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const FB = { done: '✅', err: '❌', warn: '⚠️', process: '🔄', wait: '⏳', swap: '🔁', sending: '📤', refund: '↩️', manual: '🔎', invoice: '🧾', usdt: '💲', fast: '⚡', alarm: '🚨', live: '🟢', confetti: '🎉', dot_ok: '🟢', dot_wait: '🟠', dot_act: '🔴', dot_work: '🔵', dot_closed: '⚪', step_done: '✅', step_now: '🔵', step_todo: '⚪', shield: '🛡', lock: '🔒', kill: '⛔', pause: '⏸', robot: '🤖', vault: '🏦', broadcast: '📣', history: '🕘', rates: '📈', support: '💬', ban: '🚫', limit: '📏', maint: '🛠', flood: '⌛', cb: '🔷', xr: '🚀' };
+const FB = { process_orbit: '🔄', prog_25: '◔', prog_50: '◑', prog_75: '◕', phone: '📱', plug: '🔌', inbox: '📥', server: '🖥', wallet: '👛', done: '✅', err: '❌', warn: '⚠️', process: '🔄', wait: '⏳', swap: '🔁', sending: '📤', refund: '↩️', manual: '🔎', invoice: '🧾', usdt: '💲', fast: '⚡', alarm: '🚨', live: '🟢', confetti: '🎉', dot_ok: '🟢', dot_wait: '🟠', dot_act: '🔴', dot_work: '🔵', dot_closed: '⚪', step_done: '✅', step_now: '🔵', step_todo: '⚪', shield: '🛡', lock: '🔒', kill: '⛔', pause: '⏸', robot: '🤖', vault: '🏦', broadcast: '📣', history: '🕘', rates: '📈', support: '💬', ban: '🚫', limit: '📏', maint: '🛠', flood: '⌛', cb: '🔷', xr: '🚀' };
 
 // ── эмодзи: lottie по требованию, моно перекрашиваем в цвет текста ─────────────
 const io = new IntersectionObserver((entries) => {
@@ -303,12 +315,10 @@ function remountMono() {
 }
 
 // ── разметка сообщений ─────────────────────────────────────────────────────────
-// {key} — цветной эмодзи, {-key} — моно (цвет текста), {seg:mmn} — шкала из сегментов.
-const SEGK = { m: 'seg_mint', b: 'seg_blue', a: 'seg_amber', c: 'seg_coral', e: 'seg_empty', n: 'seg_now' };
+// {key} — цветной эмодзи, {-key} — моно (цвет текста).
 const ce = (k, mono) => `<i class="ce${mono ? ' mono' : ''}" data-k="${mono ? 'mono' : 'color'}/${k}" aria-hidden="true">${FB[k] || '·'}</i>`;
 function fmt(s) {
   return s
-    .replace(/\{seg:([a-z]+)\}/g, (_, p) => `<span class="seg3">${[...p].map((c) => ce(SEGK[c])).join('')}</span>`)
     .replace(/\{(-?)([a-z_]+)\}/g, (_, m, k) => ce(k, !!m))
     .replace(/\n(?=<bqx?>)/g, '').replace(/(<\/bqx?>)\n/g, '$1')
     .replace(/<bq>/g, '<blockquote>').replace(/<\/bq>/g, '</blockquote>')
@@ -339,7 +349,7 @@ function msgHTML(m) {
   if (m.file) inner = `<div class="file"><span class="ico">${ce('export', true)}</span><div><b>${m.file}</b><small>${m.size}</small></div></div>${tm}`;
   else inner = fmt(m.html) + tm;
   const kb = m.kb ? `<div class="kb">${m.kb.map((r) => `<div class="row">${r.map(btn).join('')}</div>`).join('')}</div>` : '';
-  return `<div class="msg ${m.who}${m.rich ? ' rich' : ''}"><div class="bub">${inner}</div>${kb}</div>`;
+  return `<div class="msg ${m.who}${m.rich ? ' rich' : ''}${m.kb ? ' haskb' : ''}"><div class="bub">${inner}</div>${kb}</div>`;
 }
 function phoneHTML(p) {
   const ops = p.bot === 'ops';
@@ -384,49 +394,42 @@ function chartSVG(days) {
 
 // ══ КЛИЕНТ ════════════════════════════════════════════════════════════════════
 const ORD = 'K7M2Q9XR4T';
-const DIRS = [
+const DETAILS = `<bqx>Получено 100.00 · комиссия 2.5&nbsp;% (2.50)\nЗаявка ${ORD} · 9 секунд\nНе пересылайте чек — забрать может любой.</bqx>`;
+const PROG = {
+  'Проверяю': [CK('100', 'cb'), B(`{process} Проверяю чек на <code>100.00</code> USDT`, null, { time: '14:04' })],
+  'Отправляю': [CK('100', 'cb'), B(`{sending} Отправляю <code>97.50</code> USDT в xRocket`, null, { time: '14:04', edited: true })],
+  'Долго': [CK('100', 'cb'), B(`{wait} Отправляю <code>97.50</code> USDT в xRocket\n<i>Дольше обычного. Деньги у меня — ничего делать не нужно.</i>`, null, { time: '14:05', edited: true })],
+};
+const VARIANTS = [
   {
-    id: 'A', name: 'Квитанция', pick: true,
-    idea: 'Одно сообщение, которое заполняется: статус, сумма «было → станет», шкала из трёх сегментов. Детали — в цитате, раскрывается по нажатию.',
-    plus: ['Видно и прогресс, и деньги', 'Шкала читается без слов', 'Подходит и для оплаты счёта'],
-    minus: ['Три эмодзи в строке шкалы — исключение из правила «одно на строку»'],
+    id: 'B1', name: 'Как вы выбрали',
+    idea: 'Вариант B без изменений: строка на шаг, детали — отдельной кнопкой.',
+    plus: ['Самый короткий текст', 'Детали не мешают'],
+    minus: ['«Детали» — лишний запрос к боту и правка сообщения'],
     states: {
-      'Проверяю': [CK('100', 'cb'), B(`{process} <b>Проверяю чек</b>\n<code>100.00</code> → <code>97.50</code> USDT\n{seg:nee}`, [[[ORD, 'copy', '', 'c']]], { time: '14:04' })],
-      'Выплачиваю': [CK('100', 'cb'), B(`{sending} <b>Отправляю в xRocket</b>\n<code>100.00</code> → <code>97.50</code> USDT\n{seg:mne}`, [[[ORD, 'copy', '', 'c']]], { time: '14:04', edited: true })],
-      'Готово': [CK('100', 'cb'), B(`{done} <b>Готово</b>\n<code>97.50</code> USDT · чек xRocket\n{seg:mmm}\n<bqx>Получено 100.00 · комиссия 2.5 % (2.50)\nЗаявка ${ORD} · 9 секунд\nНе пересылайте ссылку: забрать может любой.</bqx>`, [[['Забрать 97.50 USDT', 'claim', 'success', 'u']], [['Ссылка', 'copy', '', 'c'], ['Ещё обмен', 'swap']]], { time: '14:04', edited: true })],
+      ...PROG,
+      'Готово': [CK('100', 'cb'), B(`{done} <b>97.50&nbsp;USDT</b> ждут вас в xRocket`, [[['Забрать', 'claim', 'success', 'u']], [['Детали', 'eye'], ['Ещё обмен', 'swap']]], { time: '14:04', edited: true })],
+      'Детали': [CK('100', 'cb'), B(`{done} <b>97.50&nbsp;USDT</b> ждут вас в xRocket\n<bq>Получено 100.00 · комиссия 2.5&nbsp;% (2.50)\nЗаявка ${ORD} · 9 секунд</bq>`, [[['Забрать', 'claim', 'success', 'u']], [['Скрыть', 'close'], ['Ещё обмен', 'swap']]], { time: '14:04', edited: true })],
     },
   },
   {
-    id: 'B', name: 'Одна строка',
-    idea: 'Минимум: одна строка на шаг, всё остальное — кнопки. Для тех, кто меняет каждый день и знает процесс.',
-    plus: ['Самый короткий текст', 'Ничего лишнего на экране'],
-    minus: ['Новичку не видно, сколько ещё ждать', 'Комиссия видна только в деталях'],
+    id: 'B2', name: 'Детали внутри', pick: true,
+    idea: 'То же, но детали — в свёрнутой цитате Telegram: раскрываются тапом прямо в сообщении, без запроса к боту. Кнопок на одну меньше, сумма — на зелёной кнопке.',
+    plus: ['Одна главная кнопка — забрать', 'Детали открываются мгновенно, даже без связи с ботом', 'Предупреждение «не пересылайте» рядом с деталями'],
+    minus: ['В старых клиентах цитата раскрыта сразу — сообщение чуть длиннее'],
     states: {
-      'Проверяю': [CK('100', 'cb'), B(`{process} Проверяю чек на <code>100.00</code> USDT`, [[[ORD, 'copy', '', 'c']]], { time: '14:04' })],
-      'Выплачиваю': [CK('100', 'cb'), B(`{sending} Отправляю <code>97.50</code> USDT в xRocket`, [[[ORD, 'copy', '', 'c']]], { time: '14:04', edited: true })],
-      'Готово': [CK('100', 'cb'), B(`{done} <b>97.50 USDT</b> ждут вас в xRocket`, [[['Забрать', 'claim', 'success', 'u']], [['Детали', 'eye'], ['Ещё обмен', 'swap']]], { time: '14:04', edited: true })],
+      ...PROG,
+      'Готово': [CK('100', 'cb'), B(`{done} <b>97.50&nbsp;USDT</b> ждут вас в xRocket\n${DETAILS}`, [[['Забрать 97.50&nbsp;USDT', 'claim', 'success', 'u']], [['Ещё обмен', 'swap']]], { time: '14:04', edited: true })],
     },
   },
   {
-    id: 'C', name: 'Трекер',
-    idea: 'Шаги списком, как трекинг посылки. Видно, что уже сделано и что дальше. Больше всего вызывает доверия у первого обмена.',
-    plus: ['Понятно, где деньги на каждом шаге', 'Сбой показан на своём шаге'],
-    minus: ['Четыре строки вместо двух', 'На маленьком экране длиннее'],
+    id: 'B3', name: 'Сумма на кнопке',
+    idea: 'Самый короткий текст: «Готово», а сумма — только на зелёной кнопке. Глаз сразу идёт к действию.',
+    plus: ['Минимум текста', 'Действие видно первым'],
+    minus: ['Сумма в тексте не повторяется — в истории чата её видно только на кнопке'],
     states: {
-      'Проверяю': [CK('100', 'cb'), B(`<b>CryptoBot → xRocket</b>\n{step_now} Проверяю чек · <code>100.00</code>\n{step_todo} Создаю чек xRocket\n{step_todo} Готово · <code>97.50</code>`, [[[ORD, 'copy', '', 'c']]], { time: '14:04' })],
-      'Выплачиваю': [CK('100', 'cb'), B(`<b>CryptoBot → xRocket</b>\n{step_done} Чек принят · <code>100.00</code>\n{step_now} Создаю чек xRocket\n{step_todo} Готово · <code>97.50</code>`, [[[ORD, 'copy', '', 'c']]], { time: '14:04', edited: true })],
-      'Готово': [CK('100', 'cb'), B(`<b>CryptoBot → xRocket</b>\n{step_done} Чек принят · <code>100.00</code>\n{step_done} Чек xRocket создан\n{confetti} <b>Готово · <code>97.50</code> USDT</b>`, [[['Забрать 97.50 USDT', 'claim', 'success', 'u']], [['Ссылка', 'copy', '', 'c'], ['Ещё обмен', 'swap']]], { time: '14:04', edited: true })],
-    },
-  },
-  {
-    id: 'D', name: 'Витрина',
-    idea: 'Крупное анимированное эмодзи отдельным сообщением: оно и есть статус. Под ним строка с суммой. Самый «премиальный» вид.',
-    plus: ['Эффектно, сразу видно состояние', 'Эмодзи работает как индикатор'],
-    minus: ['Два сообщения на заявку', 'Крупное эмодзи без Premium у владельца не показать'],
-    states: {
-      'Проверяю': [CK('100', 'cb'), BIG('process', { time: '14:04' }), B(`<b>Проверяю чек</b> · <code>100.00</code> USDT`, [[[ORD, 'copy', '', 'c']]], { time: '14:04' })],
-      'Выплачиваю': [CK('100', 'cb'), BIG('sending'), B(`<b>Отправляю <code>97.50</code> USDT</b> в xRocket`, [[[ORD, 'copy', '', 'c']]], { time: '14:04', edited: true })],
-      'Готово': [CK('100', 'cb'), BIG('confetti'), B(`<b><code>97.50</code> USDT</b> — чек xRocket готов`, [[['Забрать 97.50 USDT', 'claim', 'success', 'u']], [['Ссылка', 'copy', '', 'c'], ['Ещё обмен', 'swap']]], { time: '14:04', edited: true })],
+      ...PROG,
+      'Готово': [CK('100', 'cb'), B(`{done} <b>Готово</b> · чек xRocket\n${DETAILS}`, [[['Забрать 97.50&nbsp;USDT', 'claim', 'success', 'u']], [['Ещё обмен', 'swap']]], { time: '14:04', edited: true })],
     },
   },
 ];
@@ -434,215 +437,299 @@ const DIRS = [
 const MENU = [[['Обменять', 'swap', 'primary'], ['Оплатить счёт', 'invoice', 'primary']], [['Курс', 'rates'], ['История', 'history'], ['Помощь', 'help']]];
 const HINT = 'Пришлите чек или счёт';
 const FLOW = [
-  { t: 'Приветствие', tag: 'rich · /start', n: 'Пять секунд на понимание: что делает, сколько стоит, что прислать. Меню всегда под рукой.', reply: MENU, hint: HINT,
-    m: [U('/start', { time: '14:00' }), R(`<h3>{swap} Обмен CryptoBot ⇄ xRocket</h3><p>Пришлите чек — верну чеком другого кошелька. Счёт оплачу сам.</p><div class="tw"><table><tr><th>Куда</th><th class="r">Комиссия</th><th class="r">Сумма</th></tr><tr><td>CryptoBot → xRocket</td><td class="r">2.5 %</td><td class="r">1–500</td></tr><tr><td>xRocket → CryptoBot</td><td class="r">1.5 %</td><td class="r">1–500</td></tr><tr><td>Оплата счёта</td><td class="r">2.5 %</td><td class="r">1–300</td></tr></table></div><footer>{fast} Курс 1:1 · обычно 10 секунд</footer>`, null, { time: '14:00' })] },
-  { t: 'Обменять → куда', n: 'Один вопрос, две кнопки. Комиссия прямо на кнопке.', reply: MENU, hint: HINT,
-    m: [U('Обменять', { time: '14:01' }), B(`<b>Что меняем?</b>`, [[['CryptoBot → xRocket · 2.5 %', 'xr', 'primary']], [['xRocket → CryptoBot · 1.5 %', 'cb']]], { time: '14:01' })] },
-  { t: 'Пришлите чек', n: 'Как создать чек — одной строкой и кнопкой «скопировать». Ограничения — одной строкой.', reply: MENU, hint: HINT,
-    m: [B(`<b>Пришлите чек CryptoBot</b> · 1–500 USDT\nНаберите здесь <code>@send 100usdt</code> и выберите чек.\n<i>Без пароля, на одного человека.</i>`, [[['@send 100usdt', 'copy', '', 'c']], [['Как создать чек', 'help'], ['Отмена', 'close']]], { time: '14:01' })] },
-  { t: 'Проверяю', tag: 'одно окно', n: 'Сообщение создаётся сразу и дальше только правится.', m: DIRS[0].states['Проверяю'] },
-  { t: 'Отправляю', n: 'Вторая клетка шкалы. Деньги уже у нас — сумма выплаты не меняется.', m: DIRS[0].states['Выплачиваю'] },
-  { t: 'Готово', n: 'Зелёная кнопка — забрать деньги. Детали спрятаны. Если прошло больше минуты — итог новым сообщением, чтобы пришло уведомление.', m: DIRS[0].states['Готово'] },
-  { t: 'Курс и лимиты', tag: 'rich · /terms', n: 'Статус направления — цветной точкой. На паузе — сразу видно, не надо пробовать.',
-    m: [R(`<h3>{rates} Курс и лимиты</h3><div class="tw"><table><tr><th></th><th>Направление</th><th class="r">Комиссия</th><th class="r">USDT</th></tr><tr><td>{dot_ok}</td><td>CryptoBot → xRocket</td><td class="r">2.5 %</td><td class="r">1–500</td></tr><tr><td>{dot_ok}</td><td>xRocket → CryptoBot</td><td class="r">1.5 %</td><td class="r">1–500</td></tr><tr><td>{dot_ok}</td><td>Счёт CryptoBot</td><td class="r">2.5 %</td><td class="r">1–300</td></tr><tr><td>{dot_wait}</td><td>Счёт xRocket</td><td class="r">—</td><td class="r">пауза</td></tr></table></div><p>Комиссия не меньше <code>0.10</code> USDT. Новичку — до <code>100</code> USDT за обмен.</p><footer>Обновлено 14:05</footer>`, [[['Обменять', 'swap', 'primary'], ['Не отображается?', 'eye']]])] },
-  { t: 'Счёт: к оплате', tag: 'html', n: 'Котировка — сумма к оплате крупно, срок — одной строкой.',
+  { t: 'Приветствие', tag: 'rich · /start', n: 'За пять секунд: что делает бот, сколько стоит, что прислать. Меню — внизу, всегда под рукой.', reply: MENU, hint: HINT,
+    m: [U('/start', { time: '14:00' }), R(`<h3>{swap} Обмен CryptoBot ⇄ xRocket</h3><p>Пришлите чек — верну чеком другого кошелька. Счёт — оплачу.</p><div class="tw"><table><tr><th>Куда</th><th class="r">Комиссия</th><th class="r">USDT</th></tr><tr><td>CryptoBot → xRocket</td><td class="r">2.5&nbsp;%</td><td class="r">1–500</td></tr><tr><td>xRocket → CryptoBot</td><td class="r">1.5&nbsp;%</td><td class="r">1–500</td></tr><tr><td>Оплата счёта</td><td class="r">2.5&nbsp;%</td><td class="r">1–300</td></tr></table></div><footer>{fast} Курс 1:1 · обычно 10 секунд</footer>`, null, { time: '14:00' })] },
+  { t: 'Обменять → куда', n: 'Один вопрос, две кнопки, комиссия прямо на кнопке.', reply: MENU, hint: HINT,
+    m: [U('Обменять', { time: '14:01' }), B(`<b>Что меняем?</b>`, [[['CryptoBot → xRocket · 2.5&nbsp;%', 'xr', 'primary']], [['xRocket → CryptoBot · 1.5&nbsp;%', 'cb']]], { time: '14:01' })] },
+  { t: 'Пришлите чек', n: 'Как создать чек — одной строкой, команда копируется кнопкой.', reply: MENU, hint: HINT,
+    m: [B(`<b>Пришлите чек CryptoBot</b> · 1–500&nbsp;USDT\nНаберите здесь <code>@send 100usdt</code> и выберите чек.`, [[['@send 100usdt', 'copy', '', 'c']], [['Инструкция', 'help'], ['Отмена', 'close']]], { time: '14:01' })] },
+  { t: 'Проверяю', tag: 'одно окно', n: 'Сообщение появляется сразу и дальше только правится.', m: PROG['Проверяю'] },
+  { t: 'Отправляю', n: 'Деньги уже у нас, сумма выплаты не меняется.', m: PROG['Отправляю'] },
+  { t: 'Дольше обычного', n: 'Через 20 секунд добавляется строка-успокоение. Через 2 минуты — «проверяю вручную».', m: PROG['Долго'] },
+  { t: 'Готово', tag: 'вариант B2', n: 'Зелёная кнопка — забрать. Детали свёрнуты. Если прошло больше минуты — итог новым сообщением, чтобы пришло уведомление.', m: VARIANTS[1].states['Готово'] },
+  { t: 'Курс и лимиты', tag: 'rich · /terms', n: 'Статус направления — точкой. Пауза видна сразу, не надо пробовать.',
+    m: [R(`<h3>{rates} Курс и лимиты</h3><div class="tw"><table><tr><th></th><th>Куда</th><th class="r">Комиссия</th><th class="r">USDT</th></tr><tr><td>{dot_ok}</td><td>CryptoBot → xRocket</td><td class="r">2.5&nbsp;%</td><td class="r">1–500</td></tr><tr><td>{dot_ok}</td><td>xRocket → CryptoBot</td><td class="r">1.5&nbsp;%</td><td class="r">1–500</td></tr><tr><td>{dot_ok}</td><td>Счёт CryptoBot</td><td class="r">2.5&nbsp;%</td><td class="r">1–300</td></tr><tr><td>{dot_wait}</td><td>Счёт xRocket</td><td class="r">—</td><td class="r">пауза</td></tr></table></div><p>Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.</p><footer>Обновлено 14:05</footer>`, [[['Обменять', 'swap', 'primary'], ['Простой вид', 'eye']]])] },
+  { t: 'Счёт: к оплате', n: 'Сумма к оплате — на синей кнопке, срок цены — одной строкой.',
     m: [U('t.me/send?start=IVk2m…7Q', { time: '14:10' }), B(`{invoice} <b>Счёт CryptoBot</b> · <code>50.00</code> USDT\nПришлите чек xRocket на <code>51.25</code> USDT\n<i>Цена держится до 14:25.</i>`, [[['51.25', 'copy', 'primary', 'c']], [['@xrocket 51.25', 'copy', '', 'c'], ['Отмена', 'close']]], { time: '14:10' })] },
-  { t: 'Счёт: не хватает', n: 'Недоплата: сколько добавить или вернуть всё. Две кнопки, без расчётов в уме.',
+  { t: 'Счёт: не хватает', n: 'Сколько добавить — или вернуть всё. Без расчётов в уме.',
     m: [CK('50', 'xr', '14:12'), B(`{warn} <b>Не хватает <code>1.25</code> USDT</b>\nПришлите ещё чек на <code>1.25</code> или верну <code>50.00</code>.`, [[['1.25', 'copy', 'primary', 'c']], [['Вернуть 50.00', 'refund']]], { time: '14:12' })] },
-  { t: 'Счёт оплачен', n: 'Подтверждение — тот же язык, что у обмена: точка, сумма, детали в цитате.',
-    m: [B(`{done} <b>Счёт оплачен</b>\n<code>50.00</code> USDT · CryptoBot\n{seg:mmm}\n<bqx>Получено 51.25 · комиссия 2.5 % (1.25)\nСчёт IV…7Q · 14:13</bqx>`, [[['Ещё счёт', 'invoice'], ['История', 'history']]], { time: '14:13', edited: true })] },
-  { t: 'Возврат', n: 'Возврат — как выплата: та же зелёная кнопка. Сначала — почему.',
-    m: [B(`{refund} <b>Возвращаю <code>51.25</code> USDT</b>\nСчёт уже оплатил кто-то другой.`, null, { time: '14:20' }), B(`{done} <b>Возврат готов</b> · чек xRocket\n<code>51.25</code> USDT, без комиссии`, [[['Забрать 51.25 USDT', 'claim', 'success', 'u']]], { time: '14:20' })] },
-  { t: 'Ручная проверка', n: 'Деньги у нас, автоматика не справилась. Главное — не пугать: что делать не нужно ничего.',
-    m: [B(`{manual} <b>Проверяю вручную</b>\nДеньги у нас: <code>100.00</code> USDT. Обычно до 15 минут.\n<i>Ничего делать не нужно — напишу сюда.</i>`, [[['Поддержка', 'support'], [ORD, 'copy', '', 'c']]], { time: '14:06', edited: true })] },
-  { t: 'Мульти-чек xRocket', tag: 'ошибка', n: 'Мульти-чеки xRocket открываются только в приложении — не берём. Деньги остались в чеке.',
-    m: [CK('100', 'xr', '14:30'), B(`{err} <b>Мульти-чек не подойдёт</b>\nДеньги в чеке, я его не открывал.\nСоздайте обычный чек: <code>@xrocket 100</code>`, [[['@xrocket 100', 'copy', '', 'c']]], { time: '14:30' })] },
-  { t: 'Чек уже открыт', tag: 'ошибка', n: 'Чек активировал не наш юзербот — честно говорим, что денег у нас нет.',
-    m: [CK('100', 'cb', '14:31'), B(`{err} <b>Этот чек уже активирован</b>\nДеньги не у меня — их забрал тот, кто открыл чек первым.`, [[['Поддержка', 'support']]], { time: '14:31' })] },
-  { t: 'Чек с паролем', tag: 'ошибка', n: 'Пароли не принимаем вообще — и это сказано до того, как клиент что-то потерял.',
-    m: [CK('100', 'cb', '14:32'), B(`{lock} <b>Чек с паролем не принимаю</b>\nДеньги в чеке. Создайте чек без пароля.`, null, { time: '14:32' })] },
-  { t: 'Лимит и пауза', tag: 'ошибка', n: 'Дневной лимит и пауза направления — когда снова можно.',
-    m: [B(`{limit} <b>Лимит на сегодня исчерпан</b>\nМожно ещё <code>0.00</code> из <code>1 000</code> USDT. Новые обмены — после 00:00.`, null, { time: '18:02' }), B(`{pause} <b>Счета xRocket на паузе</b>\nОбычно до часа. Обмен чеков работает.`, [[['Обменять', 'swap'], ['Курс', 'rates']]], { time: '18:03' })] },
-  { t: 'История', tag: 'rich · /history', n: 'Последние заявки одной таблицей, статус — точкой. Номер — для поддержки.',
-    m: [R(`<h3>{history} История</h3><div class="tw"><table><tr><th></th><th>Когда</th><th>Обмен</th><th class="r">Итог</th></tr><tr><td>{dot_ok}</td><td>14:04</td><td>CB → xR</td><td class="r">97.50</td></tr><tr><td>{dot_ok}</td><td>вчера</td><td>счёт CB</td><td class="r">50.00</td></tr><tr><td>{dot_closed}</td><td>2 ноя</td><td>CB → xR</td><td class="r">возврат</td></tr><tr><td>{dot_ok}</td><td>1 ноя</td><td>xR → CB</td><td class="r">19.70</td></tr></table></div><footer>Всего 23 обмена · 2 310 USDT</footer>`, [[['Заявка по номеру', 'search'], ['Ещё', 'refresh']]])] },
-  { t: 'Без ссылки', n: 'Любой текст без чека — короткая подсказка, без меню-простыни.', reply: MENU, hint: HINT,
-    m: [U('привет, а как поменять?', { time: '15:00' }), B(`Пришлите чек CryptoBot или xRocket — обменяю на другой кошелёк.\nИли ссылку на счёт — оплачу.`, [[['Как создать чек', 'help']]], { time: '15:00' })] },
+  { t: 'Счёт оплачен', n: 'Тот же язык, что у обмена: строка итога, детали свёрнуты.',
+    m: [B(`{done} <b>Счёт оплачен</b> · <code>50.00</code> USDT\n<bqx>Получено 51.25 · комиссия 2.5&nbsp;% (1.25)\nСчёт IV…7Q · 14:13</bqx>`, [[['Ещё счёт', 'invoice'], ['История', 'history']]], { time: '14:13', edited: true })] },
+  { t: 'Переплата', n: 'Лишнее возвращаем сразу, отдельным чеком.',
+    m: [B(`{done} <b>Счёт оплачен</b> · <code>50.00</code> USDT\nЛишние <code>8.75</code> USDT вернул чеком xRocket.`, [[['Забрать 8.75&nbsp;USDT', 'claim', 'success', 'u']]], { time: '14:13', edited: true })] },
+  { t: 'Возврат', n: 'Сначала — почему. Возврат забирается той же зелёной кнопкой.',
+    m: [B(`{refund} <b>Возвращаю <code>51.25</code> USDT</b>\nСчёт уже оплатил кто-то другой.`, null, { time: '14:20' }), B(`{done} <b>Возврат готов</b> · чек xRocket\n<code>51.25</code> USDT, без комиссии`, [[['Забрать 51.25&nbsp;USDT', 'claim', 'success', 'u']]], { time: '14:20' })] },
+  { t: 'Ручная проверка', n: 'Деньги у нас, автоматика не справилась. Главное — не пугать.',
+    m: [B(`{manual} <b>Проверяю вручную</b>\nДеньги у меня: <code>100.00</code> USDT. Обычно до 15 минут.\n<i>Ничего делать не нужно — напишу сюда.</i>`, [[['Поддержка', 'support'], [ORD, 'copy', '', 'c']]], { time: '14:06', edited: true })] },
+  { t: 'Мульти-чек xRocket', tag: 'ошибка', n: 'Такие открываются только в приложении xRocket — не берём. Деньги остались в чеке.',
+    m: [CK('100', 'xr', '14:30'), B(`{err} <b>Мульти-чек не подойдёт</b>\nДеньги в чеке, я его не открывал. Пришлите обычный: <code>@xrocket 100</code>`, [[['@xrocket 100', 'copy', '', 'c']]], { time: '14:30' })] },
+  { t: 'Чек уже открыт', tag: 'ошибка', n: 'Честно: денег у нас нет, их забрал тот, кто открыл чек первым.',
+    m: [CK('100', 'cb', '14:31'), B(`{err} <b>Этот чек уже открыт</b>\nДеньги не у меня — их забрал тот, кто открыл чек первым.`, [[['Поддержка', 'support']]], { time: '14:31' })] },
+  { t: 'Чек не подошёл', tag: 'ошибка', n: 'Капча, подписка, только для Premium — одна форма ответа: что не так и что прислать.',
+    m: [CK('100', 'cb', '14:32'), B(`{err} <b>Чек с подпиской не подойдёт</b>\nДеньги в чеке. Пришлите обычный чек.`, null, { time: '14:32' })] },
+  { t: 'Меньше минимума', tag: 'ошибка', n: 'Чек уже открыт — деньги возвращаем сразу.',
+    m: [CK('0.50', 'cb', '14:33'), B(`{refund} <b>Меньше минимума</b> · от <code>1.00</code> USDT\nВерну <code>0.50</code> чеком CryptoBot.`, [[['Забрать 0.50&nbsp;USDT', 'claim', 'success', 'u']]], { time: '14:33' })] },
+  { t: 'Лимит и пауза', tag: 'ошибка', n: 'Когда снова можно и что можно сейчас.',
+    m: [B(`{limit} <b>Лимит на сегодня исчерпан</b>\nНовые обмены — после 00:00.`, null, { time: '18:02' }), B(`{pause} <b>Счета xRocket на паузе</b>\nОбычно до часа. Обмен чеков работает.`, [[['Обменять', 'swap'], ['Курс', 'rates']]], { time: '18:03' })] },
+  { t: 'Обслуживание', n: 'Чек не открываем — деньги остаются у клиента.',
+    m: [CK('100', 'cb', '15:10'), B(`{maint} <b>Обновляемся до 15:30</b>\nЧек не открывал — деньги в нём. Пришлите его после 15:30.`, null, { time: '15:10' })] },
+  { t: 'История', tag: 'rich · /history', n: 'Последние заявки одной таблицей. Тап — карточка заявки.',
+    m: [R(`<h3>{history} История</h3><div class="tw"><table><tr><th></th><th>Когда</th><th>Обмен</th><th class="r">Итог</th></tr><tr><td>{dot_ok}</td><td>14:04</td><td>CB → xR</td><td class="r">97.50</td></tr><tr><td>{dot_ok}</td><td>вчера</td><td>счёт CB</td><td class="r">50.00</td></tr><tr><td>{dot_closed}</td><td>2 ноя</td><td>CB → xR</td><td class="r">возврат</td></tr><tr><td>{dot_ok}</td><td>1 ноя</td><td>xR → CB</td><td class="r">19.70</td></tr></table></div><footer>Всего 23 обмена · 2 310&nbsp;USDT</footer>`, [[['14:04', 'order'], ['вчера', 'order']], [['Ещё', 'refresh']]])] },
+  { t: 'Карточка заявки', tag: 'rich', n: 'Всё по одной заявке. Если чек ещё не забран — кнопка «Забрать».',
+    m: [R(`<h3>Заявка <code>${ORD}</code></h3><p>{dot_ok} <b>Готово</b> · 5 ноя, 14:04 · 9 секунд</p><div class="tw"><table><tr><td>Прислали</td><td class="r">100.00 CryptoBot</td></tr><tr><td>Комиссия</td><td class="r">2.50 · 2.5&nbsp;%</td></tr><tr><td>Получили</td><td class="r">97.50 xRocket</td></tr><tr><td>Чек</td><td class="r">не забран</td></tr></table></div>`, [[['Забрать 97.50&nbsp;USDT', 'claim', 'success', 'u']], [['Поддержка', 'support'], [ORD, 'copy', '', 'c']]])] },
+  { t: 'Поддержка', n: 'Вопрос уходит оператору в пульт, ответ приходит сюда же. Номер заявки подставляется сам.',
+    m: [B(`{support} <b>Поддержка</b>\nНапишите вопрос одним сообщением — передам оператору.`, null, { time: '14:07' }), U('чек не пришёл уже 10 минут', { time: '14:07' }), B(`Передал оператору · заявка <code>${ORD}</code>`, null, { time: '14:07' }), B(`<b>Оператор Анна:</b> деньги у нас, проверяем. Чек будет через 5 минут.`, null, { time: '14:09' })] },
+  { t: 'Без ссылки', n: 'Любой текст без чека — короткая подсказка.', reply: MENU, hint: HINT,
+    m: [U('привет, а как поменять?', { time: '15:00' }), B(`Пришлите чек CryptoBot или xRocket — обменяю.\nИли ссылку на счёт — оплачу.`, [[['Как создать чек', 'help']]], { time: '15:00' })] },
 ];
 
 // ══ ПУЛЬТ ═════════════════════════════════════════════════════════════════════
-const DASH = [
-  { id: 'dash-1', t: 'А. «Нужно решить»', tag: 'рекомендую', n: 'Сначала то, что ждёт человека, со счётчиками на кнопках. Цифры дня и резервы ниже.', bot: 'ops',
-    m: [R(`<h3>{alarm} Нужно решить · 4</h3><div class="rows"><div>{dot_act}<span>Разбор</span><b>2 <small>· 6 мин</small></b></div><div>{dot_wait}<span>Счёт вручную</span><b>1 <small>· 12.00</small></b></div><div>{dot_wait}<span>Незнакомый ответ</span><b>1 <small>· xRocket</small></b></div></div><hr><div class="kpi"><div><small>Сегодня</small><b>148</b><em class="up">▲ 9 %</em></div><div><small>Оборот</small><b>12 480</b><em class="up">▲ 5 %</em></div><div><small>Прибыль</small><b>291.40</b><em class="up">▲ 6 %</em></div></div><div class="tw"><table><tr><th>Кошелёк</th><th class="r">Доступно</th><th class="r">Цель</th><th></th></tr><tr><td>CryptoBot</td><td class="r">2 140.00</td><td class="r">1 500</td><td>{seg:mmm}</td></tr><tr><td>xRocket</td><td class="r">640.00</td><td class="r">1 500</td><td>{seg:aee}</td></tr></table></div><footer>{live} Юзерботы 2/2 · сверка 14:00 · 14:05</footer>`, [[['Разбор · 2', 'queue', 'primary'], ['Счета · 1', 'invoice', 'primary']], [['Ответы · 1', 'alert'], ['Резервы', 'vault']], [['Меню', 'dash']]])] },
-  { id: 'dash-2', t: 'Б. «Табло»', n: 'Сначала цифры: день против вчера, шкалы резервов, p95. Для владельца, который смотрит раз в день.', bot: 'ops',
-    m: [R(`<h3>{-chart} Сегодня · 14:05</h3><div class="kpi"><div><small>Обменов</small><b>148</b><em class="up">▲ 12</em></div><div><small>Оборот</small><b>12 480</b><em class="up">▲ 5 %</em></div><div><small>Прибыль</small><b>291.40</b><em class="up">▲ 6 %</em></div><div><small>p95</small><b>14 с</b><em class="up">▼ 2 с</em></div><div><small>Ошибки</small><b>0.7 %</b><em class="mut">1 из 148</em></div><div><small>Возвраты</small><b>1.3 %</b><em class="mut">2</em></div></div><h4>Резервы</h4><div class="rows"><div>{cb}<span>CryptoBot · 2 140</span>{seg:mmm}</div><div>{xr}<span>xRocket · 640</span>{seg:aee}</div></div><footer>{dot_wait} xRocket ниже цели: комиссия CB → xR поднята до 2.5 % · ▲▼ — к вчера в это же время</footer>`, [[['7 дней', 'calendar'], ['30 дней', 'calendar']], [['Нужно решить · 4', 'alert', 'primary']]])] },
-  { id: 'dash-3', t: 'В. «Светофор»', n: 'Одна строка на подсистему, цвет — состояние. Кнопки повторяют строки один в один.', bot: 'ops',
-    m: [B(`{dot_act} <b>Разбор</b> · 2 ждут, старейший 6 мин\n{dot_wait} <b>Резервы</b> · xRocket 640 из 1 500\n{dot_ok} <b>Направления</b> · 3 из 4, счёт xR на паузе\n{dot_ok} <b>Юзерботы</b> · 2 на связи\n{dot_ok} <b>Сверка</b> · 14:00, расхождений нет\n{dot_ok} <b>Выплаты</b> · идут`, [[['Разбор', 'queue', 'primary'], ['Резервы', 'vault']], [['Направления', 'swap'], ['Юзерботы', 'robot']], [['Сверка', 'refresh'], ['Стоп-кран', 'power', 'danger']]])] },
-];
-
+const DASH_OK = R(`<h3>{alarm} Нужно решить · 4</h3><div class="rows"><div>{dot_act}<span>Разбор</span><b>2 <small>· старейший 6 мин</small></b></div><div>{dot_wait}<span>Оплатить счёт вручную</span><b>1 <small>· 12.00</small></b></div><div>{dot_wait}<span>Незнакомый ответ</span><b>1 <small>· xRocket</small></b></div></div><hr><div class="kpi"><div><small>Обменов</small><b>148</b><em class="up">▲ 9&nbsp;%</em></div><div><small>Оборот</small><b>12 480</b><em class="up">▲ 5&nbsp;%</em></div><div><small>Прибыль</small><b>291.40</b><em class="up">▲ 6&nbsp;%</em></div></div><div class="tw"><table><tr><th>Резерв</th><th class="r">Доступно</th><th class="r">От цели</th></tr><tr><td>{cb} CryptoBot</td><td class="r">2 140.00</td><td class="r">{dot_ok} 143&nbsp;%</td></tr><tr><td>{xr} xRocket</td><td class="r">640.00</td><td class="r">{dot_wait} 43&nbsp;%</td></tr></table></div><footer>{live} Аккаунты 2/2 · сверка 14:00 · выплаты идут · ▲▼ к вчера</footer>`,
+  [[['Разбор · 2', 'queue', 'primary'], ['Счета · 1', 'invoice', 'primary']], [['Ответы · 1', 'alert'], ['Резервы', 'vault']], [['Аккаунты', 'robot'], ['Меню', 'dash']]], { time: '14:05' });
+const DASH_FIRE = R(`<h3>{alarm} Нужно решить · 6</h3><p>{kill} <b>Выплаты в xRocket на паузе</b> · с 14:15</p><div class="rows"><div>{dot_act}<span>Недостача xRocket</span><b>12.00</b></div><div>{dot_act}<span>Разбор</span><b>4 <small>· старейший 18 мин</small></b></div><div>{dot_act}<span>ub-2: вход сброшен</span><b>пауза</b></div></div><hr><div class="tw"><table><tr><th>Резерв</th><th class="r">Леджер</th><th class="r">Реально</th></tr><tr><td>{cb} CryptoBot</td><td class="r">2 140.00</td><td class="r">2 140.00</td></tr><tr><td>{xr} xRocket</td><td class="r">640.00</td><td class="r">{dot_act} 628.00</td></tr></table></div><footer>{dot_act} Аккаунты 1/2 · сверка 14:15 — расхождение</footer>`,
+  [[['Недостача', 'alert', 'danger'], ['Разбор · 4', 'queue', 'primary']], [['ub-2: войти', 'plug', 'primary'], ['Резервы', 'vault']], [['Меню', 'dash']]], { time: '14:16' });
+const DASH_CALM = R(`<h3>{live} Всё спокойно</h3><p>Решать нечего. Выплаты идут, аккаунты на связи.</p><div class="kpi"><div><small>Обменов</small><b>148</b><em class="up">▲ 9&nbsp;%</em></div><div><small>Оборот</small><b>12 480</b><em class="up">▲ 5&nbsp;%</em></div><div><small>Прибыль</small><b>291.40</b><em class="up">▲ 6&nbsp;%</em></div></div><div class="tw"><table><tr><th>Резерв</th><th class="r">Доступно</th><th class="r">От цели</th></tr><tr><td>{cb} CryptoBot</td><td class="r">1 480.00</td><td class="r">{dot_ok} 99&nbsp;%</td></tr><tr><td>{xr} xRocket</td><td class="r">1 300.00</td><td class="r">{dot_ok} 87&nbsp;%</td></tr></table></div><footer>{dot_ok} Аккаунты 2/2 · сверка 14:00 · ▲▼ к вчера</footer>`,
+  [[['Статистика', 'chart'], ['Резервы', 'vault']], [['Аккаунты', 'robot'], ['Меню', 'dash']]], { time: '14:05' });
 const ADMIN = [
   { group: 'Каждый день', items: [
     { t: 'Меню пульта', n: 'Все разделы на одном экране. Счётчик — только там, где ждут человека.', bot: 'ops',
-      m: [U('/menu', { time: '14:05' }), B(`<b>Пульт</b> · вы владелец`, [[['Разбор · 2', 'queue', 'primary'], ['Заявки', 'order']], [['Резервы', 'vault'], ['Юзерботы', 'robot']], [['Направления', 'swap'], ['Пользователи', 'users']], [['Статистика', 'chart'], ['Журнал', 'journal']], [['Рассылка', 'megaphone'], ['Настройки', 'settings']], [['Персонал', 'staff'], ['Эмодзи', 'emoji']], [['Самопроверка', 'shield'], ['Экспорт', 'export']], [['Стоп-кран', 'power', 'danger']]], { time: '14:05' })] },
+      m: [U('/menu', { time: '14:05' }), B(`<b>Пульт</b> · вы владелец`, [[['Разбор · 2', 'queue', 'primary'], ['Заявки', 'order']], [['Резервы', 'vault'], ['Аккаунты', 'robot']], [['Направления', 'swap'], ['Клиенты', 'users']], [['Обращения · 1', 'inbox', 'primary'], ['Рассылка', 'megaphone']], [['Статистика', 'chart'], ['Журнал', 'journal']], [['Настройки', 'settings'], ['Персонал', 'staff']], [['Система', 'server'], ['Эмодзи', 'emoji']], [['Стоп-кран', 'power', 'danger']]], { time: '14:05' })] },
     { t: 'Очередь разбора', n: 'По возрасту. «Взять» закрепляет заявку — остальные видят, кто ей занят.', bot: 'ops',
-      m: [R(`<h3>{-queue} Разбор · 2</h3><div class="tw"><table><tr><th>Заявка</th><th>Что</th><th class="r">Ждёт</th></tr><tr><td><code>${ORD}</code></td><td>выплата: таймаут</td><td class="r">6 мин</td></tr><tr><td><code>7F3A1C9D2B</code></td><td>незнакомый ответ</td><td class="r">2 мин</td></tr></table></div><h4>Оплатить вручную · 1</h4><div class="tw"><table><tr><td><code>Q1W2E3R4T5</code></td><td>счёт CryptoBot 12.00</td><td class="r">4 мин</td></tr></table></div>`, [[['K7M2…', 'take', 'primary'], ['7F3A…', 'take']], [['Q1W2… оплатить', 'invoice']], [['Обновить', 'refresh']]])] },
-    { t: 'Карточка заявки', tag: 'rich', n: 'Ход заявки, операции, сырые ответы кошелька и проводки. Кнопки — по правам сотрудника.', bot: 'ops',
-      m: [R(`<h3>Заявка <code>${ORD}</code></h3><p>{manual} <b>Ручной разбор</b> · 6 мин · CB → xR</p><div class="tw"><table><tr><td>Клиент</td><td class="r"><a>51234567</a> · 23 обмена</td></tr><tr><td>Принято</td><td class="r">100.00 CryptoBot</td></tr><tr><td>К выплате</td><td class="r">97.50 xRocket</td></tr><tr><td>Комиссия</td><td class="r">2.50 · 2.5 %</td></tr></table></div><details open><summary>Ход · 4</summary><ul class="tasks"><li>{step_done}<span>14:04:02 · чек принят</span></li><li>{step_done}<span>14:04:03 · резерв удержан</span></li><li>{dot_act}<span>14:04:04 · чек xRocket: нет ответа 30 с</span></li><li>{manual}<span>14:04:36 · сверка: чек не найден</span></li></ul></details><details><summary>Операции · 2</summary><pre>ord-…-intake-1   done
-ord-…-payout     unknown → failed</pre></details><details><summary>Ответ кошелька</summary><pre>xRocket v3, 14:04:04 — нет ответа</pre></details><details><summary>Проводки · 2</summary><pre>+100.00  wallet:cb
+      m: [R(`<h3>{-queue} Разбор · 2</h3><div class="tw"><table><tr><th>Заявка</th><th>Что</th><th class="r">Ждёт</th></tr><tr><td><code>${ORD}</code></td><td>выплата: нет ответа</td><td class="r">6 мин</td></tr><tr><td><code>7F3A1C9D2B</code></td><td>незнакомый ответ</td><td class="r">2 мин</td></tr></table></div><h4>Оплатить вручную · 1</h4><div class="tw"><table><tr><td><code>Q1W2E3R4T5</code></td><td>счёт CryptoBot 12.00</td><td class="r">4 мин</td></tr></table></div>`, [[['K7M2…', 'take', 'primary'], ['7F3A…', 'take']], [['Q1W2… оплатить', 'invoice']], [['Обновить', 'refresh']]])] },
+    { t: 'Карточка заявки', tag: 'rich', n: 'Ход заявки, операции, сырые ответы кошелька, проводки. Кнопки — по правам сотрудника.', bot: 'ops',
+      m: [R(`<h3>Заявка <code>${ORD}</code></h3><p>{manual} <b>Ручной разбор</b> · 6 мин · CB → xR · ub-1</p><div class="tw"><table><tr><td>Клиент</td><td class="r"><a>51234567</a> · 23 обмена</td></tr><tr><td>Принято</td><td class="r">100.00 CryptoBot</td></tr><tr><td>К выплате</td><td class="r">97.50 xRocket</td></tr><tr><td>Комиссия</td><td class="r">2.50 · 2.5&nbsp;%</td></tr></table></div><details open><summary>Ход · 4</summary><ul class="tasks"><li>{step_done}<span>14:04:02 · чек принят</span></li><li>{step_done}<span>14:04:03 · резерв удержан</span></li><li>{dot_act}<span>14:04:04 · чек xRocket: нет ответа 30 с</span></li><li>{manual}<span>14:04:36 · сверка: чек не найден</span></li></ul></details><details><summary>Операции · 2</summary><pre>ord-…-intake-1   done
+ord-…-payout     unknown → failed</pre></details><details><summary>Ответ кошелька</summary><pre>xRocket v3, 14:04:04 — нет ответа</pre></details><details><summary>Проводки · 2</summary><pre>+100.00  wallet:cb:ub-1
 −100.00  client:51234567
-удержано 97.50 в xRocket</pre></details>`, [[['Взять', 'take', 'primary'], ['Написать клиенту', 'support']], [['Повторить выплату', 'refresh'], ['Вернуть', 'refund']], [['Закрыть: выплачено', 'done']], [['Закрыть без выплаты', 'trash', 'danger']]])] },
-    { t: 'Подтверждение', tag: 'nonce 60 с', n: 'Что произойдёт, сумма, обратимо ли. Кнопка одноразовая: после рестарта или второго нажатия не сработает.', bot: 'ops',
+удержано 97.50 в xRocket</pre></details>`, [[['Взять', 'take', 'primary'], ['Написать', 'support']], [['Повторить выплату', 'refresh']], [['Вернуть', 'refund'], ['Выплачено', 'done']], [['Закрыть без выплаты', 'trash', 'danger']]])] },
+    { t: 'Подтверждение', tag: 'кнопка на 60 с', n: 'Что произойдёт, сумма, обратимо ли. Кнопка одноразовая: после перезапуска или второго нажатия не сработает.', bot: 'ops',
       m: [B(`<b>Повторить выплату?</b>\nНовый чек xRocket на <code>97.50</code> USDT клиенту 51234567.\nПрежняя операция → <code>failed</code>. <b>Необратимо.</b>\n<i>Кнопка действует 60 с.</i>`, [[['Подтвердить', 'ack', 'danger'], ['Отмена', 'close']]], { time: '14:07' })] },
-    { t: 'Контрольная строка', n: 'Пять самых опасных действий — ещё и ввести строку. Здесь — номер заявки.', bot: 'ops', typed: ORD,
+    { t: 'Контрольная строка', n: 'Самые опасные действия — ещё и ввести строку. Здесь — номер заявки.', bot: 'ops', typed: ORD,
       m: [B(`<b>Закрыть без выплаты</b> · <code>${ORD}</code>\n<code>100.00</code> USDT клиента остаются у сервиса. <b>Необратимо.</b>\nВведите номер заявки.`, [[['Отмена', 'close']]], { time: '14:08' })] },
-    { t: 'Ручная оплата счёта', n: 'Задача человеку: оплатить в служебном аккаунте и отметить итог. Юзербот на это время на паузе.', bot: 'ops',
-      m: [B(`{invoice} <b>Оплатите счёт вручную</b> · <code>Q1W2E3R4T5</code>\nCryptoBot · <code>12.00</code> USDT · деньги клиента у нас\n<i>Юзербот ub-1 на паузе, пока вы в аккаунте.</i>`, [[['Открыть счёт', 'link', 'primary', 'u']], [['Оплачено', 'done', 'success'], ['Не получилось', 'close']]], { time: '14:09' })] },
+    { t: 'Ручная оплата счёта', n: 'Задача человеку. Юзербот на это время сам встаёт на паузу.', bot: 'ops',
+      m: [B(`{invoice} <b>Оплатите счёт вручную</b> · <code>Q1W2E3R4T5</code>\nCryptoBot · <code>12.00</code> USDT · деньги клиента у нас\n<i>ub-1 на паузе, пока вы в аккаунте.</i>`, [[['Открыть счёт', 'link', 'primary', 'u']], [['Оплачено', 'done', 'success'], ['Не вышло', 'close']]], { time: '14:09' })] },
+    { t: 'Обращение клиента', n: 'Вопрос из клиентского бота — в тему «Обращения», с заявкой рядом. Ответ уходит клиенту от имени бота.', bot: 'ops', topic: 'Обращения',
+      m: [B(`{-inbox} <b>Обращение</b> · 51234567 · @nick\n<bq>чек не пришёл уже 10 минут</bq>Заявка <code>${ORD}</code> · ручной разбор · 6 мин`, [[['Ответить', 'support', 'primary'], ['Заявка', 'order']], [['Шаблоны', 'edit'], ['Закрыть', 'ack']]], { time: '14:07' }), U('деньги у нас, проверяем. Чек будет через 5 минут.', { time: '14:09' }), B(`{done} Отправлено клиенту · Анна`, null, { time: '14:09' })] },
+  ] },
+  { group: 'Аккаунты юзерботов', lead: 'Наше «API»: обычные аккаунты Telegram, которые открывают чеки, создают чеки и платят по счетам. Здесь их подключают, меняют и чинят — без SSH.', items: [
+    { t: 'Аккаунты', n: 'Статус, кошельки и балансы каждого. Сумма балансов = резерв.', bot: 'ops',
+      m: [R(`<h3>{robot} Аккаунты · 2</h3><div class="rows"><div>{dot_ok}<span><b>ub-1</b> · +7 9•• ••• •• 12</span><small>ответ 3 с</small></div><div>{dot_wait}<span><b>ub-2</b> · +44 7•• ••• •• 08</span><small>FLOOD до 14:12</small></div></div><div class="tw"><table><tr><th></th><th class="r">CryptoBot</th><th class="r">xRocket</th></tr><tr><td>ub-1</td><td class="r">1 240.00</td><td class="r">410.00</td></tr><tr><td>ub-2</td><td class="r">900.00</td><td class="r">230.00</td></tr><tr><td><b>Резерв</b></td><td class="r"><b>2 140.00</b></td><td class="r"><b>640.00</b></td></tr></table></div><footer>Приложение Telegram: общее, с сервера</footer>`, [[['ub-1', 'robot'], ['ub-2', 'robot']], [['Добавить аккаунт', 'plus', 'primary']], [['API-ключи', 'key'], ['Сессии', 'shield']]])] },
+    { t: 'Карточка аккаунта', n: 'Всё про один аккаунт и все действия с ним.', bot: 'ops',
+      m: [B(`{dot_ok} <b>ub-1</b> · на связи · ответ 3 с назад\n+7 9•• ••• •• 12 · с 2 окт · облачный пароль есть\nCryptoBot <code>1 240.00</code> · xRocket <code>410.00</code>\nСегодня 96 действий · в полёте нет · шаг 1.5 с`, [[['Пауза', 'pause'], ['Сессии', 'shield']], [['Переподключить', 'refresh']], [['Кошельки', 'wallet'], ['Заменить', 'swap']], [['Отключить', 'power', 'danger']]], { time: '14:10' })] },
+    { t: 'Добавить: номер', tag: 'шаг 1 из 4', n: 'Номер присылают сообщением — бот сразу его удаляет.', bot: 'ops',
+      m: [B(`<b>Новый аккаунт</b> · 1 из 4\nПришлите номер телефона: <code>+79001234567</code>\n<i>Сообщение с номером удалю сразу.</i>`, [[['Отмена', 'close']]], { time: '15:00' }), B(`Номер <code>+7 9•• ••• •• 67</code> принят. Telegram отправил код в приложение этого аккаунта.`, null, { time: '15:00' })] },
+    { t: 'Добавить: код', tag: 'шаг 2 из 4', n: 'Код вводится кнопками: если отправить его сообщением, Telegram код сбросит. Цифры на экране скрыты.', bot: 'ops',
+      m: [B(`<b>Код из Telegram</b> · 2 из 4\nВводите кнопками — сообщением Telegram код сбросит.\n\n<b>●  ●  ○  ○  ○</b>`, [[['1'], ['2'], ['3']], [['4'], ['5'], ['6']], [['7'], ['8'], ['9']], [['⌫'], ['0'], ['Готово', null, 'off']], [['Прислать код заново', 'refresh']], [['Отмена', 'close']]], { time: '15:01', edited: true })] },
+    { t: 'Добавить: облачный пароль', tag: 'шаг 3 из 4', n: 'Только если на аккаунте включена двухэтапная проверка. Сообщение с паролем удаляется сразу.', bot: 'ops',
+      m: [B(`<b>Облачный пароль</b> · 3 из 4\nНа аккаунте включена двухэтапная проверка. Пришлите пароль — удалю сообщение сразу и нигде не сохраню.`, [[['Отмена', 'close']]], { time: '15:02' })] },
+    { t: 'Добавить: проверка', tag: 'шаг 4 из 4', n: 'Бот сам открывает оба кошелька, читает балансы и включает аккаунт только по вашей кнопке.', bot: 'ops',
+      m: [R(`<h3>{robot} ub-3 подключён</h3><ul class="tasks"><li>{step_done}<span>Вход · сессия зашифрована в базе</span></li><li>{step_done}<span>CryptoBot ответил · баланс 0.00</span></li><li>{step_done}<span>xRocket ответил · баланс 0.00</span></li><li>{step_done}<span>Чужих сессий нет</span></li></ul><p>Аккаунт на паузе, пока вы его не включите.</p>`, [[['Включить ub-3', 'play', 'primary']], [['Только CB', 'cb'], ['Только xR', 'xr']], [['Оставить на паузе', 'pause']]])] },
+    { t: 'Замена аккаунта', n: 'Новый принимает работу, старый доводит свои заявки, остатки переезжают чеками внутри сервиса.', bot: 'ops',
+      m: [R(`<h3>{swap} Замена ub-1 → ub-3</h3><ul class="tasks"><li>{step_done}<span>ub-3 подключён и проверен</span></li><li>{step_done}<span>Новые заявки идут на ub-2 и ub-3</span></li><li>{step_now}<span>ub-1 доводит 1 заявку…</span></li><li>{step_todo}<span>Остатки ub-1 → ub-3: 1 240.00 CB · 410.00 xR</span></li><li>{step_todo}<span>Выход ub-1, его сессии завершены</span></li></ul><footer>Перевод — внутренняя проводка, без комиссии</footer>`, [[['Отменить замену', 'close']]], { edited: true })] },
+    { t: 'Вход сброшен', tag: 'critical', n: 'Сессия умерла — аккаунт сам встаёт на паузу, заявки идут через другие. Войти заново — те же 4 шага.', bot: 'ops', topic: 'Ошибки',
+      m: [B(`{alarm} <b>ub-2: вход сброшен</b>\nTelegram завершил сессию. ub-2 на паузе, заявки идут через ub-1.`, [[['Войти заново', 'plug', 'primary']], [['Заменить', 'swap'], ['Отключить', 'power']]], { time: '14:15' })] },
+    { t: 'Приложение Telegram', n: 'api_id и api_hash. Общее приложение — с сервера; своё — если нужно развести аккаунты.', bot: 'ops',
+      m: [B(`<b>Приложение Telegram</b>\nОбщее для всех аккаунтов, из настроек сервера.\napi_id <code>2•••••7</code> · api_hash <code>•••••••3f</code>`, [[['Своё для ub-3', 'edit']], [['Назад', 'back']]], { time: '15:05' })] },
+    { t: 'Сессии', n: 'Все входы во все аккаунты. Незнакомые — красным, завершаются одной кнопкой.', bot: 'ops',
+      m: [R(`<h3>{-shield} Сессии</h3><div class="tw"><table><tr><td>{dot_ok}</td><td>ub-1 · сервер exch</td><td>DE</td><td class="r">сейчас</td></tr><tr><td>{dot_act}</td><td>ub-1 · iPhone 15</td><td>NL</td><td class="r">13:58</td></tr><tr><td>{dot_ok}</td><td>ub-2 · сервер exch</td><td>DE</td><td class="r">сейчас</td></tr></table></div>`, [[['Завершить чужие', 'ban', 'danger']], [['Обновить', 'refresh']]])] },
+    { t: 'Новая авторизация', tag: 'critical', n: 'В тему «Безопасность». «Это я» закрывает тихо, «Завершить» — убивает сессию.', bot: 'ops', topic: 'Безопасность',
+      m: [B(`{shield} <b>Новый вход</b> · ub-1\niPhone 15 · Telegram iOS · NL · 185.…41 · 13:58`, [[['Завершить сессию', 'ban', 'danger']], [['Это я', 'ack']]], { time: '13:58' })] },
   ] },
   { group: 'Деньги', items: [
-    { t: 'Резервы и сверка', tag: 'rich', n: 'Леджер против реального баланса, деньги в полёте и удержанные. Пороги рядом.', bot: 'ops',
-      m: [R(`<h3>{vault} Резервы</h3><div class="tw"><table><tr><th></th><th class="r">CryptoBot</th><th class="r">xRocket</th></tr><tr><td>Леджер</td><td class="r">2 140.00</td><td class="r">640.00</td></tr><tr><td>Реально</td><td class="r">2 140.00</td><td class="r">640.00</td></tr><tr><td>В полёте</td><td class="r">0.00</td><td class="r">97.50</td></tr><tr><td>Удержано</td><td class="r">300.00</td><td class="r">120.00</td></tr><tr><td>Цель · порог</td><td class="r">1 500 · 600</td><td class="r">1 500 · 600</td></tr></table></div><p>{dot_ok} Сверка 14:00 · расхождений нет</p><p>{dot_wait} xRocket у порога: комиссия CB → xR поднята до 2.5 %</p>`, [[['Сверить сейчас', 'refresh', 'primary'], ['План ребалансировки', 'swap']]])] },
-    { t: 'Недостача', tag: 'critical', n: 'Реально меньше леджера — выплаты из этого кошелька встают сами. Владельцу — вопрос «это вы?».', bot: 'ops', topic: 'Безопасность',
-      m: [B(`{alarm} <b>xRocket: реально меньше на <code>12.00</code></b>\nЛеджер 640.00 · реально 628.00\nВыплаты в xRocket на паузе. Это вы выводили?`, [[['Да, это я', 'ack'], ['Нет — расследовать', 'search', 'danger']]], { time: '14:15' })] },
-    { t: 'Направления', n: 'Комиссия с рычагом и база, лимиты, статус. Тап по строке — карточка направления.', bot: 'ops',
+    { t: 'Резервы и сверка', tag: 'rich', n: 'Леджер против реальных балансов, деньги в полёте, удержанные, пороги.', bot: 'ops',
+      m: [R(`<h3>{vault} Резервы</h3><div class="tw"><table><tr><th></th><th class="r">CryptoBot</th><th class="r">xRocket</th></tr><tr><td>Леджер</td><td class="r">2 140.00</td><td class="r">640.00</td></tr><tr><td>Реально</td><td class="r">2 140.00</td><td class="r">640.00</td></tr><tr><td>В полёте</td><td class="r">0.00</td><td class="r">97.50</td></tr><tr><td>Удержано</td><td class="r">300.00</td><td class="r">120.00</td></tr><tr><td>Цель · порог</td><td class="r">1 500 · 600</td><td class="r">1 500 · 600</td></tr></table></div><p>{dot_ok} Сверка 14:00 · расхождений нет · следующая 14:15</p><p>{dot_wait} xRocket у порога: комиссия CB → xR поднята до 2.5&nbsp;%</p>`, [[['Сверить сейчас', 'refresh', 'primary']], [['Ребалансировка', 'swap']], [['Прибыль', 'coin'], ['Пороги', 'limit']]])] },
+    { t: 'Недостача', tag: 'critical', n: 'Реально меньше леджера — выплаты из этого кошелька встают сами. Владельцу — «это вы?».', bot: 'ops', topic: 'Безопасность',
+      m: [B(`{alarm} <b>xRocket: меньше на <code>12.00</code></b>\nЛеджер 640.00 · реально 628.00 · ub-1\nВыплаты в xRocket на паузе. Это вы выводили?`, [[['Да, это я', 'ack']], [['Нет, разбираться', 'search', 'danger']]], { time: '14:15' })] },
+    { t: 'Направления', n: 'Комиссия с рычагом и база, лимиты, статус. Тап — карточка направления.', bot: 'ops',
       m: [R(`<h3>{swap} Направления</h3><div class="tw"><table><tr><th></th><th>Куда</th><th class="r">%</th><th class="r">USDT</th></tr><tr><td>{dot_ok}</td><td>CB → xR</td><td class="r">2.5 <small class="mut">2.0</small></td><td class="r">1–500</td></tr><tr><td>{dot_ok}</td><td>xR → CB</td><td class="r">1.5</td><td class="r">1–500</td></tr><tr><td>{dot_ok}</td><td>Счёт CB</td><td class="r">2.5</td><td class="r">1–300</td></tr><tr><td>{dot_wait}</td><td>Счёт xR</td><td class="r">2.0</td><td class="r">пауза</td></tr></table></div><footer>Рычаг k = 0.6 · серым — базовая комиссия</footer>`, [[['CB → xR', 'xr'], ['xR → CB', 'cb']], [['Счёт CB', 'invoice'], ['Счёт xR', 'invoice']], [['Рычаг', 'limit'], ['Новичкам', 'user']]])] },
-    { t: 'Карточка направления', n: 'Всё, что можно менять, — кнопкой. Пауза — рядом, без поиска.', bot: 'ops',
-      m: [B(`<b>CryptoBot → xRocket</b> · {dot_ok} принимаю\nКомиссия <code>2.5 %</code> = база 2.0 + рычаг 0.5\nПол · потолок <code>1.0 · 5.0 %</code>\nСумма <code>1–500</code>, новичку до <code>100</code>`, [[['Комиссия', 'edit'], ['Лимиты', 'limit']], [['Пауза', 'pause'], ['Назад', 'back']]], { time: '14:20' })] },
-    { t: 'Изменить значение', n: 'Было → стало, и к чему приведёт. Больше 1 п.п. — нужен владелец.', bot: 'ops',
-      m: [B(`Базовая комиссия CB → xR, %. Сейчас <code>2.0</code>`, null, { time: '14:21' }), U('2.4', { time: '14:21' }), B(`<b>Комиссия CB → xR</b>\n<code>2.0</code> → <code>2.4 %</code> · с рычагом станет 2.9 %\n<i>Новые заявки — сразу, начатые — по старой.</i>`, [[['Сохранить', 'done', 'primary'], ['Отмена', 'close']]], { time: '14:21' })] },
-    { t: 'План ребалансировки', n: 'Предлагаем перекинуть резерв; подтверждает только владелец.', bot: 'ops',
-      m: [B(`{swap} <b>Ребалансировка</b>\nCryptoBot → xRocket: <code>800.00</code> USDT\nПосле: <code>1 340</code> · <code>1 440</code> (цель 1 500)\n<i>Через адрес из белого списка …7Kd9Q2.</i>`, [[['Подтвердить', 'ack', 'danger'], ['Изменить сумму', 'edit']], [['Отмена', 'close']]], { time: '14:30' })] },
+    { t: 'Карточка направления', n: 'Всё, что можно менять, — кнопкой. Пауза рядом.', bot: 'ops',
+      m: [B(`<b>CryptoBot → xRocket</b> · {dot_ok} принимаю\nКомиссия <code>2.5&nbsp;%</code> = база 2.0 + рычаг 0.5\nПол · потолок <code>1.0 · 5.0&nbsp;%</code>\nСумма <code>1–500</code>, новичку до <code>100</code>`, [[['Комиссия', 'edit'], ['Лимиты', 'limit']], [['Пауза', 'pause'], ['Назад', 'back']]], { time: '14:20' })] },
+    { t: 'Изменить значение', n: 'Было → стало и к чему приведёт. Больше 1&nbsp;п.п. — нужен владелец.', bot: 'ops',
+      m: [B(`Базовая комиссия CB → xR, %. Сейчас <code>2.0</code>`, null, { time: '14:21' }), U('2.4', { time: '14:21' }), B(`<b>Комиссия CB → xR</b>\n<code>2.0</code> → <code>2.4&nbsp;%</code> · с рычагом станет 2.9&nbsp;%\n<i>Новые заявки — сразу, начатые — по старой цене.</i>`, [[['Сохранить', 'done', 'primary'], ['Отмена', 'close']]], { time: '14:21' })] },
+    { t: 'Ребалансировка', n: 'Перекинуть резерв между кошельками. Подтверждает только владелец.', bot: 'ops',
+      m: [B(`{swap} <b>Ребалансировка</b>\nCryptoBot → xRocket: <code>800.00</code> USDT\nПосле: <code>1 340</code> · <code>1 440</code> (цель 1 500)\n<i>Через адрес из белого списка …7Kd9Q2.</i>`, [[['Подтвердить', 'ack', 'danger']], [['Изменить', 'edit'], ['Отмена', 'close']]], { time: '14:30' })] },
+    { t: 'Вывод прибыли', n: 'Сколько можно вывести, не опуская резерв ниже цели. Чек — на ваш аккаунт.', bot: 'ops',
+      m: [B(`{vault} <b>Вывод прибыли</b>\nМожно вывести <code>1 721.00</code> USDT — резервы останутся выше цели.\nКуда: чек CryptoBot на ваш аккаунт.`, [[['Вывести 1 721.00', 'coin', 'primary']], [['Изменить', 'edit'], ['Отмена', 'close']]], { time: '18:00' })] },
+    { t: 'Корректировка', tag: 'только владелец', n: 'Проводка-исправление: потеря, найденные деньги. С причиной и словом ПОДТВЕРЖДАЮ.', bot: 'ops', typed: 'ПОДТВЕРЖДАЮ',
+      m: [B(`<b>Корректировка</b>\nСписать <code>12.00</code> USDT xRocket как потерю.\nПричина: <i>недостача 05.11, разбор №14</i>\nВведите <code>ПОДТВЕРЖДАЮ</code>.`, [[['Отмена', 'close']]], { time: '18:10' })] },
     { t: 'Незабранные чеки', n: 'Чеки выплат, которые клиент не забрал. Напомнить — одной кнопкой.', bot: 'ops',
       m: [R(`<h3>{-ticket} Незабранные чеки</h3><div class="tw"><table><tr><th>Не забран</th><th class="r">Чеков</th><th class="r">USDT</th></tr><tr><td>1–3 дня</td><td class="r">4</td><td class="r">212.50</td></tr><tr><td>3–7 дней</td><td class="r">2</td><td class="r">60.00</td></tr><tr><td>больше 7</td><td class="r">1</td><td class="r">15.00</td></tr></table></div>`, [[['Напомнить (7)', 'bell', 'primary'], ['Список', 'order']]])] },
   ] },
-  { group: 'Юзерботы и безопасность', items: [
-    { t: 'Юзерботы', n: 'Состояние, последний ответ, флуд, операция в полёте. Чужие сессии — красным.', bot: 'ops',
-      m: [R(`<h3>{robot} Юзерботы</h3><div class="rows"><div>{dot_ok}<span><b>ub-1</b> · ответ 3 с назад</span><small>в полёте: нет</small></div><div>{dot_wait}<span><b>ub-2</b> · FLOOD_WAIT до 14:12</span><small>пауза</small></div></div><details open><summary>Сессии ub-1 · 2</summary><div class="tw"><table><tr><td>{dot_ok}</td><td>exch · сервер</td><td>DE</td><td class="r">сейчас</td></tr><tr><td>{dot_act}</td><td>iPhone 15 · iOS</td><td>NL</td><td class="r">13:58</td></tr></table></div></details>`, [[['Пауза ub-1', 'pause'], ['Переподключить', 'refresh']], [['Завершить чужие', 'ban', 'danger']]])] },
-    { t: 'Новая авторизация', tag: 'critical', n: 'В тему «Безопасность». «Это я» — тихо закрывает, «Завершить» — убивает сессию.', bot: 'ops', topic: 'Безопасность',
-      m: [B(`{shield} <b>Новая авторизация</b> · ub-1\niPhone 15 · Telegram iOS · NL · 185.…41\nСегодня 13:58`, [[['Завершить сессию', 'ban', 'danger'], ['Это я', 'ack']]], { time: '13:58' })] },
-    { t: 'Алерт и «Принял»', tag: 'critical', n: 'Повторяется каждые 15 минут, пока кто-то не нажмёт «Принял». После — правится, а не дублируется.', bot: 'ops', topic: 'Ошибки',
+  { group: 'Тревоги и защита', items: [
+    { t: 'Алерт и «Принял»', tag: 'critical', n: 'Повторяется каждые 15 минут, пока кто-то не нажмёт «Принял». Потом правится, а не дублируется.', bot: 'ops', topic: 'Ошибки',
       m: [B(`{alarm} <b>Нужен разбор</b> · <code>${ORD}</code>\nCB → xR · 100.00 → 97.50 · клиент 51234567\nВыплата: нет ответа 30 с, чек не найден\n<bqx>xRocket v3 · 14:04:04 · ответа нет</bqx>`, [[['Открыть', 'order'], ['Взять', 'take', 'primary']], [['Принял', 'ack']]], { time: '14:04' }), B(`{dot_closed} <b>Разбор</b> · <code>${ORD}</code>\nПринял Анна · 14:07 — повторы остановлены`, [[['Открыть', 'order']]], { time: '14:07', edited: true })] },
-    { t: 'Незнакомый ответ', n: 'Направление уже на автопаузе. Сохранить ответ как фикстуру для разработчика — одной кнопкой.', bot: 'ops', topic: 'Ошибки',
-      m: [B(`{warn} <b>Незнакомый ответ</b> · xRocket · 14:02\n<bq>Чек CQ12…9F временно недоступен, попробуйте позже</bq>xR → CB на автопаузе · заявка <code>7F3A1C9D2B</code> в разборе`, [[['Сохранить фикстуру', 'export'], ['Снять паузу', 'play']], [['Заявка', 'order']]], { time: '14:02' })] },
-    { t: 'Стоп-кран', n: 'Включить может любой сотрудник. Выключить — только владелец и словом ПОДТВЕРЖДАЮ.', bot: 'ops',
-      m: [B(`{kill} <b>Выплаты остановлены</b>\nОлег · 14:20. Заявки ждут, деньги клиентов в леджере.\nВыключит владелец: введите <code>ПОДТВЕРЖДАЮ</code>.`, [[['Обслуживание 30 мин', 'maint']]], { time: '14:20' })], typed: 'ПОДТВЕРЖДАЮ' },
-    { t: 'Обслуживание', n: 'Баннер клиентам и закрытый приём ссылок; начатые заявки доводятся.', bot: 'ops',
-      m: [B(`{maint} <b>Обслуживание · до 15:00</b>\nПриём новых чеков закрыт, 3 заявки доводим.\nКлиенты видят: «Обновляемся, вернёмся к 15:00».`, [[['Продлить 15 мин', 'plus'], ['Закончить', 'play', 'primary']], [['Текст баннера', 'edit']]], { time: '14:30' })] },
+    { t: 'Незнакомый ответ', n: 'Направление уже на автопаузе. Сохранить ответ для разработчика — одной кнопкой.', bot: 'ops', topic: 'Ошибки',
+      m: [B(`{warn} <b>Незнакомый ответ</b> · xRocket · 14:02\n<bq>Чек CQ12…9F временно недоступен, попробуйте позже</bq>xR → CB на автопаузе · заявка <code>7F3A1C9D2B</code> в разборе`, [[['Сохранить фикстуру', 'export']], [['Снять паузу', 'play'], ['Заявка', 'order']]], { time: '14:02' })] },
+    { t: 'Стоп-кран', n: 'Включить может любой сотрудник. Выключить — только владелец, словом ПОДТВЕРЖДАЮ.', bot: 'ops', typed: 'ПОДТВЕРЖДАЮ',
+      m: [B(`{kill} <b>Выплаты остановлены</b>\nОлег · 14:20. Заявки ждут, деньги клиентов в леджере.\nВыключит владелец: введите <code>ПОДТВЕРЖДАЮ</code>.`, [[['Обслуживание 30 мин', 'maint']]], { time: '14:20' })] },
+    { t: 'Обслуживание', n: 'Новые чеки не принимаем, начатые заявки доводим. Клиенты видят время возврата.', bot: 'ops',
+      m: [B(`{maint} <b>Обслуживание · до 15:30</b>\nНовые чеки не принимаю, 3 заявки довожу.`, [[['+15 мин', 'plus'], ['Закончить', 'play', 'primary']], [['Текст для клиентов', 'edit']]], { time: '15:00' })] },
+    { t: 'Настройка алертов', n: 'Какое событие в какую тему и со звуком ли. Тихие часы — кроме критичных.', bot: 'ops',
+      m: [R(`<h3>{-bell} Алерты</h3><div class="tw"><table><tr><th>Событие</th><th>Тема</th><th>Звук</th></tr><tr><td>Нужен разбор</td><td>Ошибки</td><td>всегда</td></tr><tr><td>Недостача</td><td>Безопасность</td><td>всегда</td></tr><tr><td>Новый вход</td><td>Безопасность</td><td>всегда</td></tr><tr><td>Резерв у порога</td><td>Резервы</td><td>днём</td></tr><tr><td>Обмены</td><td>Обмены</td><td>без звука</td></tr></table></div><p>Тихие часы <code>00:00–08:00</code> · критичные звучат всегда</p>`, [[['Тихие часы', 'calendar'], ['Дублировать', 'users']]])] },
   ] },
-  { group: 'Люди', items: [
-    { t: 'Карточка пользователя', n: 'Оборот, средний чек, возвраты, заметки персонала. Бан и лимит — здесь же.', bot: 'ops',
-      m: [U('/user 51234567', { time: '15:00' }), R(`<h3>{-user} 51234567</h3><p class="mut">@nick · с 2 окт · ru</p><div class="kpi"><div><small>Обменов</small><b>23</b><em class="mut">1 возврат</em></div><div><small>Оборот</small><b>2 310</b><em class="mut">USDT</em></div><div><small>Средний</small><b>100.4</b><em class="mut">USDT</em></div></div><div class="tw"><table><tr><td>Лимит в сутки</td><td class="r">1 000 · общий</td></tr><tr><td>Реферер</td><td class="r">—</td></tr></table></div><details><summary>Заметки · 1</summary><p>Анна, 3 окт: просил разбить на два чека</p></details>`, [[['Бан', 'ban', 'danger'], ['Лимит', 'limit']], [['Заметка', 'edit'], ['Заявки', 'order']]])] },
-    { t: 'Бан', n: 'Причина обязательна: она уходит в журнал и видна другим сотрудникам.', bot: 'ops',
-      m: [B(`<b>Бан 51234567?</b>\nНовые чеки не примем, начатые заявки доведём.\nНапишите причину.`, [[['Мультиаккаунт', 'flag'], ['Спам', 'flag']], [['Отмена', 'close']]], { time: '15:02' })] },
-    { t: 'Персонал', n: 'Роли и потолок ручной выплаты. Смена ролей — только владелец, словом ПОДТВЕРЖДАЮ.', bot: 'ops',
+  { group: 'Клиенты и персонал', items: [
+    { t: 'Карточка клиента', n: 'Оборот, средний чек, возвраты, заметки. Бан и лимит — здесь же.', bot: 'ops',
+      m: [U('/user 51234567', { time: '15:00' }), R(`<h3>{-user} 51234567</h3><p class="mut">@nick · с 2 окт · ru</p><div class="kpi"><div><small>Обменов</small><b>23</b><em class="mut">1 возврат</em></div><div><small>Оборот</small><b>2 310</b><em class="mut">USDT</em></div><div><small>Средний</small><b>100.4</b><em class="mut">USDT</em></div></div><div class="tw"><table><tr><td>Лимит в сутки</td><td class="r">1 000 · общий</td></tr><tr><td>Обращений</td><td class="r">2</td></tr></table></div><details><summary>Заметки · 1</summary><p>Анна, 3 окт: просил разбить на два чека</p></details>`, [[['Бан', 'ban', 'danger'], ['Лимит', 'limit']], [['Заметка', 'edit'], ['Заявки', 'order']]])] },
+    { t: 'Бан', n: 'Причина обязательна: она в журнале и видна другим.', bot: 'ops',
+      m: [B(`<b>Бан 51234567?</b>\nНовые чеки не примем, начатые заявки доведём.\nПричина:`, [[['Мультиаккаунт', 'flag']], [['Спам', 'flag'], ['Своя', 'edit']], [['Отмена', 'close']]], { time: '15:02' })] },
+    { t: 'Персонал', n: 'Роли и потолок ручной выплаты. Смена ролей — только владелец.', bot: 'ops',
       m: [R(`<h3>{-staff} Персонал</h3><div class="tw"><table><tr><th>Кто</th><th>Роль</th><th class="r">Потолок</th></tr><tr><td>{dot_ok} Анна</td><td>оператор</td><td class="r">50</td></tr><tr><td>{dot_closed} Олег</td><td>админ</td><td class="r">300</td></tr><tr><td>{dot_ok} Вы</td><td>владелец</td><td class="r">∞</td></tr></table></div><footer>Зелёным — на смене</footer>`, [[['Добавить', 'plus', 'primary'], ['Роль', 'key']], [['Потолок', 'limit'], ['Отключить', 'minus']]])] },
-    { t: 'Написать клиенту', n: 'Шаблоны на частые случаи, свой текст — следующим сообщением.', bot: 'ops',
-      m: [B(`<b>Сообщение клиенту</b> 51234567 · заявка <code>${ORD}</code>`, [[['Деньги у нас, проверяем', 'support']], [['Чек отправлен повторно', 'support']], [['Возврат оформлен', 'support']], [['Свой текст', 'edit']]], { time: '14:10' })] },
   ] },
   { group: 'Рассылка', items: [
-    { t: '1. Черновик', n: 'Предпросмотр — копия того, что увидят клиенты. Аудитория и тест себе — до отправки.', bot: 'ops',
-      m: [U(`{-sparkle} Комиссия CB → xR сегодня 1.5 % до 23:59`, { time: '16:00' }), B(`<b>Рассылка</b> · черновик выше\nАудитория: <b>активные 30 дней</b> · 1 284`, [[['Тест себе', 'eye'], ['Аудитория', 'users']], [['Отправить 1 284', 'play', 'primary']], [['Изменить', 'edit'], ['Удалить', 'trash']]], { time: '16:00' })] },
-    { t: '2. Подтверждение', n: 'Сколько и как долго. «Все» — только с подтверждением владельца.', bot: 'ops',
-      m: [B(`<b>Отправить 1 284 сообщения?</b>\n≈ 1 мин 05 с при 20 в секунду. Остановить можно в процессе.`, [[['Подтвердить', 'ack', 'danger'], ['Отмена', 'close']]], { time: '16:01' })] },
-    { t: '3. Идёт отправка', n: 'Шкала и счётчики правятся раз в несколько секунд.', bot: 'ops',
-      m: [B(`{broadcast} <b>Рассылка · 612 из 1 284</b>\n{seg:mmnee}\nДоставлено 603 · заблокировали 9 · ошибок 0`, [[['Пауза', 'pause'], ['Стоп', 'close', 'danger']]], { time: '16:01', edited: true })] },
-    { t: '4. Отчёт', n: 'Итог с цифрами; заблокировавшие бот больше не получат рассылок.', bot: 'ops',
+    { t: '1. Черновик', n: 'Предпросмотр — копия того, что увидят клиенты.', bot: 'ops',
+      m: [U(`{-sparkle} Комиссия CB → xR сегодня 1.5&nbsp;% до 23:59`, { time: '16:00' }), B(`<b>Рассылка</b> · черновик выше\nКому: <b>активные 30 дней</b> · 1 284`, [[['Тест себе', 'eye'], ['Кому', 'users']], [['Отправить 1 284', 'play', 'primary']], [['Изменить', 'edit'], ['Удалить', 'trash']]], { time: '16:00' })] },
+    { t: '2. Подтверждение', n: 'Сколько и как долго. «Всем» — только с подтверждением владельца.', bot: 'ops',
+      m: [B(`<b>Отправить 1 284 сообщения?</b>\n≈ 1 мин 05 с. Остановить можно в процессе.`, [[['Подтвердить', 'ack', 'danger'], ['Отмена', 'close']]], { time: '16:01' })] },
+    { t: '3. Идёт отправка', n: 'Кольцо прогресса вместо шкалы, счётчики правятся раз в несколько секунд.', bot: 'ops',
+      m: [B(`{prog_50} <b>Рассылка · 612 из 1 284</b>\nДоставлено 603 · заблокировали 9 · ошибок 0`, [[['Пауза', 'pause'], ['Стоп', 'close', 'danger']]], { time: '16:01', edited: true })] },
+    { t: '4. Отчёт', n: 'Итог с цифрами. Заблокировавшим бот рассылки больше не уходят.', bot: 'ops',
       m: [B(`{done} <b>Рассылка готова</b> · 1 мин 08 с\nДоставлено <code>1 266</code> · заблокировали <code>18</code> · ошибок <code>0</code>`, [[['Повторить', 'refresh'], ['Журнал', 'journal']]], { time: '16:02' })] },
   ] },
-  { group: 'Аналитика и журнал', items: [
+  { group: 'Цифры и журнал', items: [
     { t: 'Статистика', tag: 'rich', n: 'Неделя против прошлой. Деньги — из леджера, совпадают со сверкой.', bot: 'ops',
-      m: [R(`<h3>{-chart} 7 дней · 29 окт – 4 ноя</h3><div class="kpi"><div><small>Оборот</small><b>74 830</b><em class="up">▲ 14 %</em></div><div><small>Обменов</small><b>812</b><em class="up">▲ 9 %</em></div><div><small>Валовая</small><b>1 721</b><em class="up">▲ 6 %</em></div></div>${chartSVG([['чт', 8900, 205], ['пт', 9600, 221], ['сб', 11800, 271], ['вс', 12900, 297], ['пн', 10400, 239], ['вт', 9300, 214], ['ср', 11930, 274]])}<details><summary>По направлениям</summary><div class="tw"><table><tr><th>Куда</th><th class="r">Обменов</th><th class="r">p95</th></tr><tr><td>CB → xR</td><td class="r">591</td><td class="r">13 с</td></tr><tr><td>xR → CB</td><td class="r">164</td><td class="r">15 с</td></tr><tr><td>Счета</td><td class="r">57</td><td class="r">22 с</td></tr></table></div></details><details><summary>Ручной разбор</summary><p>9 заявок · медиана 7 мин · максимум 31 мин</p></details><footer>Обновлено 14:05 · из леджера</footer>`, [[['Сегодня', 'calendar'], ['7 дней', 'calendar', 'primary'], ['30 дней', 'calendar']], [['Период…', 'calendar'], ['CSV', 'export']]])] },
-    { t: 'Сводка дня', n: 'Каждое утро в 09:00 в тему «Сводки». Короче статистики, без кнопок.', bot: 'ops', topic: 'Сводки',
-      m: [B(`{-chart} <b>Вчера · 4 ноября</b>\n136 обменов · <code>11 930</code> USDT · прибыль <code>274.10</code>\nОшибки 0.7 % · возвраты 1.5 % · p95 14 с\nРазбор: 2, медиана 6 мин`, null, { time: '09:00' })] },
+      m: [R(`<h3>{-chart} 7 дней · 29 окт – 4 ноя</h3><div class="kpi"><div><small>Оборот</small><b>74 830</b><em class="up">▲ 14&nbsp;%</em></div><div><small>Обменов</small><b>812</b><em class="up">▲ 9&nbsp;%</em></div><div><small>Валовая</small><b>1 721</b><em class="up">▲ 6&nbsp;%</em></div></div>${chartSVG([['чт', 8900, 205], ['пт', 9600, 221], ['сб', 11800, 271], ['вс', 12900, 297], ['пн', 10400, 239], ['вт', 9300, 214], ['ср', 11930, 274]])}<details><summary>По направлениям</summary><div class="tw"><table><tr><th>Куда</th><th class="r">Обменов</th><th class="r">p95</th></tr><tr><td>CB → xR</td><td class="r">591</td><td class="r">13 с</td></tr><tr><td>xR → CB</td><td class="r">164</td><td class="r">15 с</td></tr><tr><td>Счета</td><td class="r">57</td><td class="r">22 с</td></tr></table></div></details><details><summary>Ручной разбор</summary><p>9 заявок · медиана 7 мин · максимум 31 мин</p></details><footer>Обновлено 14:05 · из леджера</footer>`, [[['Сегодня'], ['7 дней', null, 'primary'], ['30 дней']], [['Период…', 'calendar'], ['CSV', 'export']]])] },
+    { t: 'Сводка дня', n: 'Каждое утро в 09:00 в тему «Сводки».', bot: 'ops', topic: 'Сводки',
+      m: [B(`{-chart} <b>Вчера · 4 ноября</b>\n136 обменов · <code>11 930</code> USDT · прибыль <code>274.10</code>\nОшибки 0.7&nbsp;% · возвраты 1.5&nbsp;% · p95 14 с\nРазбор: 2, медиана 6 мин`, null, { time: '09:00' })] },
     { t: 'Дайджест обменов', n: 'Раз в 5 минут в тему «Обмены», без звука.', bot: 'ops', topic: 'Обмены',
       m: [B(`<b>Обмены 14:00–14:05</b>\n<code>A1B2C3D4E5</code> CB→xR 100.00 → 97.50 · 9 с\n<code>F6A7B8C9D0</code> xR→CB 20.00 → 19.70 · 11 с\n<code>11AA22BB33</code> отказ: чек уже открыт\n<i>2 обмена · 120.00 · комиссия 2.80</i>`, null, { time: '14:05' })] },
     { t: 'Журнал', n: 'Каждое действие персонала: кто, что, было → стало.', bot: 'ops',
-      m: [R(`<h3>{-journal} Журнал</h3><div class="tw"><table><tr><td>14:07</td><td>Анна</td><td>взяла <code>K7M2…</code></td></tr><tr><td>13:40</td><td>Олег</td><td>комиссия CB → xR <code>2.0 → 2.4</code></td></tr><tr><td>12:02</td><td>Вы</td><td>стоп-кран выкл · двойное</td></tr><tr><td>11:15</td><td>Олег</td><td>бан 48812211 · спам</td></tr></table></div>`, [[['Сотрудник', 'filter'], ['Период', 'calendar']], [['CSV', 'export'], ['Ещё', 'refresh']]])] },
+      m: [R(`<h3>{-journal} Журнал</h3><div class="tw"><table><tr><td>15:03</td><td>Вы</td><td>подключён ub-3</td></tr><tr><td>14:07</td><td>Анна</td><td>взяла <code>K7M2…</code></td></tr><tr><td>13:40</td><td>Олег</td><td>комиссия CB → xR <code>2.0 → 2.4</code></td></tr><tr><td>11:15</td><td>Олег</td><td>бан 48812211 · спам</td></tr></table></div>`, [[['Сотрудник', 'filter'], ['Период', 'calendar']], [['CSV', 'export'], ['Ещё', 'refresh']]])] },
     { t: 'Экспорт', n: 'CSV прямо в чат: UTF-8, точка с запятой, суммы строкой.', bot: 'ops',
-      m: [B(`<b>Экспорт</b> · что и за какой период?`, [[['Заявки', 'order', 'primary'], ['Леджер', 'coin'], ['Журнал', 'journal']], [['Сегодня', 'calendar'], ['7 дней', 'calendar'], ['30 дней', 'calendar']]], { time: '17:00' }), FILE('orders_29.10–04.11.csv', '812 строк · 214 КБ', { time: '17:00' })] },
+      m: [B(`<b>Экспорт</b> · что и за какой период?`, [[['Заявки', 'order', 'primary'], ['Леджер', 'coin'], ['Журнал', 'journal']], [['Сегодня'], ['7 дней'], ['30 дней']]], { time: '17:00' }), FILE('orders_29.10–04.11.csv', '812 строк · 214 КБ', { time: '17:00' })] },
   ] },
-  { group: 'Настройки и сервис', items: [
-    { t: 'Настройки', n: 'Разделы реестра настроек. Изменение применяется сразу, без рестарта.', bot: 'ops',
-      m: [B(`<b>Настройки</b>`, [[['Котировки', 'wait'], ['Лимиты', 'limit']], [['Возвраты', 'refund'], ['Сверка', 'refresh']], [['Алерты', 'bell'], ['Тихие часы', 'calendar']], [['Тексты баннеров', 'edit'], ['Эмодзи', 'emoji']]], { time: '17:10' })] },
-    { t: 'Раздел «Лимиты»', n: 'Текущее значение на кнопке. Тап — ввод нового, затем было → стало.', bot: 'ops',
-      m: [B(`<b>Лимиты</b>\nСсылок в минуту <code>6</code> · заявок в сутки <code>20</code>\nВ сутки <code>1 000</code> USDT · новичку <code>100</code> USDT`, [[['Ссылок/мин · 6', 'edit'], ['Заявок · 20', 'edit']], [['В сутки · 1 000', 'edit'], ['Новичку · 100', 'edit']], [['Назад', 'back']]], { time: '17:11' })] },
-    { t: 'Самопроверка', tag: 'после деплоя', n: 'Живые аккаунты, настоящие чеки на 1 USDT. Шаги отмечаются по мере прохождения.', bot: 'ops',
-      m: [R(`<h3>{shield} Самопроверка · 1.4.0</h3><ul class="tasks"><li>{step_done}<span>Боты кошельков отвечают · 2/2</span></li><li>{step_done}<span>Балансы = леджер</span></li><li>{step_done}<span>Свой чек 1 USDT активирован · 4 с</span></li><li>{step_now}<span>Инлайн-чек xRocket 1 USDT…</span></li><li>{step_todo}<span>Возврат тестового чека</span></li></ul><footer>{wait} идёт 38 с</footer>`, [[['Остановить', 'close']]], { edited: true })] },
-    { t: 'Эмодзи', n: 'Набор кастомных эмодзи: статус, версия, роли. Обновление с прогрессом и откат.', bot: 'ops',
-      m: [R(`<h3>{-emoji} Эмодзи</h3><p>{dot_ok} Набор <code>exch_emoji</code> · 110 · v3</p><div class="rows"><div>{done}<span>Готово</span><small>done</small></div><div>{process}<span>Проверяю</span><small>process</small></div><div>{err}<span>Ошибка</span><small>err</small></div></div><p>{seg:mmmne} Загружаю v4 · 88 из 110</p><footer>{wait} 429 от Telegram: пауза 12 с</footer>`, [[['Предпросмотр', 'eye'], ['Роли', 'pin']], [['Откатить на v2', 'refresh']]], { edited: true })] },
+  { group: 'Система и настройки', items: [
+    { t: 'Система', n: 'Здоровье всего сервиса на одном экране: версия, база, бэкап, очередь, связь.', bot: 'ops',
+      m: [R(`<h3>{-server} Система</h3><div class="tw"><table><tr><td>{dot_ok} Версия</td><td class="r">1.4.0 · работает 3 дн</td></tr><tr><td>{dot_ok} База</td><td class="r">12 мс</td></tr><tr><td>{dot_ok} Бэкап</td><td class="r">03:00 · проверен</td></tr><tr><td>{dot_ok} Очередь операций</td><td class="r">пусто</td></tr><tr><td>{dot_ok} Bot API</td><td class="r">48 мс</td></tr><tr><td>{dot_wait} ub-2</td><td class="r">FLOOD до 14:12</td></tr></table></div><footer>Обновлено 14:05</footer>`, [[['Самопроверка', 'shield']], [['Предпросмотр экранов', 'eye']]])] },
+    { t: 'Предпросмотр экранов', n: 'Главная проверка «как в Telegram»: бот присылает вам все экраны клиента настоящими сообщениями.', bot: 'ops',
+      m: [B(`<b>Предпросмотр</b>\nПришлю сюда экраны клиента — с нашими эмодзи и кнопками, как их увидит клиент.`, [[['Все · 42', 'eye', 'primary']], [['Обмен', 'swap'], ['Счёт', 'invoice'], ['Ошибки', 'alert']]], { time: '17:20' })] },
+    { t: 'Самопроверка', tag: 'после обновления', n: 'Живые аккаунты, настоящие чеки на 1&nbsp;USDT. Шаги отмечаются по мере прохождения.', bot: 'ops',
+      m: [R(`<h3>{-shield} Самопроверка · 1.4.0</h3><ul class="tasks"><li>{step_done}<span>Боты кошельков отвечают · 2/2</span></li><li>{step_done}<span>Балансы = леджер</span></li><li>{step_done}<span>Свой чек 1&nbsp;USDT открыт · 4 с</span></li><li>{step_now}<span>Чек xRocket 1&nbsp;USDT…</span></li><li>{step_todo}<span>Возврат тестового чека</span></li></ul><footer>{wait} идёт 38 с</footer>`, [[['Остановить', 'close']]], { edited: true })] },
+    { t: 'Настройки', n: 'Разделы настроек. Изменение применяется сразу, без перезапуска.', bot: 'ops',
+      m: [B(`<b>Настройки</b>`, [[['Котировки', 'wait'], ['Лимиты', 'limit']], [['Возвраты', 'refund'], ['Сверка', 'refresh']], [['Алерты', 'bell'], ['Тексты', 'edit']], [['Белый список', 'shield'], ['Эмодзи', 'emoji']]], { time: '17:10' })] },
+    { t: 'Раздел «Лимиты»', n: 'Значение — на кнопке. Тап — новое значение, затем было → стало.', bot: 'ops',
+      m: [B(`<b>Лимиты</b>`, [[['Ссылок в минуту · 6', 'edit']], [['Заявок в сутки · 20', 'edit']], [['В сутки · 1 000&nbsp;USDT', 'edit']], [['Новичку · 100&nbsp;USDT', 'edit']], [['Назад', 'back']]], { time: '17:11' })] },
+    { t: 'Эмодзи', n: 'Набор кастомных эмодзи: версия, роли. Обновление с прогрессом и откат.', bot: 'ops',
+      m: [R(`<h3>{-emoji} Эмодзи</h3><p>{dot_ok} Набор <code>exch_emoji</code> · 113 · v2</p><div class="rows"><div>{done}<span>Готово</span><small>done</small></div><div>{process}<span>В работе</span><small>process</small></div><div>{err}<span>Ошибка</span><small>err</small></div></div><p>{prog_75} Загружаю v3 · 86 из 113</p><footer>{wait} Telegram просит паузу 12 с</footer>`, [[['Предпросмотр', 'eye'], ['Роли', 'pin']], [['Откатить на v1', 'refresh']]], { edited: true })] },
   ] },
 ];
 
+// ══ КОНТРОЛЬ ══════════════════════════════════════════════════════════════════
+const CONTROL = [
+  ['Деньги клиента', 'Карточка заявки: ход, операции, ответы кошельков, проводки', 'Повторить, вернуть, закрыть', 'Одна попытка на выплату; неясный исход → сверка или разбор, никогда второй чек'],
+  ['Выплаты целиком', 'Главный экран, стоп-кран', 'Остановить все выплаты', 'Включить может любой, выключить — только владелец словом'],
+  ['Резервы', 'Резервы и сверка (каждые 15 мин)', 'Сверить, ребалансировка, вывод прибыли, пороги', 'Недостача → пауза выплат из кошелька + «это вы?»'],
+  ['Аккаунты юзерботов', 'Аккаунты, карточка, сессии', 'Добавить, заменить, войти заново, пауза, отключить', 'Код — кнопками, пароль — удаляется сразу, сессия — шифруется'],
+  ['Чужие входы', 'Сессии, тема «Безопасность»', 'Завершить сессию', 'Алерт о каждом новом входе'],
+  ['Цены и направления', 'Направления, карточка направления', 'Комиссия, лимиты, рычаг, пауза', 'Больше 1&nbsp;п.п. — подтверждение владельца'],
+  ['Незнакомые ответы', 'Тема «Ошибки», разбор', 'Сохранить фикстуру, снять паузу', 'Направление встаёт на паузу само'],
+  ['Клиенты', 'Карточка клиента, обращения', 'Бан, лимит, заметка, ответить', 'Причина бана обязательна'],
+  ['Рассылки', 'Рассылка: черновик → тест → отправка', 'Пауза, стоп', '«Всем» — только с владельцем'],
+  ['Персонал', 'Персонал, журнал', 'Роли, потолки ручных выплат', 'Каждое действие — в журнале с «было → стало»'],
+  ['Сервис', 'Система, самопроверка, предпросмотр', 'Обслуживание, проверка после обновления', 'Сторож перезапускает зависший процесс'],
+  ['Алерты', 'Настройка алертов, темы', 'Куда, со звуком ли, тихие часы', 'Критичное повторяется, пока кто-то не нажмёт «Принял»'],
+];
+const TG_NOTES = [
+  ['Эмодзи и иконки на кнопках', 'Наши эмодзи и иконки на кнопках видны, только если у владельца бота есть Telegram Premium. Без него бот сам подставит обычные эмодзи — тексты от этого не ломаются.'],
+  ['Ширина кнопок', 'Кнопки под сообщением шириной с само сообщение. Длинный текст на узком телефоне обрезается многоточием — поэтому на кнопках 1–3 слова. Телефоны на этой странице — 390 px, как iPhone.'],
+  ['Свёрнутая цитата', 'Детали прячутся в цитату, которая раскрывается тапом. В старых версиях Telegram она показана раскрытой — сообщение просто длиннее.'],
+  ['Rich-сообщения', 'Таблицы, заголовки и раскрывашки (приветствие, курс, история, пульт) — новый формат Bot API 10.3. Точный вид зависит от версии Telegram, поэтому у каждого такого экрана есть простой вариант и кнопка «Не отображается?».'],
+  ['Анимация', 'В чате эмодзи играют как здесь. В списке чатов, уведомлениях и ответах Telegram показывает обычный эмодзи-заменитель.'],
+  ['Удалённые сообщения', 'Номер телефона и облачный пароль бот удаляет сразу после чтения: в личном чате от них не остаётся следа.'],
+  ['Проверка вживую', 'Окончательная проверка — «Предпросмотр экранов» в пульте: бот присылает вам каждый экран настоящим сообщением. Сделаю его вместе с пультом.'],
+];
 // ══ отрисовка ═════════════════════════════════════════════════════════════════
-function dirCard(d) {
+// Карточка с переключением состояний: одно сообщение, которое бот правит по шагам.
+function stateCard(d) {
   const names = Object.keys(d.states);
-  return `<div class="dir${d.pick ? ' pick' : ''}" data-dir="${d.id}"><h3>${d.id}. ${d.name}${d.pick ? '<span class="badge">рекомендую</span>' : ''}</h3><p>${d.idea}</p><div class="chips" role="group" aria-label="Шаг заявки">${names.map((s, i) => `<button type="button" class="chip" id="dir-${d.id}-${i}" data-state="${s}" aria-pressed="${i === names.length - 1}">${s}</button>`).join('')}<button type="button" class="chip play" id="dir-${d.id}-play" data-play="1">▶ Проиграть</button></div><div class="slot">${phoneHTML({ m: d.states[names[names.length - 1]], noinput: true })}</div><ul>${d.plus.map((x) => `<li>${x}</li>`).join('')}${d.minus.map((x) => `<li>− ${x}</li>`).join('')}</ul></div>`;
+  const last = d.start ?? names.indexOf('Готово');
+  const first = last >= 0 ? last : 0;
+  return `<div class="dir${d.pick ? ' pick' : ''}" data-dir="${d.id}"><h3>${d.id}. ${d.name}${d.pick ? '<span class="badge">рекомендую</span>' : ''}</h3><p>${d.idea}</p><div class="chips" role="group" aria-label="Состояние">${names.map((s, i) => `<button type="button" class="chip" id="st-${d.id}-${i}" data-state="${s}" aria-pressed="${i === first}">${s}</button>`).join('')}<button type="button" class="chip play" id="st-${d.id}-play" data-play="1">▶ Проиграть</button></div><div class="slot">${phoneHTML({ m: d.states[names[first]], noinput: true, bot: d.bot })}</div><ul>${d.plus.map((x) => `<li>${x}</li>`).join('')}${d.minus.map((x) => `<li>− ${x}</li>`).join('')}</ul></div>`;
 }
-function renderClient() {
-  const v = document.getElementById('view-client');
-  v.innerHTML = `<div class="block"><header><h2>Четыре направления<small>A–D</small></h2><p>Один и тот же обмен — чек CryptoBot на 100 USDT → чек xRocket. Переключайте шаги или нажмите «Проиграть»: в боте это одно сообщение, которое правится.</p></header><div class="grid wide">${DIRS.map(dirCard).join('')}</div></div>` +
-    block('Путь клиента в варианте A', FLOW.length + ' экранов', 'Денежный поток — обычные HTML-сообщения: показываются в любом клиенте. Справка (приветствие, курс, история) — rich, у каждого есть простой вариант.', FLOW);
-  v.querySelectorAll('.dir').forEach((el) => {
-    const d = DIRS.find((x) => x.id === el.dataset.dir);
+function wireStates(root, list) {
+  root.querySelectorAll('.dir').forEach((el) => {
+    const d = list.find((x) => x.id === el.dataset.dir);
+    if (!d) return;
     const slot = el.querySelector('.slot');
-    const names = Object.keys(d.states);
+    const names = Object.keys(d.states).filter((s) => s !== 'Детали');
     const show = (s) => {
-      release(slot); slot.innerHTML = phoneHTML({ m: d.states[s], noinput: true }); observe(slot);
+      release(slot);
+      slot.innerHTML = phoneHTML({ m: d.states[s], noinput: true, bot: d.bot });
+      observe(slot);
       el.querySelectorAll('[data-state]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.state === s)));
     };
     el.addEventListener('click', (e) => {
-      const b = e.target.closest('button'); if (!b) return;
+      const b = e.target.closest('button');
+      if (!b) return;
       if (b.dataset.state) { clearInterval(el._t); show(b.dataset.state); }
       if (b.dataset.play) {
-        clearInterval(el._t); let i = 0; show(names[0]);
-        el._t = setInterval(() => { i += 1; if (i >= names.length) { clearInterval(el._t); return; } show(names[i]); }, 2200);
+        clearInterval(el._t);
+        let i = 0;
+        show(names[0]);
+        el._t = setInterval(() => { i += 1; if (i >= names.length) { clearInterval(el._t); return; } show(names[i]); }, 2000);
       }
     });
   });
 }
+function renderClient() {
+  const v = document.getElementById('view-client');
+  v.innerHTML = `<div class="block"><header><h2>Вариант B — три доработки<small>B1–B3</small></h2><p>Ваш выбор — вариант B. Ниже он сам и две доработки: один обмен, чек CryptoBot на 100 USDT → чек xRocket. Переключайте шаги или нажмите «Проиграть»: в боте это одно сообщение, которое правится. Рекомендую B2.</p></header><div class="grid wide">${VARIANTS.map(stateCard).join('')}</div></div>` +
+    block('Путь клиента', FLOW.length + ' экранов', 'Всё остальное — в том же коротком стиле: строка итога, детали свёрнуты, деньги на кнопках. Денежный поток — обычные сообщения (работают в любом Telegram), справка — rich с простым вариантом.', FLOW);
+  wireStates(v, VARIANTS);
+}
 function renderAdmin() {
   const v = document.getElementById('view-admin');
-  let html = block('Главный экран: три варианта', 'А–В', 'Первое, что видит сотрудник по /dash. Рекомендую А: пульт начинается с того, что ждёт человека.', DASH, true);
-  html += `<div class="block"><header><h2>Карта пульта<small>${ADMIN.reduce((n, g) => n + g.items.length, 0)} экрана</small></h2><p>Отдельный служебный бот: свой токен, темы для алертов, чужих не слышит. Всё необратимое — через подтверждение с одноразовой кнопкой.</p></header><div class="map">${ADMIN.map((g, gi) => `<a href="#admin" data-jump="g${gi}"><b>${g.group}</b><small>${g.items.map((i) => i.t.replace(/^\d\. /, '')).join(' · ')}</small></a>`).join('')}</div></div>`;
-  ADMIN.forEach((g, gi) => { html += `<div id="g${gi}">${block(g.group, g.items.length, '', g.items)}</div>`; });
+  const total = ADMIN.reduce((n, g) => n + g.items.length, 0);
+  const dash = [
+    { t: 'Обычный день', tag: 'рекомендую', n: 'Первая строка отвечает «надо ли мне что-то делать». Счётчики — на кнопках, резерв — в процентах от цели.', bot: 'ops', m: [U('/dash', { time: '14:05' }), DASH_OK] },
+    { t: 'Пожар', n: 'Что горит — наверху и красным: недостача, сброшенный вход, пауза выплат. Красные кнопки — только сейчас.', bot: 'ops', m: [DASH_FIRE] },
+    { t: 'Тишина', n: 'Решать нечего — так и написано. Остаются цифры дня и резервы.', bot: 'ops', m: [DASH_CALM] },
+  ];
+  let html = block('Главный экран · вариант А', '3 состояния', 'Ваш вариант А, доработанный: один экран /dash, который сам меняет вид по обстановке. Бот правит его раз в минуту и сразу при событии.', dash);
+  html += `<div class="block"><header><h2>Карта пульта<small>${total} экранов</small></h2><p>Отдельный служебный бот: свой токен, темы для алертов, посторонних не слышит. Всё необратимое — через подтверждение одноразовой кнопкой.</p></header><div class="map">${ADMIN.map((g, gi) => `<a href="#admin" data-jump="g${gi}"><b>${g.group}</b><small>${g.items.map((i) => i.t.replace(/^\d\. /, '')).join(' · ')}</small></a>`).join('')}</div></div>`;
+  ADMIN.forEach((g, gi) => { html += `<div id="g${gi}">${block(g.group, g.items.length, g.lead || '', g.items)}</div>`; });
   v.innerHTML = html;
   v.querySelectorAll('[data-jump]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); document.getElementById(a.dataset.jump).scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth', block: 'start' }); }));
+}
+function renderControl() {
+  const v = document.getElementById('view-control');
+  v.innerHTML = `<div class="block"><header><h2>Что под контролем<small>${CONTROL.length}</small></h2><p>Каждый процесс сервиса: где его видно, что с ним можно сделать и что защищает от ошибки. Пустых мест нет — всё, что делает бот, видно в пульте.</p></header><div class="ctl"><table><thead><tr><th>Процесс</th><th>Где видно</th><th>Что можно</th><th>Защита</th></tr></thead><tbody>${CONTROL.map((r) => `<tr>${r.map((c, i) => (i ? `<td>${c}</td>` : `<th scope="row">${c}</th>`)).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
 function renderEmoji() {
   const v = document.getElementById('view-emoji');
   const keys = Object.keys(EMOJI);
   const tiles = (kind) => keys.filter((k) => k.startsWith(kind + '/')).map((k) => {
-    const name = k.split('/')[1]; const anim = EMOJI[k].op - EMOJI[k].ip > 60;
-    return `<div class="etile"><i class="ce${kind === 'mono' ? ' mono' : ''}" data-k="${k}" aria-hidden="true">${FB[name] || '·'}</i><b>${LABELS[name] || name}</b><code>${name}</code>${anim ? '<span class="an">анимация</span>' : ''}</div>`;
+    const name = k.split('/')[1];
+    return `<div class="etile"><i class="ce${kind === 'mono' ? ' mono' : ''}" data-k="${k}" aria-hidden="true">${FB[name] || '·'}</i><b>${LABELS[name] || name}</b><code>${name}</code></div>`;
   }).join('');
-  const nColor = keys.filter((k) => k.startsWith('color/')).length, nMono = keys.length - nColor;
-  const nAnim = keys.filter((k) => EMOJI[k].op - EMOJI[k].ip > 60).length;
-  v.innerHTML = `<div class="block"><header><h2>Свой набор эмодзи<small>${keys.length}</small></h2><p>Вектор (TGS, Lottie): чёткие в любом размере. Каждый кадр сверен с эталоном движком rlottie — тем же, что в Telegram, на тёмной и светлой теме. Анимированных — ${nAnim}.</p></header>
-  <div class="emoji-board"><div class="inline-demo">${fmt('{done} <b>Готово</b> · <code>97.50</code> USDT &nbsp; {process} Проверяю &nbsp; {seg:mmn} &nbsp; {-swap} {-history} {-settings}')}</div></div></div>
-  <div class="block"><header><h2>Цветные<small>${nColor}</small></h2><p>Статусы и плитки. Telegram не перекрашивает их: цвет несёт смысл.</p></header><div class="emoji-board"><div class="egrid">${tiles('color')}</div></div></div>
-  <div class="block"><header><h2>Линейные<small>${nMono}</small></h2><p>Для кнопок и строк. Telegram красит их в цвет текста темы (<code>needs_repainting</code>), поэтому в кнопках они белые, а в тексте — как текст.</p></header><div class="emoji-board"><div class="egrid">${tiles('mono')}</div></div></div>`;
+  const nColor = keys.filter((k) => k.startsWith('color/')).length;
+  const nMono = keys.length - nColor;
+  v.innerHTML = `<div class="block"><header><h2>Эмодзи v2<small>${keys.length}</small></h2><p>Линии тоньше, анимированы все. Правило движения одно: короткий жест в начале петли, потом покой. Постоянно двигается только то, что идёт сейчас: «в работе», «ждём», «в пути», тревога. Каждый кадр сверен с движком Telegram на тёмной и светлой теме.</p></header>
+  <div class="emoji-board"><div class="inline-demo">${fmt('{done} <b>97.50 USDT</b> ждут вас &nbsp; {process} Проверяю &nbsp; {prog_50} 612 из 1 284 &nbsp; {-swap} {-history} {-settings} {-robot}')}</div></div></div>
+  <div class="block"><header><h2>«В работе» — выберите<small>2</small></h2><p>Прежний значок заменён. Предлагаю два: точки бегут волной (по умолчанию) и точка на орбите.</p></header><div class="emoji-board"><div class="egrid">${['process', 'process_orbit'].map((k) => `<div class="etile big"><i class="ce" data-k="color/${k}" aria-hidden="true">🔄</i><b>${LABELS[k]}</b><code>${k}</code></div>`).join('')}</div></div></div>
+  <div class="block"><header><h2>Цветные<small>${nColor}</small></h2><p>Статусы и плитки. Telegram их не перекрашивает: цвет несёт смысл. Шкал больше нет — вместо них кольца прогресса.</p></header><div class="emoji-board"><div class="egrid">${tiles('color')}</div></div></div>
+  <div class="block"><header><h2>Линейные<small>${nMono}</small></h2><p>Для кнопок и строк. Telegram красит их в цвет текста темы: на кнопках белые, в тексте — как текст.</p></header><div class="emoji-board"><div class="egrid">${tiles('mono')}</div></div></div>`;
 }
 function renderRules() {
   const v = document.getElementById('view-rules');
-  const R = [
-    ['Клиент', 'Одно окно на заявку', 'Сообщение создаётся при получении чека и дальше правится. Итог — новым сообщением, если прошло больше минуты: так придёт уведомление.'],
-    ['Клиент', 'Две строки на шаг', 'Статус и деньги. Всё остальное — в раскрывающейся цитате или на кнопке. Тексты в ru.toml перепишу под выбранный вариант.'],
-    ['Клиент', 'Деньги — моноширинным', 'Суммы, номера, команды вида @send 100usdt — кодом, рядом кнопка «скопировать». Ничего не надо выделять пальцем.'],
+  const RULES = [
+    ['Клиент', 'Одно окно на заявку', 'Сообщение появляется сразу и дальше правится. Итог — новым сообщением, если прошло больше минуты: так придёт уведомление.'],
+    ['Клиент', 'Одна строка на шаг', 'Статус и деньги. Остальное — в свёрнутой цитате или на кнопке.'],
+    ['Клиент', 'Деньги — моноширинным', 'Суммы, номера, команды вида @send 100usdt копируются кнопкой. Ничего не надо выделять пальцем.'],
     ['Клиент', 'Цвет кнопки = смысл', 'Зелёная — забрать деньги. Синяя — главное действие. Красная — необратимое. Остальные — нейтральные.'],
-    ['Клиент', 'Ошибка: где деньги и что делать', 'Каждая ошибка в первой строке называет, что случилось, во второй — где деньги клиента и что ему делать.'],
-    ['Клиент', 'HTML для денег, rich для справки', 'Денежный поток — обычный HTML, работает в любом клиенте. Приветствие, курс, история — rich, с кнопкой «Не отображается?».'],
-    ['Эмодзи', 'Цвет — статус, линия — навигация', 'Цветные — состояния и плитки, их не перекрашивает Telegram. Линейные — в кнопках и строках, берут цвет текста темы.'],
-    ['Эмодзи', 'Анимация — только у живого', 'Двигается то, что идёт сейчас: проверяю, отправляю, ждём, тревога. Готово и ошибка — один короткий жест и покой.'],
-    ['Пульт', 'Сначала «что решить»', 'Главный экран начинается с очереди для человека и счётчиков на кнопках. Цифры и графики — ниже и в /stats.'],
-    ['Пульт', 'Необратимое — дважды', 'Предпросмотр «что произойдёт» и одноразовая кнопка на 60 секунд. Для пяти самых опасных действий нужно ещё ввести контрольную строку.'],
-    ['Пульт', 'Алерт правится, а не множится', 'Повтор того же события правит старое сообщение («×7, последнее 14:05»). После «Принял» алерт перестаёт повторяться.'],
-    ['Пульт', 'Деньги только из леджера', 'Статистика, резервы и сверка считаются из проводок, а не из полей заявки. Цифры везде совпадают.'],
+    ['Клиент', 'Ошибка: где деньги и что делать', 'Первая строка — что случилось, вторая — где деньги клиента и что прислать.'],
+    ['Эмодзи', 'Цвет — статус, линия — навигация', 'Цветные — состояния, Telegram их не перекрашивает. Линейные — на кнопках, берут цвет текста.'],
+    ['Пульт', 'Сначала «что решить»', 'Главный экран начинается с того, что ждёт человека. Цифры — ниже и в статистике.'],
+    ['Пульт', 'Необратимое — дважды', 'Предпросмотр «что произойдёт» и одноразовая кнопка на 60 секунд. Самые опасные действия — ещё и контрольная строка.'],
+    ['Пульт', 'Алерт правится, а не множится', 'Повтор события правит старое сообщение. После «Принял» алерт больше не звонит.'],
+    ['Пульт', 'Деньги только из леджера', 'Статистика, резервы и сверка считаются из проводок. Цифры везде совпадают.'],
   ];
-  v.innerHTML = `<div class="block"><header><h2>Правила интерфейса<small>${R.length}</small></h2><p>По ним собраны все макеты. Когда выберете варианты, перенесу их в экраны ui и в пульт.</p></header><div class="rules">${R.map(([k, b, p]) => `<div class="rule"><span class="k">${k}</span><b>${b}</b><p>${p}</p></div>`).join('')}</div></div>`;
+  v.innerHTML = `<div class="block"><header><h2>Как это будет выглядеть в Telegram<small>${TG_NOTES.length}</small></h2><p>Где макет может разойтись с настоящим Telegram и что я для этого сделал.</p></header><div class="rules">${TG_NOTES.map(([b, p]) => `<div class="rule"><span class="k">Telegram</span><b>${b}</b><p>${p}</p></div>`).join('')}</div></div>
+  <div class="block"><header><h2>Правила интерфейса<small>${RULES.length}</small></h2><p>По ним собраны все макеты.</p></header><div class="rules">${RULES.map(([k, b, p]) => `<div class="rule"><span class="k">${k}</span><b>${b}</b><p>${p}</p></div>`).join('')}</div></div>`;
 }
 
 // ── вкладки и тема чатов ───────────────────────────────────────────────────────
-const VIEWS = ['client', 'admin', 'emoji', 'rules'];
+const VIEWS = ['client', 'admin', 'control', 'emoji', 'rules'];
 const rendered = {};
-const RENDER = { client: renderClient, admin: renderAdmin, emoji: renderEmoji, rules: renderRules };
+const RENDER = { client: renderClient, admin: renderAdmin, control: renderControl, emoji: renderEmoji, rules: renderRules };
 function show(name) {
   if (!VIEWS.includes(name)) name = 'client';
   for (const v of VIEWS) {
@@ -661,9 +748,11 @@ document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('clic
   remountMono();
 }));
 try { const saved = localStorage.getItem('exch-tg'); if (saved && saved !== 'auto') document.getElementById('tg-' + saved)?.click(); } catch (e) { /* нет хранилища */ }
-document.getElementById('n-client').textContent = `${DIRS.length} + ${FLOW.length}`;
-document.getElementById('n-admin').textContent = `${DASH.length} + ${ADMIN.reduce((n, g) => n + g.items.length, 0)}`;
+document.getElementById('n-client').textContent = `${VARIANTS.length} + ${FLOW.length}`;
+document.getElementById('n-admin').textContent = `${ADMIN.reduce((n, g) => n + g.items.length, 0) + 1}`;
+document.getElementById('n-control').textContent = CONTROL.length;
 document.getElementById('n-emoji').textContent = Object.keys(EMOJI).length;
 observe(document.querySelector('header.top'));
 show(location.hash.slice(1) || 'client');
 </script>
+
