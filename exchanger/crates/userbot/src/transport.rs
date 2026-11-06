@@ -5,9 +5,13 @@
 //! этот трейт, поэтому одинаково работают в бою и в тестах.
 //!
 //! Идемпотентность (факт из lovec, `tests/send_outcomes.rs`): повтор `messages.sendMessage`
-//! или `messages.sendInlineBotResult` с ТЕМ ЖЕ `random_id` безопасен — Telegram не создаёт
-//! второе сообщение (`RANDOM_ID_DUPLICATE` или прежний результат). Поэтому каждая денежная
-//! операция получает свой `random_id` заранее и хранит его в БД.
+//! с ТЕМ ЖЕ `random_id` безопасен — Telegram не создаёт второе сообщение (`RANDOM_ID_DUPLICATE`
+//! или прежний результат). Поэтому каждая денежная операция получает свой `random_id` заранее
+//! и хранит его в БД. Нажатие кнопки (`getBotCallbackAnswer`) такой защиты не имеет: денежную
+//! кнопку сценарии нажимают ровно один раз.
+//!
+//! Чеки exch создаёт только через меню ботов (решение владельца, DESIGN-v0.2 Р5), мини-приложения
+//! не открывает (Р4): инлайн-режима и WebView в транспорте нет.
 
 use std::time::Duration;
 
@@ -21,7 +25,8 @@ use tokio::sync::broadcast;
 pub enum Chat {
     /// Личка с ботом кошелька (@send или @xrocket) по закреплённому peer id.
     WalletBot(Platform),
-    /// «Избранное» аккаунта: сюда юзербот отправляет инлайн-чеки, чтобы взять из них ссылку.
+    /// «Избранное» аккаунта: метки операций (`🏷 exch ord-…`), по которым после сбоя находится
+    /// чек операции.
     SavedMessages,
 }
 
@@ -61,7 +66,8 @@ pub struct RawMessage {
     pub entity_urls: Vec<String>,
     /// Инлайн-клавиатура по рядам.
     pub buttons: Vec<Vec<RawButton>>,
-    /// Сообщение отправлено через инлайн-режим этого бота (`via_bot`).
+    /// Сообщение отправлено через инлайн-режим этого бота (`via_bot`). exch так не отправляет;
+    /// поле — для журнала и чтобы отличать чужие сообщения «через бота».
     pub via_bot: Option<Platform>,
 }
 
@@ -85,20 +91,6 @@ impl RawMessage {
             .flatten()
             .find(|b| b.text.to_lowercase().contains(&needle))
     }
-}
-
-/// Один вариант инлайн-ответа бота (`@send 10usdt` → «Отправить чек на 10 USDT»).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct InlineResult {
-    pub id: String,
-    pub title: Option<String>,
-    pub description: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct InlineResults {
-    pub query_id: i64,
-    pub results: Vec<InlineResult>,
 }
 
 /// Ответ на нажатие callback-кнопки (всплывающее уведомление или переход по URL).
@@ -153,28 +145,6 @@ pub trait Transport: Send + Sync + 'static {
         msg_id: i32,
         data: &[u8],
     ) -> Result<CallbackAnswer, TransportError>;
-
-    /// Инлайн-запрос к боту кошелька (`10usdt` для @send, `10` для @xrocket).
-    async fn inline_query(
-        &self,
-        bot: Platform,
-        query: &str,
-    ) -> Result<InlineResults, TransportError>;
-
-    /// Отправить выбранный инлайн-результат в чат. `random_id` — как в `send_text`.
-    async fn send_inline(
-        &self,
-        to: Chat,
-        bot: Platform,
-        results: &InlineResults,
-        result_id: &str,
-        random_id: i64,
-    ) -> Result<RawMessage, TransportError>;
-
-    /// Открыть мини-приложение бота (`messages.requestWebView`): URL с `tgWebAppData`.
-    /// Денежные сценарии мини-приложения не открывают (DESIGN-v0.2 Р4). Удалить вместе с
-    /// реализацией в `mtproto`, когда запись подтвердит, что «Оплатить» у CryptoBot — кнопка в чате.
-    async fn open_webapp(&self, bot: Platform, button_url: &str) -> Result<String, TransportError>;
 
     /// Сообщения чата с id > `after_id`, по возрастанию id (догон после рестарта).
     async fn history(

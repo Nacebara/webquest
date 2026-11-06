@@ -1,28 +1,35 @@
-//! Создание чека выплаты или возврата — как обычный пользователь (DESIGN-v0.2, Р5).
+//! Создание чека выплаты или возврата — через меню бота, как обычный пользователь
+//! (DESIGN-v0.2 Р5; решение владельца 6 ноября 2026: только меню, инлайн-режим не нужен —
+//! клиенту мы отдаём ссылку на чек). Экраны — по живой записи (`parsers::screens`).
 //!
 //! 1. Метка операции в «Избранном» (`🏷 exch ord-…-payout`). По ней `find_issued_check`
 //!    находит чек этой операции после сбоя или рестарта: в Telegram id сообщений личных чатов
 //!    и «Избранного» — общий счётчик аккаунта, поэтому чек операции — между её меткой и
 //!    меткой следующей.
-//! 2. Инлайн: `@send 97.5usdt` / `@xrocket 97.5` → ровно один результат «чек на эту сумму» →
-//!    отправка в «Избранное» с `random_id` операции → ссылка из URL-кнопки.
-//! 3. Если инлайн не дошёл до отправки — меню: CryptoBot `/checks` → «Создать чек» → USDT →
-//!    сумма; xRocket `/cheques` → «Персональный» → «Создать чек» → USDT → сумма.
+//! 2. CryptoBot: `/checks` → «Создать чек» → USDT → сумма текстом → НОВОЕ сообщение: экран
+//!    чека; или «Пришлите количество активаций…» → «Пропустить ›» (одна активация) → тот же
+//!    экран правкой — чек; или «Недостаточно монет».
+//! 3. xRocket: `/cheques` → «Персональный» → «Создать чек» → USDT → сумма текстом → бот
+//!    ПРАВИТ сообщение меню: «Сумма чека … подтвердите» → сверка суммы → «✅ Подтверждаю» →
+//!    правка: экран чека; или «🔺 Недостаточно средств».
 //!
-//! После отправки инлайн-результата или суммы чек мог появиться: дальше никаких повторов
-//! с новым `random_id` и никакого меню — только `Unknown` и сверка.
+//! Где чек может появиться: CryptoBot — после отправки суммы (если на мультичек денег нет,
+//! чек создаёт сама сумма) и после «Пропустить ›»; xRocket — после «✅ Подтверждаю». С этого
+//! места — ни повторов с новым `random_id`, ни второго нажатия: только `Unknown` и сверка.
+//! Неудача, при которой чек точно не создан (бот показал экран без чека, кнопка не ушла), —
+//! `Err`: операция не выполнялась. Её повтор с той же меткой только сверяет (см. [`run`]).
 
 use domain::{Money, Platform};
 use parsers::replies::parse_created_check;
 use parsers::screens::{
-    self, AMOUNT_PROMPT, CREATE_CHECK_BUTTON, CheckCreationReply, InlineResultKind, PERSONAL_BUTTON,
+    self, AMOUNT_PROMPT, CONFIRM_BUTTON, CREATE_CHECK_BUTTON, CheckCreationReply, PERSONAL_BUTTON,
+    SKIP_BUTTON,
 };
-use tokio::time::Instant;
 
 use super::conv::{Conv, SendError};
 use super::gate::Pace;
 use super::{UserbotWallet, rid, typed_amount};
-use crate::transport::{ButtonKind, Chat, InlineResults, RawMessage, Transport, TransportError};
+use crate::transport::{ButtonKind, Chat, RawMessage, Transport, TransportError};
 use crate::wallet::{BotError, IssueMethod, IssueOutcome, IssuedCheck, OpTag};
 
 const MARKER_PREFIX: &str = "🏷 exch ";
@@ -43,9 +50,9 @@ pub(crate) async fn run<T: Transport>(
     tag: &OpTag,
 ) -> Result<IssueOutcome, BotError> {
     let mut conv = Conv::open(w, Some(&tag.key)).await;
-    // Запасной путь — меню в чате бота: проверяем «чистоту» чата до метки, пока ничего не начато.
+    // «Чистота» чата бота — до метки, пока ничего не начато.
     conv.ensure_clear(Chat::WalletBot(w.platform), None).await?;
-    let marker = match conv
+    match conv
         .send(
             Chat::SavedMessages,
             &marker_text(&tag.key),
@@ -56,51 +63,29 @@ pub(crate) async fn run<T: Transport>(
     {
         // Метка уже стояла: эту операцию начинал прошлый вызов, и чек мог быть создан.
         // Ничего не создаём — только сверка. Так `issue_check` безопасен даже при повторном
-        // вызове с тем же `OpTag` (движок так не делает, но защита — здесь, а не только там).
+        // вызове с тем же `OpTag` (движок так делает после `Err`: операция возвращается в
+        // очередь с той же меткой).
         Ok(sent) if sent.earlier_call => {
             tracing::warn!(op = %tag.key, "operation marker already exists, reconciling instead of issuing");
             return Ok(match find_with(&conv, amount, tag).await {
-                Ok(Some((check, method))) => IssueOutcome::Issued { check, method },
+                Ok(Some(check)) => IssueOutcome::Issued {
+                    check,
+                    method: IssueMethod::Menu,
+                },
                 Ok(None) => unknown("operation was started earlier and no check was found"),
                 Err(e) => unknown(format!(
                     "operation was started earlier; reconciliation failed: {e}"
                 )),
             });
         }
-        Ok(sent) => sent.msg,
+        Ok(_) => {}
         Err(SendError::NotSent(e)) => return Err(e),
         // Чек ещё не создавался: операцию можно закрыть как невыполненную.
         Err(SendError::Unknown(detail)) => {
             return Err(BotError::Unavailable(format!("operation marker: {detail}")));
         }
-    };
-
-    if w.cfg.inline_checks {
-        match inline(&mut conv, amount, tag, &marker).await? {
-            Step::Done(outcome) => return Ok(outcome),
-            Step::Fallback(reason) => {
-                tracing::info!(op = %tag.key, %reason, "inline check not sent, using the bot menu");
-            }
-        }
     }
     menu(&mut conv, amount, tag).await
-}
-
-enum Step {
-    Done(IssueOutcome),
-    /// Инлайн не дошёл до отправки: чек точно не создан.
-    Fallback(String),
-}
-
-fn inline_query(platform: Platform, amount: &Money) -> String {
-    match platform {
-        Platform::CryptoBot => format!(
-            "{}{}",
-            typed_amount(amount),
-            amount.asset().platform_code(platform).to_lowercase()
-        ),
-        Platform::XRocket => typed_amount(amount),
-    }
 }
 
 fn unknown(detail: impl Into<String>) -> IssueOutcome {
@@ -112,6 +97,7 @@ fn unknown(detail: impl Into<String>) -> IssueOutcome {
 /// Чек из сообщения, если ссылка ровно одна и сумма та, что просили.
 fn check_in(platform: Platform, msg: &RawMessage, amount: &Money) -> Result<IssuedCheck, String> {
     let check = parse_created_check(platform, &msg.text, &msg.button_urls())
+        .or_else(|| parse_created_check(platform, &msg.text, &msg.entity_urls))
         .ok_or_else(|| "no check link in the message".to_owned())?;
     match check.amount {
         Some((a, asset)) if a == amount.amount() && asset == amount.asset() => Ok(IssuedCheck {
@@ -127,166 +113,11 @@ fn check_in(platform: Platform, msg: &RawMessage, amount: &Money) -> Result<Issu
     }
 }
 
-async fn inline<T: Transport>(
-    conv: &mut Conv<'_, T>,
-    amount: &Money,
-    tag: &OpTag,
-    marker: &RawMessage,
-) -> Result<Step, BotError> {
-    let platform = conv.platform();
-    conv.pace(Pace::Bot).await?;
-    let results = match conv
-        .transport()
-        .inline_query(platform, &inline_query(platform, amount))
-        .await
-    {
-        Ok(results) => results,
-        Err(TransportError::FloodWait(d)) => {
-            return Err(conv.not_sent(TransportError::FloodWait(d)));
-        }
-        Err(e) => return Ok(Step::Fallback(format!("inline query: {e}"))),
-    };
-    let wanted = InlineResultKind::Check {
-        amount: amount.amount(),
-        asset: amount.asset(),
-    };
-    let matching: Vec<&str> = results
-        .results
-        .iter()
-        .filter(|r| {
-            screens::classify_inline_result(platform, r.title.as_deref(), r.description.as_deref())
-                == wanted
-        })
-        .map(|r| r.id.as_str())
-        .collect();
-    let [result_id] = matching.as_slice() else {
-        return Ok(Step::Fallback(format!(
-            "{} inline results match the amount",
-            matching.len()
-        )));
-    };
-    let result_id = (*result_id).to_owned();
-
-    conv.pace(Pace::Bot).await?;
-    let mark = conv.mark().await;
-    let sent = send_inline(conv, &results, &result_id, tag.random_id, marker).await;
-    let msg = match sent {
-        Ok(msg) => msg,
-        Err(SendError::NotSent(BotError::Transport(TransportError::Rpc { code, name }))) => {
-            return Ok(Step::Fallback(format!(
-                "send inline result: RPC {code} {name}"
-            )));
-        }
-        Err(SendError::NotSent(e)) => return Err(e),
-        Err(SendError::Unknown(detail)) => return Ok(Step::Done(unknown(detail))),
-    };
-
-    match check_in(platform, &msg, amount) {
-        Ok(check) => {
-            return Ok(Step::Done(IssueOutcome::Issued {
-                check,
-                method: IssueMethod::Inline,
-            }));
-        }
-        Err(e) if msg.button_urls().is_empty() => {
-            if screens::classify_check_creation(platform, &msg.text, &[])
-                == CheckCreationReply::InsufficientFunds
-            {
-                return Ok(Step::Done(IssueOutcome::InsufficientFunds));
-            }
-            tracing::info!(op = %tag.key, error = %e, "inline message has no link yet, waiting for an edit");
-        }
-        Err(e) => return Ok(Step::Done(unknown(e))),
-    }
-    // Бот может дописать кнопку правкой отправленного сообщения.
-    let deadline = conv.deadline();
-    let edited = conv
-        .wait_edit(Chat::SavedMessages, msg.id, mark, deadline, |m| {
-            !m.button_urls().is_empty()
-        })
-        .await;
-    Ok(Step::Done(match edited {
-        Some(m) => match check_in(platform, &m, amount) {
-            Ok(check) => IssueOutcome::Issued {
-                check,
-                method: IssueMethod::Inline,
-            },
-            Err(e) => unknown(e),
-        },
-        None => unknown("inline check message has no link"),
-    }))
-}
-
-/// Отправить инлайн-результат в «Избранное». Повтор — только тем же `random_id`; при
-/// `RANDOM_ID_DUPLICATE` сообщение ищем после метки операции.
-async fn send_inline<T: Transport>(
-    conv: &mut Conv<'_, T>,
-    results: &InlineResults,
-    result_id: &str,
-    random_id: i64,
-    marker: &RawMessage,
-) -> Result<RawMessage, SendError> {
-    let platform = conv.platform();
-    let call = conv
-        .transport()
-        .send_inline(Chat::SavedMessages, platform, results, result_id, random_id)
-        .await;
-    let call = match call {
-        Err(e) if e.outcome_unknown() => {
-            tracing::warn!(error = %e, "send inline outcome unknown, resending with the same random_id");
-            if let Err(flood) = conv.pace(Pace::Bot).await {
-                return find_inline_after(conv, marker)
-                    .await
-                    .ok_or_else(|| SendError::Unknown(format!("{e}; resend impossible: {flood}")));
-            }
-            match conv
-                .transport()
-                .send_inline(Chat::SavedMessages, platform, results, result_id, random_id)
-                .await
-            {
-                Ok(msg) => Ok(msg),
-                Err(e2) => {
-                    if let TransportError::FloodWait(d) = e2 {
-                        let _ = conv.not_sent(TransportError::FloodWait(d));
-                    }
-                    return find_inline_after(conv, marker)
-                        .await
-                        .ok_or_else(|| SendError::Unknown(format!("{e}; resend: {e2}")));
-                }
-            }
-        }
-        other => other,
-    };
-    match call {
-        Ok(msg) => {
-            conv.record(&msg, true).await;
-            Ok(msg)
-        }
-        Err(TransportError::RandomIdDuplicate) => find_inline_after(conv, marker)
-            .await
-            .ok_or_else(|| SendError::Unknown("RANDOM_ID_DUPLICATE, message not found".to_owned())),
-        Err(e) => Err(SendError::NotSent(conv.not_sent(e))),
-    }
-}
-
-/// Наше сообщение через бота после метки (и до следующей метки).
-async fn find_inline_after<T: Transport>(
-    conv: &mut Conv<'_, T>,
-    marker: &RawMessage,
-) -> Option<RawMessage> {
-    let platform = conv.platform();
-    let saved = conv.recent(Chat::SavedMessages).await.ok()?;
-    let mut found = saved
-        .into_iter()
-        .filter(|m| m.id > marker.id)
-        .take_while(|m| !(m.out && is_marker(&m.text)))
-        .filter(|m| m.out && m.via_bot == Some(platform));
-    let first = found.next()?;
-    if found.next().is_some() {
-        return None;
-    }
-    conv.record(&first, true).await;
-    Some(first)
+/// Разбор экрана меню после суммы: ссылки — из кнопок и из текста.
+fn creation(platform: Platform, m: &RawMessage) -> CheckCreationReply {
+    let mut urls = m.button_urls();
+    urls.extend(m.entity_urls.iter().cloned());
+    screens::classify_check_creation(platform, &m.text, &urls)
 }
 
 fn callback_button(msg: &RawMessage, mut pick: impl FnMut(&str) -> bool) -> Option<Vec<u8>> {
@@ -334,6 +165,21 @@ async fn step<T: Transport>(
         .ok_or_else(|| BotError::Unavailable(format!("check menu: no screen after '{what}'")))
 }
 
+/// Что показало меню после суммы или финального нажатия.
+fn settle(platform: Platform, reply: &RawMessage, amount: &Money) -> IssueOutcome {
+    match creation(platform, reply) {
+        CheckCreationReply::Created(_) => match check_in(platform, reply, amount) {
+            Ok(check) => IssueOutcome::Issued {
+                check,
+                method: IssueMethod::Menu,
+            },
+            Err(e) => unknown(e),
+        },
+        CheckCreationReply::InsufficientFunds => IssueOutcome::InsufficientFunds,
+        other => unknown(format!("unexpected check menu screen {other:?}")),
+    }
+}
+
 async fn menu<T: Transport>(
     conv: &mut Conv<'_, T>,
     amount: &Money,
@@ -358,7 +204,7 @@ async fn menu<T: Transport>(
         )
         .await
     {
-        Ok(sent) => sent.msg,
+        Ok(sent) => sent,
         Err(SendError::NotSent(e)) => return Err(e),
         Err(SendError::Unknown(detail)) => {
             return Err(BotError::Unavailable(format!("{command}: {detail}")));
@@ -369,8 +215,9 @@ async fn menu<T: Transport>(
         Platform::XRocket => PERSONAL_BUTTON,
     };
     let deadline = conv.deadline();
+    let cmd_id = cmd.msg.id;
     let mut screen = conv
-        .wait(chat, cmd.id, mark, deadline, false, |m| {
+        .wait(chat, cmd_id, mark, deadline, cmd.located, |m| {
             has_callback(m, |t| screens::text_matches(t, first_button))
         })
         .await
@@ -380,7 +227,7 @@ async fn menu<T: Transport>(
         screen = step(
             conv,
             chat,
-            cmd.id,
+            cmd_id,
             &screen,
             |t| screens::text_matches(t, PERSONAL_BUTTON),
             "personal",
@@ -391,7 +238,7 @@ async fn menu<T: Transport>(
     screen = step(
         conv,
         chat,
-        cmd.id,
+        cmd_id,
         &screen,
         |t| screens::text_matches(t, CREATE_CHECK_BUTTON),
         "create check",
@@ -401,7 +248,7 @@ async fn menu<T: Transport>(
     step(
         conv,
         chat,
-        cmd.id,
+        cmd_id,
         &screen,
         |t| screens::is_asset_button(t, asset),
         "asset",
@@ -409,7 +256,7 @@ async fn menu<T: Transport>(
     )
     .await?;
 
-    // Сумма: после этой отправки чек мог появиться.
+    // Сумма: у CryptoBot после этой отправки чек мог появиться.
     let mark = conv.mark().await;
     let sent = match conv
         .send(
@@ -427,47 +274,103 @@ async fn menu<T: Transport>(
             return Ok(unknown(format!("amount not confirmed: {detail}")));
         }
     };
-    let deadline: Instant = conv.deadline();
+    let amount_id = sent.msg.id;
+    let deadline = conv.deadline();
     let reply = conv
-        .wait(chat, sent.msg.id, mark, deadline, sent.located, |m| {
-            screens::classify_check_creation(platform, &m.text, &m.button_urls())
-                != CheckCreationReply::Unknown
+        .wait_screen(chat, cmd_id, amount_id, mark, deadline, sent.located, |m| {
+            creation(platform, m) != CheckCreationReply::Unknown
         })
         .await;
     let Some(reply) = reply else {
         conv.quarantine(chat);
         return Ok(unknown("no reply to the check amount"));
     };
-    Ok(
-        match screens::classify_check_creation(platform, &reply.text, &reply.button_urls()) {
-            CheckCreationReply::Created(_) => match check_in(platform, &reply, amount) {
-                Ok(check) => IssueOutcome::Issued {
-                    check,
-                    method: IssueMethod::Menu,
-                },
-                Err(e) => unknown(e),
-            },
-            CheckCreationReply::InsufficientFunds => IssueOutcome::InsufficientFunds,
-            // Шаги мультичека CryptoBot и подтверждения xRocket — следующим коммитом в этом
-            // сценарии; пока без нажатий: неясный исход и сверка, повторного создания нет.
-            CheckCreationReply::AskActivations | CheckCreationReply::Confirm { .. } => {
-                unknown("check menu asks for one more step")
+    match creation(platform, &reply) {
+        // CryptoBot: на мультичек хватает — «Пропустить ›» создаёт чек на одну активацию.
+        CheckCreationReply::AskActivations => {
+            finish(conv, cmd_id, amount_id, &reply, SKIP_BUTTON, "skip", amount).await
+        }
+        // xRocket: сумма на экране подтверждения должна совпасть с той, что просили.
+        CheckCreationReply::Confirm { amount: shown } => {
+            if shown != Some((amount.amount(), amount.asset())) {
+                return Err(BotError::Unavailable(format!(
+                    "check confirmation shows {shown:?}, expected {} {}",
+                    typed_amount(amount),
+                    amount.asset().code()
+                )));
             }
-            CheckCreationReply::Unknown => unknown("unrecognised reply to the check amount"),
-        },
-    )
+            finish(
+                conv,
+                cmd_id,
+                amount_id,
+                &reply,
+                CONFIRM_BUTTON,
+                "confirm",
+                amount,
+            )
+            .await
+        }
+        _ => Ok(settle(platform, &reply, amount)),
+    }
+}
+
+/// Последнее нажатие, которое создаёт чек: «Пропустить ›» / «✅ Подтверждаю». Ровно одно.
+async fn finish<T: Transport>(
+    conv: &mut Conv<'_, T>,
+    cmd_id: i32,
+    amount_id: i32,
+    screen: &RawMessage,
+    button: &[&str],
+    what: &str,
+    amount: &Money,
+) -> Result<IssueOutcome, BotError> {
+    let platform = conv.platform();
+    let chat = Chat::WalletBot(platform);
+    // Без кнопки ничего не нажато — чек не создан.
+    let data = callback_button(screen, |t| screens::text_matches(t, button))
+        .ok_or_else(|| BotError::Unavailable(format!("check menu: no '{what}' button")))?;
+    let mark = conv.mark().await;
+    match conv.press(chat, screen.id, &data).await {
+        Ok(answer) if answer.alert => {
+            // Бот отказал всплывающим окном: экран не сменился, но подтвердить это можно
+            // только сверкой.
+            return Ok(unknown(format!("'{what}' answered {:?}", answer.message)));
+        }
+        Ok(_) => {}
+        // Нажатие не ушло: чек не создан.
+        Err(SendError::NotSent(e)) => return Err(e),
+        Err(SendError::Unknown(detail)) => {
+            tracing::warn!(%detail, button = what, "check press outcome unknown, waiting for the screen");
+        }
+    }
+    let deadline = conv.deadline();
+    let reply = conv
+        .wait_screen(chat, cmd_id, amount_id, mark, deadline, false, |m| {
+            matches!(
+                creation(platform, m),
+                CheckCreationReply::Created(_) | CheckCreationReply::InsufficientFunds
+            )
+        })
+        .await;
+    Ok(match reply {
+        Some(reply) => settle(platform, &reply, amount),
+        None => {
+            conv.quarantine(chat);
+            unknown(format!("no check after '{what}'"))
+        }
+    })
 }
 
 /// Сверка после `IssueOutcome::Unknown` или рестарта: чек этой операции между её меткой
-/// и следующей меткой — в «Избранном» (инлайн) или в чате бота (меню). `None` — метки нет,
-/// чека нет или кандидатов несколько (тогда решает человек).
+/// и следующей меткой, в чате бота. `None` — метки нет, чека нет или кандидатов несколько
+/// (тогда решает человек).
 pub(crate) async fn find<T: Transport>(
     w: &UserbotWallet<T>,
     amount: &Money,
     tag: &OpTag,
 ) -> Result<Option<IssuedCheck>, BotError> {
     let conv = Conv::open(w, Some(&tag.key)).await;
-    Ok(find_with(&conv, amount, tag).await?.map(|(check, _)| check))
+    find_with(&conv, amount, tag).await
 }
 
 /// [`find`] внутри уже открытого разговора (ворота аккаунта уже взяты).
@@ -475,7 +378,7 @@ async fn find_with<T: Transport>(
     conv: &Conv<'_, T>,
     amount: &Money,
     tag: &OpTag,
-) -> Result<Option<(IssuedCheck, IssueMethod)>, BotError> {
+) -> Result<Option<IssuedCheck>, BotError> {
     let platform = conv.platform();
     let unavailable = |e: TransportError| BotError::Unavailable(format!("history: {e}"));
     let saved = conv
@@ -494,29 +397,13 @@ async fn find_with<T: Transport>(
         .map_or(i32::MAX, |m| m.id);
     let in_window = |m: &RawMessage| m.id > from && m.id < until;
 
-    let mut found: Vec<(IssuedCheck, IssueMethod)> = Vec::new();
-    let mut add = |check: IssuedCheck, method: IssueMethod| {
-        if !found.iter().any(|(c, _)| c.param == check.param) {
-            found.push((check, method));
-        }
-    };
-    for m in saved
-        .iter()
-        .filter(|m| in_window(m) && m.via_bot == Some(platform))
-    {
-        match check_in(platform, m, amount) {
-            Ok(check) => add(check, IssueMethod::Inline),
-            Err(e) => {
-                tracing::warn!(op = %tag.key, error = %e, "inline message without a matching check")
-            }
-        }
-    }
     let bot = conv
         .recent(Chat::WalletBot(platform))
         .await
         .map_err(unavailable)?;
-    // Ответ меню засчитывается, только если перед ним (без других наших сообщений между)
-    // стоит НАШЕ сообщение из окна этой операции — её сумма. Поздний «Чек создан» на сумму
+    // Экран засчитывается, только если перед ним (без других наших сообщений между) стоит
+    // НАШЕ сообщение из окна этой операции: команда меню (xRocket правит экран, пришедший на
+    // `/cheques`) или сумма (CryptoBot отвечает на неё новым сообщением). Поздний экран чека
     // другой операции так не попадёт в чужое окно.
     let ours_before = |m: &RawMessage| {
         bot.iter()
@@ -525,17 +412,20 @@ async fn find_with<T: Transport>(
             .max()
             .is_some_and(|o| o > from && o < until)
     };
+    let mut found: Vec<IssuedCheck> = Vec::new();
     for m in bot
         .iter()
         .filter(|m| !m.out && in_window(m) && ours_before(m))
     {
-        if let CheckCreationReply::Created(_) =
-            screens::classify_check_creation(platform, &m.text, &m.button_urls())
-        {
+        if let CheckCreationReply::Created(_) = creation(platform, m) {
             match check_in(platform, m, amount) {
-                Ok(check) => add(check, IssueMethod::Menu),
+                Ok(check) => {
+                    if !found.iter().any(|c| c.param == check.param) {
+                        found.push(check);
+                    }
+                }
                 Err(e) => {
-                    tracing::warn!(op = %tag.key, error = %e, "menu reply without a matching check")
+                    tracing::warn!(op = %tag.key, error = %e, "menu screen without a matching check")
                 }
             }
         }

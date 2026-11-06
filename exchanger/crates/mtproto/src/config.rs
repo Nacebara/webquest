@@ -168,9 +168,6 @@ pub struct MtprotoConfig {
     pub bots: PinnedBots,
     pub device: DeviceInfo,
     pub timeouts: Timeouts,
-    /// `platform` для `messages.requestWebView` (`android`, `ios`, `tdesktop`, `web`).
-    /// Влияние на мини-приложение CryptoBot не проверено (LOVEC-PORTING §8.3, P4).
-    pub webapp_platform: String,
 }
 
 impl MtprotoConfig {
@@ -182,7 +179,6 @@ impl MtprotoConfig {
             bots: PinnedBots::default(),
             device: DeviceInfo::default(),
             timeouts: Timeouts::default(),
-            webapp_platform: "tdesktop".to_owned(),
         }
     }
 

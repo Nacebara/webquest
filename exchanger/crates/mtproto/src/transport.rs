@@ -15,13 +15,11 @@
 //! - апдейты: `catch_up = true` с сохранённым pts, поэтому ответы ботов, пришедшие во время
 //!   простоя, догоняются через `getDifference`.
 
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use domain::Platform;
 use grammers_client::Client;
 use grammers_client::client::{
     AutoSleep, ClientConfiguration, NoRetries, UpdateStream, UpdatesConfiguration,
@@ -32,22 +30,19 @@ use tokio::sync::{Notify, broadcast, watch};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument as _;
-use userbot::transport::{
-    CallbackAnswer, Chat, InlineResults, RawMessage, Transport, TransportError,
-};
+use userbot::transport::{CallbackAnswer, Chat, RawMessage, Transport, TransportError};
 
 use crate::config::{MtprotoConfig, PinnedBot};
-use crate::convert::{self, BotIdentityError, ChatContext, SentMessage, WebAppKind};
+use crate::convert::{self, BotIdentityError, ChatContext, SentMessage};
 use crate::crypto::SessionKey;
 use crate::errors::{is_auth_error, map_invocation_error};
-use crate::requests::{self, BotPeer, BotPeers, WebAppTarget};
+use crate::requests::{self, BotPeer, BotPeers};
 use crate::session::{EncryptedSession, SessionError, SessionPersister, SessionStore, StoredUser};
 
 /// Ёмкость канала `subscribe()`: отставший подписчик получит `Lagged` и догонит историей.
 const BROADCAST_CAPACITY: usize = 1024;
 /// Предел очереди апдейтов grammers (по умолчанию 100 — мало для догона после простоя).
 const UPDATE_QUEUE_LIMIT: usize = 10_000;
-const MAX_WEBAPP_CACHE: usize = 512;
 const MAX_RECONNECT_BACKOFF: Duration = Duration::from_secs(60);
 const UPDATE_ERRORS_BEFORE_RECONNECT: u32 = 10;
 /// Каждый какой пинг заменять на `updates.getState` (проверка, что сессию не отозвали).
@@ -126,7 +121,6 @@ struct Shared {
     persister: Arc<SessionPersister>,
     conn: watch::Sender<Option<Conn>>,
     tx: broadcast::Sender<RawMessage>,
-    webapps: Mutex<HashMap<String, WebAppKind>>,
     auth_lost: AtomicBool,
     cancel: CancellationToken,
     /// Разбудить сторожа: проверить соединение сразу (после обрыва во время запроса).
@@ -138,23 +132,6 @@ struct Shared {
 }
 
 impl Shared {
-    fn remember_webapps(&self, markup: Option<&tl::enums::ReplyMarkup>) {
-        let found = convert::webapp_buttons(markup);
-        if found.is_empty() {
-            return;
-        }
-        if let Ok(mut cache) = self.webapps.lock() {
-            if cache.len() + found.len() > MAX_WEBAPP_CACHE {
-                cache.clear();
-            }
-            cache.extend(found);
-        }
-    }
-
-    fn webapp_kind(&self, url: &str) -> Option<WebAppKind> {
-        self.webapps.lock().ok().and_then(|c| c.get(url).copied())
-    }
-
     fn mark_auth_lost(&self) {
         if !self.auth_lost.swap(true, Ordering::SeqCst) {
             tracing::error!(
@@ -481,7 +458,6 @@ impl GrammersTransport {
             persister,
             conn: conn_tx,
             tx,
-            webapps: Mutex::new(HashMap::new()),
             auth_lost: AtomicBool::new(false),
             cancel: CancellationToken::new(),
             nudge: Notify::new(),
@@ -583,12 +559,7 @@ impl GrammersTransport {
     fn to_raw_messages(&self, messages: &[tl::enums::Message], chat: Chat) -> Vec<RawMessage> {
         messages
             .iter()
-            .filter_map(|m| {
-                if let tl::enums::Message::Message(inner) = m {
-                    self.shared.remember_webapps(inner.reply_markup.as_ref());
-                }
-                convert::message_to_raw(m, &self.shared.ctx)
-            })
+            .filter_map(|m| convert::message_to_raw(m, &self.shared.ctx))
             .filter(|m| m.chat == chat)
             .collect()
     }
@@ -667,16 +638,6 @@ impl GrammersTransport {
         chat: Chat,
         text: Option<&str>,
     ) -> Result<RawMessage, TransportError> {
-        if let tl::enums::Updates::Updates(tl::types::Updates { updates: list, .. })
-        | tl::enums::Updates::Combined(tl::types::UpdatesCombined { updates: list, .. }) =
-            updates
-        {
-            for u in list {
-                if let Some(m) = convert::update_message(u) {
-                    self.shared.remember_webapps(m.reply_markup.as_ref());
-                }
-            }
-        }
         match convert::find_sent_message(updates, random_id, chat, &self.shared.ctx) {
             SentMessage::Message(m) => Ok(m),
             SentMessage::Short { id, date, entities } => Ok(convert::sent_text_message(
@@ -742,97 +703,6 @@ impl Transport for GrammersTransport {
         Ok(convert::callback_answer(&answer))
     }
 
-    async fn inline_query(
-        &self,
-        bot: Platform,
-        query: &str,
-    ) -> Result<InlineResults, TransportError> {
-        // Через клиент без автоповторов: не проверено, не создаёт ли бот чек уже на запросе
-        // (LOVEC-PORTING §8.1, I1).
-        let request = requests::inline_query(self.shared.bots.get(bot).input_user(), query);
-        let results = self
-            .call(Lane::Action, &request, "messages.getInlineBotResults")
-            .await?;
-        Ok(convert::inline_results(&results))
-    }
-
-    async fn send_inline(
-        &self,
-        to: Chat,
-        bot: Platform,
-        results: &InlineResults,
-        result_id: &str,
-        random_id: i64,
-    ) -> Result<RawMessage, TransportError> {
-        if !results.results.iter().any(|r| r.id == result_id) {
-            return Err(TransportError::Other(
-                "result id is not among the inline results; nothing was sent".into(),
-            ));
-        }
-        let request = requests::send_inline_result(
-            self.shared.bots.input_peer(to),
-            results.query_id,
-            result_id,
-            random_id,
-        );
-        let updates = self
-            .call(Lane::Action, &request, "messages.sendInlineBotResult")
-            .await?;
-        let message = self.sent_message(&updates, random_id, to, None).await?;
-        if message.via_bot.is_some_and(|via| via != bot) {
-            tracing::warn!(?bot, via = ?message.via_bot, "inline message came via another wallet bot");
-        }
-        Ok(message)
-    }
-
-    async fn open_webapp(&self, bot: Platform, button_url: &str) -> Result<String, TransportError> {
-        let peer = *self.shared.bots.get(bot);
-        let pinned = self.shared.cfg.bots.get(bot);
-        let platform = self.shared.cfg.webapp_platform.as_str();
-        let target = requests::webapp_target(
-            button_url,
-            self.shared.webapp_kind(button_url),
-            &pinned.username,
-        )
-        .map_err(|e| TransportError::Other(format!("{e}; nothing was sent")))?;
-        // URL ответа содержит подписанные initData: в логи не пишем.
-        let result = match target {
-            WebAppTarget::WebView { url } => {
-                self.call(
-                    Lane::Action,
-                    &requests::request_webview(&peer, &url, platform),
-                    "messages.requestWebView",
-                )
-                .await?
-            }
-            WebAppTarget::Simple { url } => {
-                self.call(
-                    Lane::Action,
-                    &requests::request_simple_webview(&peer, &url, platform),
-                    "messages.requestSimpleWebView",
-                )
-                .await?
-            }
-            WebAppTarget::App {
-                short_name,
-                start_param,
-            } => {
-                self.call(
-                    Lane::Action,
-                    &requests::request_app_webview(
-                        &peer,
-                        &short_name,
-                        start_param.as_deref(),
-                        platform,
-                    ),
-                    "messages.requestAppWebView",
-                )
-                .await?
-            }
-        };
-        Ok(convert::webview_url(&result))
-    }
-
     async fn history(
         &self,
         chat: Chat,
@@ -844,11 +714,6 @@ impl Transport for GrammersTransport {
             .call(Lane::Read, &request, "messages.getHistory")
             .await?;
         let messages = convert::messages_of(result);
-        for m in &messages {
-            if let tl::enums::Message::Message(inner) = m {
-                self.shared.remember_webapps(inner.reply_markup.as_ref());
-            }
-        }
         let limit = usize::try_from(limit.clamp(1, requests::MAX_HISTORY_LIMIT)).unwrap_or(1);
         Ok(convert::history_page(
             &messages,
@@ -865,11 +730,6 @@ impl Transport for GrammersTransport {
             .call(Lane::Read, &request, "messages.getHistory")
             .await?;
         let messages = convert::messages_of(result);
-        for m in &messages {
-            if let tl::enums::Message::Message(inner) = m {
-                self.shared.remember_webapps(inner.reply_markup.as_ref());
-            }
-        }
         let limit = usize::try_from(limit.clamp(1, requests::MAX_HISTORY_LIMIT)).unwrap_or(1);
         Ok(convert::history_page(
             &messages,
@@ -1029,9 +889,6 @@ async fn update_loop(shared: &Shared, stream: &mut UpdateStream) -> Ended {
         match stream.next_raw().await {
             Ok((update, _state, _peers)) => {
                 errors = 0;
-                if let Some(m) = convert::update_message(&update) {
-                    shared.remember_webapps(m.reply_markup.as_ref());
-                }
                 if let Some(raw) = convert::update_to_raw(&update, &shared.ctx) {
                     tracing::debug!(chat = ?raw.chat, id = raw.id, edited = raw.edit_date.is_some(), "wallet chat message");
                     // Нет подписчиков — не ошибка: сообщение догонится историей.

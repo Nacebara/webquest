@@ -1,15 +1,12 @@
 //! Сырые запросы TL слоя 227. Только чистые построители: какие флаги и поля уходят на сервер,
 //! проверяется тестами офлайн.
 //!
-//! Высокоуровневые методы grammers (`send_message`, `InlineResult::send`) не используются: они
+//! Высокоуровневые методы grammers (`send_message`) не используются: они
 //! генерируют свой `random_id`, и идемпотентный повтор становится невозможен (LOVEC-PORTING §3.2).
 
 use domain::Platform;
 use grammers_tl_types as tl;
-use url::Url;
 use userbot::transport::Chat;
-
-use crate::convert::WebAppKind;
 
 /// Предел Telegram на одну страницу истории.
 pub const MAX_HISTORY_LIMIT: u32 = 100;
@@ -96,45 +93,6 @@ pub fn send_message(
     }
 }
 
-/// `messages.getInlineBotResults`: запрос от имени себя (`peer = inputPeerSelf`, «Избранное»).
-pub fn inline_query(
-    bot: tl::enums::InputUser,
-    query: &str,
-) -> tl::functions::messages::GetInlineBotResults {
-    tl::functions::messages::GetInlineBotResults {
-        bot,
-        peer: tl::enums::InputPeer::PeerSelf,
-        geo_point: None,
-        query: query.to_owned(),
-        offset: String::new(),
-    }
-}
-
-/// `messages.sendInlineBotResult` с заданным `random_id`; подпись «via @bot» не скрываем —
-/// по ней сообщение-чек находится в «Избранном».
-pub fn send_inline_result(
-    peer: tl::enums::InputPeer,
-    query_id: i64,
-    result_id: &str,
-    random_id: i64,
-) -> tl::functions::messages::SendInlineBotResult {
-    tl::functions::messages::SendInlineBotResult {
-        silent: false,
-        background: false,
-        clear_draft: false,
-        hide_via: false,
-        peer,
-        reply_to: None,
-        random_id,
-        query_id,
-        id: result_id.to_owned(),
-        schedule_date: None,
-        send_as: None,
-        quick_reply_shortcut: None,
-        allow_paid_stars: None,
-    }
-}
-
 /// `messages.getBotCallbackAnswer` без пароля (кнопки с `requires_password` не нажимаем).
 pub fn press_callback(
     peer: tl::enums::InputPeer,
@@ -197,139 +155,6 @@ pub fn get_messages(ids: &[i32]) -> tl::functions::messages::GetMessages {
             .iter()
             .map(|&id| tl::types::InputMessageId { id }.into())
             .collect(),
-    }
-}
-
-/// Куда ведёт кнопка мини-приложения.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum WebAppTarget {
-    /// `keyboardButtonWebView` (или тип неизвестен) → `messages.requestWebView`.
-    WebView { url: String },
-    /// `keyboardButtonSimpleWebView` → `messages.requestSimpleWebView`.
-    Simple { url: String },
-    /// Ссылка `t.me/<бот>/<приложение>?startapp=…` → `messages.requestAppWebView`.
-    App {
-        short_name: String,
-        start_param: Option<String>,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum WebAppUrlError {
-    #[error("not a valid mini app URL")]
-    Invalid,
-    /// Ссылка на мини-приложение другого бота: не открываем (CLAUDE.md п. 10).
-    #[error("mini app link points to a bot other than the pinned wallet bot")]
-    ForeignBot,
-    #[error("unsupported mini app link form")]
-    Unsupported,
-}
-
-const TME_HOSTS: [&str; 3] = ["t.me", "telegram.me", "telegram.dog"];
-
-/// Выбрать метод открытия мини-приложения по URL кнопки и её запомненному типу.
-pub fn webapp_target(
-    url: &str,
-    known: Option<WebAppKind>,
-    bot_username: &str,
-) -> Result<WebAppTarget, WebAppUrlError> {
-    let parsed = Url::parse(url).map_err(|_| WebAppUrlError::Invalid)?;
-    if !matches!(parsed.scheme(), "https" | "http") {
-        return Err(WebAppUrlError::Invalid);
-    }
-    let host = parsed
-        .host_str()
-        .ok_or(WebAppUrlError::Invalid)?
-        .to_ascii_lowercase();
-    let host = host.strip_prefix("www.").unwrap_or(&host);
-    if TME_HOSTS.contains(&host) {
-        let segments: Vec<&str> = parsed
-            .path_segments()
-            .map(|s| s.filter(|p| !p.is_empty()).collect())
-            .unwrap_or_default();
-        let [bot, app] = segments.as_slice() else {
-            return Err(WebAppUrlError::Unsupported);
-        };
-        if !bot.eq_ignore_ascii_case(bot_username.trim_start_matches('@')) {
-            return Err(WebAppUrlError::ForeignBot);
-        }
-        let start_param = parsed
-            .query_pairs()
-            .find(|(k, _)| k == "startapp")
-            .map(|(_, v)| v.into_owned());
-        return Ok(WebAppTarget::App {
-            short_name: (*app).to_owned(),
-            start_param,
-        });
-    }
-    Ok(match known {
-        Some(WebAppKind::SimpleWebView) => WebAppTarget::Simple {
-            url: url.to_owned(),
-        },
-        Some(WebAppKind::WebView) | None => WebAppTarget::WebView {
-            url: url.to_owned(),
-        },
-    })
-}
-
-pub fn request_webview(
-    bot: &BotPeer,
-    url: &str,
-    platform: &str,
-) -> tl::functions::messages::RequestWebView {
-    tl::functions::messages::RequestWebView {
-        from_bot_menu: false,
-        silent: false,
-        compact: false,
-        fullscreen: false,
-        peer: bot.input_peer(),
-        bot: bot.input_user(),
-        url: Some(url.to_owned()),
-        start_param: None,
-        theme_params: None,
-        platform: platform.to_owned(),
-        reply_to: None,
-        send_as: None,
-    }
-}
-
-pub fn request_simple_webview(
-    bot: &BotPeer,
-    url: &str,
-    platform: &str,
-) -> tl::functions::messages::RequestSimpleWebView {
-    tl::functions::messages::RequestSimpleWebView {
-        from_switch_webview: false,
-        from_side_menu: false,
-        compact: false,
-        fullscreen: false,
-        bot: bot.input_user(),
-        url: Some(url.to_owned()),
-        start_param: None,
-        theme_params: None,
-        platform: platform.to_owned(),
-    }
-}
-
-pub fn request_app_webview(
-    bot: &BotPeer,
-    short_name: &str,
-    start_param: Option<&str>,
-    platform: &str,
-) -> tl::functions::messages::RequestAppWebView {
-    tl::functions::messages::RequestAppWebView {
-        write_allowed: false,
-        compact: false,
-        fullscreen: false,
-        peer: bot.input_peer(),
-        app: tl::types::InputBotAppShortName {
-            bot_id: bot.input_user(),
-            short_name: short_name.to_owned(),
-        }
-        .into(),
-        start_param: start_param.map(str::to_owned),
-        theme_params: None,
-        platform: platform.to_owned(),
     }
 }
 
@@ -413,23 +238,6 @@ mod tests {
     }
 
     #[test]
-    fn inline_requests_use_saved_messages_and_random_id() {
-        let b = bots();
-        let q = inline_query(b.xrocket.input_user(), "10");
-        assert_eq!(q.peer, tl::enums::InputPeer::PeerSelf);
-        assert_eq!(q.query, "10");
-        assert_eq!(q.offset, "");
-
-        let send = send_inline_result(b.input_peer(Chat::SavedMessages), 555, "usdt", 99);
-        assert_eq!(send.peer, tl::enums::InputPeer::PeerSelf);
-        assert_eq!(
-            (send.query_id, send.id.as_str(), send.random_id),
-            (555, "usdt", 99)
-        );
-        assert!(!send.hide_via);
-    }
-
-    #[test]
     fn callback_request() {
         let req = press_callback(bots().cryptobot.input_peer(), 42, b"asset:usdt");
         assert_eq!(req.msg_id, 42);
@@ -482,81 +290,11 @@ mod tests {
         }
         let history = get_history(bots().cryptobot.input_peer(), 7, 3);
         assert_eq!(wire(&history), history);
-        let send = send_inline_result(tl::enums::InputPeer::PeerSelf, 1, "r", 2);
-        let back = wire(&send);
-        assert_eq!(back, send);
-        assert_eq!(back.random_id, 2);
-        assert_eq!(back.peer, tl::enums::InputPeer::PeerSelf);
         let msg = send_message(tl::enums::InputPeer::PeerSelf, "/checks", 3);
         let back = wire(&msg);
         assert!(back.no_webpage);
         assert_eq!((back.random_id, back.message.as_str()), (3, "/checks"));
         let press = press_callback(bots().xrocket.input_peer(), 9, b"x");
         assert_eq!(wire(&press), press);
-    }
-
-    #[test]
-    fn webapp_targets() {
-        assert_eq!(
-            webapp_target("https://app.send.tg/invoice?x=1", None, "send"),
-            Ok(WebAppTarget::WebView {
-                url: "https://app.send.tg/invoice?x=1".into()
-            })
-        );
-        assert_eq!(
-            webapp_target(
-                "https://app.send.tg/wallet",
-                Some(WebAppKind::SimpleWebView),
-                "send"
-            ),
-            Ok(WebAppTarget::Simple {
-                url: "https://app.send.tg/wallet".into()
-            })
-        );
-        assert_eq!(
-            webapp_target("https://t.me/send/app?startapp=IVabc", None, "send"),
-            Ok(WebAppTarget::App {
-                short_name: "app".into(),
-                start_param: Some("IVabc".into())
-            })
-        );
-        assert_eq!(
-            webapp_target("https://www.T.me/Send/wallet", None, "@send"),
-            Ok(WebAppTarget::App {
-                short_name: "wallet".into(),
-                start_param: None
-            })
-        );
-        assert_eq!(
-            webapp_target("https://t.me/send_scam_bot/app?startapp=x", None, "send"),
-            Err(WebAppUrlError::ForeignBot)
-        );
-        assert_eq!(
-            webapp_target("https://t.me/send?startapp=x", None, "send"),
-            Err(WebAppUrlError::Unsupported)
-        );
-        assert_eq!(
-            webapp_target("tg://resolve?domain=send", None, "send"),
-            Err(WebAppUrlError::Invalid)
-        );
-        assert_eq!(
-            webapp_target("not a url", None, "send"),
-            Err(WebAppUrlError::Invalid)
-        );
-    }
-
-    #[test]
-    fn webview_requests() {
-        let b = bots();
-        let r = request_webview(&b.cryptobot, "https://app.send.tg/x", "tdesktop");
-        assert_eq!(r.peer, b.cryptobot.input_peer());
-        assert_eq!(r.bot, b.cryptobot.input_user());
-        assert_eq!(r.url.as_deref(), Some("https://app.send.tg/x"));
-        assert_eq!(r.platform, "tdesktop");
-        let s = request_simple_webview(&b.cryptobot, "https://app.send.tg/y", "android");
-        assert_eq!(s.url.as_deref(), Some("https://app.send.tg/y"));
-        let a = request_app_webview(&b.xrocket, "wallet", Some("inv_x"), "tdesktop");
-        assert_eq!(a.start_param.as_deref(), Some("inv_x"));
-        assert!(!a.write_allowed);
     }
 }

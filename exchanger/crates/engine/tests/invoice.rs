@@ -528,9 +528,10 @@ async fn excess_check_issued_with_a_timeout_is_found_not_repeated(pool: PgPool) 
     let inv = shop_invoice(&e, InvoiceSpec::crypto(CB, usdt(dec!(10))));
     let order = quoted(&e, &inv).await;
     pay_in(&e, &order, XR, dec!(15)).await;
-    // Единственный инлайн-чек в сценарии — чек на переплату: создан, а вызов вернул таймаут.
+    // Единственный чек в сценарии — чек на переплату: «✅ Подтверждаю» создало его, а вызов
+    // вернул таймаут. Нажатие не повторяется: экран чека берётся из потока.
     e.world
-        .inject(e.ub, Call::SendInline, Fault::TimeoutAfterEffect, 1);
+        .inject(e.ub, Call::CheckPress, Fault::TimeoutAfterEffect, 1);
     e.drain().await;
     e.engine.resolve_unknown().await.unwrap();
 
@@ -543,7 +544,7 @@ async fn excess_check_issued_with_a_timeout_is_found_not_repeated(pool: PgPool) 
         .filter(|op| op.kind == OpKind::CreateExcessCheck)
         .collect();
     assert_eq!(excess.len(), 1);
-    assert_eq!(excess[0].status, OpStatus::Succeeded, "найден сверкой");
+    assert_eq!(excess[0].status, OpStatus::Succeeded);
     assert_eq!(e.world.checks_created_by(e.ub).len(), 1, "второго чека нет");
     let url = d.payout_check_url.expect("ссылка на чек переплаты");
     e.world.claim_check(e.client, &url).unwrap();

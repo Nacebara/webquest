@@ -23,10 +23,10 @@ pub enum CheckStatus {
 pub enum CheckOrigin {
     /// Помощник теста ([`super::SimWorld::create_check`]).
     Helper,
-    /// Меню бота: `/checks` или `/cheques`. `random_id` — у сообщения с суммой.
+    /// Меню бота: `/checks` или `/cheques`. `random_id` — у сообщения с суммой (0 — сумма
+    /// выбрана кнопкой «Мин.» / «Макс.»). Чек создаёт нажатие «Пропустить ›» у CryptoBot
+    /// (или сама сумма, если на мультичек денег нет) и «✅ Подтверждаю» у xRocket.
     Menu { random_id: i64 },
-    /// Инлайн-режим: `send_inline` с этим `random_id`.
-    Inline { random_id: i64 },
 }
 
 /// Что положить в мир помощником [`super::SimWorld::create_check`].
@@ -264,15 +264,22 @@ pub struct SimInvoice {
 pub enum Call {
     Any,
     SendText,
+    /// Любое нажатие кнопки, в том числе денежное.
     Press,
-    InlineQuery,
-    SendInline,
+    /// Только нажатие, которое создаёт чек: CryptoBot «Пропустить ›» (`count-N`), xRocket
+    /// «✅ Подтверждаю».
+    CheckPress,
+    /// Только нажатие, которое платит по счёту: CryptoBot «💳 Оплатить» и «💸 Отправить платеж
+    /// получателю», xRocket «Оплатить».
+    PayPress,
     History,
 }
 
 impl Call {
     pub(crate) fn matches(self, actual: Call) -> bool {
-        self == Call::Any || self == actual
+        self == Call::Any
+            || self == actual
+            || (self == Call::Press && matches!(actual, Call::CheckPress | Call::PayPress))
     }
 }
 

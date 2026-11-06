@@ -53,9 +53,8 @@ pub struct IssuedCheck {
 /// Как был создан чек — для журнала и статистики.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IssueMethod {
-    /// `@send 10usdt` / `@xrocket 10` → результат в «Избранное».
-    Inline,
-    /// `/checks` → «Создать чек» / `/cheques` → «Персональный» → «Создать чек».
+    /// `/checks` → «Создать чек» / `/cheques` → «Персональный» → «Создать чек»
+    /// (единственный способ: DESIGN-v0.2 Р5).
     Menu,
 }
 
@@ -124,12 +123,12 @@ pub trait WalletBot: Send + Sync {
     async fn activate_check(&self, param: &str, tag: &OpTag)
     -> Result<ActivationOutcome, BotError>;
 
-    /// Создать чек на `amount`: инлайн-режим, при неудаче — меню бота. Одна попытка.
+    /// Создать чек на `amount` через меню бота. Одна попытка.
     async fn issue_check(&self, amount: &Money, tag: &OpTag) -> Result<IssueOutcome, BotError>;
 
     /// Сверка после `IssueOutcome::Unknown` или рестарта: чек этой операции между её меткой
-    /// в «Избранном» и следующей меткой (инлайн-сообщение или ответ меню). `None` — чека нет
-    /// или связать его с операцией нельзя: решает человек.
+    /// в «Избранном» и следующей меткой (экран меню в чате бота). `None` — чека нет или
+    /// связать его с операцией нельзя: решает человек.
     async fn find_issued_check(
         &self,
         amount: &Money,
@@ -139,7 +138,9 @@ pub trait WalletBot: Send + Sync {
     /// Открыть чужой счёт без оплаты.
     async fn inspect_invoice(&self, param: &str) -> Result<InvoiceInfo, BotError>;
 
-    /// Оплатить чужой счёт: валюта кнопкой → «Оплатить» — одно нажатие, без код-пароля.
+    /// Оплатить чужой счёт кнопками в чате бота, без код-пароля. Нажатие, которое платит, —
+    /// одно (CryptoBot: «💳 Оплатить» и, для нового получателя, «💸 Отправить платеж
+    /// получателю»; xRocket: «Оплатить»).
     async fn pay_invoice(
         &self,
         param: &str,

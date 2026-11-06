@@ -28,7 +28,6 @@ thiserror.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
-url = "2.5"
 userbot = { path = "../userbot" }
 zeroize = { version = "1.8", features = ["std"] }
 

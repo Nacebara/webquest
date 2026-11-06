@@ -9,6 +9,11 @@
 //! такого. Окна разных команд не пересекаются, поэтому один ответ не может достаться двум
 //! операциям: ни поздний ответ на прошлую команду, ни ответ на следующую.
 //!
+//! Меню ботов отвечают и правкой своего экрана, который старше последней нашей команды:
+//! xRocket на введённую сумму чека правит сообщение меню (оно пришло в ответ на `/cheques`).
+//! Для этого [`Conv::wait_screen`]: окно открывает команда, с которой начался экран, а
+//! закрывает наше следующее сообщение после последней команды разговора.
+//!
 //! «Чистый чат»: первая команда операции в чат бота уходит, только если на нашу прошлую
 //! команду в этом чате уже есть ответ (по истории Telegram, а не по таймеру в памяти — это
 //! переживает рестарт). Иначе ждём `late_reply_quarantine`, затем операция возвращается
@@ -30,6 +35,9 @@ use super::UserbotWallet;
 use super::gate::{GateState, Pace};
 use crate::transport::{CallbackAnswer, Chat, RawMessage, Transport, TransportError};
 use crate::wallet::BotError;
+
+/// Команды меню чеков: их экран бот правит на месте, в том числе в ответ на сумму.
+const MENU_COMMANDS: [&str; 2] = ["/checks", "/cheques"];
 
 /// Отправка не удалась.
 #[derive(Debug)]
@@ -77,10 +85,6 @@ impl<'a, T: Transport> Conv<'a, T> {
             op: op.map(str::to_owned),
             cleared: HashSet::new(),
         }
-    }
-
-    pub fn transport(&self) -> &T {
-        &self.w.transport
     }
 
     pub fn platform(&self) -> domain::Platform {
@@ -224,7 +228,24 @@ impl<'a, T: Transport> Conv<'a, T> {
                 break;
             };
             let last = &msgs[i];
-            let answered = msgs[i + 1..].iter().any(|m| Self::answers(platform, m));
+            // Ответ — новое сообщение бота после команды или (только в меню чеков) правка
+            // экрана меню, пришедшего на нашу предыдущую команду `/checks` / `/cheques`,
+            // сделанная не раньше этой: xRocket отвечает на сумму чека правкой меню.
+            let menu_cmd = msgs[..i]
+                .iter()
+                .rposition(|m| m.out)
+                .map(|j| &msgs[j])
+                .filter(|p| MENU_COMMANDS.contains(&p.text.as_str()))
+                .map(|p| p.id);
+            let edited_screen = |m: &RawMessage| {
+                !m.out
+                    && m.id < last.id
+                    && menu_cmd.is_some_and(|p| m.id > p)
+                    && m.edit_date.is_some_and(|d| d >= last.date)
+                    && Self::answers(platform, m)
+            };
+            let answered = msgs[i + 1..].iter().any(|m| Self::answers(platform, m))
+                || msgs[..i].iter().any(edited_screen);
             if answered || next_text == Some(last.text.as_str()) {
                 break;
             }
@@ -414,56 +435,64 @@ impl<'a, T: Transport> Conv<'a, T> {
         self.wait_where(
             chat,
             after_id,
+            after_id,
             mark,
             deadline,
             history_first,
-            true,
             candidate,
             accept,
         )
         .await
     }
 
-    /// Ждать правку сообщения `msg_id` (в том числе нашего: инлайн-чек в «Избранном»).
-    pub async fn wait_edit(
+    /// Ждать экран меню: новое сообщение бота или правку его экрана в окне от команды
+    /// `opened_by` (с неё начался экран, например `/cheques`) до нашего следующего сообщения
+    /// после `last_out` (последнее наше сообщение разговора, например сумма чека).
+    /// Принимаются только сообщения, пришедшие после отметки `mark`, и — если не дождались —
+    /// текущие версии по истории.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn wait_screen(
         &mut self,
         chat: Chat,
-        msg_id: i32,
+        opened_by: i32,
+        last_out: i32,
         mark: usize,
         deadline: Instant,
+        history_first: bool,
         accept: impl FnMut(&RawMessage) -> bool,
     ) -> Option<RawMessage> {
-        let candidate = move |m: &RawMessage| m.chat == chat && m.id == msg_id;
+        let candidate = move |m: &RawMessage| m.chat == chat && !m.out && m.id > opened_by;
         self.wait_where(
             chat,
-            msg_id - 1,
+            opened_by,
+            last_out,
             mark,
             deadline,
-            false,
-            false,
+            history_first,
             candidate,
             accept,
         )
         .await
     }
 
-    /// `bounded` — окно команды: сообщения после нашего следующего сообщения в этом чате
-    /// не рассматриваются (ответы на следующую команду и поздние ответы — не наши).
+    /// Окно команды: сообщения после нашего следующего сообщения в этом чате (первого нашего
+    /// с id больше `bound_after`) не рассматриваются — ответы на следующую команду и поздние
+    /// ответы не наши. История читается с `history_after`.
     #[allow(clippy::too_many_arguments)]
     async fn wait_where(
         &mut self,
         chat: Chat,
         history_after: i32,
+        bound_after: i32,
         mark: usize,
         deadline: Instant,
         history_first: bool,
-        bounded: bool,
         candidate: impl Fn(&RawMessage) -> bool,
         mut accept: impl FnMut(&RawMessage) -> bool,
     ) -> Option<RawMessage> {
         let next_out = |msgs: &[RawMessage]| {
             msgs.iter()
-                .filter(|m| bounded && m.chat == chat && m.out && m.id > history_after)
+                .filter(|m| m.chat == chat && m.out && m.id > bound_after)
                 .map(|m| m.id)
                 .min()
         };
@@ -482,7 +511,7 @@ impl<'a, T: Transport> Conv<'a, T> {
             while pos < self.seen.len() {
                 let m = self.seen[pos].clone();
                 pos += 1;
-                if bounded && m.chat == chat && m.out && m.id > history_after {
+                if m.chat == chat && m.out && m.id > bound_after {
                     upper = Some(upper.map_or(m.id, |u| u.min(m.id)));
                     continue;
                 }

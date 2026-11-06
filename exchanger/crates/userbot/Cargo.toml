@@ -24,6 +24,8 @@ tracing.workspace = true
 
 [dev-dependencies]
 rust_decimal_macros.workspace = true
+# Сверка текстов симулятора с живой записью (`parsers/tests/fixtures/live_wallet_replies.json`).
+serde_json = "1"
 tokio = { workspace = true, features = ["test-util"] }
 
 [lints]

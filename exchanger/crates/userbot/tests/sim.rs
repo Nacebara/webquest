@@ -1,11 +1,17 @@
-//! Симулятор ботов кошельков (DESIGN-v0.2 §5): каждый ответ, меню, инлайн, счета, сбои.
+//! Симулятор ботов кошельков (DESIGN-v0.2 §5) на живых экранах: активация, меню чеков обоих
+//! кошельков, счета, кошелёк, сбои. Ключевые экраны дополнительно прогоняются через парсеры —
+//! симулятор и разбор не должны разойтись.
 #![cfg(feature = "sim")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::time::Duration;
 
 use domain::{Asset, Decimal, Money, Platform};
-use parsers::replies::{InvoicePayReply, classify_invoice_payment};
+use parsers::ActivationReply;
+use parsers::replies::{classify_activation, parse_balance};
+use parsers::screens::{
+    CheckCreationReply, InvoiceScreen, classify_check_creation, classify_invoice_screen,
+};
 use rust_decimal_macros::dec;
 use tokio::sync::broadcast;
 use userbot::sim::{
@@ -18,6 +24,7 @@ const CB: Platform = Platform::CryptoBot;
 const XR: Platform = Platform::XRocket;
 const CB_CHAT: Chat = Chat::WalletBot(Platform::CryptoBot);
 const XR_CHAT: Chat = Chat::WalletBot(Platform::XRocket);
+const NBSP: char = '\u{a0}';
 
 fn usdt(x: Decimal) -> Money {
     Money::new(x, Asset::Usdt).unwrap()
@@ -55,9 +62,21 @@ fn drain(rx: &mut broadcast::Receiver<RawMessage>) -> Vec<RawMessage> {
     out
 }
 
-/// Ровно одно новое сообщение бота в потоке.
+/// Последние версии сообщений из потока, по порядку первого появления.
+fn settled(rx: &mut broadcast::Receiver<RawMessage>) -> Vec<RawMessage> {
+    let mut out: Vec<RawMessage> = Vec::new();
+    for m in drain(rx) {
+        match out.iter_mut().find(|o| o.id == m.id && o.chat == m.chat) {
+            Some(o) => *o = m,
+            None => out.push(m),
+        }
+    }
+    out
+}
+
+/// Ровно одно сообщение бота (последняя версия, если бот его правил).
 fn one(rx: &mut broadcast::Receiver<RawMessage>) -> RawMessage {
-    let mut msgs = drain(rx);
+    let mut msgs = settled(rx);
     assert_eq!(msgs.len(), 1, "ожидали одно сообщение: {msgs:#?}");
     msgs.remove(0)
 }
@@ -73,6 +92,11 @@ fn data(msg: &RawMessage, button: &str) -> Vec<u8> {
     }
 }
 
+async fn press(t: &SimTransport, chat: Chat, msg: &RawMessage, button: &str) {
+    let answer = t.press(chat, msg.id, &data(msg, button)).await.unwrap();
+    assert!(!answer.alert, "{button}: {answer:?}");
+}
+
 fn start_param(url: &str) -> &str {
     url.split("start=").nth(1).unwrap()
 }
@@ -81,6 +105,12 @@ async fn start(t: &SimTransport, chat: Chat, code: &str, rid: i64) -> RawMessage
     t.send_text(chat, &format!("/start {code}"), rid)
         .await
         .unwrap()
+}
+
+fn urls(m: &RawMessage) -> Vec<String> {
+    let mut u = m.button_urls();
+    u.extend(m.entity_urls.iter().cloned());
+    u
 }
 
 // ---------- активация ----------
@@ -100,24 +130,32 @@ async fn activation_moves_money_and_notifies_creator() {
         .create_check(CheckSpec::new(CB, usdt(dec!(100))).by(client))
         .unwrap();
     assert_eq!(world.balance(client, CB, Asset::Usdt), dec!(50));
-    assert!(
-        check.code.starts_with("CQ") && check.code.len() == 12,
-        "{}",
-        check.code
-    );
+    assert!(check.code.starts_with("CQ") && check.code.len() == 12);
     assert_eq!(check.url, format!("https://t.me/send?start={}", check.code));
     let total = world.total_in_world(CB, Asset::Usdt);
 
     let mut rx = t.subscribe();
     let sent = start(&t, CB_CHAT, &check.code, 1).await;
     assert!(sent.out);
-    assert_eq!(sent.text, format!("/start {}", check.code));
-
-    let reply = one(&mut rx);
-    assert_eq!(reply.text, "Вы получили 100 USDT.");
-    assert!(!reply.out);
-    assert!(reply.id > sent.id);
-    assert_eq!(reply.chat, CB_CHAT);
+    // «🕘 Получение…», затем правка того же сообщения.
+    let versions = drain(&mut rx);
+    assert_eq!(versions.len(), 2);
+    assert_eq!(versions[0].text, "🕘 Получение 🪙 100 USDT ($100)…");
+    assert_eq!(versions[1].id, versions[0].id);
+    assert!(versions[1].edit_date.is_some());
+    assert_eq!(versions[1].text, "📥 Вы получили 🪙 100 USDT ($100).");
+    assert!(versions[1].id > sent.id);
+    assert_eq!(
+        classify_activation(CB, &versions[0].text),
+        ActivationReply::InProgress
+    );
+    assert_eq!(
+        classify_activation(CB, &versions[1].text),
+        ActivationReply::Received {
+            amount: dec!(100),
+            asset: Asset::Usdt
+        }
+    );
 
     assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(100));
     let check = world.check(&check.code).unwrap();
@@ -128,26 +166,41 @@ async fn activation_moves_money_and_notifies_creator() {
     let notice = world.messages(client, CB_CHAT).pop().unwrap();
     assert_eq!(
         notice.text,
-        format!(
-            "Ваш чек активировал @exch_cb.\n\nЧек на 100 USDT — {}",
-            check.url
-        )
+        "🦋 \u{2068}@exch_cb\u{2069} активировал(а) ваш чек и получил(а) 🪙 100 USDT ($100)."
     );
-    assert_eq!(notice.entity_urls, vec![check.url.clone()]);
+    assert_eq!(
+        classify_activation(CB, &notice.text),
+        ActivationReply::ClaimNotice
+    );
 }
 
 #[tokio::test]
 async fn second_start_with_new_random_id_says_already_activated() {
     let Env { world, ub, t, .. } = env();
-    let url = world.client_check(CB, usdt(dec!(5))).unwrap();
-    let code = start_param(&url).to_owned();
     let mut rx = t.subscribe();
-    start(&t, CB_CHAT, &code, 1).await;
-    assert_eq!(one(&mut rx).text, "Вы получили 5 USDT.");
-    // Ловушка lovec (AUDIT.md:46): повтор с НОВЫМ random_id после выигрыша.
-    start(&t, CB_CHAT, &code, 2).await;
-    assert_eq!(one(&mut rx).text, texts::ALREADY_ACTIVATED);
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(5));
+    for (platform, chat, rid) in [(CB, CB_CHAT, 10), (XR, XR_CHAT, 20)] {
+        let url = world.client_check(platform, usdt(dec!(5))).unwrap();
+        let code = start_param(&url).to_owned();
+        start(&t, chat, &code, rid + 1).await;
+        assert!(matches!(
+            classify_activation(platform, &one(&mut rx).text),
+            ActivationReply::Received { .. }
+        ));
+        // Ловушка lovec (AUDIT.md:46): повтор с НОВЫМ random_id после выигрыша.
+        start(&t, chat, &code, rid + 2).await;
+        let again = one(&mut rx).text;
+        match platform {
+            CB => assert_eq!(again, "Этот чек уже активирован."),
+            XR => {
+                assert_eq!(again, "Этот перевод уже активирован вами.");
+                assert_eq!(
+                    classify_activation(XR, &again),
+                    ActivationReply::AlreadyActivatedByUs
+                );
+            }
+        }
+        assert_eq!(world.balance(ub, platform, Asset::Usdt), dec!(5));
+    }
 }
 
 #[tokio::test]
@@ -162,54 +215,75 @@ async fn every_rejection_class_has_its_text_and_moves_no_money() {
     let other = world.add_account("someone");
     let m = usdt(dec!(3));
     let mk = |spec: CheckSpec| world.create_check(spec).unwrap().code;
-    let cases: Vec<(Chat, String, &str)> = vec![
-        (CB_CHAT, "CQAAAAAAAAAA".into(), "Чек не найден."),
+    let cases: Vec<(Chat, String, &str, ActivationReply)> = vec![
+        (
+            CB_CHAT,
+            "CQAAAAAAAAAA".into(),
+            "Чек не найден, удалён или не был создан из-за недостаточного баланса.",
+            ActivationReply::NotFound,
+        ),
+        (
+            XR_CHAT,
+            "t_AAAAAAAAAAAAAAA".into(),
+            "Этот перевод не найден.",
+            ActivationReply::NotFound,
+        ),
         (
             XR_CHAT,
             "mci_AAAAAAAAAAAAAAA".into(),
             "Мульти-чек не найден.",
+            ActivationReply::NotFound,
         ),
         (
             XR_CHAT,
-            "mc_AAAAAAAAAAAAAAA".into(),
-            "Мульти-чек не найден.",
+            mk(CheckSpec::new(CB, m)),
+            "Этот перевод не найден.",
+            ActivationReply::NotFound,
         ),
-        (XR_CHAT, mk(CheckSpec::new(CB, m)), "Чек не найден."),
         (
             CB_CHAT,
             mk(CheckSpec::new(CB, m).personal_for(other)),
-            "Вы не можете активировать этот чек.",
+            "К сожалению, вы не можете получить этот подарок. Он предназначен для другого получателя.",
+            ActivationReply::NotForYou,
         ),
         (
             CB_CHAT,
             mk(CheckSpec::new(CB, m).with_subscription("@wallet_news")),
             "Подпишитесь на канал @wallet_news, чтобы активировать этот чек.",
+            ActivationReply::NeedsSubscription,
         ),
         (
             CB_CHAT,
             mk(CheckSpec::new(CB, m).with_captcha()),
-            "Введите символы, которые вы видите на картинке.",
+            texts::CAPTCHA,
+            ActivationReply::Captcha,
         ),
         (
             CB_CHAT,
             mk(CheckSpec::new(CB, m).with_password("pw")),
-            "Введите пароль от чека.",
+            texts::PASSWORD_PROMPT,
+            ActivationReply::PasswordRequired,
         ),
         (
             CB_CHAT,
             mk(CheckSpec::new(CB, m).premium_only()),
             texts::PREMIUM_ONLY,
-        ),
-        (
-            XR_CHAT,
-            mk(CheckSpec::new(XR, m).premium_only()),
-            texts::PREMIUM_ONLY,
+            ActivationReply::PremiumOnly,
         ),
     ];
     let mut rx = t.subscribe();
-    for (i, (chat, code, expected)) in cases.iter().enumerate() {
+    for (i, (chat, code, expected, class)) in cases.iter().enumerate() {
         start(&t, *chat, code, 100 + i64::try_from(i).unwrap()).await;
-        assert_eq!(one(&mut rx).text, *expected, "код {code}");
+        let reply = one(&mut rx);
+        assert_eq!(reply.text, *expected, "код {code}");
+        let Chat::WalletBot(platform) = chat else {
+            unreachable!()
+        };
+        assert_eq!(
+            classify_activation(*platform, &reply.text),
+            *class,
+            "{code}"
+        );
     }
     // Свой чек: бот показывает его, но не зачисляет.
     let own = world.create_check(CheckSpec::new(CB, m).by(ub)).unwrap();
@@ -228,7 +302,7 @@ async fn every_rejection_class_has_its_text_and_moves_no_money() {
 }
 
 #[tokio::test]
-async fn subscription_and_premium_pass_when_satisfied() {
+async fn subscription_premium_and_password_pass_when_satisfied() {
     let Env { world, ub, t, .. } = env();
     let m = usdt(dec!(2));
     let sub = world
@@ -237,37 +311,27 @@ async fn subscription_and_premium_pass_when_satisfied() {
     let prem = world
         .create_check(CheckSpec::new(XR, m).premium_only())
         .unwrap();
-    let personal = world
-        .create_check(CheckSpec::new(CB, m).personal_for(ub))
+    let pw = world
+        .create_check(CheckSpec::new(CB, usdt(dec!(1))).with_password("s3cret"))
         .unwrap();
     world.join_channel(ub, "@chan").unwrap();
     world.set_premium(ub, true).unwrap();
     let mut rx = t.subscribe();
     start(&t, CB_CHAT, &sub.code, 1).await;
-    assert_eq!(one(&mut rx).text, "Вы получили 2 USDT.");
+    assert_eq!(one(&mut rx).text, "📥 Вы получили 🪙 2 USDT ($2).");
     start(&t, XR_CHAT, &prem.code, 2).await;
-    assert_eq!(one(&mut rx).text, "🚀 Вы получили 2 USDT");
-    start(&t, CB_CHAT, &personal.code, 3).await;
-    assert_eq!(one(&mut rx).text, "Вы получили 2 USDT.");
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(4));
-    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(2));
-}
-
-#[tokio::test]
-async fn password_check_accepts_only_the_right_password() {
-    let Env { world, ub, t, .. } = env();
-    let check = world
-        .create_check(CheckSpec::new(CB, usdt(dec!(1))).with_password("s3cret"))
-        .unwrap();
-    let mut rx = t.subscribe();
-    start(&t, CB_CHAT, &check.code, 1).await;
+    assert_eq!(
+        one(&mut rx).text,
+        format!("💰 Вы успешно получили 2{NBSP}USDT (2.0$).")
+    );
+    start(&t, CB_CHAT, &pw.code, 3).await;
     assert_eq!(one(&mut rx).text, texts::PASSWORD_PROMPT);
-    t.send_text(CB_CHAT, "wrong", 2).await.unwrap();
+    t.send_text(CB_CHAT, "wrong", 4).await.unwrap();
     assert_eq!(one(&mut rx).text, texts::WRONG_PASSWORD);
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(0));
-    t.send_text(CB_CHAT, "s3cret", 3).await.unwrap();
-    assert_eq!(one(&mut rx).text, "Вы получили 1 USDT.");
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(1));
+    t.send_text(CB_CHAT, "s3cret", 5).await.unwrap();
+    assert_eq!(one(&mut rx).text, "📥 Вы получили 🪙 1 USDT ($1).");
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(3));
+    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(2));
 }
 
 #[tokio::test]
@@ -277,35 +341,26 @@ async fn xrocket_fresh_check_is_not_found_once_then_succeeds() {
     let check = world
         .create_check(CheckSpec::new(XR, usdt(dec!(10))))
         .unwrap();
-    assert!(
-        check.code.starts_with("t_") && check.code.len() == 17,
-        "{}",
-        check.code
-    );
+    assert!(check.code.starts_with("t_") && check.code.len() == 17);
     assert_eq!(
         check.url,
         format!("https://t.me/xrocket?start={}", check.code)
     );
     let mut rx = t.subscribe();
     start(&t, XR_CHAT, &check.code, 1).await;
-    assert_eq!(one(&mut rx).text, "Чек не найден.");
+    assert_eq!(one(&mut rx).text, "Этот перевод не найден.");
     assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(0));
     start(&t, XR_CHAT, &check.code, 2).await;
-    assert_eq!(one(&mut rx).text, "🚀 Вы получили 10 USDT");
+    let versions = drain(&mut rx);
+    assert_eq!(
+        versions[0].text,
+        format!("⏱ Получение 10{NBSP}USDT (10.0$)")
+    );
+    assert_eq!(
+        versions.last().unwrap().text,
+        format!("💰 Вы успешно получили 10{NBSP}USDT (10.0$).")
+    );
     assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(10));
-
-    // Чек старше окна — сразу успех; CryptoBot так не делает.
-    let old = world
-        .create_check(CheckSpec::new(XR, usdt(dec!(1))))
-        .unwrap();
-    world.advance(Duration::from_secs(5));
-    start(&t, XR_CHAT, &old.code, 3).await;
-    assert_eq!(one(&mut rx).text, "🚀 Вы получили 1 USDT");
-    let cb = world
-        .create_check(CheckSpec::new(CB, usdt(dec!(1))))
-        .unwrap();
-    start(&t, CB_CHAT, &cb.code, 4).await;
-    assert_eq!(one(&mut rx).text, "Вы получили 1 USDT.");
 }
 
 #[tokio::test]
@@ -322,9 +377,12 @@ async fn multi_check_gives_each_user_one_activation() {
     assert!(check.code.starts_with("mci_") && check.code.len() == 19);
     let mut rx = t.subscribe();
     start(&t, XR_CHAT, &check.code, 1).await;
-    assert_eq!(one(&mut rx).text, "🚀 Вы получили 0.5 TONCOIN");
+    assert_eq!(
+        one(&mut rx).text,
+        format!("💰 Вы успешно получили 0.5{NBSP}TONCOIN (2.5$).")
+    );
     start(&t, XR_CHAT, &check.code, 2).await;
-    assert_eq!(one(&mut rx).text, texts::ALREADY_ACTIVATED);
+    assert_eq!(one(&mut rx).text, "Этот перевод уже активирован вами.");
     assert_eq!(
         world.claim_check(client, &check.url).unwrap(),
         ClaimOutcome::Received(ton(dec!(0.5)))
@@ -347,7 +405,7 @@ async fn random_id_duplicate_on_send_text_has_no_side_effects() {
     let url = world.client_check(CB, usdt(dec!(7))).unwrap();
     let mut rx = t.subscribe();
     start(&t, CB_CHAT, start_param(&url), 42).await;
-    assert_eq!(one(&mut rx).text, "Вы получили 7 USDT.");
+    assert_eq!(one(&mut rx).text, "📥 Вы получили 🪙 7 USDT ($7).");
     let before = world.messages(ub, CB_CHAT);
     let err = t
         .send_text(CB_CHAT, &format!("/start {}", start_param(&url)), 42)
@@ -357,7 +415,7 @@ async fn random_id_duplicate_on_send_text_has_no_side_effects() {
     assert!(drain(&mut rx).is_empty());
     assert_eq!(world.messages(ub, CB_CHAT), before);
     assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(7));
-    // random_id общий для всех чатов аккаунта и для send_inline.
+    // random_id общий для всех чатов аккаунта.
     assert_eq!(
         t.send_text(Chat::SavedMessages, "note", 42)
             .await
@@ -366,413 +424,284 @@ async fn random_id_duplicate_on_send_text_has_no_side_effects() {
     );
 }
 
-// ---------- меню чеков ----------
+// ---------- меню чеков CryptoBot ----------
+
+/// `/checks` → «Создать чек» → USDT: экран ввода суммы (сообщение меню).
+async fn cb_amount_prompt(
+    t: &SimTransport,
+    rx: &mut broadcast::Receiver<RawMessage>,
+) -> RawMessage {
+    t.send_text(CB_CHAT, "/checks", 900).await.unwrap();
+    let menu = one(rx);
+    assert_eq!(menu.text, texts::cb_checks_menu());
+    press(t, CB_CHAT, &menu, "Создать чек").await;
+    let coins = one(rx);
+    assert_eq!(coins.id, menu.id, "бот правит меню");
+    assert_eq!(coins.text, texts::CB_CHOOSE_COIN);
+    press(t, CB_CHAT, &coins, "USDT").await;
+    let prompt = one(rx);
+    assert_eq!(prompt.id, menu.id);
+    assert!(prompt.text.starts_with("Пришлите сумму чека в USDT."));
+    prompt
+}
 
 #[tokio::test]
-async fn cryptobot_menu_creates_exactly_one_check_per_random_id() {
-    let Env {
-        world,
-        ub,
-        t,
-        client,
-    } = env();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(50)).unwrap();
+async fn cryptobot_menu_asks_for_activations_and_skip_creates_one_check() {
+    let Env { world, ub, t, .. } = env();
+    world.set_balance(ub, CB, Asset::Usdt, dec!(100)).unwrap();
     let mut rx = t.subscribe();
+    let prompt = cb_amount_prompt(&t, &mut rx).await;
+    assert!(prompt.text.ends_with("Ваш баланс: 100 USDT ($100)"));
 
-    t.send_text(CB_CHAT, "/checks", 1).await.unwrap();
-    let menu = one(&mut rx);
-    assert!(menu.text.contains("Чеки"));
-    t.press(CB_CHAT, menu.id, &data(&menu, "Создать чек"))
-        .await
-        .unwrap();
-    let assets = one(&mut rx);
-    assert_eq!(assets.id, menu.id, "меню правится на месте");
-    assert!(assets.edit_date.is_some());
-    assert!(assets.find_button("USDT").is_some() && assets.find_button("TON").is_some());
-    t.press(CB_CHAT, menu.id, &data(&assets, "USDT"))
-        .await
-        .unwrap();
+    // Сумма укладывается в баланс 10 раз: новое сообщение «Пришлите количество активаций…».
+    let amount = t.send_text(CB_CHAT, "10", 77).await.unwrap();
     let ask = one(&mut rx);
+    assert!(ask.id > amount.id, "ответ на сумму — новое сообщение");
+    assert_eq!(ask.text, texts::cb_ask_activations(10));
     assert_eq!(
-        ask.text,
-        "Отправьте сумму чека в USDT.\n\nДоступно: 50 USDT."
+        classify_check_creation(CB, &ask.text, &urls(&ask)),
+        CheckCreationReply::AskActivations
     );
+    assert!(world.checks().is_empty(), "чек ещё не создан");
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(100));
 
-    t.send_text(CB_CHAT, "10", 100).await.unwrap();
-    let created = one(&mut rx);
-    let check = world.checks_created_by(ub).pop().unwrap();
-    let link = format!("https://t.me/send?start={}", check.code);
-    assert!(created.text.contains(&link), "{}", created.text);
-    assert!(created.text.contains("Чек на 10 USDT"));
-    assert_eq!(created.entity_urls, vec![link.clone()]);
-    assert_eq!(created.button_urls(), vec![link.clone()]);
-    assert_eq!(check.origin, CheckOrigin::Menu { random_id: 100 });
-    assert_eq!(check.amount, usdt(dec!(10)));
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(40));
-
-    // Повтор отправки суммы с тем же random_id — второго чека нет.
-    assert_eq!(
-        t.send_text(CB_CHAT, "10", 100).await.unwrap_err(),
-        TransportError::RandomIdDuplicate
-    );
-    // С новым random_id диалог уже закрыт — тоже без чека.
-    t.send_text(CB_CHAT, "10", 101).await.unwrap();
-    assert_eq!(one(&mut rx).text, texts::UNKNOWN_COMMAND);
-    assert_eq!(world.checks_created_by(ub).len(), 1);
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(40));
-
-    // «Мои чеки» показывает ссылку.
-    t.send_text(CB_CHAT, "/checks", 102).await.unwrap();
-    let menu = one(&mut rx);
-    t.press(CB_CHAT, menu.id, &data(&menu, "Мои чеки"))
-        .await
-        .unwrap();
-    let list = one(&mut rx);
-    assert!(list.text.contains(&link));
-    assert_eq!(list.button_urls(), vec![link.clone()]);
-
-    // Клиент забирает чек — создателю уведомление, список пуст.
-    assert_eq!(
-        world.claim_check(client, &link).unwrap(),
-        ClaimOutcome::Received(usdt(dec!(10)))
-    );
-    assert_eq!(
-        one(&mut rx).text,
-        format!("Ваш чек активировал @client.\n\nЧек на 10 USDT — {link}")
-    );
-    t.send_text(CB_CHAT, "/checks", 103).await.unwrap();
-    let menu = one(&mut rx);
-    t.press(CB_CHAT, menu.id, &data(&menu, "Мои чеки"))
-        .await
-        .unwrap();
-    assert_eq!(one(&mut rx).text, texts::NO_ACTIVE_CHECKS);
-}
-
-#[tokio::test]
-async fn xrocket_menu_creates_personal_check() {
-    let Env { world, ub, t, .. } = env();
-    world.set_balance(ub, XR, Asset::Usdt, dec!(30)).unwrap();
-    let mut rx = t.subscribe();
-    t.send_text(XR_CHAT, "/cheques", 1).await.unwrap();
-    let menu = one(&mut rx);
-    t.press(XR_CHAT, menu.id, &data(&menu, "Персональный"))
-        .await
-        .unwrap();
-    let personal = one(&mut rx);
-    t.press(XR_CHAT, menu.id, &data(&personal, "Создать чек"))
-        .await
-        .unwrap();
-    let assets = one(&mut rx);
-    assert!(assets.find_button("TONCOIN").is_some());
-    t.press(XR_CHAT, menu.id, &data(&assets, "USDT"))
-        .await
-        .unwrap();
-    assert_eq!(
-        one(&mut rx).text,
-        "Отправьте сумму чека в USDT.\n\nБаланс: 30 USDT."
-    );
-    t.send_text(XR_CHAT, "12,5", 2).await.unwrap();
-    let created = one(&mut rx);
-    let check = world.checks_created_by(ub).pop().unwrap();
-    assert!(check.code.starts_with("t_") && check.code.len() == 17);
-    let link = format!("https://t.me/xrocket?start={}", check.code);
-    assert!(created.text.contains(&link));
-    assert_eq!(created.button_urls(), vec![link]);
-    assert_eq!(check.amount, usdt(dec!(12.5)));
-    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(17.5));
-
-    // Мульти-чек — всплывающее уведомление, без правки.
-    t.send_text(XR_CHAT, "/cheques", 3).await.unwrap();
-    let menu = one(&mut rx);
-    let answer = t
-        .press(XR_CHAT, menu.id, &data(&menu, "Мульти-чек"))
-        .await
-        .unwrap();
-    assert!(answer.alert);
-    assert!(drain(&mut rx).is_empty());
-}
-
-#[tokio::test]
-async fn menu_reports_insufficient_funds_and_bad_amount() {
-    let Env { world, ub, t, .. } = env();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(5)).unwrap();
-    world.set_balance(ub, XR, Asset::Usdt, dec!(5)).unwrap();
-    let mut rx = t.subscribe();
-
-    t.send_text(CB_CHAT, "/checks", 1).await.unwrap();
-    let menu = one(&mut rx);
-    t.press(CB_CHAT, menu.id, &data(&menu, "Создать чек"))
-        .await
-        .unwrap();
-    let assets = one(&mut rx);
-    t.press(CB_CHAT, menu.id, &data(&assets, "USDT"))
-        .await
-        .unwrap();
-    one(&mut rx);
-    t.send_text(CB_CHAT, "abc", 2).await.unwrap();
-    assert_eq!(one(&mut rx).text, texts::BAD_AMOUNT);
-    t.send_text(CB_CHAT, "10", 3).await.unwrap();
-    assert_eq!(one(&mut rx).text, "Недостаточно средств. Доступно: 5 USDT.");
-
-    t.send_text(XR_CHAT, "/cheques", 4).await.unwrap();
-    let menu = one(&mut rx);
-    t.press(XR_CHAT, menu.id, &data(&menu, "Персональный"))
-        .await
-        .unwrap();
-    let p = one(&mut rx);
-    t.press(XR_CHAT, menu.id, &data(&p, "Создать чек"))
-        .await
-        .unwrap();
-    let a = one(&mut rx);
-    t.press(XR_CHAT, menu.id, &data(&a, "USDT")).await.unwrap();
-    one(&mut rx);
-    t.send_text(XR_CHAT, "5.01", 5).await.unwrap();
-    assert_eq!(one(&mut rx).text, "Недостаточно средств. Доступно: 5 USDT.");
-
-    assert!(world.checks().is_empty());
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(5));
-    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(5));
-}
-
-// ---------- инлайн ----------
-
-#[tokio::test]
-async fn inline_check_is_created_at_send_time_once_per_random_id() {
-    let Env {
-        world,
-        ub,
-        t,
-        client,
-    } = env();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(50)).unwrap();
-    let results = t.inline_query(CB, "10usdt").await.unwrap();
-    let ids: Vec<&str> = results.results.iter().map(|r| r.id.as_str()).collect();
-    assert_eq!(ids, vec!["check-USDT", "invoice-USDT"]);
-    assert_eq!(
-        results.results[0].title.as_deref(),
-        Some("Отправить 10 USDT")
-    );
-    assert!(world.checks().is_empty(), "запрос не создаёт чек");
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(50));
-
-    let sent = t
-        .send_inline(Chat::SavedMessages, CB, &results, "check-USDT", 555)
-        .await
-        .unwrap();
-    assert!(sent.out);
-    assert_eq!(sent.chat, Chat::SavedMessages);
-    assert_eq!(sent.via_bot, Some(CB));
-    assert_eq!(sent.text, "🦋 Чек на 10 USDT");
-    let urls = sent.button_urls();
-    assert_eq!(urls.len(), 1);
-    assert!(urls[0].starts_with("https://t.me/send?start=CQ"));
-    assert!(sent.entity_urls.is_empty(), "ссылка — только в кнопке");
-    let check = world.checks_created_by(ub).pop().unwrap();
-    assert_eq!(check.url, urls[0]);
-    assert_eq!(check.origin, CheckOrigin::Inline { random_id: 555 });
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(40));
-
-    assert_eq!(
-        t.send_inline(Chat::SavedMessages, CB, &results, "check-USDT", 555)
-            .await
-            .unwrap_err(),
-        TransportError::RandomIdDuplicate
-    );
-    assert_eq!(world.checks().len(), 1);
-    assert_eq!(world.messages(ub, Chat::SavedMessages).len(), 1);
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(40));
-
-    // Ссылку из кнопки клиент активирует; юзербот получает уведомление.
-    let mut rx = t.subscribe();
-    assert_eq!(
-        world.claim_check(client, &urls[0]).unwrap(),
-        ClaimOutcome::Received(usdt(dec!(10)))
-    );
-    let notice = one(&mut rx);
-    assert_eq!(notice.chat, CB_CHAT);
-    assert_eq!(
-        notice.text,
-        format!(
-            "Ваш чек активировал @client.\n\nЧек на 10 USDT — {}",
-            urls[0]
-        )
-    );
-    assert_eq!(world.balance(client, CB, Asset::Usdt), dec!(10));
-}
-
-#[tokio::test]
-async fn inline_xrocket_offers_every_asset() {
-    let Env { world, ub, t, .. } = env();
-    world.set_balance(ub, XR, Asset::Usdt, dec!(50)).unwrap();
-    world.set_balance(ub, XR, Asset::Ton, dec!(50)).unwrap();
-    let results = t.inline_query(XR, "10").await.unwrap();
-    let titles: Vec<_> = results
-        .results
-        .iter()
-        .map(|r| r.title.clone().unwrap())
-        .collect();
-    assert_eq!(titles, vec!["Чек на 10 USDT", "Чек на 10 TONCOIN"]);
-    let sent = t
-        .send_inline(Chat::SavedMessages, XR, &results, "check-TON", 1)
-        .await
-        .unwrap();
-    assert_eq!(sent.text, "🚀 Чек на 10 TONCOIN");
-    assert_eq!(sent.via_bot, Some(XR));
-    assert!(sent.button_urls()[0].starts_with("https://t.me/xrocket?start=t_"));
-    assert_eq!(world.balance(ub, XR, Asset::Ton), dec!(40));
-    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(50));
-    assert_eq!(world.checks()[0].amount, ton(dec!(10)));
-}
-
-#[tokio::test]
-async fn inline_insufficient_funds_creates_nothing() {
-    let Env { world, ub, t, .. } = env();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(5)).unwrap();
-    let results = t.inline_query(CB, "10 usdt").await.unwrap();
-    assert_eq!(
-        results.results[0].title.as_deref(),
-        Some(texts::INLINE_INSUFFICIENT_TITLE)
-    );
-    let sent = t
-        .send_inline(Chat::SavedMessages, CB, &results, "check-USDT", 1)
-        .await
-        .unwrap();
-    assert_eq!(sent.text, texts::INLINE_INSUFFICIENT_MESSAGE);
-    assert!(sent.buttons.is_empty());
-
-    // Денег хватало при запросе, но не при отправке: чек не создан.
-    world.set_balance(ub, CB, Asset::Usdt, dec!(20)).unwrap();
-    let results = t.inline_query(CB, "10usdt").await.unwrap();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(3)).unwrap();
-    let sent = t
-        .send_inline(Chat::SavedMessages, CB, &results, "check-USDT", 2)
-        .await
-        .unwrap();
-    assert_eq!(sent.text, texts::INLINE_INSUFFICIENT_MESSAGE);
-    assert!(world.checks().is_empty());
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(3));
-}
-
-#[tokio::test]
-async fn inline_bad_query_or_result_does_not_consume_random_id() {
-    let Env { world, ub, t, .. } = env();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(50)).unwrap();
-    let results = t.inline_query(CB, "10usdt").await.unwrap();
-    let err = t
-        .send_inline(Chat::SavedMessages, XR, &results, "check-USDT", 9)
-        .await
-        .unwrap_err();
-    assert!(matches!(err, TransportError::Rpc { ref name, .. } if name == "QUERY_ID_INVALID"));
-    let err = t
-        .send_inline(Chat::SavedMessages, CB, &results, "nope", 9)
-        .await
-        .unwrap_err();
-    assert!(matches!(err, TransportError::Rpc { ref name, .. } if name == "RESULT_ID_INVALID"));
-    // Чужой запрос: query_id принадлежит другому аккаунту.
-    let other = world.transport(world.add_account("other"));
+    // «Пропустить ›» — одна активация; экран чека — правкой того же сообщения.
+    press(&t, CB_CHAT, &ask, "Пропустить").await;
+    let screen = one(&mut rx);
+    assert_eq!(screen.id, ask.id);
+    let created = match classify_check_creation(CB, &screen.text, &urls(&screen)) {
+        CheckCreationReply::Created(c) => c,
+        other => panic!("{other:?}: {screen:#?}"),
+    };
+    assert_eq!(created.amount, Some((dec!(10), Asset::Usdt)));
+    let checks = world.checks_created_by(ub);
+    assert_eq!(checks.len(), 1);
+    assert_eq!(checks[0].code, created.param);
+    assert_eq!(checks[0].activations, 1);
+    assert_eq!(checks[0].origin, CheckOrigin::Menu { random_id: 77 });
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(90));
+    // Кнопки «Пропустить» на экране чека уже нет: второго чека нажатием не сделать.
+    assert!(screen.find_button("Пропустить").is_none());
     assert!(
-        other
-            .send_inline(Chat::SavedMessages, CB, &results, "check-USDT", 1)
+        t.press(CB_CHAT, ask.id, &data(&ask, "Пропустить"))
             .await
             .is_err()
     );
-    t.send_inline(Chat::SavedMessages, CB, &results, "check-USDT", 9)
-        .await
-        .unwrap();
     assert_eq!(world.checks().len(), 1);
-    assert!(
-        t.inline_query(CB, "10btc")
-            .await
-            .unwrap()
-            .results
-            .is_empty()
-    );
 }
 
 #[tokio::test]
-async fn inline_invoice_result_creates_our_invoice() {
+async fn cryptobot_menu_creates_the_check_on_the_amount_when_no_multicheck_fits() {
     let Env { world, ub, t, .. } = env();
-    let results = t.inline_query(CB, "3usdt").await.unwrap();
-    let sent = t
-        .send_inline(Chat::SavedMessages, CB, &results, "invoice-USDT", 1)
+    world.set_balance(ub, CB, Asset::Usdt, dec!(5.05)).unwrap();
+    let mut rx = t.subscribe();
+    cb_amount_prompt(&t, &mut rx).await;
+    let amount = t.send_text(CB_CHAT, "4", 5).await.unwrap();
+    let screen = one(&mut rx);
+    assert!(screen.id > amount.id);
+    assert_eq!(
+        screen.text,
+        texts::cb_check(&usdt(dec!(4)), dec!(4), &world.checks()[0].code)
+    );
+    assert!(matches!(
+        classify_check_creation(CB, &screen.text, &urls(&screen)),
+        CheckCreationReply::Created(_)
+    ));
+    assert_eq!(world.checks()[0].origin, CheckOrigin::Menu { random_id: 5 });
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(1.05));
+}
+
+#[tokio::test]
+async fn cryptobot_menu_reports_insufficient_funds_and_bad_amount() {
+    let Env { world, ub, t, .. } = env();
+    world.set_balance(ub, CB, Asset::Usdt, dec!(5)).unwrap();
+    let mut rx = t.subscribe();
+    cb_amount_prompt(&t, &mut rx).await;
+    t.send_text(CB_CHAT, "abc", 1).await.unwrap();
+    assert!(one(&mut rx).text.starts_with("Неверная сумма"));
+    t.send_text(CB_CHAT, "10", 2).await.unwrap();
+    let reply = one(&mut rx);
+    assert_eq!(
+        reply.text,
+        "Недостаточно монет. Пополните баланс.\n\nВаш баланс: 5 USDT ($5)."
+    );
+    assert_eq!(
+        classify_check_creation(CB, &reply.text, &urls(&reply)),
+        CheckCreationReply::InsufficientFunds
+    );
+    assert!(world.checks().is_empty());
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(5));
+}
+
+#[tokio::test]
+async fn cryptobot_check_is_deleted_with_confirmation() {
+    let Env { world, ub, t, .. } = env();
+    world.set_balance(ub, CB, Asset::Usdt, dec!(5)).unwrap();
+    let mut rx = t.subscribe();
+    cb_amount_prompt(&t, &mut rx).await;
+    t.send_text(CB_CHAT, "4", 1).await.unwrap();
+    let screen = one(&mut rx);
+    let code = world.checks()[0].code.clone();
+    press(&t, CB_CHAT, &screen, "Удалить чек").await;
+    let confirm = one(&mut rx);
+    assert_eq!(confirm.text, texts::CB_CONFIRM_DELETE);
+    press(&t, CB_CHAT, &confirm, "Да").await;
+    let versions = drain(&mut rx);
+    assert_eq!(versions[0].text, texts::CB_DELETING);
+    assert_eq!(versions.last().unwrap().text, texts::cb_checks_menu());
+    assert_eq!(world.check(&code).unwrap().status, CheckStatus::Cancelled);
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(5));
+}
+
+// ---------- меню чеков xRocket ----------
+
+/// `/cheques` → «Персональный» → «Создать чек» → USDT: экран ввода суммы (сообщение меню).
+async fn xr_amount_prompt(
+    t: &SimTransport,
+    rx: &mut broadcast::Receiver<RawMessage>,
+) -> RawMessage {
+    t.send_text(XR_CHAT, "/cheques", 900).await.unwrap();
+    let menu = one(rx);
+    assert_eq!(menu.text, texts::XR_CHEQUES_MENU);
+    press(t, XR_CHAT, &menu, "Персональный").await;
+    let personal = one(rx);
+    assert_eq!(personal.text, texts::XR_PERSONAL);
+    press(t, XR_CHAT, &personal, "Создать чек").await;
+    let coins = one(rx);
+    assert_eq!(coins.text, texts::XR_CHOOSE_COIN);
+    press(t, XR_CHAT, &coins, "USDT").await;
+    let prompt = one(rx);
+    assert_eq!(prompt.id, menu.id, "всё — правки одного сообщения");
+    assert!(prompt.text.ends_with("Введите сумму чека в USDT:"));
+    prompt
+}
+
+#[tokio::test]
+async fn xrocket_menu_confirms_the_amount_and_creates_the_check_on_confirm() {
+    let Env { world, ub, t, .. } = env();
+    world.set_balance(ub, XR, Asset::Usdt, dec!(50)).unwrap();
+    let mut rx = t.subscribe();
+    let prompt = xr_amount_prompt(&t, &mut rx).await;
+
+    // Ответ на сумму — правка сообщения меню, оно старше нашей суммы.
+    let amount = t.send_text(XR_CHAT, "10", 31).await.unwrap();
+    let confirm = one(&mut rx);
+    assert_eq!(confirm.id, prompt.id);
+    assert!(confirm.id < amount.id);
+    assert_eq!(
+        confirm.text,
+        format!(
+            "🏷 Персональный чек\n\nСумма чека: 10{NBSP}USDT (10.0$)\n\nПожалуйста, подтвердите корректность данных:"
+        )
+    );
+    assert_eq!(
+        classify_check_creation(XR, &confirm.text, &urls(&confirm)),
+        CheckCreationReply::Confirm {
+            amount: Some((dec!(10), Asset::Usdt))
+        }
+    );
+    assert!(world.checks().is_empty(), "сумма чек не создаёт");
+
+    press(&t, XR_CHAT, &confirm, "Подтверждаю").await;
+    let screen = one(&mut rx);
+    assert_eq!(screen.id, prompt.id);
+    let created = match classify_check_creation(XR, &screen.text, &urls(&screen)) {
+        CheckCreationReply::Created(c) => c,
+        other => panic!("{other:?}: {screen:#?}"),
+    };
+    assert_eq!(created.amount, Some((dec!(10), Asset::Usdt)));
+    let checks = world.checks_created_by(ub);
+    assert_eq!(checks.len(), 1);
+    assert_eq!(checks[0].code, created.param);
+    assert!(checks[0].code.starts_with("t_"));
+    assert_eq!(checks[0].origin, CheckOrigin::Menu { random_id: 31 });
+    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(40));
+    // Повторное «Подтверждаю» невозможно: на экране чека его нет.
+    assert!(
+        t.press(XR_CHAT, confirm.id, &data(&confirm, "Подтверждаю"))
+            .await
+            .is_err()
+    );
+    assert_eq!(world.checks().len(), 1);
+}
+
+#[tokio::test]
+async fn xrocket_menu_says_insufficient_on_the_same_screen_and_waits_for_another_amount() {
+    let Env { world, ub, t, .. } = env();
+    world.set_balance(ub, XR, Asset::Usdt, dec!(5.02)).unwrap();
+    let mut rx = t.subscribe();
+    let prompt = xr_amount_prompt(&t, &mut rx).await;
+    t.send_text(XR_CHAT, "10", 1).await.unwrap();
+    let screen = one(&mut rx);
+    assert_eq!(screen.id, prompt.id);
+    assert!(screen.text.ends_with("🔺 Недостаточно средств на балансе."));
+    assert_eq!(
+        classify_check_creation(XR, &screen.text, &urls(&screen)),
+        CheckCreationReply::InsufficientFunds
+    );
+    assert!(world.checks().is_empty());
+    t.send_text(XR_CHAT, "1", 2).await.unwrap();
+    let confirm = one(&mut rx);
+    assert!(matches!(
+        classify_check_creation(XR, &confirm.text, &urls(&confirm)),
+        CheckCreationReply::Confirm { .. }
+    ));
+    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(5.02));
+}
+
+#[tokio::test]
+async fn xrocket_delete_is_silent() {
+    let Env { world, ub, t, .. } = env();
+    world.set_balance(ub, XR, Asset::Usdt, dec!(5)).unwrap();
+    let mut rx = t.subscribe();
+    xr_amount_prompt(&t, &mut rx).await;
+    t.send_text(XR_CHAT, "1", 1).await.unwrap();
+    let confirm = one(&mut rx);
+    press(&t, XR_CHAT, &confirm, "Подтверждаю").await;
+    let screen = one(&mut rx);
+    let code = world.checks()[0].code.clone();
+    press(&t, XR_CHAT, &screen, "Удалить").await;
+    let back = one(&mut rx);
+    assert_eq!(
+        back.id, screen.id,
+        "никакого сообщения — только правка экрана"
+    );
+    assert_eq!(back.text, texts::XR_PERSONAL);
+    assert_eq!(world.check(&code).unwrap().status, CheckStatus::Cancelled);
+    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(5));
+}
+
+#[tokio::test]
+async fn money_press_faults_hit_only_the_pressing_that_creates_the_check() {
+    let Env { world, ub, t, .. } = env();
+    world.set_balance(ub, XR, Asset::Usdt, dec!(5)).unwrap();
+    let mut rx = t.subscribe();
+    // Сбой денежного нажатия не трогает обычные кнопки меню.
+    world.inject(ub, Call::CheckPress, Fault::TimeoutAfterEffect, 1);
+    xr_amount_prompt(&t, &mut rx).await;
+    t.send_text(XR_CHAT, "1", 1).await.unwrap();
+    let confirm = one(&mut rx);
+    let err = t
+        .press(XR_CHAT, confirm.id, &data(&confirm, "Подтверждаю"))
         .await
-        .unwrap();
-    assert_eq!(sent.text, "🧾 Счёт на 3 USDT");
-    let inv = world.invoices().pop().unwrap();
-    assert_eq!(inv.creator, Some(ub));
-    assert_eq!(sent.button_urls(), vec![inv.url.clone()]);
-    assert!(inv.code.starts_with("IV") && inv.code.len() == 12);
+        .unwrap_err();
+    assert_eq!(err, TransportError::Timeout);
+    // Чек создан, экран пришёл в поток.
+    let screen = one(&mut rx);
+    assert!(matches!(
+        classify_check_creation(XR, &screen.text, &urls(&screen)),
+        CheckCreationReply::Created(_)
+    ));
+    assert_eq!(world.checks().len(), 1);
 }
 
 // ---------- сбои ----------
 
 #[tokio::test]
-async fn timeout_after_effect_really_created_the_inline_check() {
-    let Env { world, ub, t, .. } = env();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(50)).unwrap();
-    let results = t.inline_query(CB, "10usdt").await.unwrap();
-    world.inject(ub, Call::SendInline, Fault::TimeoutAfterEffect, 1);
-    let err = t
-        .send_inline(Chat::SavedMessages, CB, &results, "check-USDT", 77)
-        .await
-        .unwrap_err();
-    assert_eq!(err, TransportError::Timeout);
-    assert!(err.outcome_unknown());
-    let checks = world.checks_created_by(ub);
-    assert_eq!(checks.len(), 1, "чек создан, хотя вызов вернул таймаут");
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(40));
-    // Сверка: сообщение со ссылкой есть в «Избранном».
-    let saved = t.history(Chat::SavedMessages, 0, 10).await.unwrap();
-    assert_eq!(saved.len(), 1);
-    assert_eq!(saved[0].via_bot, Some(CB));
-    assert_eq!(saved[0].button_urls(), vec![checks[0].url.clone()]);
-    // Повтор с тем же random_id второго чека не создаёт.
-    assert_eq!(
-        t.send_inline(Chat::SavedMessages, CB, &results, "check-USDT", 77)
-            .await
-            .unwrap_err(),
-        TransportError::RandomIdDuplicate
-    );
-    assert_eq!(world.checks().len(), 1);
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(40));
-}
-
-#[tokio::test]
-async fn timeout_after_effect_in_menu_still_delivers_the_link() {
-    let Env { world, ub, t, .. } = env();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(50)).unwrap();
-    let mut rx = t.subscribe();
-    t.send_text(CB_CHAT, "/checks", 1).await.unwrap();
-    let menu = one(&mut rx);
-    t.press(CB_CHAT, menu.id, &data(&menu, "Создать чек"))
-        .await
-        .unwrap();
-    let a = one(&mut rx);
-    t.press(CB_CHAT, menu.id, &data(&a, "USDT")).await.unwrap();
-    one(&mut rx);
-    world.inject(ub, Call::SendText, Fault::TimeoutAfterEffect, 1);
-    assert_eq!(
-        t.send_text(CB_CHAT, "10", 2).await.unwrap_err(),
-        TransportError::Timeout
-    );
-    let reply = one(&mut rx);
-    let check = world.checks_created_by(ub).pop().unwrap();
-    assert!(reply.text.contains(&check.url));
-    // Наше сообщение с суммой есть в истории, хотя id его не вернулся.
-    let hist = t.history(CB_CHAT, 0, 100).await.unwrap();
-    assert!(hist.iter().any(|m| m.out && m.text == "10"));
-    assert_eq!(
-        t.send_text(CB_CHAT, "10", 2).await.unwrap_err(),
-        TransportError::RandomIdDuplicate
-    );
-    assert_eq!(world.checks().len(), 1);
-}
-
-#[tokio::test]
 async fn failures_before_effect_do_nothing_and_keep_random_id_free() {
     let Env { world, ub, t, .. } = env();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(50)).unwrap();
-    let results = t.inline_query(CB, "10usdt").await.unwrap();
+    let url = world.client_check(CB, usdt(dec!(3))).unwrap();
+    let text = format!("/start {}", start_param(&url));
     for fault in [
         Fault::TimeoutBeforeEffect,
         Fault::Disconnected,
@@ -782,26 +711,20 @@ async fn failures_before_effect_do_nothing_and_keep_random_id_free() {
             name: "PEER_ID_INVALID".into(),
         },
     ] {
-        world.inject(ub, Call::SendInline, fault.clone(), 1);
-        let err = t
-            .send_inline(Chat::SavedMessages, CB, &results, "check-USDT", 5)
-            .await
-            .unwrap_err();
+        world.inject(ub, Call::SendText, fault.clone(), 1);
+        let err = t.send_text(CB_CHAT, &text, 5).await.unwrap_err();
         match fault {
             Fault::TimeoutBeforeEffect => assert_eq!(err, TransportError::Timeout),
             Fault::Disconnected => assert_eq!(err, TransportError::Disconnected),
             Fault::FloodWait(d) => assert_eq!(err, TransportError::FloodWait(d)),
             _ => assert!(matches!(err, TransportError::Rpc { code: 400, .. })),
         }
-        assert!(world.checks().is_empty(), "{fault:?}");
-        assert!(world.messages(ub, Chat::SavedMessages).is_empty());
-        assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(50));
+        assert!(world.messages(ub, CB_CHAT).is_empty(), "{fault:?}");
+        assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(0));
     }
     // random_id не занят: та же отправка проходит один раз.
-    t.send_inline(Chat::SavedMessages, CB, &results, "check-USDT", 5)
-        .await
-        .unwrap();
-    assert_eq!(world.checks().len(), 1);
+    t.send_text(CB_CHAT, &text, 5).await.unwrap();
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(3));
 }
 
 #[tokio::test]
@@ -815,7 +738,7 @@ async fn disconnect_after_effect_on_start_still_claims() {
         .await
         .unwrap_err();
     assert_eq!(err, TransportError::Disconnected);
-    assert_eq!(one(&mut rx).text, "Вы получили 4 USDT.");
+    assert_eq!(one(&mut rx).text, "📥 Вы получили 🪙 4 USDT ($4).");
     assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(4));
 }
 
@@ -825,11 +748,11 @@ async fn faults_apply_to_next_n_matching_calls_only() {
     world.inject(ub, Call::Any, Fault::Disconnected, 2);
     world.inject(ub, Call::History, Fault::TimeoutBeforeEffect, 1);
     assert_eq!(
-        t.inline_query(CB, "1").await.unwrap_err(),
+        t.send_text(CB_CHAT, "/wallet", 1).await.unwrap_err(),
         TransportError::Disconnected
     );
     assert_eq!(
-        t.send_text(CB_CHAT, "/wallet", 1).await.unwrap_err(),
+        t.press(CB_CHAT, 1, b"x").await.unwrap_err(),
         TransportError::Disconnected
     );
     // Правило Any исчерпано, дальше — правило для history.
@@ -864,8 +787,10 @@ async fn delayed_reply_arrives_later_but_effect_is_immediate() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(reply.text, "Вы получили 2 USDT.");
     assert!(reply.id > sent.id);
+    tokio::task::yield_now().await;
+    let last = settled(&mut rx).pop().unwrap_or(reply);
+    assert_eq!(last.text, "📥 Вы получили 🪙 2 USDT ($2).");
 }
 
 #[tokio::test(start_paused = true)]
@@ -883,7 +808,7 @@ async fn processing_message_is_edited_into_the_final_reply() {
     );
     start(&t, XR_CHAT, start_param(&url), 1).await;
     let first = one(&mut rx);
-    assert_eq!(first.text, texts::PROCESSING);
+    assert_eq!(first.text, texts::processing(XR));
     assert_eq!(first.edit_date, None);
     let fin = tokio::time::timeout(Duration::from_secs(3), rx.recv())
         .await
@@ -891,26 +816,10 @@ async fn processing_message_is_edited_into_the_final_reply() {
         .unwrap();
     assert_eq!(fin.id, first.id, "правка того же сообщения");
     assert!(fin.edit_date.is_some());
-    assert_eq!(fin.text, "🚀 Вы получили 3 USDT");
+    let done = format!("💰 Вы успешно получили 3{NBSP}USDT (3.0$).");
+    assert_eq!(fin.text, done);
     let hist = t.history(XR_CHAT, 0, 10).await.unwrap();
-    assert_eq!(hist.last().unwrap().text, "🚀 Вы получили 3 USDT");
-
-    // Без паузы обе версии приходят сразу.
-    let url = world.client_check(XR, usdt(dec!(1))).unwrap();
-    world.inject(
-        ub,
-        Call::SendText,
-        Fault::ProcessingFirst {
-            final_after: Duration::ZERO,
-        },
-        1,
-    );
-    start(&t, XR_CHAT, start_param(&url), 2).await;
-    let both = drain(&mut rx);
-    assert_eq!(both.len(), 2);
-    assert_eq!(both[0].text, texts::PROCESSING);
-    assert_eq!(both[1].id, both[0].id);
-    assert_eq!(both[1].text, "🚀 Вы получили 1 USDT");
+    assert_eq!(hist.last().unwrap().text, done);
 }
 
 #[tokio::test]
@@ -922,11 +831,11 @@ async fn unknown_text_no_reply_and_edit_instead_of_new() {
     world.inject(
         ub,
         Call::SendText,
-        Fault::UnknownReply(texts::UNKNOWN_DEFAULT.into()),
+        Fault::UnknownReply("Что-то пошло не так.".into()),
         1,
     );
     start(&t, CB_CHAT, start_param(&url), 1).await;
-    assert_eq!(one(&mut rx).text, texts::UNKNOWN_DEFAULT);
+    assert_eq!(one(&mut rx).text, "Что-то пошло не так.");
     assert_eq!(
         world.balance(ub, CB, Asset::Usdt),
         dec!(1),
@@ -948,343 +857,391 @@ async fn unknown_text_no_reply_and_edit_instead_of_new() {
     assert_eq!(edited.id, wallet.id);
     assert!(edited.id < sent.id, "ответ — правка старого сообщения");
     assert!(edited.edit_date.is_some());
-    assert_eq!(edited.text, "Вы получили 4 USDT.");
+    assert_eq!(edited.text, "📥 Вы получили 🪙 4 USDT ($4).");
     assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(7));
 }
 
-// ---------- счета ----------
+// ---------- счета CryptoBot ----------
 
 #[tokio::test]
-async fn cryptobot_invoice_is_paid_with_the_pay_button_without_passcode() {
-    let Env { world, ub, t, .. } = env();
-    let shop = world.add_account("shop");
-    let inv = world
-        .create_invoice(
-            InvoiceSpec::crypto(CB, usdt(dec!(10)))
-                .by(shop)
-                .description("Заказ 42"),
-        )
-        .unwrap();
-    assert!(inv.code.starts_with("IV") && inv.code.len() == 12);
-    assert_eq!(inv.url, format!("https://t.me/send?start={}", inv.code));
-    world.set_balance(ub, CB, Asset::Usdt, dec!(25)).unwrap();
-    let mut rx = t.subscribe();
-
-    start(&t, CB_CHAT, &inv.code, 1).await;
-    let card = one(&mut rx);
-    for part in [
-        format!("Счёт {}", inv.code),
-        "Сумма: 10 USDT".into(),
-        "Описание: Заказ 42".into(),
-        "Одноразовый счёт".into(),
-        "Статус: ожидает оплаты".into(),
-    ] {
-        assert!(card.text.contains(&part), "{part} в {}", card.text);
-    }
-    t.press(CB_CHAT, card.id, &data(&card, "USDT"))
-        .await
-        .unwrap();
-    let screen = one(&mut rx);
-    assert_eq!(screen.id, card.id);
-    assert!(screen.text.contains("К оплате: 10 USDT"));
-    // «Оплатить» — кнопка в чате: траты в пределах лимита без код-пароля ($500 по умолчанию).
-    let pay = data(&screen, "Оплатить");
-    t.press(CB_CHAT, screen.id, &pay).await.unwrap();
-    let done = one(&mut rx);
-    assert_eq!(done.id, card.id);
-    assert_eq!(
-        done.text,
-        format!("✅ Счёт {} оплачен.\n\nСписано: 10 USDT.", inv.code)
-    );
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(15));
-    assert_eq!(world.balance(shop, CB, Asset::Usdt), dec!(10));
-    let paid = world.invoice(&inv.code).unwrap();
-    assert_eq!(paid.status, SimInvoiceStatus::Paid);
-    assert_eq!(paid.payments.len(), 1);
-    assert!(
-        world
-            .messages(shop, CB_CHAT)
-            .pop()
-            .unwrap()
-            .text
-            .contains("оплачен пользователем @exch_cb")
-    );
-
-    // После оплаты кнопки на сообщении нет: второе нажатие отклонено, деньги не тронуты.
-    assert!(t.press(CB_CHAT, screen.id, &pay).await.is_err());
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(15));
-
-    start(&t, CB_CHAT, &inv.code, 2).await;
-    let card = one(&mut rx);
-    assert!(card.text.contains("Статус: оплачен"));
-    assert!(card.buttons.is_empty());
-}
-
-/// Открыть счёт CryptoBot, выбрать USDT, нажать «Оплатить»; вернуть ответ бота.
-async fn pay_by_button(
-    t: &SimTransport,
-    rx: &mut broadcast::Receiver<RawMessage>,
-    code: &str,
-    rid: i64,
-) -> String {
-    start(t, CB_CHAT, code, rid).await;
-    let card = one(rx);
-    t.press(CB_CHAT, card.id, &data(&card, "USDT"))
-        .await
-        .unwrap();
-    let screen = one(rx);
-    t.press(CB_CHAT, screen.id, &data(&screen, "Оплатить"))
-        .await
-        .unwrap();
-    one(rx).text
-}
-
-#[tokio::test]
-async fn cryptobot_asks_for_the_passcode_over_the_24h_limit_and_moves_no_money() {
-    let Env { world, ub, t, .. } = env();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(100)).unwrap();
-    world.set_passcode_free_limit(ub, Some(dec!(15))).unwrap();
-    let mut rx = t.subscribe();
-
-    let first = world
-        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))))
-        .unwrap();
-    assert!(
-        pay_by_button(&t, &mut rx, &first.code, 1)
-            .await
-            .contains("оплачен")
-    );
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(90));
-
-    // 10 + 10 > 15: CryptoBot просит код-пароль. Код мы не вводим — ничего не списано.
-    let second = world
-        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))))
-        .unwrap();
-    let reply = pay_by_button(&t, &mut rx, &second.code, 2).await;
-    assert_eq!(reply, texts::PASSCODE_REQUIRED);
-    assert_eq!(
-        classify_invoice_payment(CB, &reply),
-        InvoicePayReply::PasscodeRequired
-    );
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(90));
-    assert_eq!(
-        world.invoice(&second.code).unwrap().status,
-        SimInvoiceStatus::Active
-    );
-
-    // Через сутки первая трата выходит из окна — тот же счёт оплачивается кнопкой.
-    world.advance(Duration::from_secs(24 * 3600 + 1));
-    assert!(
-        pay_by_button(&t, &mut rx, &second.code, 3)
-            .await
-            .contains("оплачен")
-    );
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(80));
-
-    // Лимит 0 — код-пароль всегда.
-    world.set_passcode_free_limit(ub, None).unwrap();
-    let third = world
-        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(1))))
-        .unwrap();
-    assert_eq!(
-        pay_by_button(&t, &mut rx, &third.code, 4).await,
-        texts::PASSCODE_REQUIRED
-    );
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(80));
-}
-
-#[tokio::test]
-async fn fiat_invoice_shows_amount_in_asset_by_rate() {
-    let Env { world, ub, t, .. } = env();
-    world.set_fiat_rate(Asset::Usdt, "EUR", dec!(0.95));
-    let inv = world
-        .create_invoice(InvoiceSpec::fiat(
-            CB,
-            dec!(10),
-            "EUR",
-            &[Asset::Usdt, Asset::Ton],
-        ))
-        .unwrap();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(100)).unwrap();
-    let mut rx = t.subscribe();
-    start(&t, CB_CHAT, &inv.code, 1).await;
-    let card = one(&mut rx);
-    assert!(card.text.contains("Сумма: 10 EUR"));
-    assert!(card.find_button("USDT").is_some());
-    assert!(card.find_button("TON").is_none(), "курса TON/EUR нет");
-    t.press(CB_CHAT, card.id, &data(&card, "USDT"))
-        .await
-        .unwrap();
-    let screen = one(&mut rx);
-    // 10 / 0.95 = 10.526… → вверх до 0.01.
-    assert!(
-        screen.text.contains("К оплате: 10.53 USDT"),
-        "{}",
-        screen.text
-    );
-    t.press(CB_CHAT, screen.id, &data(&screen, "Оплатить"))
-        .await
-        .unwrap();
-    assert!(one(&mut rx).text.contains("Списано: 10.53 USDT"));
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(89.47));
-}
-
-#[tokio::test]
-async fn xrocket_invoice_is_paid_by_button() {
+async fn cryptobot_usdt_invoice_opens_on_confirmation_and_asks_to_trust_a_new_recipient() {
     let Env {
         world,
         ub,
         t,
         client,
     } = env();
+    world.set_balance(ub, CB, Asset::Usdt, dec!(50)).unwrap();
     let inv = world
-        .create_invoice(InvoiceSpec::crypto(XR, usdt(dec!(10))).by(client))
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))).by(client))
         .unwrap();
-    assert!(inv.code.starts_with("inv_"));
-    assert_eq!(inv.url, format!("https://t.me/xrocket?start={}", inv.code));
-    world.set_balance(ub, XR, Asset::Usdt, dec!(20)).unwrap();
     let mut rx = t.subscribe();
-    start(&t, XR_CHAT, &inv.code, 1).await;
-    let card = one(&mut rx);
-    t.press(XR_CHAT, card.id, &data(&card, "USDT"))
-        .await
-        .unwrap();
+    start(&t, CB_CHAT, &inv.code, 1).await;
     let screen = one(&mut rx);
-    assert!(screen.text.contains("К оплате: 10 USDT"));
-    t.press(XR_CHAT, card.id, &data(&screen, "Оплатить"))
-        .await
-        .unwrap();
-    let done = one(&mut rx);
-    assert_eq!(done.id, card.id);
+    let number = match classify_invoice_screen(CB, &screen.text) {
+        InvoiceScreen::Confirm { number, amount } => {
+            assert_eq!(amount, Some((dec!(10), Asset::Usdt)));
+            number.unwrap()
+        }
+        other => panic!("{other:?}: {screen:#?}"),
+    };
+    assert!(number.starts_with("IV") && number != inv.code);
+    assert!(screen.find_button("Оплатить анонимно").is_some());
+
+    // Новый получатель: «Оплатить» спрашивает о доверии, денег не списывает.
+    press(&t, CB_CHAT, &screen, "💳 Оплатить").await;
+    let trust = one(&mut rx);
+    assert_eq!(trust.id, screen.id);
     assert_eq!(
-        done.text,
-        format!("✅ Счёт {} оплачен.\n\nСписано: 10 USDT.", inv.code)
+        classify_invoice_screen(CB, &trust.text),
+        InvoiceScreen::TrustRecipient
     );
-    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(10));
-    assert_eq!(world.balance(client, XR, Asset::Usdt), dec!(10));
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(50));
+
+    press(&t, CB_CHAT, &trust, "Отправить платеж").await;
+    let msgs = settled(&mut rx);
+    assert_eq!(msgs.len(), 2, "{msgs:#?}");
+    assert_eq!(msgs[0].text, texts::CB_PAID_MARK);
+    assert_eq!(
+        msgs[1].text,
+        format!("📥 Вы оплатили счёт #{number} на сумму 🪙 10 USDT ($10).\n\nПолучатель: @client")
+    );
+    assert_eq!(
+        classify_invoice_screen(CB, &msgs[1].text),
+        InvoiceScreen::Paid {
+            number: Some(number),
+            amount: Some((dec!(10), Asset::Usdt))
+        }
+    );
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(40));
+    assert_eq!(world.balance(client, CB, Asset::Usdt), dec!(10));
     assert_eq!(
         world.invoice(&inv.code).unwrap().status,
         SimInvoiceStatus::Paid
     );
-    // Кнопки больше нет — повторное нажатие отклонено, денег не тронуто.
-    let err = t
-        .press(XR_CHAT, card.id, &data(&screen, "Оплатить"))
-        .await
-        .unwrap_err();
-    assert!(matches!(err, TransportError::Rpc { ref name, .. } if name == "DATA_INVALID"));
-    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(10));
-    start(&t, XR_CHAT, &inv.code, 2).await;
-    assert!(one(&mut rx).text.contains("Статус: оплачен"));
-    start(&t, XR_CHAT, "inv_AAAAAAAAAAAAAAA", 3).await;
-    assert_eq!(one(&mut rx).text, texts::INVOICE_NOT_FOUND);
+
+    // Знакомому получателю — без вопроса: «Оплатить» сразу платит.
+    let inv2 = world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(5))).by(client))
+        .unwrap();
+    start(&t, CB_CHAT, &inv2.code, 2).await;
+    let screen = one(&mut rx);
+    press(&t, CB_CHAT, &screen, "💳 Оплатить").await;
+    let msgs = settled(&mut rx);
+    assert!(matches!(
+        classify_invoice_screen(CB, &msgs.last().unwrap().text),
+        InvoiceScreen::Paid { .. }
+    ));
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(35));
+    // Оплаченный счёт.
+    start(&t, CB_CHAT, &inv.code, 3).await;
+    assert_eq!(
+        classify_invoice_screen(CB, &one(&mut rx).text),
+        InvoiceScreen::AlreadyPaid
+    );
 }
 
 #[tokio::test]
-async fn xrocket_invoice_statuses_and_timeout_after_press() {
+async fn cryptobot_fiat_invoice_shows_coins_with_amounts_on_buttons() {
     let Env { world, ub, t, .. } = env();
-    world.set_balance(ub, XR, Asset::Usdt, dec!(5)).unwrap();
+    world.set_balance(ub, CB, Asset::Usdt, dec!(50)).unwrap();
+    world.set_fiat_rate(Asset::Usdt, "USD", dec!(0.998));
+    let inv = world
+        .create_invoice(InvoiceSpec::fiat(
+            CB,
+            dec!(5),
+            "USD",
+            &[Asset::Usdt, Asset::Ton],
+        ))
+        .unwrap();
     let mut rx = t.subscribe();
-    let open_pay_screen = |code: String, rid: i64| {
+    start(&t, CB_CHAT, &inv.code, 1).await;
+    let coins = one(&mut rx);
+    assert!(
+        coins
+            .text
+            .starts_with("Выберите монету для оплаты счета #IV")
+    );
+    assert!(coins.text.ends_with("на сумму $5."));
+    assert!(matches!(
+        classify_invoice_screen(CB, &coins.text),
+        InvoiceScreen::ChooseCoin { .. }
+    ));
+    // 5 / 0.998 = 5.01002…, вверх до шага 0.01.
+    let usdt_button = coins.find_button("USDT").unwrap().text.clone();
+    assert_eq!(usdt_button, "USDT · 5.02 USDT");
+    press(&t, CB_CHAT, &coins, "USDT").await;
+    let confirm = one(&mut rx);
+    assert!(matches!(
+        classify_invoice_screen(CB, &confirm.text),
+        InvoiceScreen::Confirm {
+            amount: Some((a, Asset::Usdt)),
+            ..
+        } if a == dec!(5.02)
+    ));
+    press(&t, CB_CHAT, &confirm, "💳 Оплатить").await;
+    let trust = one(&mut rx);
+    press(&t, CB_CHAT, &trust, "Отправить платеж").await;
+    let paid = settled(&mut rx).pop().unwrap();
+    assert!(
+        paid.text.contains("на сумму 5 USD (5.02 USDT)"),
+        "{}",
+        paid.text
+    );
+    assert!(matches!(
+        classify_invoice_screen(CB, &paid.text),
+        InvoiceScreen::Paid { amount: Some((a, Asset::Usdt)), .. } if a == dec!(5.02)
+    ));
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(44.98));
+}
+
+#[tokio::test]
+async fn cryptobot_invoice_without_funds_offers_networks_and_moves_nothing() {
+    let Env { world, ub, t, .. } = env();
+    world.set_balance(ub, CB, Asset::Usdt, dec!(3)).unwrap();
+    let inv = world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))))
+        .unwrap();
+    let mut rx = t.subscribe();
+    start(&t, CB_CHAT, &inv.code, 1).await;
+    let screen = one(&mut rx);
+    press(&t, CB_CHAT, &screen, "💳 Оплатить").await;
+    let net = one(&mut rx);
+    assert_eq!(net.text, "Выберите сеть для оплаты счёта в USDT.");
+    assert_eq!(
+        classify_invoice_screen(CB, &net.text),
+        InvoiceScreen::InsufficientFunds
+    );
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(3));
+    assert!(world.invoice(&inv.code).unwrap().payments.is_empty());
+}
+
+#[tokio::test]
+async fn cryptobot_asks_for_the_passcode_over_the_24h_limit_and_moves_no_money() {
+    let Env { world, ub, t, .. } = env();
+    world.set_balance(ub, CB, Asset::Usdt, dec!(1000)).unwrap();
+    world.set_passcode_free_limit(ub, Some(dec!(15))).unwrap();
+    let mut rx = t.subscribe();
+    let pay = |code: String, rid: i64| {
         let t = t.clone();
         async move {
-            let mut rx = t.subscribe();
-            start(&t, XR_CHAT, &code, rid).await;
-            let card = one(&mut rx);
-            t.press(XR_CHAT, card.id, &data(&card, "USDT"))
-                .await
-                .unwrap();
-            (card.id, one(&mut rx))
+            start(&t, CB_CHAT, &code, rid).await;
         }
     };
+    let first = world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))))
+        .unwrap();
+    pay(first.code.clone(), 1).await;
+    let screen = one(&mut rx);
+    press(&t, CB_CHAT, &screen, "💳 Оплатить").await;
+    let trust = one(&mut rx);
+    press(&t, CB_CHAT, &trust, "Отправить платеж").await;
+    drain(&mut rx);
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(990));
 
-    // Не хватает денег.
+    // 10 + 10 > 15 за сутки: бот просит код-пароль, деньги не двигаются.
+    let second = world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))))
+        .unwrap();
+    pay(second.code.clone(), 2).await;
+    let screen = one(&mut rx);
+    press(&t, CB_CHAT, &screen, "💳 Оплатить").await;
+    let asked = one(&mut rx);
+    assert_eq!(asked.text, texts::CB_PASSCODE_REQUIRED);
+    assert_eq!(
+        classify_invoice_screen(CB, &asked.text),
+        InvoiceScreen::PasscodeRequired
+    );
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(990));
+    // Через сутки лимит снова свободен.
+    world.advance(Duration::from_secs(24 * 3600 + 1));
+    let third = world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))))
+        .unwrap();
+    pay(third.code.clone(), 3).await;
+    let screen = one(&mut rx);
+    press(&t, CB_CHAT, &screen, "💳 Оплатить").await;
+    let msgs = settled(&mut rx);
+    assert!(matches!(
+        classify_invoice_screen(CB, &msgs.last().unwrap().text),
+        InvoiceScreen::Paid { .. }
+    ));
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(980));
+}
+
+// ---------- счета xRocket ----------
+
+#[tokio::test]
+async fn xrocket_invoice_is_paid_via_the_wallet_method() {
+    let Env {
+        world,
+        ub,
+        t,
+        client,
+    } = env();
+    world.set_balance(ub, XR, Asset::Usdt, dec!(5.02)).unwrap();
+    let inv = world
+        .create_invoice(InvoiceSpec::crypto(XR, usdt(dec!(2))).by(client))
+        .unwrap();
+    let mut rx = t.subscribe();
+    start(&t, XR_CHAT, &inv.code, 1).await;
+    let card = one(&mut rx);
+    let number = match classify_invoice_screen(XR, &card.text) {
+        InvoiceScreen::ChooseMethod { number, amount } => {
+            assert_eq!(amount, Some((dec!(2), Asset::Usdt)));
+            number.unwrap()
+        }
+        other => panic!("{other:?}: {card:#?}"),
+    };
+    assert!(number.starts_with("INV"));
+    press(&t, XR_CHAT, &card, "xRocket").await;
+    let confirm = one(&mut rx);
+    assert_eq!(confirm.id, card.id);
+    assert!(
+        confirm
+            .text
+            .ends_with(&format!("🔸 Подтвердите ваш платёж на 2{NBSP}USDT (2.0$)"))
+    );
+    assert!(matches!(
+        classify_invoice_screen(XR, &confirm.text),
+        InvoiceScreen::Confirm {
+            amount: Some((a, Asset::Usdt)),
+            ..
+        } if a == dec!(2)
+    ));
+    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(5.02));
+    press(&t, XR_CHAT, &confirm, "Оплатить").await;
+    let msgs = settled(&mut rx);
+    assert_eq!(msgs.len(), 2);
+    assert_eq!(msgs[0].text, texts::XR_LOADING);
+    assert_eq!(
+        classify_invoice_screen(XR, &msgs[0].text),
+        InvoiceScreen::Progress
+    );
+    assert!(msgs[1].text.starts_with(&format!(
+        "📋 Вы успешно оплатили счёт на сумму 2{NBSP}USDT (2.0$). ID платежа: #i"
+    )));
+    assert!(matches!(
+        classify_invoice_screen(XR, &msgs[1].text),
+        InvoiceScreen::Paid {
+            amount: Some((a, Asset::Usdt)),
+            ..
+        } if a == dec!(2)
+    ));
+    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(3.02));
+    assert_eq!(world.balance(client, XR, Asset::Usdt), dec!(2));
+    start(&t, XR_CHAT, &inv.code, 2).await;
+    let again = one(&mut rx);
+    assert_eq!(again.text, "Данный счёт уже оплачен.");
+    assert_eq!(
+        classify_invoice_screen(XR, &again.text),
+        InvoiceScreen::AlreadyPaid
+    );
+}
+
+#[tokio::test]
+async fn xrocket_invoice_without_funds_says_so_and_moves_nothing() {
+    let Env { world, ub, t, .. } = env();
+    world.set_balance(ub, XR, Asset::Usdt, dec!(5.02)).unwrap();
     let inv = world
         .create_invoice(InvoiceSpec::crypto(XR, usdt(dec!(10))))
         .unwrap();
-    let (id, screen) = open_pay_screen(inv.code.clone(), 1).await;
-    t.press(XR_CHAT, id, &data(&screen, "Оплатить"))
-        .await
-        .unwrap();
-    let last = drain(&mut rx).pop().unwrap();
+    let mut rx = t.subscribe();
+    start(&t, XR_CHAT, &inv.code, 1).await;
+    let card = one(&mut rx);
+    press(&t, XR_CHAT, &card, "xRocket").await;
+    let screen = one(&mut rx);
+    assert!(screen.text.ends_with("🔺 Недостаточно средств на балансе."));
     assert_eq!(
-        last.text,
-        "Недостаточно средств для оплаты счёта. Доступно: 5 USDT, нужно 10 USDT."
+        classify_invoice_screen(XR, &screen.text),
+        InvoiceScreen::InsufficientFunds
     );
-    assert_eq!(
-        world.invoice(&inv.code).unwrap().status,
-        SimInvoiceStatus::Active
-    );
+    assert!(screen.find_button("Оплатить").is_none());
+    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(5.02));
+}
 
-    // Истёк между экраном и нажатием.
-    let inv = world
+#[tokio::test]
+async fn invoice_statuses_and_pay_press_timeout() {
+    let Env {
+        world,
+        ub,
+        t,
+        client,
+    } = env();
+    world.set_balance(ub, XR, Asset::Usdt, dec!(10)).unwrap();
+    let mut rx = t.subscribe();
+    start(&t, XR_CHAT, "inv_AAAAAAAAAAAAAAA", 1).await;
+    assert_eq!(
+        classify_invoice_screen(XR, &one(&mut rx).text),
+        InvoiceScreen::NotFound
+    );
+    let expired = world
         .create_invoice(InvoiceSpec::crypto(XR, usdt(dec!(1))))
         .unwrap();
-    let (id, screen) = open_pay_screen(inv.code.clone(), 2).await;
-    world.expire_invoice(&inv.code).unwrap();
-    t.press(XR_CHAT, id, &data(&screen, "Оплатить"))
-        .await
-        .unwrap();
-    assert_eq!(drain(&mut rx).pop().unwrap().text, texts::INVOICE_EXPIRED);
-    start(&t, XR_CHAT, &inv.code, 3).await;
-    let card = drain(&mut rx).pop().unwrap();
-    assert!(card.text.contains("Статус: истёк"));
-    assert!(card.buttons.is_empty());
-
-    // Многоразовый: платится дважды, остаётся активным.
-    let inv = world
-        .create_invoice(InvoiceSpec::crypto(XR, usdt(dec!(1))).multi_use())
-        .unwrap();
-    for rid in [4, 6] {
-        let (id, screen) = open_pay_screen(inv.code.clone(), rid).await;
-        assert!(screen.text.contains("Многоразовый счёт"));
-        t.press(XR_CHAT, id, &data(&screen, "Оплатить"))
-            .await
-            .unwrap();
-    }
-    let multi = world.invoice(&inv.code).unwrap();
-    assert_eq!(multi.status, SimInvoiceStatus::Active);
-    assert_eq!(multi.payments.len(), 2);
-    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(3));
-
-    // Таймаут после нажатия «Оплатить»: оплачено.
-    let inv = world
-        .create_invoice(InvoiceSpec::crypto(XR, usdt(dec!(2))))
-        .unwrap();
-    let (id, screen) = open_pay_screen(inv.code.clone(), 8).await;
-    world.inject(ub, Call::Press, Fault::TimeoutAfterEffect, 1);
+    world.expire_invoice(&expired.code).unwrap();
+    start(&t, XR_CHAT, &expired.code, 2).await;
     assert_eq!(
-        t.press(XR_CHAT, id, &data(&screen, "Оплатить"))
+        classify_invoice_screen(XR, &one(&mut rx).text),
+        InvoiceScreen::Expired
+    );
+    let own = world
+        .create_invoice(InvoiceSpec::crypto(XR, usdt(dec!(1))).by(ub))
+        .unwrap();
+    start(&t, XR_CHAT, &own.code, 3).await;
+    assert_eq!(one(&mut rx).text, texts::INVOICE_OWN);
+
+    // «Оплатить» выполнено, ответ вызова потерян: квитанция всё равно в потоке, платёж один.
+    let inv = world
+        .create_invoice(InvoiceSpec::crypto(XR, usdt(dec!(3))).by(client))
+        .unwrap();
+    start(&t, XR_CHAT, &inv.code, 4).await;
+    let card = one(&mut rx);
+    press(&t, XR_CHAT, &card, "xRocket").await;
+    let confirm = one(&mut rx);
+    world.inject(ub, Call::PayPress, Fault::TimeoutAfterEffect, 1);
+    assert_eq!(
+        t.press(XR_CHAT, confirm.id, &data(&confirm, "Оплатить"))
             .await
             .unwrap_err(),
         TransportError::Timeout
     );
-    assert_eq!(
-        world.invoice(&inv.code).unwrap().status,
-        SimInvoiceStatus::Paid
-    );
-    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(1));
-    assert!(drain(&mut rx).pop().unwrap().text.contains("оплачен"));
+    let msgs = settled(&mut rx);
+    assert!(matches!(
+        classify_invoice_screen(XR, &msgs.last().unwrap().text),
+        InvoiceScreen::Paid { .. }
+    ));
+    assert_eq!(world.invoice(&inv.code).unwrap().payments.len(), 1);
+    assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(7));
 }
 
-// ---------- кошелёк, уведомления, история ----------
+// ---------- кошелёк, переводы, история ----------
 
 #[tokio::test]
-async fn wallet_screen_lists_balances() {
+async fn wallet_screen_lists_balances_as_the_parser_reads_them() {
     let Env { world, ub, t, .. } = env();
     world.set_balance(ub, CB, Asset::Usdt, dec!(12.50)).unwrap();
-    world.set_balance(ub, XR, Asset::Ton, dec!(1.5)).unwrap();
+    world.set_balance(ub, XR, Asset::Usdt, dec!(5.02)).unwrap();
     let mut rx = t.subscribe();
     t.send_text(CB_CHAT, "/wallet", 1).await.unwrap();
-    assert_eq!(
-        one(&mut rx).text,
-        "👛 Кошелёк\n\nTether: 12.5 USDT\nToncoin: 0 TON"
+    let cb = one(&mut rx);
+    assert!(
+        cb.text
+            .starts_with("👛 Кошелёк\n\n🪙 Tether: 12.5 USDT ($12.5)")
     );
-    t.send_text(XR_CHAT, "👛 Кошелёк", 2).await.unwrap();
-    assert_eq!(
-        one(&mut rx).text,
-        "👛 Мой кошелёк\n\nTether: 0 USDT\nToncoin: 1.5 TONCOIN"
-    );
-    assert_eq!(world.balances(ub, XR), vec![usdt(dec!(0)), ton(dec!(1.5))]);
+    let usdt_line = |p: Platform, text: &str| {
+        parse_balance(p, text)
+            .into_iter()
+            .find(|b| b.asset == Asset::Usdt)
+            .map(|b| b.amount)
+    };
+    assert_eq!(usdt_line(CB, &cb.text), Some(dec!(12.5)));
+    t.send_text(XR_CHAT, "/wallet", 2).await.unwrap();
+    let xr = one(&mut rx);
+    assert!(xr.text.starts_with(&format!(
+        "👛 Мой кошелёк\n\n🪙{NBSP}USDT: 5.02{NBSP}USDT (5.0$)"
+    )));
+    assert_eq!(usdt_line(XR, &xr.text), Some(dec!(5.02)));
+    assert_eq!(world.balances(ub, XR), vec![usdt(dec!(5.02)), ton(dec!(0))]);
     t.send_text(CB_CHAT, "/start", 3).await.unwrap();
     assert_eq!(one(&mut rx).text, texts::welcome(CB));
     t.send_text(CB_CHAT, "привет", 4).await.unwrap();
@@ -1297,10 +1254,16 @@ async fn incoming_transfer_notice_credits_balance() {
     let mut rx = t.subscribe();
     world.incoming_transfer(ub, CB, usdt(dec!(5)), "x").unwrap();
     let msg = one(&mut rx);
-    assert_eq!(msg.text, "Вы получили 5 USDT от @x.");
-    assert_eq!(msg.chat, CB_CHAT);
+    assert_eq!(msg.text, "📥 Вы получили 🪙 5 USDT ($5) от @x.");
+    assert_eq!(
+        classify_activation(CB, &msg.text),
+        ActivationReply::IncomingTransfer {
+            amount: dec!(5),
+            asset: Asset::Usdt
+        }
+    );
     assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(5));
-    let ad = world.bot_message(ub, XR, "Реклама").unwrap();
+    let ad = world.bot_message(ub, XR, "🚀 Реклама").unwrap();
     assert_eq!(one(&mut rx), ad);
 }
 
@@ -1314,9 +1277,7 @@ async fn history_returns_messages_after_id_in_order_with_edits() {
         .await
         .unwrap();
     t.send_text(CB_CHAT, "/wallet", 3).await.unwrap();
-    t.press(CB_CHAT, menu.id, &data(&menu, "Создать чек"))
-        .await
-        .unwrap();
+    press(&t, CB_CHAT, &menu, "Создать чек").await;
 
     let all = t.history(CB_CHAT, 0, 100).await.unwrap();
     assert_eq!(all.len(), 4);
@@ -1324,7 +1285,7 @@ async fn history_returns_messages_after_id_in_order_with_edits() {
     assert_eq!(all[0], first);
     assert_eq!(
         all[1].text,
-        texts::CHOOSE_CHECK_ASSET,
+        texts::CB_CHOOSE_COIN,
         "в истории — последняя версия"
     );
     let after = t.history(CB_CHAT, menu.id, 1).await.unwrap();
@@ -1338,7 +1299,7 @@ async fn history_returns_messages_after_id_in_order_with_edits() {
 }
 
 #[tokio::test]
-async fn press_rejects_unknown_message_or_data() {
+async fn press_rejects_unknown_message_or_data_and_answers_unsupported_buttons() {
     let Env { t, .. } = env();
     let mut rx = t.subscribe();
     let sent = t.send_text(CB_CHAT, "/checks", 1).await.unwrap();
@@ -1352,29 +1313,26 @@ async fn press_rejects_unknown_message_or_data() {
         "MESSAGE_ID_INVALID"
     );
     assert_eq!(
-        name(
-            t.press(CB_CHAT, menu.id, b"cb:checks:asset:USDT")
-                .await
-                .unwrap_err()
-        ),
-        "DATA_INVALID"
+        name(t.press(CB_CHAT, menu.id, b"count-1").await.unwrap_err()),
+        "DATA_INVALID",
+        "кнопки нет на экране"
     );
     assert_eq!(
-        name(
-            t.press(CB_CHAT, sent.id, b"cb:checks:create")
-                .await
-                .unwrap_err()
-        ),
-        "DATA_INVALID"
+        name(t.press(CB_CHAT, sent.id, b"create").await.unwrap_err()),
+        "DATA_INVALID",
+        "своё сообщение"
     );
     assert_eq!(
-        name(
-            t.press(XR_CHAT, menu.id, b"cb:checks:create")
-                .await
-                .unwrap_err()
-        ),
+        name(t.press(XR_CHAT, menu.id, b"create").await.unwrap_err()),
         "MESSAGE_ID_INVALID"
     );
+    // Кнопка, которую exch не нажимает: всплывающее окно, экран не меняется.
+    let answer = t
+        .press(CB_CHAT, menu.id, &data(&menu, "‹ Назад"))
+        .await
+        .unwrap();
+    assert!(answer.alert);
+    assert!(drain(&mut rx).is_empty());
 }
 
 #[tokio::test]
@@ -1399,14 +1357,19 @@ async fn many_accounts_share_one_world_and_money_is_conserved() {
         .create_check(CheckSpec::new(CB, usdt(dec!(40))).by(alice))
         .unwrap();
     start(&t_cb, CB_CHAT, &check.code, 1).await;
-    // …и выплачивает чеком xRocket с другого аккаунта, Боб его забирает.
-    let results = t_xr.inline_query(XR, "39").await.unwrap();
-    let msg = t_xr
-        .send_inline(Chat::SavedMessages, XR, &results, "check-USDT", 1)
-        .await
-        .unwrap();
+    // …и выплачивает чеком xRocket через меню с другого аккаунта, Боб его забирает.
+    let mut rx = t_xr.subscribe();
+    xr_amount_prompt(&t_xr, &mut rx).await;
+    t_xr.send_text(XR_CHAT, "39", 2).await.unwrap();
+    let confirm = one(&mut rx);
+    press(&t_xr, XR_CHAT, &confirm, "Подтверждаю").await;
+    let screen = one(&mut rx);
+    let url = match classify_check_creation(XR, &screen.text, &urls(&screen)) {
+        CheckCreationReply::Created(c) => c.url,
+        other => panic!("{other:?}"),
+    };
     assert_eq!(
-        world.claim_check(bob, &msg.button_urls()[0]).unwrap(),
+        world.claim_check(bob, &url).unwrap(),
         ClaimOutcome::Received(usdt(dec!(39)))
     );
 
@@ -1439,7 +1402,7 @@ async fn cancelled_check_refunds_creator_and_is_not_found() {
     assert_eq!(world.balance(client, CB, Asset::Usdt), dec!(10));
     let mut rx = t.subscribe();
     start(&t, CB_CHAT, &check.code, 1).await;
-    assert_eq!(one(&mut rx).text, texts::CHECK_NOT_FOUND);
+    assert_eq!(one(&mut rx).text, texts::not_found(CB, &check.code));
     assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(0));
     assert!(
         world

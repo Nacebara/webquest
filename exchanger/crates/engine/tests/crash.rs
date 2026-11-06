@@ -65,14 +65,15 @@ fn random_fault(rng: &mut Rng) -> (Call, Fault) {
             },
         ),
         7 => (Call::SendText, Fault::FloodWait(Duration::ZERO)),
-        8 => (Call::SendInline, Fault::TimeoutAfterEffect),
-        9 => (Call::SendInline, Fault::DisconnectedAfterEffect),
-        10 => (Call::SendInline, Fault::TimeoutBeforeEffect),
+        // Нажатия меню: «Пропустить ›» / «✅ Подтверждаю» создают чек, «Оплатить» платит.
+        8 => (Call::Press, Fault::DisconnectedAfterEffect),
+        9 => (Call::Press, Fault::TimeoutBeforeEffect),
+        10 => (Call::Press, Fault::DelayReply(ms(90))),
         11 => (
-            Call::InlineQuery,
+            Call::Press,
             Fault::Rpc {
                 code: 400,
-                name: "BOT_INLINE_DISABLED".to_owned(),
+                name: "MESSAGE_ID_INVALID".to_owned(),
             },
         ),
         12 => (Call::History, Fault::Disconnected),

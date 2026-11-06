@@ -1,16 +1,13 @@
 //! [`SimTransport`] — [`Transport`] одного аккаунта поверх общего [`SimWorld`].
 
 use async_trait::async_trait;
-use domain::Platform;
 use tokio::sync::broadcast;
 
 use super::SimWorld;
 use super::bots;
 use super::model::{AccountId, Call, Fault};
 use super::state::Draft;
-use crate::transport::{
-    CallbackAnswer, Chat, InlineResults, RawMessage, Transport, TransportError,
-};
+use crate::transport::{CallbackAnswer, Chat, RawMessage, Transport, TransportError};
 
 /// Транспорт одного аккаунта Telegram в мире симулятора.
 #[derive(Clone)]
@@ -129,7 +126,8 @@ impl Transport for SimTransport {
                 return Err(TransportError::NotAuthorized);
             }
             st.tick();
-            let fault = st.take_fault(acc, Call::Press);
+            let call = bots::press_kind(&st, acc, chat, msg_id, data);
+            let fault = st.take_fault(acc, call);
             if let Some(e) = before_effect(fault.as_ref()) {
                 return Err(e);
             }
@@ -139,79 +137,6 @@ impl Transport for SimTransport {
         };
         self.world.spawn_delayed(delayed);
         result
-    }
-
-    async fn inline_query(
-        &self,
-        bot: Platform,
-        query: &str,
-    ) -> Result<InlineResults, TransportError> {
-        let acc = self.account;
-        let mut st = self.world.lock();
-        if !st.accounts.contains_key(&acc) {
-            return Err(TransportError::NotAuthorized);
-        }
-        st.tick();
-        let fault = st.take_fault(acc, Call::InlineQuery);
-        if let Some(e) = before_effect(fault.as_ref()) {
-            return Err(e);
-        }
-        let results = bots::on_inline_query(&mut st, acc, bot, query);
-        finish(results, fault.as_ref())
-    }
-
-    async fn send_inline(
-        &self,
-        to: Chat,
-        bot: Platform,
-        results: &InlineResults,
-        result_id: &str,
-        random_id: i64,
-    ) -> Result<RawMessage, TransportError> {
-        let acc = self.account;
-        let mut st = self.world.lock();
-        if !st.accounts.contains_key(&acc) {
-            return Err(TransportError::NotAuthorized);
-        }
-        st.tick();
-        let fault = st.take_fault(acc, Call::SendInline);
-        if let Some(e) = before_effect(fault.as_ref()) {
-            return Err(e);
-        }
-        let duplicate = st
-            .account(acc)
-            .map_err(|_| TransportError::NotAuthorized)?
-            .random_ids
-            .contains(&random_id);
-        if duplicate {
-            return Err(TransportError::RandomIdDuplicate);
-        }
-        // Ошибка разбора запроса (`QUERY_ID_INVALID`, …) не занимает `random_id`.
-        let draft =
-            bots::on_send_inline(&mut st, acc, bot, results.query_id, result_id, random_id)?;
-        st.account_mut(acc)
-            .map_err(|_| TransportError::NotAuthorized)?
-            .random_ids
-            .insert(random_id);
-        let sent = st
-            .store_outgoing(acc, to, draft)
-            .ok_or(TransportError::NotAuthorized)?;
-        finish(sent, fault.as_ref())
-    }
-
-    async fn open_webapp(&self, bot: Platform, button_url: &str) -> Result<String, TransportError> {
-        let acc = self.account;
-        let mut st = self.world.lock();
-        if !st.accounts.contains_key(&acc) {
-            return Err(TransportError::NotAuthorized);
-        }
-        st.tick();
-        // Мини-приложений в денежных сценариях нет (DESIGN-v0.2 Р4): ни одной не откроем.
-        let _ = (bot, button_url);
-        Err(TransportError::Rpc {
-            code: 400,
-            name: "WEBAPP_URL_INVALID".to_owned(),
-        })
     }
 
     async fn history(

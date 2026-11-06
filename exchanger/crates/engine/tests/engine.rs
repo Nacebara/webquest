@@ -182,13 +182,16 @@ async fn payout_timeout_is_reconciled_to_exactly_one_check(pool: PgPool) {
     let e = env(pool).await;
     let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
     let order = accepted(e.submit(&url).await);
-    // Чек создан, ответ потерян, повтор не дошёл, история на время недоступна.
-    e.world
-        .inject(e.ub, Call::SendInline, Fault::TimeoutAfterEffect, 1);
-    e.world
-        .inject(e.ub, Call::SendInline, Fault::Disconnected, 1);
+    // «Пропустить ›» создало чек, а экран чека пришёл позже, чем ждал сценарий; история на
+    // время недоступна.
+    e.world.inject(
+        e.ub,
+        Call::CheckPress,
+        Fault::DelayReply(Duration::from_millis(700)),
+        1,
+    );
     // Первые два чтения истории — проверки «чистого чата» перед активацией и перед выдачей:
-    // пропускаем их, сбой — на поиске чека.
+    // пропускаем их, сбой — на догоне ответа и на поиске чека.
     e.world
         .inject(e.ub, Call::History, Fault::DelayReply(Duration::ZERO), 2);
     e.world.inject(e.ub, Call::History, Fault::Disconnected, 3);
@@ -200,6 +203,8 @@ async fn payout_timeout_is_reconciled_to_exactly_one_check(pool: PgPool) {
     assert_eq!(payout.status, OpStatus::Unknown);
     assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
 
+    // Экран чека дошёл.
+    tokio::time::sleep(Duration::from_millis(800)).await;
     e.world.clear_faults(e.ub);
     e.engine.resolve_unknown().await.unwrap();
     let (order_now, d) = e.order(order.id).await;

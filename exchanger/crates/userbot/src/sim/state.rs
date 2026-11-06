@@ -24,6 +24,8 @@ const BROADCAST_CAPACITY: usize = 4096;
 /// Первый id сообщения аккаунта (как у живого аккаунта с историей).
 const FIRST_MSG_ID: i32 = 1000;
 const FIRST_USER_ID: i64 = 7_000_000_001;
+const CHECK_NUM_BASE: u64 = 63_865_900;
+const INVOICE_NUM_BASE: u64 = 69_544_490;
 /// Детерминированный ГПСЧ (SplitMix64): коды чеков и счетов одинаковы от запуска к запуску.
 pub(crate) struct SplitMix64(u64);
 
@@ -39,6 +41,52 @@ impl SplitMix64 {
 
 const CODE_ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
+/// Что показывает сообщение бота. Callback-данные живых ботов — команды экрана («Success»,
+/// «Back», «count-1»), а не уникальные id: смысл нажатия зависит от того, что на экране сейчас.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Screen {
+    /// CryptoBot `/checks`: «Создать чек», «Активные чеки».
+    CbChecksMenu,
+    CbChooseCoin,
+    CbAskAmount(Asset),
+    /// Сумма укладывается в баланс не меньше двух раз: «Пропустить ›» — одна активация.
+    /// `random_id` — у сообщения с суммой (0, если сумма выбрана кнопкой).
+    CbAskActivations {
+        amount: Money,
+        max: u32,
+        random_id: i64,
+    },
+    CbCheck(String),
+    CbConfirmDelete(String),
+    CbManage,
+    XrChequesMenu,
+    XrPersonal,
+    XrChooseCoin,
+    XrAskAmount(Asset),
+    XrConfirm {
+        amount: Money,
+        random_id: i64,
+    },
+    XrCheck(String),
+    /// Счёт CryptoBot в фиате: выбор монеты.
+    CbInvoiceCoins(String),
+    CbInvoiceConfirm {
+        code: String,
+        asset: Asset,
+    },
+    CbInvoiceTrust {
+        code: String,
+        asset: Asset,
+    },
+    /// «Выберите сеть для оплаты счёта» — денег на балансе не хватает.
+    CbInvoiceNetwork(String),
+    XrInvoice(String),
+    XrInvoiceConfirm(String),
+    XrInvoiceInsufficient(String),
+    /// Экран без кнопок-команд (результат, уведомление).
+    Static,
+}
+
 /// Черновик сообщения бота (без id и времени — их назначает мир при публикации).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Draft {
@@ -46,6 +94,7 @@ pub(crate) struct Draft {
     pub entity_urls: Vec<String>,
     pub buttons: Vec<Vec<RawButton>>,
     pub via_bot: Option<Platform>,
+    pub screen: Option<Screen>,
 }
 
 impl Draft {
@@ -65,12 +114,29 @@ impl Draft {
         self.entity_urls = urls;
         self
     }
+
+    pub fn on(mut self, screen: Screen) -> Self {
+        self.screen = Some(screen);
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Op {
     New(Draft),
     Edit(i32, Draft),
+    /// Новое сообщение и сразу его правки: «🕘 Получение…» → «📥 Вы получили…», «💸» → «👌».
+    Staged(Draft, Vec<Draft>),
+}
+
+impl Op {
+    /// Сбои, которые подменяют ответ, работают с его последней версией.
+    fn settled(self) -> Op {
+        match self {
+            Op::Staged(first, then) => Op::New(then.into_iter().last().unwrap_or(first)),
+            other => other,
+        }
+    }
 }
 
 /// Сообщение бота, которое нужно опубликовать в чате аккаунта.
@@ -93,8 +159,9 @@ pub(crate) struct Delayed {
 pub(crate) enum Dialog {
     #[default]
     Idle,
-    /// Меню чеков: валюта выбрана, бот ждёт сумму.
-    AwaitCheckAmount(Asset),
+    /// Меню чеков: валюта выбрана, бот ждёт сумму. `menu` — сообщение меню (xRocket отвечает
+    /// на сумму правкой его, CryptoBot — новым сообщением).
+    AwaitCheckAmount { asset: Asset, menu: i32 },
     /// `/start` чека с паролем: бот ждёт пароль.
     AwaitCheckPassword(String),
 }
@@ -135,32 +202,22 @@ impl AccountState {
     }
 }
 
-/// Один вариант инлайн-ответа и что он сделает при отправке.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum InlineItem {
-    Check(Money),
-    Insufficient(Money),
-    Invoice(Money),
-}
-
-pub(crate) struct InlineQuery {
-    pub account: AccountId,
-    pub platform: Platform,
-    pub items: Vec<(String, InlineItem)>,
-}
-
 pub(crate) struct WorldState {
     pub now_ms: i64,
     pub tick_ms: i64,
     rng: SplitMix64,
     next_user_id: i64,
-    next_query_id: i64,
     pub accounts: BTreeMap<AccountId, AccountState>,
     pub checks: BTreeMap<String, SimCheck>,
     pub check_order: Vec<String>,
     pub invoices: BTreeMap<String, SimInvoice>,
     pub invoice_order: Vec<String>,
-    pub inline_queries: HashMap<i64, InlineQuery>,
+    /// Что показывает каждое сообщение бота: (аккаунт, чат, id).
+    pub screens: HashMap<(AccountId, Chat, i32), Screen>,
+    /// CryptoBot: плательщик уже переводил этому получателю (иначе — «Вы уверены, что
+    /// доверяете этому получателю?»). Получатель `None` — счёт внешнего магазина.
+    pub trusted: HashSet<(AccountId, Option<AccountId>)>,
+    next_payment: u64,
     /// Сколько единиц фиата стоит 1 единица актива: `(USDT, "USD") = 1`.
     pub fiat_rates: BTreeMap<(Asset, String), Decimal>,
     /// xRocket отвечает «не найден» на первый `/start` чека моложе этого окна (мс).
@@ -177,13 +234,14 @@ impl WorldState {
             tick_ms: DEFAULT_TICK_MS,
             rng: SplitMix64(seed),
             next_user_id: FIRST_USER_ID,
-            next_query_id: 1,
             accounts: BTreeMap::new(),
             checks: BTreeMap::new(),
             check_order: Vec::new(),
             invoices: BTreeMap::new(),
             invoice_order: Vec::new(),
-            inline_queries: HashMap::new(),
+            screens: HashMap::new(),
+            trusted: HashSet::new(),
+            next_payment: 1,
             fiat_rates,
             xrocket_fresh_window_ms: None,
         }
@@ -315,7 +373,7 @@ impl WorldState {
     }
 
     /// Стоимость в USD по курсам мира (USDT = 1 USD); неизвестный курс — номинал.
-    fn usd_value(&self, m: &Money) -> Decimal {
+    pub fn usd_value(&self, m: &Money) -> Decimal {
         let rate = self
             .fiat_rates
             .get(&(m.asset(), "USD".to_owned()))
@@ -419,6 +477,21 @@ impl WorldState {
         Ok(check)
     }
 
+    /// Создатель удалил чек: остаток возвращается ему, `/start` отвечает «не найден».
+    pub fn cancel_check(&mut self, code: &str) -> Result<(), SimError> {
+        let check = self
+            .checks
+            .get_mut(code)
+            .ok_or_else(|| SimError::UnknownCheck(code.to_owned()))?;
+        let refund = check.locked();
+        check.status = CheckStatus::Cancelled;
+        let (creator, platform, asset) = (check.creator, check.platform, check.amount.asset());
+        if let (Some(c), Ok(m)) = (creator, Money::new(refund, asset)) {
+            self.credit(c, platform, m)?;
+        }
+        Ok(())
+    }
+
     pub fn insert_invoice(&mut self, spec: InvoiceSpec) -> Result<SimInvoice, SimError> {
         let positive = match &spec.amount {
             InvoiceAmount::Crypto(m) => !m.amount().is_zero(),
@@ -480,10 +553,36 @@ impl WorldState {
         }
     }
 
-    pub fn next_query_id(&mut self) -> i64 {
-        let id = self.next_query_id;
-        self.next_query_id += 1;
-        id
+    /// Номер платежа xRocket: `i<номер счёта>_<n>`.
+    pub fn next_payment(&mut self) -> u64 {
+        let n = self.next_payment;
+        self.next_payment += 1;
+        n
+    }
+
+    /// Числовой id чека в callback-данных CryptoBot (`confirm-delete-check-63865902`).
+    pub fn check_num(&self, code: &str) -> Option<u64> {
+        let pos = self.check_order.iter().position(|c| c == code)?;
+        u64::try_from(pos).ok().map(|p| CHECK_NUM_BASE + p)
+    }
+
+    pub fn check_by_num(&self, num: u64) -> Option<&SimCheck> {
+        let pos = usize::try_from(num.checked_sub(CHECK_NUM_BASE)?).ok()?;
+        self.checks.get(self.check_order.get(pos)?)
+    }
+
+    /// Номер счёта, который бот пишет в тексте (`#IV69544493`, `#INV7276063`); код ссылки другой.
+    pub fn invoice_number(&self, code: &str) -> Option<String> {
+        let pos = self.invoice_order.iter().position(|c| c == code)?;
+        let n = INVOICE_NUM_BASE + u64::try_from(pos).ok()?;
+        Some(match self.invoices.get(code)?.platform {
+            Platform::CryptoBot => format!("IV{n}"),
+            Platform::XRocket => format!("INV{n}"),
+        })
+    }
+
+    pub fn screen(&self, id: AccountId, chat: Chat, msg_id: i32) -> Option<&Screen> {
+        self.screens.get(&(id, chat, msg_id))
     }
 
     // ---------- сбои ----------
@@ -543,6 +642,18 @@ impl WorldState {
         }
     }
 
+    fn remember(&mut self, account: AccountId, chat: Chat, msg_id: i32, screen: Option<Screen>) {
+        let key = (account, chat, msg_id);
+        match screen {
+            Some(s) => {
+                self.screens.insert(key, s);
+            }
+            None => {
+                self.screens.remove(&key);
+            }
+        }
+    }
+
     /// Наше исходящее сообщение: в историю, но не в поток (как у отправившей сессии MTProto).
     pub fn store_outgoing(
         &mut self,
@@ -561,9 +672,26 @@ impl WorldState {
     pub fn publish(&mut self, ob: Outbound) -> Option<RawMessage> {
         let Outbound { account, chat, op } = ob;
         match op {
+            Op::Staged(first, then) => {
+                let mut shown = self.publish(Outbound {
+                    account,
+                    chat,
+                    op: Op::New(first),
+                })?;
+                for draft in then {
+                    shown = self.publish(Outbound {
+                        account,
+                        chat,
+                        op: Op::Edit(shown.id, draft),
+                    })?;
+                }
+                Some(shown)
+            }
             Op::New(draft) => {
                 let msg_id = self.next_msg_id(account)?;
+                let screen = draft.screen.clone();
                 let msg = self.build(chat, msg_id, false, draft);
+                self.remember(account, chat, msg_id, screen);
                 let a = self.accounts.get_mut(&account)?;
                 a.chats.entry(chat).or_default().push(msg.clone());
                 // Ошибка отправки = нет подписчиков; сообщение всё равно есть в истории.
@@ -572,6 +700,7 @@ impl WorldState {
             }
             Op::Edit(msg_id, draft) => {
                 let now = self.now_secs();
+                let screen = draft.screen.clone();
                 let a = self.accounts.get_mut(&account)?;
                 let msg = a
                     .chats
@@ -584,6 +713,7 @@ impl WorldState {
                 msg.edit_date = Some(now);
                 let edited = msg.clone();
                 let _ = a.tx.send(edited.clone());
+                self.remember(account, chat, msg_id, screen);
                 Some(edited)
             }
         }
@@ -627,6 +757,23 @@ impl WorldState {
         if mine.is_empty() {
             return None;
         }
+        let platform = match own.1 {
+            Chat::WalletBot(p) => p,
+            Chat::SavedMessages => Platform::CryptoBot,
+        };
+        if matches!(
+            fault,
+            Some(Fault::UnknownReply(_) | Fault::EditInsteadOfNew | Fault::ProcessingFirst { .. })
+        ) {
+            let first = mine.remove(0);
+            mine.insert(
+                0,
+                Outbound {
+                    op: first.op.settled(),
+                    ..first
+                },
+            );
+        }
         match fault {
             Some(Fault::NoReply) => None,
             Some(Fault::DelayReply(d)) => Some(Delayed {
@@ -637,8 +784,8 @@ impl WorldState {
                 let first = &mut mine[0];
                 let draft = Draft::text(text.clone());
                 first.op = match &first.op {
-                    Op::New(_) => Op::New(draft),
                     Op::Edit(id, _) => Op::Edit(*id, draft),
+                    Op::New(_) | Op::Staged(..) => Op::New(draft),
                 };
                 self.publish_all(mine);
                 None
@@ -654,7 +801,7 @@ impl WorldState {
             }
             Some(Fault::ProcessingFirst { final_after }) => {
                 let first = mine.remove(0);
-                let processing = Draft::text(texts::PROCESSING);
+                let processing = Draft::text(texts::processing(platform));
                 let final_op = match first.op {
                     Op::New(draft) => {
                         let shown = self.publish(Outbound {
@@ -672,6 +819,7 @@ impl WorldState {
                         });
                         Op::Edit(id, draft)
                     }
+                    staged @ Op::Staged(..) => staged,
                 };
                 let mut rest = vec![Outbound {
                     account: first.account,

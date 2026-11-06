@@ -16,9 +16,7 @@ use userbot::sim::{
     AccountId, Call, CheckOrigin, CheckSpec, Fault, InvoiceSpec, SimInvoiceStatus, SimTransport,
     SimWorld,
 };
-use userbot::transport::{
-    CallbackAnswer, Chat, InlineResults, RawMessage, Transport, TransportError,
-};
+use userbot::transport::{CallbackAnswer, Chat, RawMessage, Transport, TransportError};
 use userbot::{
     AccountGate, ActivationOutcome, BotError, IssueMethod, IssueOutcome, OpTag, PayOutcome,
     RejectReason, UserbotWallet, WalletBot,
@@ -52,20 +50,12 @@ struct Scripted {
     world: SimWorld,
     account: AccountId,
     on_text: Mutex<Vec<(String, Fault)>>,
-    on_press: Mutex<Vec<(String, Fault)>>,
     on_recent: Mutex<Vec<(Chat, Fault)>>,
 }
 
 impl Scripted {
     fn fault_on_text(&self, text: &str, fault: Fault) {
         self.on_text.lock().unwrap().push((text.to_owned(), fault));
-    }
-
-    fn fault_on_press(&self, data_contains: &str, fault: Fault) {
-        self.on_press
-            .lock()
-            .unwrap()
-            .push((data_contains.to_owned(), fault));
     }
 
     fn fault_on_recent(&self, chat: Chat, fault: Fault) {
@@ -99,34 +89,7 @@ impl Transport for Scripted {
         msg_id: i32,
         data: &[u8],
     ) -> Result<CallbackAnswer, TransportError> {
-        let data_str = String::from_utf8_lossy(data).into_owned();
-        self.arm(&self.on_press, |k| data_str.contains(k), Call::Press);
         self.inner.press(chat, msg_id, data).await
-    }
-
-    async fn inline_query(
-        &self,
-        bot: Platform,
-        query: &str,
-    ) -> Result<InlineResults, TransportError> {
-        self.inner.inline_query(bot, query).await
-    }
-
-    async fn send_inline(
-        &self,
-        to: Chat,
-        bot: Platform,
-        results: &InlineResults,
-        result_id: &str,
-        random_id: i64,
-    ) -> Result<RawMessage, TransportError> {
-        self.inner
-            .send_inline(to, bot, results, result_id, random_id)
-            .await
-    }
-
-    async fn open_webapp(&self, bot: Platform, button_url: &str) -> Result<String, TransportError> {
-        self.inner.open_webapp(bot, button_url).await
     }
 
     async fn history(
@@ -177,7 +140,6 @@ fn env() -> Env {
         world: world.clone(),
         account: ub,
         on_text: Mutex::new(Vec::new()),
-        on_press: Mutex::new(Vec::new()),
         on_recent: Mutex::new(Vec::new()),
     });
     Env {
@@ -195,13 +157,6 @@ impl Env {
     fn wallet(&self, platform: Platform) -> UserbotWallet<Scripted> {
         UserbotWallet::new(platform, self.transport.clone(), self.gate.clone())
             .with_log(self.log.clone())
-    }
-
-    fn menu_only(&self, platform: Platform) -> UserbotWallet<Scripted> {
-        self.wallet(platform).with_config(FlowConfig {
-            inline_checks: false,
-            ..FlowConfig::default()
-        })
     }
 
     fn balance(&self, platform: Platform) -> Decimal {
@@ -372,7 +327,7 @@ async fn late_reply_does_not_leak_into_the_next_operation() {
     );
     assert_eq!(e.balance(CB), dec!(100), "деньги пришли — движок сверит");
 
-    // «Вы получили 100 USDT» придёт во время следующей операции и не будет её ответом,
+    // «📥 Вы получили 🪙 100 USDT» придёт во время следующей операции и не будет её ответом,
     // даже если её собственный ответ задержится.
     let second = e.world.client_check(CB, usdt(dec!(7))).unwrap();
     e.world.inject(
@@ -390,7 +345,7 @@ async fn late_reply_does_not_leak_into_the_next_operation() {
         .log
         .entries()
         .into_iter()
-        .find(|l| l.message.text == "Вы получили 100 USDT.")
+        .find(|l| l.message.text == "📥 Вы получили 🪙 100 USDT ($100).")
         .expect("поздний ответ записан");
     assert_eq!(late.op, None);
 }
@@ -552,204 +507,173 @@ async fn two_platforms_on_one_account_take_turns() {
 
 // ============================== выдача чека ==============================
 
-async fn issue_inline_once(platform: Platform) {
+async fn issue_once(platform: Platform, fund: Decimal, amount: Decimal) {
     let e = env();
-    e.fund(platform, dec!(500));
+    e.fund(platform, fund);
     let total = e.world.total_in_world(platform, Asset::Usdt);
     let t = tag("ord-7-payout");
     let out = e
         .wallet(platform)
-        .issue_check(&usdt(dec!(97.5)), &t)
+        .issue_check(&usdt(amount), &t)
         .await
         .unwrap();
     let IssueOutcome::Issued { check, method } = out else {
-        panic!("{out:?}");
+        panic!("{platform:?}: {out:?}");
     };
-    assert_eq!(method, IssueMethod::Inline);
-    assert_eq!(check.amount, usdt(dec!(97.5)));
+    assert_eq!(method, IssueMethod::Menu);
+    assert_eq!(check.amount, usdt(amount));
 
     let created = e.world.checks_created_by(e.ub);
-    assert_eq!(created.len(), 1);
+    assert_eq!(created.len(), 1, "{platform:?}");
     assert_eq!(created[0].code, check.param);
     assert_eq!(created[0].url, check.url);
-    assert_eq!(
+    assert_eq!(created[0].activations, 1, "не мультичек");
+    assert!(matches!(
         created[0].origin,
-        CheckOrigin::Inline {
-            random_id: t.random_id
-        }
-    );
-    assert_eq!(e.balance(platform), dec!(402.5));
+        CheckOrigin::Menu { random_id } if random_id != 0
+    ));
+    assert_eq!(e.balance(platform), fund - amount);
     assert_eq!(e.world.total_in_world(platform, Asset::Usdt), total);
 
     let saved = e.world.messages(e.ub, Chat::SavedMessages);
+    assert_eq!(saved.len(), 1);
     assert_eq!(saved[0].text, userbot::flows::marker_text("ord-7-payout"));
-    assert_eq!(saved[1].via_bot, Some(platform));
+    let command = match platform {
+        CB => "/checks",
+        XR => "/cheques",
+    };
+    let amount_text = amount.normalize().to_string();
+    assert_eq!(
+        e.sent_texts(Chat::WalletBot(platform)),
+        vec![command.to_owned(), amount_text]
+    );
 
     // Клиент забирает чек — деньги у него.
     e.world.claim_check(e.client, &check.url).unwrap();
-    assert_eq!(e.world.balance(e.client, platform, Asset::Usdt), dec!(97.5));
+    assert_eq!(e.world.balance(e.client, platform, Asset::Usdt), amount);
 }
 
 #[tokio::test(start_paused = true)]
-async fn inline_check_is_created_once_xrocket() {
-    issue_inline_once(XR).await;
+async fn cryptobot_check_via_skip_when_a_multicheck_would_fit() {
+    issue_once(CB, dec!(500), dec!(97.5)).await;
 }
 
 #[tokio::test(start_paused = true)]
-async fn inline_check_is_created_once_cryptobot() {
-    issue_inline_once(CB).await;
+async fn cryptobot_check_on_the_amount_when_no_multicheck_fits() {
+    issue_once(CB, dec!(150), dec!(97.5)).await;
 }
 
 #[tokio::test(start_paused = true)]
-async fn menu_creates_the_check_on_both_platforms() {
-    for platform in [CB, XR] {
-        let e = env();
-        e.fund(platform, dec!(100));
-        let out = e
-            .menu_only(platform)
-            .issue_check(&usdt(dec!(12.25)), &tag("ord-1-payout"))
-            .await
-            .unwrap();
-        let IssueOutcome::Issued { check, method } = out else {
-            panic!("{platform:?}: {out:?}");
-        };
-        assert_eq!(method, IssueMethod::Menu);
-        let created = e.world.checks_created_by(e.ub);
-        assert_eq!(created.len(), 1, "{platform:?}");
-        assert_eq!(created[0].code, check.param);
-        assert!(matches!(created[0].origin, CheckOrigin::Menu { .. }));
-        assert_eq!(e.balance(platform), dec!(87.75));
-    }
-}
-
-#[tokio::test(start_paused = true)]
-async fn inline_failure_before_sending_falls_back_to_menu() {
-    let e = env();
-    e.fund(XR, dec!(100));
-    e.world.inject(
-        e.ub,
-        Call::InlineQuery,
-        Fault::Rpc {
-            code: 400,
-            name: "BOT_INLINE_DISABLED".to_owned(),
-        },
-        1,
-    );
-    let out = e
-        .wallet(XR)
-        .issue_check(&usdt(dec!(10)), &tag("ord-1-payout"))
-        .await
-        .unwrap();
-    assert!(
-        matches!(
-            out,
-            IssueOutcome::Issued {
-                method: IssueMethod::Menu,
-                ..
-            }
-        ),
-        "{out:?}"
-    );
-    assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
+async fn xrocket_check_via_confirmation() {
+    issue_once(XR, dec!(500), dec!(97.5)).await;
 }
 
 #[tokio::test(start_paused = true)]
 async fn insufficient_funds_creates_nothing() {
-    let e = env();
-    e.fund(CB, dec!(10));
-    let out = e
-        .wallet(CB)
-        .issue_check(&usdt(dec!(97.5)), &tag("ord-1-payout"))
-        .await
-        .unwrap();
-    assert_eq!(out, IssueOutcome::InsufficientFunds);
-    assert!(e.world.checks_created_by(e.ub).is_empty());
-    assert_eq!(e.balance(CB), dec!(10));
+    for platform in [CB, XR] {
+        let e = env();
+        e.fund(platform, dec!(10));
+        let out = e
+            .wallet(platform)
+            .issue_check(&usdt(dec!(97.5)), &tag("ord-1-payout"))
+            .await
+            .unwrap();
+        assert_eq!(out, IssueOutcome::InsufficientFunds, "{platform:?}");
+        assert!(e.world.checks_created_by(e.ub).is_empty());
+        assert_eq!(e.balance(platform), dec!(10));
+    }
 }
 
 #[tokio::test(start_paused = true)]
-async fn inline_timeout_after_effect_is_resolved_by_the_same_random_id() {
-    let e = env();
-    e.fund(XR, dec!(100));
-    e.world
-        .inject(e.ub, Call::SendInline, Fault::TimeoutAfterEffect, 1);
-    let out = e
-        .wallet(XR)
-        .issue_check(&usdt(dec!(30)), &tag("ord-1-payout"))
-        .await
-        .unwrap();
-    assert!(
-        matches!(
-            out,
-            IssueOutcome::Issued {
-                method: IssueMethod::Inline,
-                ..
-            }
-        ),
-        "{out:?}"
-    );
-    assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
-    assert_eq!(e.balance(XR), dec!(70));
-}
-
-#[tokio::test(start_paused = true)]
-async fn unknown_issue_is_never_retried_and_find_recovers_the_check() {
-    let e = env();
-    e.fund(CB, dec!(100));
-    let t = tag("ord-9-payout");
-    // Чек создан, ответ потерян; повтор упал до сервера; история недоступна.
-    e.world
-        .inject(e.ub, Call::SendInline, Fault::TimeoutAfterEffect, 1);
-    e.world
-        .inject(e.ub, Call::SendInline, Fault::Disconnected, 1);
-    e.transport
-        .fault_on_recent(Chat::SavedMessages, Fault::Disconnected);
-    let wallet = e.wallet(CB);
-    let out = wallet.issue_check(&usdt(dec!(25)), &t).await.unwrap();
-    assert!(matches!(out, IssueOutcome::Unknown { .. }), "{out:?}");
-    assert_eq!(
-        e.world.checks_created_by(e.ub).len(),
-        1,
-        "без меню и без второго чека"
-    );
-
-    e.world.clear_faults(e.ub);
-    let found = wallet.find_issued_check(&usdt(dec!(25)), &t).await.unwrap();
-    let created = &e.world.checks_created_by(e.ub)[0];
-    assert_eq!(found.map(|c| c.param), Some(created.code.clone()));
-    assert_eq!(e.balance(CB), dec!(75));
-}
-
-#[tokio::test(start_paused = true)]
-async fn menu_amount_timeout_is_resolved_by_the_same_random_id() {
+async fn amount_timeout_after_effect_is_resolved_by_the_same_random_id() {
     let e = env();
     e.fund(CB, dec!(100));
     e.transport.fault_on_text("40", Fault::TimeoutAfterEffect);
     let out = e
-        .menu_only(CB)
+        .wallet(CB)
         .issue_check(&usdt(dec!(40)), &tag("ord-1-payout"))
         .await
         .unwrap();
-    assert!(
-        matches!(
-            out,
-            IssueOutcome::Issued {
-                method: IssueMethod::Menu,
-                ..
-            }
-        ),
-        "{out:?}"
-    );
+    assert!(matches!(out, IssueOutcome::Issued { .. }), "{out:?}");
     assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
+    assert_eq!(
+        e.sent_texts(Chat::WalletBot(CB))
+            .iter()
+            .filter(|t| *t == "40")
+            .count(),
+        1,
+        "повтор тем же random_id не создал второго сообщения"
+    );
 }
 
 #[tokio::test(start_paused = true)]
-async fn menu_without_reply_to_amount_is_unknown_and_left_to_a_human() {
+async fn check_press_timeout_takes_the_screen_from_the_stream() {
+    for platform in [CB, XR] {
+        let e = env();
+        e.fund(platform, dec!(100));
+        e.world
+            .inject(e.ub, Call::CheckPress, Fault::TimeoutAfterEffect, 1);
+        let out = e
+            .wallet(platform)
+            .issue_check(&usdt(dec!(30)), &tag("ord-1-payout"))
+            .await
+            .unwrap();
+        assert!(
+            matches!(out, IssueOutcome::Issued { .. }),
+            "{platform:?}: {out:?}"
+        );
+        assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
+        assert_eq!(e.balance(platform), dec!(70));
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn unknown_issue_is_never_retried_and_find_recovers_the_check() {
+    for platform in [CB, XR] {
+        let e = env();
+        e.fund(platform, dec!(100));
+        let t = tag("ord-9-payout");
+        // Чек создан нажатием, экран чека пришёл позже, чем ждёт сценарий.
+        e.world.inject(
+            e.ub,
+            Call::CheckPress,
+            Fault::DelayReply(Duration::from_secs(40)),
+            1,
+        );
+        let wallet = e.wallet(platform);
+        let out = wallet.issue_check(&usdt(dec!(25)), &t).await.unwrap();
+        assert!(matches!(out, IssueOutcome::Unknown { .. }), "{out:?}");
+        assert_eq!(
+            e.world.checks_created_by(e.ub).len(),
+            1,
+            "без второго нажатия и без второго чека"
+        );
+        tokio::time::sleep(Duration::from_secs(30)).await;
+        // История на время недоступна — сверка откладывается, а не выдумывает ответ.
+        e.transport
+            .fault_on_recent(Chat::SavedMessages, Fault::Disconnected);
+        assert!(matches!(
+            wallet.find_issued_check(&usdt(dec!(25)), &t).await,
+            Err(BotError::Unavailable(_))
+        ));
+        let found = wallet.find_issued_check(&usdt(dec!(25)), &t).await.unwrap();
+        let created = &e.world.checks_created_by(e.ub)[0];
+        assert_eq!(
+            found.map(|c| c.param),
+            Some(created.code.clone()),
+            "{platform:?}"
+        );
+        assert_eq!(e.balance(platform), dec!(75));
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn check_press_without_reply_is_unknown_and_left_to_a_human() {
     let e = env();
     e.fund(CB, dec!(100));
-    e.transport.fault_on_text("40", Fault::NoReply);
+    e.world.inject(e.ub, Call::CheckPress, Fault::NoReply, 1);
     let t = tag("ord-1-payout");
-    let wallet = e.menu_only(CB);
+    let wallet = e.wallet(CB);
     let out = wallet.issue_check(&usdt(dec!(40)), &t).await.unwrap();
     assert!(matches!(out, IssueOutcome::Unknown { .. }), "{out:?}");
     // Чек есть, но бот о нём не сообщил: связать его с операцией нечем — решает оператор.
@@ -761,45 +685,99 @@ async fn menu_without_reply_to_amount_is_unknown_and_left_to_a_human() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn find_tells_operations_apart_by_markers() {
+async fn amount_without_reply_is_unknown_when_the_amount_itself_creates_the_check() {
+    let e = env();
+    // На мультичек не хватает: чек создаёт сама сумма.
+    e.fund(CB, dec!(50));
+    e.transport.fault_on_text("40", Fault::NoReply);
+    let out = e
+        .wallet(CB)
+        .issue_check(&usdt(dec!(40)), &tag("ord-1-payout"))
+        .await
+        .unwrap();
+    assert!(matches!(out, IssueOutcome::Unknown { .. }), "{out:?}");
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn xrocket_confirmation_with_another_amount_is_never_pressed() {
     let e = env();
     e.fund(XR, dec!(100));
-    let wallet = e.wallet(XR);
-    let (t1, t2) = (tag("ord-1-payout"), tag("ord-2-payout"));
-    let amount = usdt(dec!(10));
-    let IssueOutcome::Issued { check: c1, .. } = wallet.issue_check(&amount, &t1).await.unwrap()
-    else {
-        panic!()
-    };
-    let IssueOutcome::Issued { check: c2, .. } = wallet.issue_check(&amount, &t2).await.unwrap()
-    else {
-        panic!()
-    };
-    assert_ne!(c1.param, c2.param);
-    assert_eq!(
-        wallet.find_issued_check(&amount, &t1).await.unwrap(),
-        Some(c1)
+    // Бот понял сумму не так: на экране подтверждения 11 вместо 10.
+    e.transport.fault_on_text(
+        "10",
+        Fault::UnknownReply(
+            "🏷 Персональный чек\n\nСумма чека: 11\u{a0}USDT (11.0$)\n\nПожалуйста, подтвердите корректность данных:"
+                .to_owned(),
+        ),
     );
-    assert_eq!(
-        wallet.find_issued_check(&amount, &t2).await.unwrap(),
-        Some(c2)
-    );
-    assert_eq!(
-        wallet
-            .find_issued_check(&amount, &tag("ord-3-payout"))
-            .await
-            .unwrap(),
-        None,
-        "нет метки — нет чека"
-    );
-    assert_eq!(
-        wallet
-            .find_issued_check(&usdt(dec!(11)), &t1)
-            .await
-            .unwrap(),
-        None,
-        "другая сумма"
-    );
+    let out = e
+        .wallet(XR)
+        .issue_check(&usdt(dec!(10)), &tag("ord-1-payout"))
+        .await;
+    assert!(matches!(out, Err(BotError::Unavailable(_))), "{out:?}");
+    assert!(e.world.checks_created_by(e.ub).is_empty());
+    assert_eq!(e.balance(XR), dec!(100));
+}
+
+#[tokio::test(start_paused = true)]
+async fn missing_menu_is_not_executed() {
+    let e = env();
+    e.fund(CB, dec!(100));
+    e.transport.fault_on_text("/checks", Fault::NoReply);
+    let out = e
+        .wallet(CB)
+        .issue_check(&usdt(dec!(10)), &tag("ord-1-payout"))
+        .await;
+    assert!(matches!(out, Err(BotError::Unavailable(_))), "{out:?}");
+    assert!(e.world.checks_created_by(e.ub).is_empty());
+}
+
+#[tokio::test(start_paused = true)]
+async fn find_tells_operations_apart_by_markers() {
+    for platform in [CB, XR] {
+        let e = env();
+        e.fund(platform, dec!(100));
+        let wallet = e.wallet(platform);
+        let (t1, t2) = (tag("ord-1-payout"), tag("ord-2-payout"));
+        let amount = usdt(dec!(10));
+        let IssueOutcome::Issued { check: c1, .. } =
+            wallet.issue_check(&amount, &t1).await.unwrap()
+        else {
+            panic!()
+        };
+        let IssueOutcome::Issued { check: c2, .. } =
+            wallet.issue_check(&amount, &t2).await.unwrap()
+        else {
+            panic!()
+        };
+        assert_ne!(c1.param, c2.param);
+        assert_eq!(
+            wallet.find_issued_check(&amount, &t1).await.unwrap(),
+            Some(c1),
+            "{platform:?}"
+        );
+        assert_eq!(
+            wallet.find_issued_check(&amount, &t2).await.unwrap(),
+            Some(c2)
+        );
+        assert_eq!(
+            wallet
+                .find_issued_check(&amount, &tag("ord-3-payout"))
+                .await
+                .unwrap(),
+            None,
+            "нет метки — нет чека"
+        );
+        assert_eq!(
+            wallet
+                .find_issued_check(&usdt(dec!(11)), &t1)
+                .await
+                .unwrap(),
+            None,
+            "другая сумма"
+        );
+    }
 }
 
 #[tokio::test(start_paused = true)]
@@ -808,7 +786,7 @@ async fn flood_wait_before_issuing_creates_nothing() {
     e.fund(XR, dec!(100));
     e.world.inject(
         e.ub,
-        Call::InlineQuery,
+        Call::Press,
         Fault::FloodWait(Duration::from_secs(61)),
         1,
     );
@@ -824,11 +802,7 @@ async fn flood_wait_before_issuing_creates_nothing() {
 
 fn shop_invoice(e: &Env, platform: Platform, amount: Money) -> String {
     e.world
-        .create_invoice(
-            InvoiceSpec::crypto(platform, amount)
-                .by(e.shop)
-                .description("Заказ 42"),
-        )
+        .create_invoice(InvoiceSpec::crypto(platform, amount).by(e.shop))
         .unwrap()
         .code
 }
@@ -836,22 +810,28 @@ fn shop_invoice(e: &Env, platform: Platform, amount: Money) -> String {
 #[tokio::test(start_paused = true)]
 async fn inspect_reads_the_invoice_card() {
     let e = env();
-    let code = shop_invoice(&e, CB, usdt(dec!(10)));
-    let info = e.wallet(CB).inspect_invoice(&code).await.unwrap();
-    assert_eq!(info.param, code);
-    assert_eq!(info.card.status, parsers::InvoiceStatus::Active);
-    assert_eq!(info.card.amount, Some((dec!(10), Asset::Usdt)));
-    assert_eq!(info.card.single_use, Some(true));
-    assert_eq!(info.card.description.as_deref(), Some("Заказ 42"));
+    for platform in [CB, XR] {
+        let code = shop_invoice(&e, platform, usdt(dec!(10)));
+        let info = e.wallet(platform).inspect_invoice(&code).await.unwrap();
+        assert_eq!(info.param, code);
+        assert_eq!(
+            info.card.status,
+            parsers::InvoiceStatus::Active,
+            "{platform:?}"
+        );
+        assert_eq!(info.card.amount, Some((dec!(10), Asset::Usdt)));
+        assert!(info.card.number.is_some());
+        assert!(!info.card.insufficient_funds);
+    }
 }
 
 #[tokio::test(start_paused = true)]
-async fn cryptobot_invoice_is_paid_by_one_press_without_passcode() {
+async fn cryptobot_invoice_is_paid_without_passcode_trusting_a_new_recipient_once() {
     let e = env();
     e.fund(CB, dec!(25));
     let code = shop_invoice(&e, CB, usdt(dec!(10)));
-    let out = e
-        .wallet(CB)
+    let wallet = e.wallet(CB);
+    let out = wallet
         .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
         .await
         .unwrap();
@@ -861,6 +841,14 @@ async fn cryptobot_invoice_is_paid_by_one_press_without_passcode() {
     assert_eq!(inv.payments.len(), 1);
     assert_eq!(e.balance(CB), dec!(15));
     assert_eq!(e.world.balance(e.shop, CB, Asset::Usdt), dec!(10));
+    // Знакомый получатель — без вопроса о доверии.
+    let code = shop_invoice(&e, CB, usdt(dec!(5)));
+    let out = wallet
+        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(5)), &tag("ord-2-pay"))
+        .await
+        .unwrap();
+    assert_eq!(out, PayOutcome::Paid);
+    assert_eq!(e.balance(CB), dec!(10));
 }
 
 #[tokio::test(start_paused = true)]
@@ -913,86 +901,92 @@ async fn xrocket_invoice_is_paid_by_one_press() {
 
 #[tokio::test(start_paused = true)]
 async fn pay_press_timeout_is_never_pressed_again() {
-    let e = env();
-    e.fund(XR, dec!(50));
-    let paid = shop_invoice(&e, XR, usdt(dec!(10)));
-    e.transport
-        .fault_on_press(":pay:", Fault::TimeoutAfterEffect);
-    let out = e
-        .wallet(XR)
-        .pay_invoice(&paid, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
-        .await
-        .unwrap();
-    assert_eq!(
-        out,
-        PayOutcome::Paid,
-        "ответ бота пришёл, хотя нажатие вернуло таймаут"
-    );
-    assert_eq!(e.world.invoice(&paid).unwrap().payments.len(), 1);
+    for platform in [CB, XR] {
+        let e = env();
+        e.fund(platform, dec!(50));
+        let paid = shop_invoice(&e, platform, usdt(dec!(10)));
+        e.world
+            .inject(e.ub, Call::PayPress, Fault::TimeoutAfterEffect, 1);
+        let out = e
+            .wallet(platform)
+            .pay_invoice(&paid, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
+            .await
+            .unwrap();
+        // CryptoBot: таймаут на «Оплатить», которое показало вопрос о доверии; дальше —
+        // одно нажатие «Отправить платеж».
+        assert_eq!(out, PayOutcome::Paid, "{platform:?}: ответ бота пришёл");
+        assert_eq!(e.world.invoice(&paid).unwrap().payments.len(), 1);
 
-    // Нажатие сработало, а бот промолчал: исход неизвестен, второго нажатия нет.
-    let silent = shop_invoice(&e, XR, usdt(dec!(10)));
-    e.transport.fault_on_press(":pay:", Fault::NoReply);
-    let out = e
-        .wallet(XR)
-        .pay_invoice(&silent, Asset::Usdt, &usdt(dec!(10)), &tag("ord-2-pay"))
-        .await
-        .unwrap();
-    assert!(matches!(out, PayOutcome::Unknown { .. }), "{out:?}");
-    assert_eq!(e.world.invoice(&silent).unwrap().payments.len(), 1);
-    assert_eq!(e.balance(XR), dec!(30));
+        // Нажатие сработало, а бот промолчал: исход неизвестен, второго нажатия нет.
+        let silent = shop_invoice(&e, platform, usdt(dec!(10)));
+        e.world.inject(e.ub, Call::PayPress, Fault::NoReply, 1);
+        let out = e
+            .wallet(platform)
+            .pay_invoice(&silent, Asset::Usdt, &usdt(dec!(10)), &tag("ord-2-pay"))
+            .await
+            .unwrap();
+        assert!(
+            matches!(out, PayOutcome::Unknown { .. }),
+            "{platform:?}: {out:?}"
+        );
+        let payments = e.world.invoice(&silent).unwrap().payments.len();
+        assert!(payments <= 1, "{platform:?}");
+        assert_eq!(
+            e.balance(platform),
+            dec!(50) - dec!(10) * Decimal::from(1 + payments)
+        );
+    }
 }
 
 #[tokio::test(start_paused = true)]
 async fn invoice_problems_are_reported_without_paying() {
-    let e = env();
-    e.fund(XR, dec!(5));
-    let wallet = e.wallet(XR);
-    let pay = |code: String, expected: Money, key: &'static str| {
-        let wallet = &wallet;
-        async move {
-            wallet
-                .pay_invoice(&code, Asset::Usdt, &expected, &tag(key))
-                .await
-                .unwrap()
-        }
-    };
+    for platform in [CB, XR] {
+        let e = env();
+        e.fund(platform, dec!(5));
+        let wallet = e.wallet(platform);
+        let pay = |code: String, expected: Money, key: &'static str| {
+            let wallet = &wallet;
+            async move {
+                wallet
+                    .pay_invoice(&code, Asset::Usdt, &expected, &tag(key))
+                    .await
+                    .unwrap()
+            }
+        };
 
-    let code = shop_invoice(&e, XR, usdt(dec!(10)));
-    assert!(matches!(
-        pay(code.clone(), usdt(dec!(9)), "ord-1-pay").await,
-        PayOutcome::NeedsHuman { .. }
-    ));
-    assert_eq!(
-        pay(code, usdt(dec!(10)), "ord-2-pay").await,
-        PayOutcome::InsufficientFunds
-    );
+        let code = shop_invoice(&e, platform, usdt(dec!(10)));
+        assert!(
+            matches!(
+                pay(code.clone(), usdt(dec!(9)), "ord-1-pay").await,
+                PayOutcome::NeedsHuman { .. }
+            ),
+            "{platform:?}: другая сумма"
+        );
+        assert_eq!(
+            pay(code, usdt(dec!(10)), "ord-2-pay").await,
+            PayOutcome::InsufficientFunds,
+            "{platform:?}"
+        );
 
-    let expired = shop_invoice(&e, XR, usdt(dec!(1)));
-    e.world.expire_invoice(&expired).unwrap();
-    assert_eq!(
-        pay(expired, usdt(dec!(1)), "ord-3-pay").await,
-        PayOutcome::Expired
-    );
-
-    let multi = e
-        .world
-        .create_invoice(
-            InvoiceSpec::crypto(XR, usdt(dec!(1)))
-                .by(e.shop)
-                .multi_use(),
-        )
-        .unwrap()
-        .code;
-    assert!(matches!(
-        pay(multi, usdt(dec!(1)), "ord-4-pay").await,
-        PayOutcome::NeedsHuman { .. }
-    ));
-    assert_eq!(e.balance(XR), dec!(5));
+        let expired = shop_invoice(&e, platform, usdt(dec!(1)));
+        e.world.expire_invoice(&expired).unwrap();
+        assert_eq!(
+            pay(expired, usdt(dec!(1)), "ord-3-pay").await,
+            PayOutcome::Expired,
+            "{platform:?}"
+        );
+        assert!(
+            matches!(
+                pay("IVAAAAAAAAAA".to_owned(), usdt(dec!(1)), "ord-4-pay").await,
+                PayOutcome::NeedsHuman { .. }
+            ) || platform == XR
+        );
+        assert_eq!(e.balance(platform), dec!(5));
+    }
 }
 
 #[tokio::test(start_paused = true)]
-async fn fiat_invoice_is_checked_against_the_amount_due() {
+async fn fiat_invoice_is_checked_against_the_amount_on_the_coin_button() {
     let e = env();
     e.fund(CB, dec!(50));
     e.world.set_fiat_rate(Asset::Usdt, "USD", dec!(1));
@@ -1001,9 +995,21 @@ async fn fiat_invoice_is_checked_against_the_amount_due() {
         .create_invoice(InvoiceSpec::fiat(CB, dec!(10), "USD", &[Asset::Usdt]).by(e.shop))
         .unwrap()
         .code;
-    let out = e
-        .wallet(CB)
+    let wallet = e.wallet(CB);
+    let info = wallet.inspect_invoice(&code).await.unwrap();
+    assert_eq!(info.card.fiat, Some((dec!(10), "USD".to_owned())));
+    assert_eq!(info.card.amount, Some((dec!(10), Asset::Usdt)));
+    // Курс сдвинулся: на кнопке уже не та сумма — не платим.
+    e.world.set_fiat_rate(Asset::Usdt, "USD", dec!(0.99));
+    let out = wallet
         .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
+        .await
+        .unwrap();
+    assert!(matches!(out, PayOutcome::NeedsHuman { .. }), "{out:?}");
+    assert_eq!(e.balance(CB), dec!(50));
+    e.world.set_fiat_rate(Asset::Usdt, "USD", dec!(1));
+    let out = wallet
+        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-2-pay"))
         .await
         .unwrap();
     assert_eq!(out, PayOutcome::Paid);
@@ -1028,31 +1034,24 @@ async fn balances_come_from_the_wallet_screen() {
 
 #[tokio::test(start_paused = true)]
 async fn issuing_again_with_the_same_tag_never_creates_a_second_check() {
-    let e = env();
-    e.fund(XR, dec!(100));
-    let t = tag("ord-1-payout-1");
-    let wallet = e.wallet(XR);
-    let IssueOutcome::Issued { check, .. } = wallet.issue_check(&usdt(dec!(10)), &t).await.unwrap()
-    else {
-        panic!("first call issues")
-    };
-    // При повторе инлайн отказывает: раньше сценарий ушёл бы в меню и создал второй чек.
-    e.world.inject(
-        e.ub,
-        Call::InlineQuery,
-        Fault::Rpc {
-            code: 400,
-            name: "BOT_INLINE_DISABLED".to_owned(),
-        },
-        1,
-    );
-    let again = wallet.issue_check(&usdt(dec!(10)), &t).await.unwrap();
-    match again {
-        IssueOutcome::Issued { check: same, .. } => assert_eq!(same.param, check.param),
-        other => panic!("{other:?}"),
+    for platform in [CB, XR] {
+        let e = env();
+        e.fund(platform, dec!(100));
+        let t = tag("ord-1-payout-1");
+        let wallet = e.wallet(platform);
+        let IssueOutcome::Issued { check, .. } =
+            wallet.issue_check(&usdt(dec!(10)), &t).await.unwrap()
+        else {
+            panic!("first call issues")
+        };
+        let again = wallet.issue_check(&usdt(dec!(10)), &t).await.unwrap();
+        match again {
+            IssueOutcome::Issued { check: same, .. } => assert_eq!(same.param, check.param),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(e.world.checks_created_by(e.ub).len(), 1, "{platform:?}");
+        assert_eq!(e.balance(platform), dec!(90));
     }
-    assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
-    assert_eq!(e.balance(XR), dec!(90));
 }
 
 #[tokio::test(start_paused = true)]
@@ -1060,22 +1059,40 @@ async fn repeating_an_unknown_issue_reconciles_instead_of_issuing() {
     let e = env();
     e.fund(CB, dec!(100));
     let t = tag("ord-2-payout-1");
-    let wallet = e.menu_only(CB);
-    e.transport.fault_on_text("40", Fault::NoReply);
+    let wallet = e.wallet(CB);
+    e.world.inject(e.ub, Call::CheckPress, Fault::NoReply, 1);
     let first = wallet.issue_check(&usdt(dec!(40)), &t).await.unwrap();
     assert!(matches!(first, IssueOutcome::Unknown { .. }), "{first:?}");
-    // Пока на сумму нет ответа, чат бота занят: повтор даже не начинается.
-    let refused = wallet.issue_check(&usdt(dec!(40)), &t).await;
-    assert!(
-        matches!(refused, Err(BotError::Unavailable(_))),
-        "{refused:?}"
-    );
-    tokio::time::advance(FlowConfig::default().unanswered_block).await;
     // Повтор той же операции ничего не создаёт: бот так и не сообщил о чеке — исход неизвестен.
     let again = wallet.issue_check(&usdt(dec!(40)), &t).await.unwrap();
     assert!(matches!(again, IssueOutcome::Unknown { .. }), "{again:?}");
     assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
     assert_eq!(e.balance(CB), dec!(60));
+}
+
+#[tokio::test(start_paused = true)]
+async fn xrocket_menu_edit_answers_the_amount_and_frees_the_chat() {
+    let e = env();
+    e.fund(XR, dec!(100));
+    let wallet = e.wallet(XR);
+    // Ответ xRocket на сумму — правка меню, а не новое сообщение: следующая операция в этом
+    // чате не должна ждать «ответа» на сумму.
+    let out = wallet
+        .issue_check(&usdt(dec!(10)), &tag("ord-1-payout-1"))
+        .await
+        .unwrap();
+    assert!(matches!(out, IssueOutcome::Issued { .. }));
+    let url = e.world.client_check(XR, usdt(dec!(3))).unwrap();
+    let started = tokio::time::Instant::now();
+    let got = wallet
+        .activate_check(param(&url), &tag("ord-2-intake-1"))
+        .await
+        .unwrap();
+    assert_eq!(got, ActivationOutcome::Received(usdt(dec!(3))));
+    assert!(
+        started.elapsed() < FlowConfig::default().late_reply_quarantine,
+        "чат свободен сразу"
+    );
 }
 
 #[tokio::test(start_paused = true)]

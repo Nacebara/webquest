@@ -1,6 +1,5 @@
 //! Экраны ботов кошельков, по которым юзербот выдаёт чеки и платит по счетам (DESIGN-v0.2,
-//! Р4–Р5): инлайн-результаты `@send 10usdt` / `@xrocket 10`, меню `/checks` и `/cheques`,
-//! ответ на создание чека, сумма к оплате на экране счёта.
+//! Р4–Р5): меню `/checks` и `/cheques`, ответ на создание чека, экраны оплаты счёта.
 //!
 //! Словари — по живой записи владельца (6 ноября 2026, `tests/fixtures/live_*.json`): меню
 //! чеков, экраны созданного чека, счета обоих кошельков. Новый вариант текста — фикстурой и
@@ -46,9 +45,6 @@ pub fn is_pay_button(text: &str) -> bool {
 /// Бот просит ввести сумму чека.
 pub const AMOUNT_PROMPT: &[&str] = &["сумм", "amount"];
 
-/// Вариант инлайн-ответа: чек, счёт, «недостаточно средств» или что-то другое.
-const INLINE_INVOICE: &[&str] = &["счет", "запрос", "invoice", "request"];
-const INLINE_CHECK: &[&str] = &["чек", "отправить", "check", "cheque", "send"];
 /// Ответ меню на ввод суммы: чек создан.
 const CREATED: &[&str] = &["создан", "created"];
 /// Экран созданного чека: CryptoBot «Любой может активировать этот чек. Скопируйте ссылку…»,
@@ -66,56 +62,10 @@ const ASK_ACTIVATIONS: &[&str] = &["количество активаций", "n
 const CONFIRM_DATA: &[&str] = &["подтвердите корректность данных", "confirm the data"];
 /// Строка суммы на экране подтверждения чека xRocket: «Сумма чека: 1 USDT (1.0$)».
 const CHECK_AMOUNT_LABEL: &[&str] = &["сумма чека", "check amount"];
-/// Строка с суммой к оплате на экране счёта.
-const DUE_LABELS: &[&str] = &["к оплате", "to pay", "amount due"];
 
 /// Есть ли в тексте (после [`normalize`]) одна из подстрок словаря.
 pub fn text_matches(text: &str, needles: &[&str]) -> bool {
     has(&normalize(text), needles)
-}
-
-/// Вариант из ответа на инлайн-запрос к боту кошелька.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum InlineResultKind {
-    /// «Отправить 10 USDT» / «Чек на 10 USDT» — отправка создаст чек на эту сумму.
-    Check {
-        amount: Decimal,
-        asset: Asset,
-    },
-    /// «Запросить 10 USDT» — это счёт, не чек.
-    Invoice,
-    Insufficient,
-    Other,
-}
-
-/// Что предлагает инлайн-результат. Сумма — из заголовка, если там её нет — из описания.
-/// Признаки счёта и нехватки средств сильнее признаков чека.
-pub fn classify_inline_result(
-    platform: Platform,
-    title: Option<&str>,
-    description: Option<&str>,
-) -> InlineResultKind {
-    let norm = normalize(&format!(
-        "{} {}",
-        title.unwrap_or_default(),
-        description.unwrap_or_default()
-    ));
-    if has(&norm, INLINE_INVOICE) {
-        return InlineResultKind::Invoice;
-    }
-    if has(&norm, INSUFFICIENT) {
-        return InlineResultKind::Insufficient;
-    }
-    if !has(&norm, INLINE_CHECK) {
-        return InlineResultKind::Other;
-    }
-    let money = title
-        .and_then(|t| amount::parse_money(t, platform))
-        .or_else(|| description.and_then(|d| amount::parse_money(d, platform)));
-    match money {
-        Some((amount, asset)) => InlineResultKind::Check { amount, asset },
-        None => InlineResultKind::Other,
-    }
 }
 
 /// Ответ меню чеков на введённую сумму.
@@ -327,12 +277,16 @@ pub fn read_invoice_card(
     button_texts: &[String],
 ) -> replies::InvoiceCard {
     use replies::{InvoiceCard, InvoiceStatus};
+    // Многоразовый счёт не оплачиваем (SPEC §4: при неясном исходе повтор — двойная оплата).
+    // В живой записи такого счёта нет: признак — слово «многоразовый» / «мульти-счёт» на
+    // экране, если бот его пишет (docs/RECORDING.md, шаг «многоразовый счёт»).
+    let multi = has(&normalize(text), replies::MULTI_USE);
     let active = |number, amount, fiat| InvoiceCard {
         status: InvoiceStatus::Active,
         number,
         amount,
         fiat,
-        single_use: Some(true),
+        single_use: Some(!multi),
         ..InvoiceCard::default()
     };
     match classify_invoice_screen(platform, text) {
@@ -394,13 +348,6 @@ pub fn is_asset_button(text: &str, asset: Asset) -> bool {
         .any(|token| codes.contains(&token))
 }
 
-/// Сумма к оплате на экране счёта после выбора валюты: строка «К оплате: 10 USDT».
-pub fn parse_amount_due(platform: Platform, text: &str) -> Option<(Decimal, Asset)> {
-    text.lines()
-        .filter(|line| has(&normalize(line), DUE_LABELS))
-        .find_map(|line| amount::parse_money(&links::blank_urls(line), platform))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -408,56 +355,6 @@ mod tests {
 
     const CB: Platform = Platform::CryptoBot;
     const XR: Platform = Platform::XRocket;
-
-    #[test]
-    fn inline_results_are_told_apart() {
-        assert_eq!(
-            classify_inline_result(
-                CB,
-                Some("Отправить 97.5 USDT"),
-                Some("Чек на 97.5 USDT. Доступно: 100 USDT")
-            ),
-            InlineResultKind::Check {
-                amount: dec!(97.5),
-                asset: Asset::Usdt
-            }
-        );
-        assert_eq!(
-            classify_inline_result(XR, Some("Чек на 0.5 TONCOIN"), None),
-            InlineResultKind::Check {
-                amount: dec!(0.5),
-                asset: Asset::Ton
-            }
-        );
-        assert_eq!(
-            classify_inline_result(CB, Some("Запросить 10 USDT"), Some("Счёт на 10 USDT")),
-            InlineResultKind::Invoice
-        );
-        assert_eq!(
-            classify_inline_result(
-                XR,
-                Some("Недостаточно средств"),
-                Some("Нужно 10 USDT, доступно 3 USDT")
-            ),
-            InlineResultKind::Insufficient
-        );
-        assert_eq!(
-            classify_inline_result(CB, Some("Send 5 USDT"), Some("Check for 5 USDT")),
-            InlineResultKind::Check {
-                amount: dec!(5),
-                asset: Asset::Usdt
-            }
-        );
-        // Без суммы или без слова «чек» — не выбираем.
-        assert_eq!(
-            classify_inline_result(CB, Some("Отправить чек"), None),
-            InlineResultKind::Other
-        );
-        assert_eq!(
-            classify_inline_result(CB, Some("10 USDT"), None),
-            InlineResultKind::Other
-        );
-    }
 
     #[test]
     fn check_creation_needs_word_and_single_link() {
@@ -513,20 +410,5 @@ mod tests {
         assert!(is_asset_button("TONCOIN", Asset::Ton));
         assert!(!is_asset_button("TONCOIN", Asset::Usdt));
         assert!(!is_asset_button("USDTX", Asset::Usdt));
-    }
-
-    #[test]
-    fn amount_due_is_taken_from_its_line() {
-        let screen = "🧾 Счёт IVAbCdEfGhIj\n\nСумма: $10.00\nОдноразовый счёт\n\n\
-                      К оплате: 10.05 USDT\nДоступно: 25 USDT";
-        assert_eq!(
-            parse_amount_due(CB, screen),
-            Some((dec!(10.05), Asset::Usdt))
-        );
-        assert_eq!(parse_amount_due(CB, "Сумма: 10 USDT"), None);
-        assert_eq!(
-            parse_amount_due(XR, "Amount due: 0.5 TONCOIN"),
-            Some((dec!(0.5), Asset::Ton))
-        );
     }
 }

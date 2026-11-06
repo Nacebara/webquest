@@ -371,7 +371,7 @@ fn affirmed(norm: &str, re: &Regex) -> bool {
     re.captures_iter(norm).any(|c| c.name("neg").is_none())
 }
 
-const MULTI_USE: &[&str] = &[
+pub(crate) const MULTI_USE: &[&str] = &[
     "многоразов",
     "multi",
     "reusable",

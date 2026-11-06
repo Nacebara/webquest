@@ -371,122 +371,7 @@ async fn bot_response_timeout_on_press_is_outcome_unknown() {
 }
 
 #[tokio::test]
-async fn inline_check_goes_to_saved_messages_with_the_given_random_id() {
-    let fake = fake(|req| {
-        if let Some(q) = req.parse::<tl::functions::messages::GetInlineBotResults>() {
-            assert_eq!(q.peer, tl::enums::InputPeer::PeerSelf);
-            let send_message: tl::enums::BotInlineMessage = tl::types::BotInlineMessageText {
-                no_webpage: false,
-                invert_media: false,
-                message: "Чек на 10 USDT".into(),
-                entities: None,
-                reply_markup: None,
-            }
-            .into();
-            let results: tl::enums::messages::BotResults = tl::types::messages::BotResults {
-                gallery: false,
-                query_id: 555,
-                next_offset: None,
-                switch_pm: None,
-                switch_webview: None,
-                results: vec![
-                    tl::types::BotInlineResult {
-                        id: "usdt-10".into(),
-                        r#type: "article".into(),
-                        title: Some("Отправить 10 USDT".into()),
-                        description: None,
-                        url: None,
-                        thumb: None,
-                        content: None,
-                        send_message,
-                    }
-                    .into(),
-                ],
-                cache_time: 0,
-                users: Vec::new(),
-            }
-            .into();
-            return Some(Reply::ok(&results));
-        }
-        let s = req.parse::<tl::functions::messages::SendInlineBotResult>()?;
-        let mut msg = message(90, SELF_ID, true, "🦋 Чек на 10 USDT");
-        msg.via_bot_id = Some(CB);
-        msg.reply_markup = Some(inline_markup(vec![vec![url_button(
-            "Получить 10 USDT",
-            "https://t.me/send?start=CQAbCdEfGhIj",
-        )]]));
-        Some(Reply::ok(&updates(vec![
-            tl::types::UpdateMessageId {
-                id: 90,
-                random_id: s.random_id,
-            }
-            .into(),
-            new_message(msg, START_PTS + 60),
-        ])))
-    })
-    .await;
-    let transport = connect(&fake).await;
-
-    let results = transport
-        .inline_query(Platform::CryptoBot, "10usdt")
-        .await
-        .unwrap();
-    assert_eq!(results.query_id, 555);
-    assert_eq!(results.results[0].id, "usdt-10");
-
-    let unknown = transport
-        .send_inline(
-            Chat::SavedMessages,
-            Platform::CryptoBot,
-            &results,
-            "nope",
-            1,
-        )
-        .await;
-    assert!(matches!(unknown, Err(TransportError::Other(_))));
-    assert_eq!(
-        fake.count::<tl::functions::messages::SendInlineBotResult>(),
-        0
-    );
-
-    let sent = transport
-        .send_inline(
-            Chat::SavedMessages,
-            Platform::CryptoBot,
-            &results,
-            "usdt-10",
-            4242,
-        )
-        .await
-        .unwrap();
-    assert_eq!(sent.chat, Chat::SavedMessages);
-    assert_eq!(sent.id, 90);
-    assert_eq!(sent.via_bot, Some(Platform::CryptoBot));
-    assert_eq!(
-        sent.button_urls(),
-        vec!["https://t.me/send?start=CQAbCdEfGhIj".to_owned()]
-    );
-
-    let requests = fake.parsed::<tl::functions::messages::SendInlineBotResult>();
-    assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].random_id, 4242);
-    assert_eq!(requests[0].query_id, 555);
-    assert_eq!(requests[0].id, "usdt-10");
-    assert_eq!(requests[0].peer, tl::enums::InputPeer::PeerSelf);
-    let queries = fake.parsed::<tl::functions::messages::GetInlineBotResults>();
-    assert_eq!(
-        queries[0].bot,
-        tl::types::InputUser {
-            user_id: CB,
-            access_hash: CB_HASH
-        }
-        .into()
-    );
-    transport.shutdown().await;
-}
-
-#[tokio::test]
-async fn history_and_webapp_buttons() {
+async fn history_window_and_webapp_buttons() {
     let fake = fake(|req| {
         if req.is::<tl::functions::messages::GetHistory>() {
             let mut card = message(31, CB, false, "Счёт на 5 USDT");
@@ -511,17 +396,7 @@ async fn history_and_webapp_buttons() {
             .into();
             return Some(Reply::ok(&messages));
         }
-        let web: tl::enums::WebViewResult = tl::types::WebViewResultUrl {
-            fullsize: false,
-            fullscreen: false,
-            same_origin: false,
-            query_id: None,
-            url: "https://app.send.tg/#tgWebAppData=signed".into(),
-        }
-        .into();
-        (req.is::<tl::functions::messages::RequestSimpleWebView>()
-            || req.is::<tl::functions::messages::RequestWebView>())
-        .then(|| Reply::ok(&web))
+        None
     })
     .await;
     let transport = connect(&fake).await;
@@ -542,36 +417,6 @@ async fn history_and_webapp_buttons() {
         (30, -20, 20, 29)
     );
 
-    // Кнопка была SimpleWebView — значит requestSimpleWebView.
-    let url = transport
-        .open_webapp(Platform::CryptoBot, "https://app.send.tg/pay/simple")
-        .await
-        .unwrap();
-    assert_eq!(url, "https://app.send.tg/#tgWebAppData=signed");
-    assert_eq!(
-        fake.count::<tl::functions::messages::RequestSimpleWebView>(),
-        1
-    );
-    // Неизвестная кнопка — requestWebView с peer бота.
-    transport
-        .open_webapp(Platform::CryptoBot, "https://app.send.tg/other")
-        .await
-        .unwrap();
-    let web = &fake.parsed::<tl::functions::messages::RequestWebView>()[0];
-    assert_eq!(web.url.as_deref(), Some("https://app.send.tg/other"));
-    assert_eq!(
-        web.peer,
-        tl::types::InputPeerUser {
-            user_id: CB,
-            access_hash: CB_HASH
-        }
-        .into()
-    );
-    // Мини-приложение чужого бота не открываем.
-    let foreign = transport
-        .open_webapp(Platform::CryptoBot, "https://t.me/evil_bot/app?startapp=x")
-        .await;
-    assert!(matches!(foreign, Err(TransportError::Other(_))));
     transport.shutdown().await;
 }
 

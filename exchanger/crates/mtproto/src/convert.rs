@@ -14,9 +14,7 @@
 
 use domain::Platform;
 use grammers_tl_types as tl;
-use userbot::transport::{
-    ButtonKind, CallbackAnswer, Chat, InlineResult, InlineResults, RawButton, RawMessage,
-};
+use userbot::transport::{ButtonKind, CallbackAnswer, Chat, RawButton, RawMessage};
 
 use crate::config::{PinnedBot, PinnedBots};
 
@@ -64,15 +62,6 @@ impl ChatContext {
     }
 }
 
-/// Тип кнопки мини-приложения: от него зависит метод `requestWebView` / `requestSimpleWebView`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum WebAppKind {
-    /// `keyboardButtonWebView` → `messages.requestWebView` (peer = бот).
-    WebView,
-    /// `keyboardButtonSimpleWebView` → `messages.requestSimpleWebView`.
-    SimpleWebView,
-}
-
 /// Одна кнопка инлайн-клавиатуры.
 pub fn button_of(button: &tl::enums::KeyboardButton) -> RawButton {
     use tl::enums::KeyboardButton as B;
@@ -115,24 +104,6 @@ pub fn buttons_of(markup: Option<&tl::enums::ReplyMarkup>) -> Vec<Vec<RawButton>
             .collect(),
         _ => Vec::new(),
     }
-}
-
-/// Кнопки мини-приложений сообщения с их типом.
-pub fn webapp_buttons(markup: Option<&tl::enums::ReplyMarkup>) -> Vec<(String, WebAppKind)> {
-    let Some(tl::enums::ReplyMarkup::ReplyInlineMarkup(m)) = markup else {
-        return Vec::new();
-    };
-    m.rows
-        .iter()
-        .flat_map(|tl::enums::KeyboardButtonRow::Row(row)| row.buttons.iter())
-        .filter_map(|b| match b {
-            tl::enums::KeyboardButton::WebView(b) => Some((b.url.clone(), WebAppKind::WebView)),
-            tl::enums::KeyboardButton::SimpleWebView(b) => {
-                Some((b.url.clone(), WebAppKind::SimpleWebView))
-            }
-            _ => None,
-        })
-        .collect()
 }
 
 /// Подстрока по смещению и длине в единицах UTF-16 (как в `MessageEntity`).
@@ -182,21 +153,6 @@ pub fn update_to_raw(update: &tl::enums::Update, ctx: &ChatContext) -> Option<Ra
     match update {
         tl::enums::Update::NewMessage(u) => message_to_raw(&u.message, ctx),
         tl::enums::Update::EditMessage(u) => message_to_raw(&u.message, ctx),
-        _ => None,
-    }
-}
-
-/// Сырое сообщение апдейта (для запоминания кнопок мини-приложений).
-pub fn update_message(update: &tl::enums::Update) -> Option<&tl::types::Message> {
-    match update {
-        tl::enums::Update::NewMessage(tl::types::UpdateNewMessage {
-            message: tl::enums::Message::Message(m),
-            ..
-        })
-        | tl::enums::Update::EditMessage(tl::types::UpdateEditMessage {
-            message: tl::enums::Message::Message(m),
-            ..
-        }) => Some(m),
         _ => None,
     }
 }
@@ -302,30 +258,6 @@ pub fn sent_text_message(
     }
 }
 
-/// Результаты инлайн-запроса.
-pub fn inline_results(results: &tl::enums::messages::BotResults) -> InlineResults {
-    let tl::enums::messages::BotResults::Results(r) = results;
-    InlineResults {
-        query_id: r.query_id,
-        results: r
-            .results
-            .iter()
-            .map(|res| match res {
-                tl::enums::BotInlineResult::Result(b) => InlineResult {
-                    id: b.id.clone(),
-                    title: b.title.clone(),
-                    description: b.description.clone(),
-                },
-                tl::enums::BotInlineResult::BotInlineMediaResult(b) => InlineResult {
-                    id: b.id.clone(),
-                    title: b.title.clone(),
-                    description: b.description.clone(),
-                },
-            })
-            .collect(),
-    }
-}
-
 pub fn callback_answer(answer: &tl::enums::messages::BotCallbackAnswer) -> CallbackAnswer {
     let tl::enums::messages::BotCallbackAnswer::Answer(a) = answer;
     CallbackAnswer {
@@ -333,11 +265,6 @@ pub fn callback_answer(answer: &tl::enums::messages::BotCallbackAnswer) -> Callb
         alert: a.alert,
         url: a.url.clone(),
     }
-}
-
-pub fn webview_url(result: &tl::enums::WebViewResult) -> String {
-    let tl::enums::WebViewResult::Url(u) = result;
-    u.url.clone()
 }
 
 /// Сообщения из ответа `getHistory` / `getMessages`.
@@ -649,19 +576,6 @@ pub(crate) mod tests {
                 ],
             ]
         );
-        assert_eq!(
-            webapp_buttons(Some(&markup)),
-            vec![
-                (
-                    "https://app.send.tg/invoices/IVabc".to_owned(),
-                    WebAppKind::WebView
-                ),
-                (
-                    "https://app.send.tg/wallet".to_owned(),
-                    WebAppKind::SimpleWebView
-                ),
-            ]
-        );
     }
 
     #[test]
@@ -845,7 +759,6 @@ pub(crate) mod tests {
         .into();
         let raw = update_to_raw(&update, &ctx()).unwrap();
         assert_eq!(raw.edit_date, Some(1_760_000_009));
-        assert!(update_message(&update).is_some());
 
         let other: tl::enums::Update = tl::types::UpdateMessageId {
             id: 1,
@@ -1003,67 +916,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn inline_results_and_answers() {
-        let send_message: tl::enums::BotInlineMessage = tl::types::BotInlineMessageText {
-            no_webpage: false,
-            invert_media: false,
-            message: "Чек на 10 USDT".into(),
-            entities: None,
-            reply_markup: None,
-        }
-        .into();
-        let results: tl::enums::messages::BotResults = tl::types::messages::BotResults {
-            gallery: false,
-            query_id: 987_654_321,
-            next_offset: None,
-            switch_pm: None,
-            switch_webview: None,
-            results: vec![
-                tl::types::BotInlineResult {
-                    id: "usdt".into(),
-                    r#type: "article".into(),
-                    title: Some("Отправить 10 USDT".into()),
-                    description: Some("Чек".into()),
-                    url: None,
-                    thumb: None,
-                    content: None,
-                    send_message: send_message.clone(),
-                }
-                .into(),
-                tl::types::BotInlineMediaResult {
-                    id: "ton".into(),
-                    r#type: "photo".into(),
-                    photo: None,
-                    document: None,
-                    title: None,
-                    description: None,
-                    send_message,
-                }
-                .into(),
-            ],
-            cache_time: 0,
-            users: Vec::new(),
-        }
-        .into();
-        let results = tl::enums::messages::BotResults::from_bytes(&results.to_bytes()).unwrap();
-        let mapped = inline_results(&results);
-        assert_eq!(mapped.query_id, 987_654_321);
-        assert_eq!(
-            mapped.results,
-            vec![
-                InlineResult {
-                    id: "usdt".into(),
-                    title: Some("Отправить 10 USDT".into()),
-                    description: Some("Чек".into())
-                },
-                InlineResult {
-                    id: "ton".into(),
-                    title: None,
-                    description: None
-                },
-            ]
-        );
-
+    fn callback_answers() {
         let answer: tl::enums::messages::BotCallbackAnswer =
             tl::types::messages::BotCallbackAnswer {
                 alert: true,
@@ -1082,15 +935,6 @@ pub(crate) mod tests {
                 url: None
             }
         );
-        let web: tl::enums::WebViewResult = tl::types::WebViewResultUrl {
-            fullsize: false,
-            fullscreen: false,
-            same_origin: false,
-            query_id: Some(1),
-            url: "https://app.send.tg/#tgWebAppData=x".into(),
-        }
-        .into();
-        assert_eq!(webview_url(&web), "https://app.send.tg/#tgWebAppData=x");
     }
 
     #[test]

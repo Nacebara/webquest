@@ -13,4 +13,4 @@ pub use links::{LinkError, LinkKind, WalletLink};
 pub use replies::{
     ActivationReply, BalanceLine, CreatedCheck, InvoiceCard, InvoicePayReply, InvoiceStatus,
 };
-pub use screens::{CheckCreationReply, InlineResultKind};
+pub use screens::{CheckCreationReply, InvoiceScreen};
