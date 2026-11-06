@@ -40,6 +40,20 @@ impl SessionKey {
         }
     }
 
+    /// Случайный ключ на время одного процесса (`exch listen`): сессия живёт только в памяти,
+    /// на диск не пишется, ключ нигде не хранится.
+    pub fn ephemeral() -> Result<Self, CryptoError> {
+        let generated = chacha20poly1305::Key::try_generate().map_err(|_| CryptoError::Random)?;
+        let mut bytes = Zeroizing::new([0u8; 32]);
+        bytes.copy_from_slice(generated.as_slice());
+        Ok(Self::from_bytes(0, &bytes))
+    }
+
+    /// Второй экземпляр того же ключа: `login` и `GrammersTransport::connect` забирают свой.
+    pub fn duplicate(&self) -> Self {
+        Self::from_bytes(self.version, self.key.expose_secret())
+    }
+
     pub fn version(&self) -> i16 {
         self.version
     }

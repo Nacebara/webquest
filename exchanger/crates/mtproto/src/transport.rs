@@ -533,6 +533,15 @@ impl GrammersTransport {
         self.shared.conn.borrow().is_some()
     }
 
+    /// Выйти из аккаунта (`auth.logOut`): Telegram удаляет эту сессию у себя, в «Устройствах»
+    /// её больше нет. Для `exch listen`, где сессия живёт только в памяти. После вызова все
+    /// запросы — `NotAuthorized`.
+    pub async fn log_out(&self) -> Result<(), TransportError> {
+        self.call(Lane::Read, &tl::functions::auth::LogOut {}, "auth.logOut")
+            .await
+            .map(|_| ())
+    }
+
     /// Остановить соединение и сохранить сессию.
     pub async fn shutdown(&self) {
         self.shared.cancel.cancel();

@@ -305,6 +305,25 @@ async fn check_password(
 #[derive(Debug, Default)]
 pub struct TerminalPrompt;
 
+/// Спросить строку в терминале (ввод виден). Для `exch listen`: `api_id`.
+pub async fn ask(prompt: &'static str) -> Result<SecretString, LoginError> {
+    read_line(prompt).await
+}
+
+/// Спросить строку без эха (ввод не виден). Для `exch listen`: `api_hash`.
+pub async fn ask_hidden(prompt: &'static str) -> Result<SecretString, LoginError> {
+    tokio::task::spawn_blocking(move || {
+        rpassword::prompt_password(prompt)
+            .map(|p| {
+                let p = Zeroizing::new(p);
+                SecretString::from(p.trim().to_owned())
+            })
+            .map_err(|e| LoginError::Prompt(e.to_string()))
+    })
+    .await
+    .map_err(|e| LoginError::Prompt(e.to_string()))?
+}
+
 async fn read_line(prompt: &'static str) -> Result<SecretString, LoginError> {
     tokio::task::spawn_blocking(move || {
         use std::io::Write as _;

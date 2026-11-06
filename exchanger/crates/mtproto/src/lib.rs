@@ -104,6 +104,8 @@ pub mod transport;
 
 pub use config::{DeviceInfo, MtprotoConfig, PinnedBot, PinnedBots, Timeouts};
 pub use crypto::{CryptoError, SealedSession, SessionKey, open, seal};
-pub use login::{LoginError, LoginOutcome, LoginPrompt, TerminalPrompt, login, mask_phone};
+pub use login::{
+    LoginError, LoginOutcome, LoginPrompt, TerminalPrompt, ask, ask_hidden, login, mask_phone,
+};
 pub use session::{EncryptedSession, MemoryStore, SessionStore, StoreError};
 pub use transport::{ConnectError, GrammersTransport};

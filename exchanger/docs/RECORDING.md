@@ -34,14 +34,38 @@
 3. **Второй аккаунт** — ваш основной или знакомого. С него создаются чеки и счета для тестового.
 4. **CryptoBot → «Безопасность» → «Лимит без код-пароля».** Запишите, сколько стоит. Для теста
    хватит $500 по умолчанию.
-5. **Сервер:** `.env` с `DATABASE_URL`, `TG_API_ID`, `TG_API_HASH`, `SESSION_KEY`, затем
-   ```bash
-   exch migrate
-   exch login --label test-1 --platform cryptobot   # номер, код из Telegram, облачный пароль — в терминале
-   exch login --label test-1 --platform xrocket     # та же сессия, без кода
-   ```
+5. **Где запускать** — на ноутбуке (проще) или на сервере.
+
+## Запуск на ноутбуке: `exch listen`
+
+Без базы данных и без сервера. Вход — прямо в терминале. Сессия живёт только в памяти под
+случайным ключом этого запуска. На выходе слушатель сам выходит из аккаунта (`auth.logOut`),
+и в «Устройствах» сессии не остаётся.
+
+```powershell
+.\exch.exe listen                     # спросит api_id, api_hash, телефон, код, облачный пароль
+.\exch.exe listen --out rec.jsonl --history 300
+```
+
+`api_id` и `api_hash` берутся из `TG_API_ID` и `TG_API_HASH`: из окружения или из файла `.env`
+рядом. Если их нет, слушатель спросит, а `api_hash` вводится без эха. Сборка под Windows —
+`cargo build --release --target x86_64-pc-windows-gnu --bin exch` (MinGW, `SQLX_OFFLINE=true`).
+Нужны только системные библиотеки Windows. Готовый архив с `README.txt` для владельца
+собирается из `target/x86_64-pc-windows-gnu/release/exch.exe`.
+
+## Запуск на сервере: `exch record`
+
+`.env` с `DATABASE_URL`, `TG_API_ID`, `TG_API_HASH`, `SESSION_KEY`, затем:
+
+```bash
+exch migrate
+exch login --label test-1 --platform cryptobot   # номер, код из Telegram, облачный пароль — в терминале
+exch login --label test-1 --platform xrocket     # та же сессия, без кода
+```
 
 ## Запись
+
+На сервере (на ноутбуке запись начинается сама после входа в `exch listen`):
 
 ```bash
 exch record --label test-1 --out ~/rec-test-1.jsonl --history 300

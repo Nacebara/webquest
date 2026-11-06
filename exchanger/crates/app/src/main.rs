@@ -60,6 +60,17 @@ enum Command {
         #[arg(long, default_value_t = 0)]
         history: u32,
     },
+    /// Слушатель для ноутбука (docs/RECORDING.md): войти в тестовый аккаунт прямо здесь и
+    /// записывать ответы @send и @xrocket в файл. Без базы данных; сессия только в памяти, на
+    /// выходе — выход из аккаунта. Ничего не отправляет. Нужны TG_API_ID и TG_API_HASH (или ввод).
+    Listen {
+        /// Куда писать (JSON lines).
+        #[arg(long, default_value = "exch-record.jsonl")]
+        out: PathBuf,
+        /// Сначала записать столько последних сообщений каждого чата.
+        #[arg(long, default_value_t = 300)]
+        history: u32,
+    },
 }
 
 fn parse_platform(s: &str) -> Result<domain::Platform, String> {
@@ -81,7 +92,9 @@ fn main() -> ExitCode {
             let _ = dotenvy::dotenv();
         }
     }
-    init_tracing();
+    // У слушателя на ноутбуке вывод для человека: короткие строки, только предупреждения.
+    let human = matches!(cli.command, Command::Listen { .. });
+    init_tracing(human);
 
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -104,10 +117,15 @@ fn main() -> ExitCode {
                 out,
                 history,
             } => record(label, out, history).await,
+            Command::Listen { out, history } => listen(out, history).await,
         }
     });
     match result {
         Ok(()) => ExitCode::SUCCESS,
+        Err(e) if human => {
+            eprintln!("Ошибка: {e:#}");
+            ExitCode::FAILURE
+        }
         Err(e) => {
             tracing::error!(error = format!("{e:#}"), "exch stopped with an error");
             ExitCode::FAILURE
@@ -115,13 +133,27 @@ fn main() -> ExitCode {
     }
 }
 
-fn init_tracing() {
+fn init_tracing(human: bool) {
+    if human {
+        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
+        tracing_subscriber::fmt()
+            .compact()
+            .with_target(false)
+            .with_env_filter(filter)
+            .with_writer(std::io::stderr)
+            .init();
+        return;
+    }
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     tracing_subscriber::fmt()
         .json()
         .with_env_filter(filter)
         .with_current_span(true)
         .init();
+}
+
+async fn listen(out: PathBuf, history: u32) -> anyhow::Result<()> {
+    app::listen::run(&out, history).await
 }
 
 fn load_config() -> anyhow::Result<Config> {
