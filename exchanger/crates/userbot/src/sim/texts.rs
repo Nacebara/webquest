@@ -464,8 +464,23 @@ pub fn invoice_not_found(platform: Platform) -> &'static str {
 
 /// Синтетика.
 pub const INVOICE_EXPIRED: &str = "Срок действия счёта истёк.";
-/// Синтетика: пометка многоразового счёта на первом экране (живого текста ещё нет).
+/// Синтетика: пометка многоразового счёта xRocket на первом экране (живого текста ещё нет).
 pub const MULTI_USE_MARK: &str = "\n\nМногоразовый счёт.";
+
+/// Многоразовый счёт CryptoBot: сумму выбирает плательщик (живая запись, второй проход).
+pub fn cb_invoice_open_amount(
+    min: &Money,
+    min_usd: Decimal,
+    balance: &Money,
+    bal_usd: Decimal,
+) -> String {
+    format!(
+        "Пришлите сумму {} для оплаты счёта.\n\nМинимум: {}\nВаш баланс: {}",
+        min.asset().platform_code(Platform::CryptoBot),
+        bare(Platform::CryptoBot, min, min_usd),
+        bare(Platform::CryptoBot, balance, bal_usd)
+    )
+}
 /// Синтетика.
 pub const INVOICE_OWN: &str = "Нельзя оплатить собственный счёт.";
 

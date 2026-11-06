@@ -105,10 +105,15 @@ fn outcome(reply: ActivationReply, raw: RawMessage) -> ActivationOutcome {
         ActivationReply::PremiumOnly => rejected(RejectReason::PremiumOnly),
         // xRocket «уже активирован вами»: чек открыл этот аккаунт раньше (прошлая попытка,
         // ответ на которую потерялся). Деньги у нас, но этим ответом не подтверждены — сверка.
+        // Чек в чужой монете: деньги у нас, но обменять их нельзя — заявка человеку, без паузы.
+        ActivationReply::ReceivedOther { amount, code } => {
+            ActivationOutcome::ReceivedOther { amount, code }
+        }
         ActivationReply::AlreadyActivatedByUs
         | ActivationReply::InProgress
         | ActivationReply::ClaimNotice
         | ActivationReply::IncomingTransfer { .. }
+        | ActivationReply::IncomingTransferOther
         | ActivationReply::Unknown => ActivationOutcome::Unknown { raw: Some(raw) },
     }
 }

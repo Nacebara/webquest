@@ -47,6 +47,7 @@ def scramble_digits(m):
 # магазин в подтверждении xRocket, профиль в настройках.
 NAME_RULES = [
     (re.compile(r'^(🦋 )?⁨?.*?⁩?(?= активировал\(а\) ваш чек)', re.M), lambda m: (m.group(1) or '') + '⁨Ivan⁩'),
+    (re.compile(r'^⁨?.*?⁩?(?= оплатил\(а\) ваш сч)', re.M), '⁨Ivan⁩'),
     (re.compile(r'(Получатель: ).*'), r'\1Shop'),
     (re.compile(r'(\) от ).+?(\.?)$', re.M), r'\1Shop\2'),
     (re.compile(r'(оплатили счёт )(?!#)(?!на сумму).+?( на сумму)'), r'\1Shop\2'),

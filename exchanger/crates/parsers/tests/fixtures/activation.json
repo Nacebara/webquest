@@ -56,7 +56,7 @@
     { "platform": "cryptobot", "text": "что-то новое", "class": "unknown" },
     { "platform": "cryptobot", "text": "", "class": "unknown" },
     { "platform": "cryptobot", "text": "Вы получили подарок", "class": "unknown" },
-    { "platform": "cryptobot", "text": "Вы получили 0.001 BTC", "class": "unknown" },
+    { "platform": "cryptobot", "text": "Вы получили 0.001 BTC", "class": "received_other", "amount": "0.001", "asset": "BTC" },
     { "platform": "cryptobot", "text": "Вы получили 1,234 TON", "class": "unknown" },
     { "platform": "cryptobot", "text": "Вы получили перевод от @x", "class": "unknown" }
   ]

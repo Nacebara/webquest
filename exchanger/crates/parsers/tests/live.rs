@@ -1,4 +1,4 @@
-//! Живые ответы @send и @xrocket (запись владельца 6 ноября 2026, `fixtures/live_wallet_replies.json`).
+//! Живые ответы @send и @xrocket (две записи владельца 6 ноября 2026, `fixtures/live_wallet_replies.json`).
 //! Смысл каждого ответа размечен по значению; тест проверяет, что парсеры понимают его так же.
 //! Все расхождения печатаются разом.
 
@@ -42,6 +42,12 @@ fn opt_str(v: &Value) -> Option<String> {
 
 fn expected_activation(e: &Value) -> ActivationReply {
     if let Some(list) = e.as_array() {
+        if list[0] == "received_other" {
+            return ActivationReply::ReceivedOther {
+                amount: dec(&list[1]),
+                code: list[2].as_str().unwrap().to_owned(),
+            };
+        }
         let (amount, asset) = money(&list[1..]).unwrap();
         return match list[0].as_str().unwrap() {
             "received" => ActivationReply::Received { amount, asset },
@@ -55,6 +61,7 @@ fn expected_activation(e: &Value) -> ActivationReply {
         "already_activated" => ActivationReply::AlreadyActivated,
         "already_activated_by_us" => ActivationReply::AlreadyActivatedByUs,
         "not_for_you" => ActivationReply::NotForYou,
+        "incoming_transfer_other" => ActivationReply::IncomingTransferOther,
         "not_found" => ActivationReply::NotFound,
         "unknown" => ActivationReply::Unknown,
         other => panic!("unknown activation {other}"),
@@ -140,18 +147,27 @@ fn live_wallet_replies() {
                     .as_array()
                     .map(|f| (dec(&f[0]), f[1].as_str().unwrap().to_owned()));
                 let amount = e["amount"].as_array().and_then(|a| money(a));
+                // Разовость проверяем там, где она размечена (многоразовый счёт — `false`).
+                let single = e["single_use"].as_bool();
+                let got_single = single.and(card.single_use);
                 (
                     format!(
-                        "{:?} {:?} {:?} {:?} {}",
-                        card.status, card.number, card.fiat, card.amount, card.insufficient_funds
+                        "{:?} {:?} {:?} {:?} {} {:?}",
+                        card.status,
+                        card.number,
+                        card.fiat,
+                        card.amount,
+                        card.insufficient_funds,
+                        got_single
                     ),
                     format!(
-                        "{:?} {:?} {:?} {:?} {}",
+                        "{:?} {:?} {:?} {:?} {} {:?}",
                         status,
                         opt_str(&e["number"]),
                         fiat,
                         amount,
-                        e["insufficient_funds"].as_bool().unwrap()
+                        e["insufficient_funds"].as_bool().unwrap(),
+                        single
                     ),
                 )
             }

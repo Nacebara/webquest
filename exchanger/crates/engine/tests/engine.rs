@@ -238,6 +238,34 @@ async fn wallet_short_of_funds_goes_to_a_human_and_pauses_the_direction(pool: Pg
     assert_eq!(e.ledger("liability:payable:USDT").await, dec!(-100));
 }
 
+/// Клиент прислал чек xRocket в другой монете (живой ответ: «💰 Вы успешно получили 3 XROCK
+/// (0.09$).»). Монеты в кошельке, обменять их нельзя: заявка человеку, выплаты нет, и это
+/// знакомый ответ — направление не встаёт на паузу.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn check_in_another_coin_goes_to_a_human_without_pausing(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(XR, usdt(dec!(3))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::UnknownReply("💰 Вы успешно получили 3\u{a0}XROCK (0.09$).".to_owned()),
+        1,
+    );
+    e.drain().await;
+    let (order, d) = e.order(order.id).await;
+    assert_eq!(order.state, OrderState::ManualReview);
+    let reason = d.manual_reason.unwrap();
+    assert!(reason.contains("XROCK"), "{reason}");
+    assert!(e.world.checks_created_by(e.ub).is_empty(), "выплаты нет");
+    let mut conn = e.pool.acquire().await.unwrap();
+    let dir = storage::directions::get(&mut conn, Direction::XrToCbCheck)
+        .await
+        .unwrap();
+    assert!(!dir.auto_paused, "знакомый ответ — не пауза");
+    assert_eq!(e.ledger("liability:payable:USDT").await, dec!(0));
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn flood_wait_postpones_without_spending_an_attempt(pool: PgPool) {
     let e = env(pool).await;

@@ -44,8 +44,14 @@ for m in msgs:
     # ---- активация и всё, что может прийти, пока ждём ответа на /start <чек> ----
     if re.search(r'получение .*usdt', low):
         add('activation', m, 'in_progress')
-    elif 'активировал(а) ваш чек' in low:
+    elif 'активировал(а) ваш чек' in low or 'оплатил(а) ваш сч' in low:
         add('activation', m, 'claim_notice')
+    elif re.search(r'вы (успешно )?получили', low) and ' от ' in low and not money(t):
+        # Перевод в другой монете — посторонний ответ, как и перевод в USDT.
+        add('activation', m, 'incoming_transfer_other')
+    elif re.search(r'вы (успешно )?получили', low) and not money(t):
+        other = re.search(r'(\d[\d.,]*)\s*([A-Z]{2,10})\b', t)
+        add('activation', m, ['received_other', num(other.group(1)), other.group(2)])
     elif re.search(r'вы (успешно )?получили', low) and ' от ' in low:
         add('activation', m, ['incoming_transfer'] + money(t))
     elif re.search(r'вы (успешно )?получили', low):
@@ -65,9 +71,12 @@ for m in msgs:
         add('invoice_screen', m, 'progress')
     elif 'выберите монету для оплаты' in low:
         add('invoice_screen', m, ['choose_coin', re.search(r'#(IV\d+)', t).group(1)])
+        fiat = re.search(r'\$\s*([\d.]+)', first)
+        coin = re.search(r'USDT\s*·\s*([\d.]+)\s+USDT', ' '.join(b['text'] for r in m['buttons'] for b in r))
+        # Многоразовый счёт без суммы: монеты без сумм, дальше — «Пришлите сумму…».
         add('invoice_card', m, {'status': 'active', 'number': re.search(r'#(IV\d+)', t).group(1),
-            'fiat': [re.search(r'\$\s*([\d.]+)', first).group(1), 'USD'],
-            'amount': [re.search(r'USDT\s*·\s*([\d.]+)\s+USDT', ' '.join(b['text'] for r in m['buttons'] for b in r)).group(1), 'USDT'],
+            'fiat': [fiat.group(1), 'USD'] if fiat else None,
+            'amount': [coin.group(1), 'USDT'] if coin else None,
             'insufficient_funds': False})
     elif 'подтвердите оплату счёта' in low:
         add('invoice_screen', m, ['confirm', re.search(r'#(IV\d+)', t).group(1)] + money(t, 'Отправляете'))
@@ -86,6 +95,8 @@ for m in msgs:
             'amount': money(t, 'Сумма:'), 'insufficient_funds': False})
     elif 'пришлите сумму usdt для оплаты счёта' in low:
         add('invoice_screen', m, 'open_amount')
+        add('invoice_card', m, {'status': 'active', 'number': None, 'fiat': None, 'amount': None,
+            'insufficient_funds': False, 'single_use': False})
     elif re.search(r'вы (успешно )?оплатили сч', low):
         nm = re.search(r'#(IV\d+)', t)
         amt = money(t)
@@ -94,7 +105,10 @@ for m in msgs:
         add('invoice_screen', m, 'already_paid')
         add('invoice_card', m, {'status': 'paid', 'number': None, 'fiat': None, 'amount': None, 'insufficient_funds': False})
     # ---- меню чеков ----
-    if 'скопируйте ссылку' in low or 'ссылка на чек' in low:
+    if 'поделиться счётом' in low:
+        # Экран созданного счёта похож на экран чека («Скопируйте ссылку…»), но это не чек.
+        add('check_creation', m, 'unknown')
+    elif 'скопируйте ссылку' in low or 'ссылка на чек' in low:
         link = re.search(r'(?:t\.me/send\?start=(CQ\w{10})|t\.me/xrocket\?start=(t_[\w-]{15}))', t)
         param = link.group(1) or link.group(2)
         add('check_creation', m, ['created', param] + money(t, 'Сумма'))
@@ -120,7 +134,7 @@ for m in msgs:
             exp = [[tm.group(1), 'USDT', '0']]
         add('balance', m, exp)
 
-about = ('Живые ответы @send и @xrocket из записи владельца 6 ноября 2026 (exch listen). Коды чеков и '
+about = ('Живые ответы @send и @xrocket из записей владельца 6 ноября 2026 (exch listen, два прохода). Коды чеков и '
          'счетов перемешаны с сохранением формата, имена людей и магазинов заменены. Смысл каждого '
          'ответа размечен по значению. kind: activation | invoice_screen | invoice_card | '
          'check_creation | balance.')

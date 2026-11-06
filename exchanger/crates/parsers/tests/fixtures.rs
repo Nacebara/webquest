@@ -274,6 +274,10 @@ impl ActivationCase {
             "premium_only" => ActivationReply::PremiumOnly,
             "in_progress" => ActivationReply::InProgress,
             "claim_notice" => ActivationReply::ClaimNotice,
+            "received_other" => ActivationReply::ReceivedOther {
+                amount: dec(self.amount.as_deref().expect("amount for this class")),
+                code: self.asset.clone().expect("coin code for this class"),
+            },
             "unknown" => ActivationReply::Unknown,
             other => panic!("unknown activation class in fixture: {other}"),
         }

@@ -35,6 +35,12 @@ pub enum RejectReason {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActivationOutcome {
     Received(Money),
+    /// Чек в монете, которую сервис не принимает (XROCK, GRAM…): деньги в кошельке, вернуть
+    /// их может только человек.
+    ReceivedOther {
+        amount: domain::Decimal,
+        code: String,
+    },
     Rejected(RejectReason),
     /// Ответа нет или он незнакомый — сверка по балансу и истории.
     Unknown {

@@ -51,6 +51,14 @@ pub enum ActivationReply {
         amount: Decimal,
         asset: Asset,
     },
+    /// Чек в монете, которую сервис не принимает: xRocket «💰 Вы успешно получили 3 XROCK
+    /// (0.09$).». Деньги уже в кошельке — это не незнакомый ответ, а заявка для человека.
+    ReceivedOther {
+        amount: Decimal,
+        code: String,
+    },
+    /// Входящий перевод в другой монете — посторонний ответ, как [`Self::IncomingTransfer`].
+    IncomingTransferOther,
     Unknown,
 }
 
@@ -62,6 +70,7 @@ impl ActivationReply {
             ActivationReply::InProgress
                 | ActivationReply::ClaimNotice
                 | ActivationReply::IncomingTransfer { .. }
+                | ActivationReply::IncomingTransferOther
                 | ActivationReply::Unknown
         )
     }
@@ -199,6 +208,10 @@ const IN_PROGRESS: &[&str] = &[
 /// Уведомление создателю чека (lovec `replies.rs:96-99`; английский вариант — для
 /// `lang_code = "en"`, SPEC §1.3).
 const CLAIM_SUBJECT: &[&str] = &["ваш чек", "your check", "your cheque"];
+/// Создателю счёта: «Ivan оплатил(а) ваш счёт #IV…. Вы получили 🪙 0.01 USDT.» (живая запись
+/// CryptoBot) — похоже на выигрыш чека, но это уведомление.
+const INVOICE_NOTICE_SUBJECT: &[&str] = &["ваш счет", "ваш счёт", "your invoice"];
+const INVOICE_NOTICE_VERB: &[&str] = &["оплатил", "paid"];
 const CLAIM_VERB: &[&str] = &["активировал", "получил", "activated", "claimed", "received"];
 /// Отправитель во входящем переводе: «Вы получили 5 USDT от @x» (lovec AUDIT.md:82),
 /// «📥 Вы получили 🪙 4.77 USDT ($4.76) от Spins | Wins.» (живая запись CryptoBot: без `@`).
@@ -206,6 +219,26 @@ const FROM_SENDER: &[&str] = &["от @", "from @", "от пользовател�
 
 /// «… получили <сумма> … от <имя>» / «… received … from <name>»: имя отправителя после фразы
 /// получения. Победа по чеку («Вы получили 5 USDT ($4.99).») такого хвоста не имеет.
+/// Сумма в монете, которой нет в [`Asset`]: «3 XROCK», «0.5 GRAM» (первая такая пара).
+static OTHER_MONEY: LazyLock<Regex> = LazyLock::new(|| {
+    // Шаблон постоянный и покрыт тестами: ошибка здесь — ошибка сборки, а не данных.
+    #[allow(clippy::expect_used)]
+    Regex::new(r"(\d+(?:[.,]\d+)?)\s*([A-Z][A-Z0-9]{1,9})\b").expect("coin regex is valid")
+});
+
+fn other_money(text: &str) -> Option<(Decimal, String)> {
+    let blanked = links::blank_urls(text);
+    OTHER_MONEY.captures_iter(&blanked).find_map(|c| {
+        let code = c.get(2)?.as_str();
+        // Известные активы разбирает `amount::parse_money`; сюда попадает только чужая монета.
+        if code.parse::<Asset>().is_ok() || code == "USD" {
+            return None;
+        }
+        let amount: Decimal = c.get(1)?.as_str().replace(',', ".").parse().ok()?;
+        (amount > Decimal::ZERO).then(|| (amount, code.to_owned()))
+    })
+}
+
 static FROM_NAME: LazyLock<Regex> = LazyLock::new(|| {
     // Шаблон постоянный и покрыт тестами: ошибка здесь — ошибка сборки, а не данных.
     #[allow(clippy::expect_used)]
@@ -234,14 +267,17 @@ pub fn classify_activation(platform: Platform, text: &str) -> ActivationReply {
     if has(&t, WRONG_PASSWORD) {
         return ActivationReply::PasswordRequired;
     }
-    if has(&t, CLAIM_SUBJECT) && has(&t, CLAIM_VERB) {
+    if (has(&t, CLAIM_SUBJECT) && has(&t, CLAIM_VERB))
+        || (has(&t, INVOICE_NOTICE_SUBJECT) && has(&t, INVOICE_NOTICE_VERB))
+    {
         return ActivationReply::ClaimNotice;
     }
     let won = has(&t, WON);
     if won && (has(&t, FROM_SENDER) || FROM_NAME.is_match(&t)) {
-        return match money() {
-            Some((amount, asset)) => ActivationReply::IncomingTransfer { amount, asset },
-            None => ActivationReply::Unknown,
+        return match (money(), other_money(text)) {
+            (Some((amount, asset)), _) => ActivationReply::IncomingTransfer { amount, asset },
+            (None, Some(_)) => ActivationReply::IncomingTransferOther,
+            (None, None) => ActivationReply::Unknown,
         };
     }
     if has(&t, LOST_BY_US) {
@@ -253,9 +289,10 @@ pub fn classify_activation(platform: Platform, text: &str) -> ActivationReply {
     } else if has(&t, NOT_FOR_US) {
         ActivationReply::NotForYou
     } else if won {
-        match money() {
-            Some((amount, asset)) => ActivationReply::Received { amount, asset },
-            None => ActivationReply::Unknown,
+        match (money(), other_money(text)) {
+            (Some((amount, asset)), _) => ActivationReply::Received { amount, asset },
+            (None, Some((amount, code))) => ActivationReply::ReceivedOther { amount, code },
+            (None, None) => ActivationReply::Unknown,
         }
     } else if has(&t, INVALID) {
         ActivationReply::NotFound
@@ -760,7 +797,6 @@ mod tests {
     fn win_without_clear_amount_is_unknown() {
         for text in [
             "Вы получили подарок",
-            "Вы получили 0.001 BTC",
             "Вы получили 1,234 TON",
             "Вы получили $5.00",
         ] {
@@ -770,6 +806,20 @@ mod tests {
                 "{text}"
             );
         }
+        // Выигрыш в монете, которой нет в `Asset`, — свой класс (живая запись: «💰 Вы успешно
+        // получили 3 XROCK (0.09$).»): не зачисляется, заявка — человеку. Раньше это был
+        // `Unknown` с паузой направления: любой клиент ставил бы приём на паузу таким чеком.
+        assert_eq!(
+            classify_activation(CB, "Вы получили 0.001 BTC"),
+            ActivationReply::ReceivedOther {
+                amount: dec!(0.001),
+                code: "BTC".to_owned()
+            }
+        );
+        assert_eq!(
+            classify_activation(XR, "💰 Вы получили 3 XROCK от @x."),
+            ActivationReply::IncomingTransferOther
+        );
         // Реклама Premium рядом с выигрышем не превращает его в отказ.
         assert_eq!(
             classify_activation(CB, "Вы получили 3 USDT. Купите Telegram Premium в @send"),

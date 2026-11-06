@@ -386,6 +386,47 @@ impl Engine {
                 .await?
                 .0
             }
+            // Чек в монете, которую сервис не принимает: монеты уже в кошельке, в леджере их нет.
+            // Вернуть их может только человек; это знакомый ответ — направление не на паузу.
+            ActivationOutcome::ReceivedOther { amount, code } => {
+                storage::operations::finish(
+                    &mut tx,
+                    op.id,
+                    OpStatus::Succeeded,
+                    &json!({ "received_other": amount.to_string(), "code": code }),
+                    None,
+                    None,
+                )
+                .await?;
+                let (order, _) = transit(
+                    &mut tx,
+                    &order,
+                    Event::IntakeOutcomeUnknown,
+                    &OrderPatch::default(),
+                    None,
+                    cause,
+                )
+                .await?;
+                let reason = format!(
+                    "the client sent a check in {code}, not USDT: {amount} {code} is in the wallet and \
+                     not in the ledger; return it to the client by hand"
+                );
+                let patch = OrderPatch {
+                    manual_reason: Some(&reason),
+                    ..OrderPatch::default()
+                };
+                let (order, _) = transit(
+                    &mut tx,
+                    &order,
+                    Event::ReconciliationAmbiguous,
+                    &patch,
+                    Some(&reason),
+                    cause,
+                )
+                .await?;
+                tracing::warn!(op = op.id, %code, "check in an unsupported coin: order goes to a human");
+                order
+            }
             ActivationOutcome::Unknown { raw } => {
                 let unrecognised = raw.is_some();
                 let text = raw.map(|m| m.text);

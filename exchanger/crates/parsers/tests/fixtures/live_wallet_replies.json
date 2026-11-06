@@ -1,5 +1,5 @@
 {
- "about": "Живые ответы @send и @xrocket из записи владельца 6 ноября 2026 (exch listen). Коды чеков и счетов перемешаны с сохранением формата, имена людей и магазинов заменены. Смысл каждого ответа размечен по значению. kind: activation | invoice_screen | invoice_card | check_creation | balance.",
+ "about": "Живые ответы @send и @xrocket из записей владельца 6 ноября 2026 (exch listen, два прохода). Коды чеков и счетов перемешаны с сохранением формата, имена людей и магазинов заменены. Смысл каждого ответа размечен по значению. kind: activation | invoice_screen | invoice_card | check_creation | balance.",
  "cases": [
   {
    "kind": "activation",
@@ -298,6 +298,28 @@
    ],
    "urls": [],
    "expect": "open_amount"
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "cryptobot",
+   "text": "Пришлите сумму USDT для оплаты счёта.\n\nМинимум: 0.2 USDT ($0.20)\nВаш баланс: 4.78453 USDT ($4.78)",
+   "buttons": [
+    [
+     "Мин. · 0.2 USDT ($0.20)"
+    ],
+    [
+     "‹ Изменить монету"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": null,
+    "fiat": null,
+    "amount": null,
+    "insufficient_funds": false,
+    "single_use": false
+   }
   },
   {
    "kind": "invoice_screen",
@@ -2690,6 +2712,410 @@
    ],
    "urls": [],
    "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "Многоразовый счёт #IV42196070\n\nМин. сумма: не указана\n\nПолучено: 0 – 0 USDT\nОсталось: не указано\n\nЛюбой может оплатить этот счёт в USDT анонимно и добавить комментарий.\n\nСкопируйте ссылку, чтобы поделиться счётом:\nt.me/send?start=IVHZVAg8gwrM",
+   "buttons": [
+    [
+     "Поделиться счётом"
+    ],
+    [
+     "Показать QR-код"
+    ],
+    [
+     "Количество оплат",
+     "Мин. сумма"
+    ],
+    [
+     "Добавить картинку"
+    ],
+    [
+     "Уведомления",
+     "Разрешения"
+    ],
+    [
+     "Скрытое сообщение: Выкл."
+    ],
+    [
+     "Удалить счёт"
+    ],
+    [
+     "‹ Назад к списку счетов"
+    ]
+   ],
+   "urls": [
+    "t.me/send?start=IVHZVAg8gwrM"
+   ],
+   "expect": "unknown"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 3 XROCK (0.09$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received_other",
+    "3",
+    "XROCK"
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "​Здесь вы можете создать счёт для получения оплаты или сбора средств в криптовалюте. Смотрите видеоинструкцию ›\n\nПопробовать счета можно в @CryptoBotDonates.",
+   "buttons": [
+    [
+     "Создать счёт"
+    ],
+    [
+     "Создать из чата"
+    ],
+    [
+     "Активные счета · 21"
+    ],
+    [
+     "Неоплаченные счета · 29"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "Многоразовый счёт #IV02000126\n\nМин. сумма: не указана\n\nПолучено: 0 – 0 USDT\nОсталось: не указано\n\nЛюбой может оплатить этот счёт в USDT анонимно и добавить комментарий.\n\nСкопируйте ссылку, чтобы поделиться счётом:\nt.me/send?start=IV0toZRn9OEf",
+   "buttons": [
+    [
+     "Поделиться счётом"
+    ],
+    [
+     "Показать QR-код"
+    ],
+    [
+     "Количество оплат",
+     "Мин. сумма"
+    ],
+    [
+     "Добавить картинку"
+    ],
+    [
+     "Уведомления",
+     "Разрешения"
+    ],
+    [
+     "Скрытое сообщение: Выкл."
+    ],
+    [
+     "Удалить счёт"
+    ],
+    [
+     "‹ Назад к списку счетов"
+    ]
+   ],
+   "urls": [
+    "t.me/send?start=IV0toZRn9OEf"
+   ],
+   "expect": "unknown"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "Пришлите сумму USDT для оплаты счёта.\n\nМинимум: 0.01 USDT ($0.01)\nВаш баланс: 0.0472 USDT ($0.05)",
+   "buttons": [
+    [
+     "Мин. · 0.01 USDT ($0.01)"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "open_amount"
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "cryptobot",
+   "text": "Пришлите сумму USDT для оплаты счёта.\n\nМинимум: 0.01 USDT ($0.01)\nВаш баланс: 0.0472 USDT ($0.05)",
+   "buttons": [
+    [
+     "Мин. · 0.01 USDT ($0.01)"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": null,
+    "fiat": null,
+    "amount": null,
+    "insufficient_funds": false,
+    "single_use": false
+   }
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Подтвердите оплату счёта #IV02000126\n\nОтправляете: 0.01 USDT ($0.01)\n   \nВы уверены, что хотите оплатить этот счёт?",
+   "buttons": [
+    [
+     "💳 Оплатить 0.01 USDT"
+    ],
+    [
+     "Оплатить анонимно: Нет"
+    ],
+    [
+     "Добавить комментарий"
+    ],
+    [
+     "‹ Изменить сумму"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "confirm",
+    "IV02000126",
+    "0.01",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "⁨Ivan⁩ оплатил(а) ваш счёт #IV02000126. Вы получили 🪙 0.01 USDT.",
+   "buttons": [],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Вы оплатили счёт #IV02000126 на сумму 🪙 0.01 USDT.",
+   "buttons": [
+    [
+     "Оплатить ещё раз"
+    ]
+   ],
+   "urls": [
+    "http://t.me/CryptoBot?start=IVIe8pLpQnOp"
+   ],
+   "expect": [
+    "paid",
+    "IV02000126",
+    "0.01",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "​Здесь вы можете создать счёт для получения оплаты или сбора средств в криптовалюте. Смотрите видеоинструкцию ›\n\nПопробовать счета можно в @CryptoBotDonates.",
+   "buttons": [
+    [
+     "Создать счёт"
+    ],
+    [
+     "Создать из чата"
+    ],
+    [
+     "Активные счета · 22"
+    ],
+    [
+     "Неоплаченные счета · 29"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "Многоразовый счёт #IV02440453\n\nМин. сумма: не указана\n\nПолучено: 0 – $0\nОсталось: не указано\n\nЛюбой может оплатить этот счёт в USDC, USDT анонимно и добавить комментарий.\n\nСкопируйте ссылку, чтобы поделиться счётом:\nt.me/send?start=IVL5H5WvjlCP",
+   "buttons": [
+    [
+     "Поделиться счётом"
+    ],
+    [
+     "Показать QR-код"
+    ],
+    [
+     "Количество оплат",
+     "Мин. сумма"
+    ],
+    [
+     "Добавить картинку"
+    ],
+    [
+     "Уведомления",
+     "Разрешения"
+    ],
+    [
+     "Скрытое сообщение: Выкл."
+    ],
+    [
+     "Удалить счёт"
+    ],
+    [
+     "‹ Назад к списку счетов"
+    ]
+   ],
+   "urls": [
+    "t.me/send?start=IVL5H5WvjlCP"
+   ],
+   "expect": "unknown"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "Выберите монету для оплаты счета #IV02440453.",
+   "buttons": [
+    [
+     "USDC",
+     "USDT"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "choose_coin",
+    "IV02440453"
+   ]
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "cryptobot",
+   "text": "Выберите монету для оплаты счета #IV02440453.",
+   "buttons": [
+    [
+     "USDC",
+     "USDT"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": "IV02440453",
+    "fiat": null,
+    "amount": null,
+    "insufficient_funds": false
+   }
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "Пришлите сумму USDT для оплаты счёта.\n\nМинимум: 0.01 USDT ($0.01)\nВаш баланс: 0.0472 USDT ($0.05)",
+   "buttons": [
+    [
+     "Мин. · 0.01 USDT ($0.01)"
+    ],
+    [
+     "‹ Изменить монету"
+    ]
+   ],
+   "urls": [],
+   "expect": "open_amount"
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "cryptobot",
+   "text": "Пришлите сумму USDT для оплаты счёта.\n\nМинимум: 0.01 USDT ($0.01)\nВаш баланс: 0.0472 USDT ($0.05)",
+   "buttons": [
+    [
+     "Мин. · 0.01 USDT ($0.01)"
+    ],
+    [
+     "‹ Изменить монету"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": null,
+    "fiat": null,
+    "amount": null,
+    "insufficient_funds": false,
+    "single_use": false
+   }
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Подтвердите оплату счёта #IV02440453\n\nОтправляете: 0.01 USDT ($0.01)\n   \nВы уверены, что хотите оплатить этот счёт?",
+   "buttons": [
+    [
+     "💳 Оплатить 0.01 USDT"
+    ],
+    [
+     "Оплатить анонимно: Нет"
+    ],
+    [
+     "Добавить комментарий"
+    ],
+    [
+     "‹ Изменить сумму"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "confirm",
+    "IV02440453",
+    "0.01",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "⁨Ivan⁩ оплатил(а) ваш счёт #IV02440453. Вы получили 🪙 0.01 USDT.",
+   "buttons": [],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Вы оплатили счёт #IV02440453 на сумму 🪙 0.01 USDT.",
+   "buttons": [
+    [
+     "Оплатить ещё раз"
+    ]
+   ],
+   "urls": [
+    "http://t.me/CryptoBot?start=IVHxamEensQd"
+   ],
+   "expect": [
+    "paid",
+    "IV02440453",
+    "0.01",
+    "USDT"
+   ]
   }
  ]
 }

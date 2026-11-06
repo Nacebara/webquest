@@ -983,8 +983,30 @@ fn open_invoice(st: &WorldState, acc: AccountId, platform: Platform, code: &str)
         Platform::XRocket => xr_invoice_screen(st, acc, code),
     };
     if !inv.single_use {
-        // Синтетика: как живые боты помечают многоразовый счёт, в записи ещё нет.
-        draft.text.push_str(texts::MULTI_USE_MARK);
+        match platform {
+            // Живая запись: многоразовый счёт CryptoBot — без суммы, «Пришлите сумму USDT…».
+            Platform::CryptoBot => {
+                let asset = inv.accepted_assets.first().copied().unwrap_or(Asset::Usdt);
+                let min = min_check(Platform::CryptoBot, asset);
+                let balance = st.balance_money(acc, platform, asset);
+                draft = Draft::text(texts::cb_invoice_open_amount(
+                    &min,
+                    st.usd_value(&min),
+                    &balance,
+                    st.usd_value(&balance),
+                ))
+                .with_buttons(vec![vec![callback(
+                    &format!(
+                        "Мин. · {} {}",
+                        texts::amount(min.amount()),
+                        asset.platform_code(platform)
+                    ),
+                    "pay-use-min",
+                )]]);
+            }
+            // Синтетика: экран многоразового счёта xRocket в записи ещё не попадался.
+            Platform::XRocket => draft.text.push_str(texts::MULTI_USE_MARK),
+        }
     }
     reply(acc, platform, draft)
 }

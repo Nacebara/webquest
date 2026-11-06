@@ -200,6 +200,7 @@ impl<'a, T: Transport> Conv<'a, T> {
                 classify_activation(platform, &m.text),
                 ActivationReply::ClaimNotice
                     | ActivationReply::IncomingTransfer { .. }
+                    | ActivationReply::IncomingTransferOther
                     | ActivationReply::InProgress
             )
     }
