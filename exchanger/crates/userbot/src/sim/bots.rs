@@ -229,7 +229,28 @@ pub(crate) fn claim(
         Platform::CryptoBot => callback("Открыть кошелёк", "wallet-as-new"),
         Platform::XRocket => callback("‹ Назад", "Back"),
     };
+    // Свой чек (третья запись владельца) зачисляется, а уведомление создателю приходит в тот же
+    // чат. CryptoBot — между «🕘 Получение…» и правкой «📥 Вы получили…» (74248 → 74249 →
+    // правка 74248); xRocket — после правки (72623 → 72624, 73357 → 73358): это обычный
+    // `Staged` и уведомление следом.
+    let own = platform == CB
+        && notice
+            .as_ref()
+            .is_some_and(|n| n.account == acc && n.chat == Chat::WalletBot(platform));
+    let mut notice = notice;
     let first = match outcome {
+        ClaimOutcome::Received(m) if own => {
+            let usd = st.usd_value(&m);
+            let between = match notice.take().map(|n| n.op) {
+                Some(Op::New(d)) => d,
+                _ => Draft::text(String::new()),
+            };
+            Op::StagedAround(Box::new((
+                Draft::text(texts::receiving(platform, &m, usd)),
+                between,
+                Draft::text(texts::received(platform, &m, usd)).with_buttons(vec![vec![back]]),
+            )))
+        }
         ClaimOutcome::Received(m) => {
             let usd = st.usd_value(&m);
             Op::Staged(
@@ -259,10 +280,6 @@ pub(crate) fn claim(
                 ClaimOutcome::PasswordRequired => texts::PASSWORD_PROMPT.to_owned(),
                 ClaimOutcome::WrongPassword => texts::WRONG_PASSWORD.to_owned(),
                 ClaimOutcome::PremiumOnly => texts::PREMIUM_ONLY.to_owned(),
-                ClaimOutcome::OwnCheck => match st.checks.get(code) {
-                    Some(c) => texts::own_check(platform, &c.amount, &c.url),
-                    None => texts::not_found(platform, code).to_owned(),
-                },
                 ClaimOutcome::Received(_) => String::new(),
             };
             Op::New(Draft::text(text).with_buttons(vec![vec![back]]))
@@ -314,9 +331,6 @@ fn evaluate_claim(
     {
         check.fresh_not_found_served = true;
         return (ClaimOutcome::NotFound, None);
-    }
-    if check.creator == Some(acc) {
-        return (ClaimOutcome::OwnCheck, None);
     }
     if check.status == CheckStatus::Claimed || check.claimed_by.contains(&acc) {
         return (ClaimOutcome::AlreadyActivated, None);

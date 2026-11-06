@@ -157,8 +157,6 @@ pub enum ClaimOutcome {
     PasswordRequired,
     WrongPassword,
     PremiumOnly,
-    /// Создатель открыл свой же чек: бот показывает его, но не зачисляет.
-    OwnCheck,
 }
 
 /// Сумма счёта.

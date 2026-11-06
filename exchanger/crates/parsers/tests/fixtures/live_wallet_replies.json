@@ -1,5 +1,5 @@
 {
- "about": "Живые ответы @send и @xrocket из записей владельца 6 ноября 2026 (exch listen, два прохода). Коды чеков и счетов перемешаны с сохранением формата, имена людей и магазинов заменены. Смысл каждого ответа размечен по значению. kind: activation | invoice_screen | invoice_card | check_creation | balance.",
+ "about": "Живые ответы @send и @xrocket из записей владельца 6 ноября 2026 (exch listen, три прохода; в третьем — активация своих чеков). Коды чеков и счетов перемешаны с сохранением формата, имена людей и магазинов заменены. Смысл каждого ответа размечен по значению. kind: activation | invoice_screen | invoice_card | check_creation | balance.",
  "cases": [
   {
    "kind": "activation",
@@ -2262,7 +2262,7 @@
     "status": "active",
     "number": "IV95554731",
     "fiat": [
-     "5.",
+     "5",
      "USD"
     ],
     "amount": [
@@ -2425,7 +2425,7 @@
     "status": "active",
     "number": "IV79114774",
     "fiat": [
-     "10.",
+     "10",
      "USD"
     ],
     "amount": [
@@ -3116,6 +3116,298 @@
     "0.01",
     "USDT"
    ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "Выберите монету для оплаты счета #IV44644655 на сумму $10.",
+   "buttons": [
+    [
+     "USDT · 10.011549 USDT"
+    ],
+    [
+     "GRAM · 9.083213379 GRAM"
+    ],
+    [
+     "SOL · 0.111 SOL"
+    ],
+    [
+     "TRX · 31.438373 TRX"
+    ],
+    [
+     "BTC · 0.0001316 BTC"
+    ],
+    [
+     "ETH · 0.00446 ETH"
+    ],
+    [
+     "DOGE · 138.4240149 DOGE"
+    ],
+    [
+     "LTC · 0.1896 LTC"
+    ],
+    [
+     "BNB · 0.0144 BNB"
+    ],
+    [
+     "USDC · 10.003322 USDC"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "choose_coin",
+    "IV44644655"
+   ]
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "cryptobot",
+   "text": "Выберите монету для оплаты счета #IV44644655 на сумму $10.",
+   "buttons": [
+    [
+     "USDT · 10.011549 USDT"
+    ],
+    [
+     "GRAM · 9.083213379 GRAM"
+    ],
+    [
+     "SOL · 0.111 SOL"
+    ],
+    [
+     "TRX · 31.438373 TRX"
+    ],
+    [
+     "BTC · 0.0001316 BTC"
+    ],
+    [
+     "ETH · 0.00446 ETH"
+    ],
+    [
+     "DOGE · 138.4240149 DOGE"
+    ],
+    [
+     "LTC · 0.1896 LTC"
+    ],
+    [
+     "BNB · 0.0144 BNB"
+    ],
+    [
+     "USDC · 10.003322 USDC"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": "IV44644655",
+    "fiat": [
+     "10",
+     "USD"
+    ],
+    "amount": [
+     "10.011549",
+     "USDT"
+    ],
+    "insufficient_funds": false
+   }
+  },
+  {
+   "kind": "balance",
+   "platform": "xrocket",
+   "text": "👛 Мой кошелёк\n\n🪙 XROCK: 3 XROCK (0.09$)\n\n🪙 USDT: 0 USDT\n\n🪙 USDC: 0 USDC\n\n🪙 LTC: 0 LTC\n\n🪙 GRAM: 0 GRAM\n\n🪙 SOL: 0 SOL\n\n🪙 TRX: 0 TRX\n\n🪙 ETH: 0 ETH\n\n🪙 BTC: 0 BTC\n\n≈ 0.09 $\n\nЧтобы настроить отображение, нажми на кнопку \"Отображение балансов\".",
+   "buttons": [
+    [
+     "• 1 •",
+     "2",
+     "3",
+     "4 ›",
+     "8 ››"
+    ],
+    [
+     " Пополнение",
+     " Вывод"
+    ],
+    [
+     "💼 Общий баланс"
+    ],
+    [
+     "🔄️​ Перевод между балансами"
+    ],
+    [
+     " Повысить безопасность"
+    ],
+    [
+     " Отображение балансов"
+    ],
+    [
+     " В приложении удобней"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xrocket/app?startapp=wallet",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "0",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "🕘 Получение 🪙 0.021025 USDT ($0.02)…",
+   "buttons": [],
+   "urls": [],
+   "expect": "in_progress"
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "🦋 ⁨Ivan⁩ активировал(а) ваш чек и получил(а) 🪙 0.021025 USDT ($0.02).",
+   "buttons": [],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "📥 Вы получили 🪙 0.021025 USDT ($0.02).",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "0.021025",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n      \nВыберите валюту чека:",
+   "buttons": [
+    [
+     " XROCK"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n      \nСколько XROCK вы хотите отправить пользователю с помощью чека?\n      \nМаксимум: 3 XROCK (0.09$)\nМинимум: 0.3 XROCK (0.009$)\n\nВведите сумму чека в XROCK:",
+   "buttons": [
+    [
+     "Максимум · 3 XROCK (0.09$)"
+    ],
+    [
+     "‹ Выбор валюты"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n\nСумма чека: 3 XROCK (0.09$)\n\nПожалуйста, подтвердите корректность данных:",
+   "buttons": [
+    [
+     "✅ Подтверждаю",
+     "❌ Отклоняю"
+    ],
+    [
+     "‹ Изменить сумму"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "confirm"
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n         \nСумма чека: 3 XROCK (0.09$)\n\n‼️ Никогда не делайте скриншот и не передавайте ссылку на чек людям, которым вы не доверяете. Делая это, вы передаете средства в этом чеке безвозмездно, без гарантий получить что-то взамен. Мошенники могут использовать это, чтобы получить ваши монеты\n\nСсылка на чек:\nhttps://t.me/xrocket?start=t_00hu6mrQhjH3XTQ",
+   "buttons": [
+    [
+     " Отправить"
+    ],
+    [
+     "📷 Показать QR-код"
+    ],
+    [
+     "Добавить описание"
+    ],
+    [
+     "Привязать к пользователю"
+    ],
+    [
+     "Удалить"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xrocket?start=t_00hu6mrQhjH3XTQ"
+   ],
+   "expect": [
+    "created",
+    "t_00hu6mrQhjH3XTQ"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⏱ Получение 3 XROCK (0.09$)",
+   "buttons": [],
+   "urls": [],
+   "expect": "in_progress"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 3 XROCK (0.09$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
   }
  ]
 }

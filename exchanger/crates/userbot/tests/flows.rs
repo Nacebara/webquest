@@ -438,6 +438,68 @@ async fn repeated_activation_with_the_same_tag_is_idempotent() {
     assert_eq!(e.balance(CB), dec!(100));
 }
 
+/// Третья запись владельца: свой чек. CryptoBot — «🕘 Получение…», уведомление «… активировал(а)
+/// ваш чек и получил(а) …» (тоже с суммой!), затем правка «📥 Вы получили …»; xRocket —
+/// уведомление после правки. Ответ — правка, а не уведомление; деньги одни; позднее уведомление
+/// не становится ответом следующей операции.
+#[tokio::test(start_paused = true)]
+async fn own_check_notice_is_never_the_answer() {
+    for platform in [CB, XR] {
+        let e = env();
+        e.fund(platform, dec!(10));
+        let own = e
+            .world
+            .create_check(CheckSpec::new(platform, usdt(dec!(3))).by(e.ub))
+            .unwrap();
+        let out = e
+            .wallet(platform)
+            .activate_check(&own.code, &tag("ord-1-intake-1"))
+            .await
+            .unwrap();
+        assert_eq!(
+            out,
+            ActivationOutcome::Received(usdt(dec!(3))),
+            "{platform:?}"
+        );
+        assert_eq!(e.balance(platform), dec!(10));
+        if platform == CB {
+            // Уведомление пришло посреди ответа: сценарий его видел, записал и пропустил.
+            let notices: Vec<_> = e
+                .log
+                .entries()
+                .into_iter()
+                .filter(|l| l.message.text.contains("активировал(а) ваш чек"))
+                .collect();
+            assert_eq!(notices.len(), 1);
+            assert_eq!(notices[0].op, None);
+        }
+        // Следующая операция получает свой ответ, а не хвост предыдущей.
+        let next = e
+            .world
+            .create_check(CheckSpec::new(platform, usdt(dec!(2))))
+            .unwrap();
+        let out = e
+            .wallet(platform)
+            .activate_check(&next.code, &tag("ord-2-intake-1"))
+            .await
+            .unwrap();
+        assert_eq!(
+            out,
+            ActivationOutcome::Received(usdt(dec!(2))),
+            "{platform:?}"
+        );
+        assert_eq!(e.balance(platform), dec!(12));
+        assert!(
+            e.log
+                .entries()
+                .iter()
+                .filter(|l| l.message.text.contains("активировал(а) ваш чек"))
+                .all(|l| l.op.is_none()),
+            "{platform:?}"
+        );
+    }
+}
+
 #[tokio::test(start_paused = true)]
 async fn incoming_transfer_while_waiting_is_not_a_win() {
     let e = env();

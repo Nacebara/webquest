@@ -127,6 +127,10 @@ pub(crate) enum Op {
     Edit(i32, Draft),
     /// Новое сообщение и сразу его правки: «🕘 Получение…» → «📥 Вы получили…», «💸» → «👌».
     Staged(Draft, Vec<Draft>),
+    /// Как [`Op::Staged`], но между первым сообщением и правкой — ещё одно новое сообщение в том
+    /// же чате. Живая запись: свой чек — «🕘 Получение…», уведомление «… активировал(а) ваш
+    /// чек…», затем правка «📥 Вы получили…».
+    StagedAround(Box<(Draft, Draft, Draft)>),
 }
 
 impl Op {
@@ -134,6 +138,7 @@ impl Op {
     fn settled(self) -> Op {
         match self {
             Op::Staged(first, then) => Op::New(then.into_iter().last().unwrap_or(first)),
+            Op::StagedAround(staged) => Op::New(staged.2),
             other => other,
         }
     }
@@ -672,6 +677,24 @@ impl WorldState {
     pub fn publish(&mut self, ob: Outbound) -> Option<RawMessage> {
         let Outbound { account, chat, op } = ob;
         match op {
+            Op::StagedAround(staged) => {
+                let (first, between, last) = *staged;
+                let shown = self.publish(Outbound {
+                    account,
+                    chat,
+                    op: Op::New(first),
+                })?;
+                self.publish(Outbound {
+                    account,
+                    chat,
+                    op: Op::New(between),
+                });
+                self.publish(Outbound {
+                    account,
+                    chat,
+                    op: Op::Edit(shown.id, last),
+                })
+            }
             Op::Staged(first, then) => {
                 let mut shown = self.publish(Outbound {
                     account,
@@ -785,7 +808,7 @@ impl WorldState {
                 let draft = Draft::text(text.clone());
                 first.op = match &first.op {
                     Op::Edit(id, _) => Op::Edit(*id, draft),
-                    Op::New(_) | Op::Staged(..) => Op::New(draft),
+                    Op::New(_) | Op::Staged(..) | Op::StagedAround(..) => Op::New(draft),
                 };
                 self.publish_all(mine);
                 None
@@ -819,7 +842,7 @@ impl WorldState {
                         });
                         Op::Edit(id, draft)
                     }
-                    staged @ Op::Staged(..) => staged,
+                    staged @ (Op::Staged(..) | Op::StagedAround(..)) => staged,
                 };
                 let mut rest = vec![Outbound {
                     account: first.account,

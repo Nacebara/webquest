@@ -42,7 +42,8 @@ for m in msgs:
     low = t.lower()
     first = t.split('\n')[0]
     # ---- активация и всё, что может прийти, пока ждём ответа на /start <чек> ----
-    if re.search(r'получение .*usdt', low):
+    # «🕘 Получение 🪙 0.02 USDT…», «⏱ Получение 3 XROCK (0.09$)»: промежуточный ответ, монета любая.
+    if re.match(r'^\W*получение\s', low):
         add('activation', m, 'in_progress')
     elif 'активировал(а) ваш чек' in low or 'оплатил(а) ваш сч' in low:
         add('activation', m, 'claim_notice')
@@ -71,7 +72,7 @@ for m in msgs:
         add('invoice_screen', m, 'progress')
     elif 'выберите монету для оплаты' in low:
         add('invoice_screen', m, ['choose_coin', re.search(r'#(IV\d+)', t).group(1)])
-        fiat = re.search(r'\$\s*([\d.]+)', first)
+        fiat = re.search(r'\$\s*(\d+(?:\.\d+)?)', first)
         coin = re.search(r'USDT\s*·\s*([\d.]+)\s+USDT', ' '.join(b['text'] for r in m['buttons'] for b in r))
         # Многоразовый счёт без суммы: монеты без сумм, дальше — «Пришлите сумму…».
         add('invoice_card', m, {'status': 'active', 'number': re.search(r'#(IV\d+)', t).group(1),
@@ -111,11 +112,13 @@ for m in msgs:
     elif 'скопируйте ссылку' in low or 'ссылка на чек' in low:
         link = re.search(r'(?:t\.me/send\?start=(CQ\w{10})|t\.me/xrocket\?start=(t_[\w-]{15}))', t)
         param = link.group(1) or link.group(2)
-        add('check_creation', m, ['created', param] + money(t, 'Сумма'))
+        # Чек в чужой монете создан, но суммы в поддерживаемом активе нет: сценарий отдаст его человеку.
+        add('check_creation', m, ['created', param] + (money(t, 'Сумма') or []))
     elif 'количество активаций' in low:
         add('check_creation', m, 'ask_activations')
     elif 'подтвердите корректность данных' in low and first.startswith('🏷'):
-        add('check_creation', m, ['confirm'] + money(t, 'Сумма чека'))
+        # Чек в чужой монете («3 XROCK»): суммы в поддерживаемом активе нет — сценарий не нажмёт.
+        add('check_creation', m, ['confirm'] + (money(t, 'Сумма чека') or []))
     elif first.startswith('🏷') and 'недостаточно средств' in low:
         add('check_creation', m, 'insufficient_funds')
     elif first.startswith('Недостаточно монет'):
@@ -134,7 +137,7 @@ for m in msgs:
             exp = [[tm.group(1), 'USDT', '0']]
         add('balance', m, exp)
 
-about = ('Живые ответы @send и @xrocket из записей владельца 6 ноября 2026 (exch listen, два прохода). Коды чеков и '
+about = ('Живые ответы @send и @xrocket из записей владельца 6 ноября 2026 (exch listen, три прохода; в третьем — активация своих чеков). Коды чеков и '
          'счетов перемешаны с сохранением формата, имена людей и магазинов заменены. Смысл каждого '
          'ответа размечен по значению. kind: activation | invoice_screen | invoice_card | '
          'check_creation | balance.')

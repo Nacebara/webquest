@@ -285,20 +285,53 @@ async fn every_rejection_class_has_its_text_and_moves_no_money() {
             "{code}"
         );
     }
-    // Свой чек: бот показывает его, но не зачисляет.
-    let own = world.create_check(CheckSpec::new(CB, m).by(ub)).unwrap();
-    start(&t, CB_CHAT, &own.code, 200).await;
-    assert!(
-        one(&mut rx)
-            .text
-            .contains("Это ваш собственный чек на 3 USDT")
-    );
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(7));
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(10));
     assert_eq!(world.balance(ub, XR, Asset::Usdt), dec!(0));
-    assert_eq!(
-        world.claim_check(client, &own.url).unwrap(),
-        ClaimOutcome::Received(m)
-    );
+    let _ = client;
+}
+
+/// Свой чек можно открыть самому (третья запись владельца): деньги возвращаются, а уведомление
+/// создателю приходит в тот же чат.
+#[tokio::test]
+async fn own_check_is_received_with_the_notice_in_the_live_order() {
+    let Env { world, ub, t, .. } = env();
+    // Порядок — по третьей записи владельца: CryptoBot присылает уведомление между двумя
+    // версиями ответа, xRocket — после правки.
+    for (platform, chat, rid, notice_at) in [(CB, CB_CHAT, 1, 1), (XR, XR_CHAT, 2, 2)] {
+        world
+            .set_balance(ub, platform, Asset::Usdt, dec!(10))
+            .unwrap();
+        let own = world
+            .create_check(CheckSpec::new(platform, usdt(dec!(3))).by(ub))
+            .unwrap();
+        assert_eq!(world.balance(ub, platform, Asset::Usdt), dec!(7));
+        let mut rx = t.subscribe();
+        start(&t, chat, &own.code, rid).await;
+        let seen = drain(&mut rx);
+        assert_eq!(seen.len(), 3, "{seen:#?}");
+        let mut answer: Vec<_> = seen.iter().collect();
+        let notice = answer.remove(notice_at);
+        assert_eq!(
+            classify_activation(platform, &notice.text),
+            ActivationReply::ClaimNotice,
+            "{}",
+            notice.text
+        );
+        assert!(notice.id > answer[0].id, "уведомление — новое сообщение");
+        assert_eq!(
+            classify_activation(platform, &answer[0].text),
+            ActivationReply::InProgress
+        );
+        assert_eq!(answer[1].id, answer[0].id, "правка первого сообщения");
+        assert_eq!(
+            classify_activation(platform, &answer[1].text),
+            ActivationReply::Received {
+                amount: dec!(3),
+                asset: Asset::Usdt
+            }
+        );
+        assert_eq!(world.balance(ub, platform, Asset::Usdt), dec!(10));
+    }
 }
 
 #[tokio::test]
