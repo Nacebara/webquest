@@ -1,9 +1,11 @@
 //! Чужие счета: просмотр и оплата (DESIGN-v0.2, Р4; LOVEC-PORTING §8.3–§8.4).
 //!
 //! Оплата: `/start IV…` (`inv_…`) → карточка → кнопка валюты → экран «к оплате» → сверка
-//! суммы с ожидаемой → «Оплатить». У xRocket «Оплатить» — callback-кнопка: нажимаем один раз
-//! и больше никогда. У CryptoBot — мини-приложение с PIN: без [`super::WebAppPayer`] сценарий
-//! останавливается на `NeedsHuman` (оператор платит руками), деньги при этом не двигаются.
+//! суммы с ожидаемой → «Оплатить». У обоих кошельков «Оплатить» — кнопка в чате: нажимаем один
+//! раз и больше никогда. CryptoBot не спрашивает код-пароль, пока траты аккаунта за 24 часа не
+//! выходят за «лимит без код-пароля» (DESIGN-v0.2 Р4, Р11); движок за этим следит. Если бот всё
+//! же просит код — код мы не вводим никогда: `NeedsHuman`, деньги не двигались. Кнопку, которая
+//! открывает мини-приложение, не нажимаем — тоже `NeedsHuman`.
 
 use domain::{Asset, Money};
 use parsers::replies::{classify_invoice_payment, parse_invoice_card};
@@ -12,8 +14,8 @@ use parsers::{InvoicePayReply, InvoiceStatus};
 
 use super::conv::{Conv, SendError};
 use super::gate::Pace;
-use super::{UserbotWallet, WebAppOutcome, rid, typed_amount};
-use crate::transport::{ButtonKind, Chat, RawMessage, Transport, TransportError};
+use super::{UserbotWallet, rid, typed_amount};
+use crate::transport::{ButtonKind, Chat, RawMessage, Transport};
 use crate::wallet::{BotError, InvoiceInfo, OpTag, PayOutcome};
 
 const NOT_FOUND: &[&str] = &["не найден", "не существует", "not found", "does not exist"];
@@ -104,6 +106,9 @@ fn from_reply(reply: InvoicePayReply) -> Option<PayOutcome> {
         InvoicePayReply::AlreadyPaid => Some(PayOutcome::AlreadyPaid),
         InvoicePayReply::Expired => Some(PayOutcome::Expired),
         InvoicePayReply::InsufficientFunds => Some(PayOutcome::InsufficientFunds),
+        InvoicePayReply::PasscodeRequired => Some(needs_human(
+            "CryptoBot asks for the passcode: spending is over the passcode-free limit",
+        )),
         InvoicePayReply::Unknown => None,
     }
 }
@@ -204,8 +209,8 @@ pub(crate) async fn pay<T: Transport>(
         return Ok(needs_human("no pay button"));
     };
     match button.kind.clone() {
-        ButtonKind::WebApp(url) => pay_in_webapp(w, &mut conv, &url, cmd.id).await,
         ButtonKind::Callback(data) => press_pay(&mut conv, pay_screen.id, &data, cmd.id).await,
+        ButtonKind::WebApp(_) => Ok(needs_human("the pay button opens a mini app: pay manually")),
         other => Ok(needs_human(format!("unsupported pay button {other:?}"))),
     }
 }
@@ -217,7 +222,7 @@ fn has_pay_button(m: &RawMessage) -> bool {
         .any(|b| screens::text_matches(&b.text, PAY_BUTTON))
 }
 
-/// xRocket: одно нажатие «Оплатить». После него — только ожидание ответа, без повторов.
+/// Одно нажатие «Оплатить». После него — только ожидание ответа, без повторов.
 async fn press_pay<T: Transport>(
     conv: &mut Conv<'_, T>,
     screen_id: i32,
@@ -261,51 +266,4 @@ async fn press_pay<T: Transport>(
             }
         }
     })
-}
-
-/// CryptoBot: мини-приложение с PIN.
-async fn pay_in_webapp<T: Transport>(
-    w: &UserbotWallet<T>,
-    conv: &mut Conv<'_, T>,
-    button_url: &str,
-    after_id: i32,
-) -> Result<PayOutcome, BotError> {
-    let platform = conv.platform();
-    let Some(payer) = w.payer.clone() else {
-        return Ok(needs_human(
-            "payment needs the CryptoBot mini app (PIN): pay manually",
-        ));
-    };
-    conv.pace(Pace::Bot).await?;
-    let session = match conv.transport().open_webapp(platform, button_url).await {
-        Ok(url) => url,
-        Err(TransportError::FloodWait(d)) => {
-            return Err(conv.not_sent(TransportError::FloodWait(d)));
-        }
-        // Открытие мини-приложения ничего не платит.
-        Err(e) => return Err(BotError::Unavailable(format!("mini app: {e}"))),
-    };
-    let mark = conv.mark().await;
-    let outcome = match payer.pay(platform, &session).await {
-        WebAppOutcome::Paid => PayOutcome::Paid,
-        WebAppOutcome::AlreadyPaid => PayOutcome::AlreadyPaid,
-        WebAppOutcome::Expired => PayOutcome::Expired,
-        WebAppOutcome::InsufficientFunds => PayOutcome::InsufficientFunds,
-        WebAppOutcome::NotPaid(reason) => needs_human(reason),
-        WebAppOutcome::Unknown(detail) => PayOutcome::Unknown { detail },
-    };
-    if outcome == PayOutcome::Paid {
-        // Подтверждение бота — в журнал операции; деньги уже ушли, исход от него не зависит.
-        let chat = Chat::WalletBot(platform);
-        let deadline = conv.deadline();
-        let confirmed = conv
-            .wait(chat, after_id, mark, deadline, false, |m| {
-                classify_invoice_payment(platform, &m.text) == InvoicePayReply::Paid
-            })
-            .await;
-        if confirmed.is_none() {
-            tracing::warn!("mini app reported payment, the bot did not confirm it");
-        }
-    }
-    Ok(outcome)
 }

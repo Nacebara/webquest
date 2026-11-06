@@ -28,7 +28,7 @@ use storage::orders::{NewOrder, OrderPatch, OrderRow};
 
 use crate::effects::{EffectCtx, create_op, transit};
 use crate::settle::{Decision, fee_pct, refund};
-use crate::submit::{SubmitReject, Submitted, daily_limit, setting_decimal};
+use crate::submit::{SubmitReject, Submitted, daily_limit, setting_decimal, spendable};
 use crate::{Engine, EngineError};
 
 /// Срок котировки по умолчанию (`settings.quote_ttl_seconds`).
@@ -229,7 +229,7 @@ impl Engine {
             .await?
             .ok_or(EngineError::NoWalletAccount(target))?;
         storage::holds::lock_wallet(&mut tx, wallet_id).await?;
-        let available = storage::holds::available(&mut tx, wallet_id, asset).await?;
+        let available = spendable(&mut tx, &self.cfg, target, wallet_id, asset).await?;
         let fee_pct = fee_pct(&mut tx, &dir, wallet_id, asset, Decimal::ZERO).await?;
         // `X` клиент присылает чеком платформы входа: вверх до её шага.
         let step = Step::from_decimal(

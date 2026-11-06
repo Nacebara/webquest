@@ -5,11 +5,12 @@
 use std::time::Duration;
 
 use domain::{Asset, Decimal, Money, Platform};
+use parsers::replies::{InvoicePayReply, classify_invoice_payment};
 use rust_decimal_macros::dec;
 use tokio::sync::broadcast;
 use userbot::sim::{
     AccountId, Call, CheckOrigin, CheckSpec, CheckStatus, ClaimOutcome, Fault, InvoiceSpec,
-    SimInvoiceStatus, SimTransport, SimWorld, WebAppPayment, texts,
+    SimInvoiceStatus, SimTransport, SimWorld, texts,
 };
 use userbot::transport::{ButtonKind, Chat, RawMessage, Transport, TransportError};
 
@@ -954,7 +955,7 @@ async fn unknown_text_no_reply_and_edit_instead_of_new() {
 // ---------- счета ----------
 
 #[tokio::test]
-async fn cryptobot_invoice_is_paid_through_webapp_pin() {
+async fn cryptobot_invoice_is_paid_with_the_pay_button_without_passcode() {
     let Env { world, ub, t, .. } = env();
     let shop = world.add_account("shop");
     let inv = world
@@ -967,7 +968,6 @@ async fn cryptobot_invoice_is_paid_through_webapp_pin() {
     assert!(inv.code.starts_with("IV") && inv.code.len() == 12);
     assert_eq!(inv.url, format!("https://t.me/send?start={}", inv.code));
     world.set_balance(ub, CB, Asset::Usdt, dec!(25)).unwrap();
-    world.set_pin(ub, "1234").unwrap();
     let mut rx = t.subscribe();
 
     start(&t, CB_CHAT, &inv.code, 1).await;
@@ -987,38 +987,20 @@ async fn cryptobot_invoice_is_paid_through_webapp_pin() {
     let screen = one(&mut rx);
     assert_eq!(screen.id, card.id);
     assert!(screen.text.contains("К оплате: 10 USDT"));
-    let pay = screen.find_button("Оплатить").unwrap();
-    let ButtonKind::WebApp(button_url) = &pay.kind else {
-        panic!("у CryptoBot «Оплатить» — мини-приложение: {pay:?}");
-    };
-    // Нажать её как callback нельзя.
-    assert!(t.press(CB_CHAT, card.id, b"pay").await.is_err());
-
-    let url = t.open_webapp(CB, button_url).await.unwrap();
-    assert!(url.contains("session="));
+    // «Оплатить» — кнопка в чате: траты в пределах лимита без код-пароля ($500 по умолчанию).
+    let pay = data(&screen, "Оплатить");
+    t.press(CB_CHAT, screen.id, &pay).await.unwrap();
+    let done = one(&mut rx);
+    assert_eq!(done.id, card.id);
     assert_eq!(
-        world.complete_webapp_payment(&url, "0000").unwrap(),
-        WebAppPayment::WrongPin { attempts_left: 2 }
-    );
-    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(25));
-    assert_eq!(
-        world.invoice(&inv.code).unwrap().status,
-        SimInvoiceStatus::Active
-    );
-
-    assert_eq!(
-        world.complete_webapp_payment(&url, "1234").unwrap(),
-        WebAppPayment::Paid(usdt(dec!(10)))
+        done.text,
+        format!("✅ Счёт {} оплачен.\n\nСписано: 10 USDT.", inv.code)
     );
     assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(15));
     assert_eq!(world.balance(shop, CB, Asset::Usdt), dec!(10));
     let paid = world.invoice(&inv.code).unwrap();
     assert_eq!(paid.status, SimInvoiceStatus::Paid);
     assert_eq!(paid.payments.len(), 1);
-    assert_eq!(
-        one(&mut rx).text,
-        format!("✅ Счёт {} оплачен.\n\nСписано: 10 USDT.", inv.code)
-    );
     assert!(
         world
             .messages(shop, CB_CHAT)
@@ -1028,16 +1010,8 @@ async fn cryptobot_invoice_is_paid_through_webapp_pin() {
             .contains("оплачен пользователем @exch_cb")
     );
 
-    // Повторная отправка формы и новая сессия деньги не трогают.
-    assert_eq!(
-        world.complete_webapp_payment(&url, "1234").unwrap(),
-        WebAppPayment::SessionUsed
-    );
-    let again = t.open_webapp(CB, button_url).await.unwrap();
-    assert_eq!(
-        world.complete_webapp_payment(&again, "1234").unwrap(),
-        WebAppPayment::AlreadyPaid
-    );
+    // После оплаты кнопки на сообщении нет: второе нажатие отклонено, деньги не тронуты.
+    assert!(t.press(CB_CHAT, screen.id, &pay).await.is_err());
     assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(15));
 
     start(&t, CB_CHAT, &inv.code, 2).await;
@@ -1046,65 +1020,77 @@ async fn cryptobot_invoice_is_paid_through_webapp_pin() {
     assert!(card.buttons.is_empty());
 }
 
+/// Открыть счёт CryptoBot, выбрать USDT, нажать «Оплатить»; вернуть ответ бота.
+async fn pay_by_button(
+    t: &SimTransport,
+    rx: &mut broadcast::Receiver<RawMessage>,
+    code: &str,
+    rid: i64,
+) -> String {
+    start(t, CB_CHAT, code, rid).await;
+    let card = one(rx);
+    t.press(CB_CHAT, card.id, &data(&card, "USDT"))
+        .await
+        .unwrap();
+    let screen = one(rx);
+    t.press(CB_CHAT, screen.id, &data(&screen, "Оплатить"))
+        .await
+        .unwrap();
+    one(rx).text
+}
+
 #[tokio::test]
-async fn webapp_pin_blocks_after_three_wrong_attempts_and_checks_funds() {
+async fn cryptobot_asks_for_the_passcode_over_the_24h_limit_and_moves_no_money() {
     let Env { world, ub, t, .. } = env();
-    let inv = world
+    world.set_balance(ub, CB, Asset::Usdt, dec!(100)).unwrap();
+    world.set_passcode_free_limit(ub, Some(dec!(15))).unwrap();
+    let mut rx = t.subscribe();
+
+    let first = world
         .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))))
         .unwrap();
-    world.set_pin(ub, "1234").unwrap();
-    world.set_balance(ub, CB, Asset::Usdt, dec!(4)).unwrap();
-    let button = format!(
-        "https://pay.send.sim.invalid/invoice?code={}&asset=USDT",
-        inv.code
-    );
-    let url = t.open_webapp(CB, &button).await.unwrap();
-    assert_eq!(
-        world.complete_webapp_payment(&url, "1234").unwrap(),
-        WebAppPayment::InsufficientFunds {
-            available: usdt(dec!(4)),
-            needed: usdt(dec!(10))
-        }
-    );
-    for left in [2, 1] {
-        assert_eq!(
-            world.complete_webapp_payment(&url, "1").unwrap(),
-            WebAppPayment::WrongPin {
-                attempts_left: left
-            }
-        );
-    }
-    assert_eq!(
-        world.complete_webapp_payment(&url, "1").unwrap(),
-        WebAppPayment::Blocked
-    );
-    assert_eq!(
-        world.complete_webapp_payment(&url, "1234").unwrap(),
-        WebAppPayment::SessionUsed
-    );
     assert!(
-        world
-            .complete_webapp_payment("https://example.com/?session=1", "1234")
-            .is_err()
-    );
-    assert!(t.open_webapp(XR, &button).await.is_err());
-    assert!(
-        t.open_webapp(CB, "https://evil.example/invoice?code=IV&asset=USDT")
+        pay_by_button(&t, &mut rx, &first.code, 1)
             .await
-            .is_err()
+            .contains("оплачен")
     );
-    // Таймаут после открытия: сессия есть, но URL потерян.
-    world.inject(ub, Call::OpenWebApp, Fault::TimeoutAfterEffect, 1);
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(90));
+
+    // 10 + 10 > 15: CryptoBot просит код-пароль. Код мы не вводим — ничего не списано.
+    let second = world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))))
+        .unwrap();
+    let reply = pay_by_button(&t, &mut rx, &second.code, 2).await;
+    assert_eq!(reply, texts::PASSCODE_REQUIRED);
     assert_eq!(
-        t.open_webapp(CB, &button).await.unwrap_err(),
-        TransportError::Timeout
+        classify_invoice_payment(CB, &reply),
+        InvoicePayReply::PasscodeRequired
     );
-    world.expire_invoice(&inv.code).unwrap();
-    let url = t.open_webapp(CB, &button).await.unwrap();
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(90));
     assert_eq!(
-        world.complete_webapp_payment(&url, "1234").unwrap(),
-        WebAppPayment::Expired
+        world.invoice(&second.code).unwrap().status,
+        SimInvoiceStatus::Active
     );
+
+    // Через сутки первая трата выходит из окна — тот же счёт оплачивается кнопкой.
+    world.advance(Duration::from_secs(24 * 3600 + 1));
+    assert!(
+        pay_by_button(&t, &mut rx, &second.code, 3)
+            .await
+            .contains("оплачен")
+    );
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(80));
+
+    // Лимит 0 — код-пароль всегда.
+    world.set_passcode_free_limit(ub, None).unwrap();
+    let third = world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(1))))
+        .unwrap();
+    assert_eq!(
+        pay_by_button(&t, &mut rx, &third.code, 4).await,
+        texts::PASSCODE_REQUIRED
+    );
+    assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(80));
 }
 
 #[tokio::test]
@@ -1136,14 +1122,10 @@ async fn fiat_invoice_shows_amount_in_asset_by_rate() {
         "{}",
         screen.text
     );
-    let ButtonKind::WebApp(button) = &screen.find_button("Оплатить").unwrap().kind else {
-        panic!()
-    };
-    let url = t.open_webapp(CB, button).await.unwrap();
-    assert_eq!(
-        world.complete_webapp_payment(&url, "any").unwrap(),
-        WebAppPayment::Paid(usdt(dec!(10.53)))
-    );
+    t.press(CB_CHAT, screen.id, &data(&screen, "Оплатить"))
+        .await
+        .unwrap();
+    assert!(one(&mut rx).text.contains("Списано: 10.53 USDT"));
     assert_eq!(world.balance(ub, CB, Asset::Usdt), dec!(89.47));
 }
 

@@ -172,6 +172,8 @@ pub trait Transport: Send + Sync + 'static {
     ) -> Result<RawMessage, TransportError>;
 
     /// Открыть мини-приложение бота (`messages.requestWebView`): URL с `tgWebAppData`.
+    /// Денежные сценарии мини-приложения не открывают (DESIGN-v0.2 Р4). Удалить вместе с
+    /// реализацией в `mtproto`, когда запись подтвердит, что «Оплатить» у CryptoBot — кнопка в чате.
     async fn open_webapp(&self, bot: Platform, button_url: &str) -> Result<String, TransportError>;
 
     /// Сообщения чата с id > `after_id`, по возрастанию id (догон после рестарта).

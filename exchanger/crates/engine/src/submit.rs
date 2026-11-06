@@ -174,7 +174,7 @@ impl Engine {
                 .await?
                 .ok_or(EngineError::NoWalletAccount(target))?;
             storage::holds::lock_wallet(&mut tx, wallet).await?;
-            let available = storage::holds::available(&mut tx, wallet, asset).await?;
+            let available = spendable(&mut tx, &self.cfg, target, wallet, asset).await?;
             let new_user = storage::orders::is_new_user(&mut tx, user_id).await?;
             let per_order = if new_user {
                 dir.new_user_max_amount
@@ -256,6 +256,37 @@ impl Engine {
         }
         Ok(result)
     }
+}
+
+/// Сколько резерва кошелька можно отдать под новую заявку: доступное по леджеру, а у кошелька
+/// CryptoBot — не больше запаса до «лимита без код-пароля» за 24 часа (DESIGN-v0.2 Р11), чтобы
+/// при выплате или оплате счёта бот не спросил код. Лимит — настройка
+/// `cb_passcode_free_limit_usd` (меняется из пульта), без неё — [`EngineConfig::cb_passcode_free_limit`].
+/// Вызывать после `holds::lock_wallet` в той же транзакции.
+pub(crate) async fn spendable(
+    conn: &mut sqlx::PgConnection,
+    cfg: &crate::EngineConfig,
+    platform: Platform,
+    wallet_account_id: i16,
+    asset: Asset,
+) -> Result<domain::Decimal, EngineError> {
+    let available = storage::holds::available(&mut *conn, wallet_account_id, asset).await?;
+    if platform != Platform::CryptoBot {
+        return Ok(available);
+    }
+    let limit = match setting_decimal(&mut *conn, "cb_passcode_free_limit_usd").await? {
+        Some(limit) => Some(limit),
+        None => cfg.cb_passcode_free_limit,
+    };
+    let Some(limit) = limit else {
+        return Ok(available);
+    };
+    let committed = storage::holds::committed_spend_24h(&mut *conn, wallet_account_id).await?;
+    let headroom = domain::pricing::passcode_free_headroom(limit, committed);
+    if headroom < available {
+        tracing::debug!(%limit, %committed, %headroom, "passcode-free limit caps the CryptoBot reserve");
+    }
+    Ok(available.min(headroom))
 }
 
 /// Суточный лимит из `settings.daily_limit_usd` (`{"default": 1000, "new_user": 200}`);

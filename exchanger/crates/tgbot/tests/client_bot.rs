@@ -26,7 +26,7 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use ui::{EmojiSet, Ui, UiConfig};
 use userbot::flows::FlowConfig;
-use userbot::sim::{AccountId, InvoiceSpec, SimInvoiceStatus, SimWebAppPayer, SimWorld};
+use userbot::sim::{AccountId, InvoiceSpec, SimInvoiceStatus, SimWorld};
 use userbot::{AccountGate, UserbotWallet, WalletBot};
 
 const CB: Platform = Platform::CryptoBot;
@@ -372,12 +372,9 @@ async fn env(pool: PgPool) -> Env {
     let transport = Arc::new(world.transport(ub));
     let gate = Arc::new(AccountGate::new("ub-1"));
     let mut wallets: HashMap<Platform, Arc<dyn WalletBot>> = HashMap::new();
-    world.set_pin(ub, "2580").unwrap();
     for platform in [CB, XR] {
         let w = Arc::new(
-            UserbotWallet::new(platform, transport.clone(), gate.clone())
-                .with_config(fast())
-                .with_payer(Arc::new(SimWebAppPayer::new(world.clone(), "2580"))),
+            UserbotWallet::new(platform, transport.clone(), gate.clone()).with_config(fast()),
         );
         wallets.insert(platform, w.clone() as Arc<dyn WalletBot>);
         engine = engine.with_wallet(w);

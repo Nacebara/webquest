@@ -43,6 +43,32 @@ pub async fn available(
     Ok(available.unwrap_or(Decimal::ZERO))
 }
 
+/// Сколько кошелёк за последние 24 часа потратил или обязался потратить, в стейблкоинах
+/// (1 = 1 USD): операции, которые выводят деньги, кроме неудавшихся и отменённых, плюс активные
+/// удержания под будущие выплаты. Для «лимита без код-пароля» CryptoBot (DESIGN-v0.2 Р11).
+/// Удержание, по которому уже создана операция, закрыто (`consumed`) и второй раз не считается.
+pub async fn committed_spend_24h(
+    conn: &mut PgConnection,
+    wallet_account_id: i16,
+) -> Result<Decimal, StorageError> {
+    let total = sqlx::query_scalar!(
+        r#"SELECT
+             COALESCE((SELECT SUM(o.amount) FROM operations o JOIN assets a ON a.code = o.asset
+                        WHERE o.wallet_account_id = $1 AND a.is_stable
+                          AND o.kind IN ('create_payout_check', 'create_refund_check',
+                                         'create_excess_check', 'pay_invoice', 'withdrawal')
+                          AND o.status IN ('pending', 'dispatched', 'succeeded', 'unknown')
+                          AND COALESCE(o.dispatched_at, o.created_at) > now() - interval '24 hours'), 0)
+           + COALESCE((SELECT SUM(h.amount) FROM holds h JOIN assets a ON a.code = h.asset
+                        WHERE h.wallet_account_id = $1 AND a.is_stable AND h.state = 'active'), 0)
+           AS "total!""#,
+        wallet_account_id,
+    )
+    .fetch_one(conn)
+    .await?;
+    Ok(total)
+}
+
 /// Удержать `amount` под заявку. Вызывать после [`lock_wallet`] в той же транзакции.
 pub async fn place(
     conn: &mut PgConnection,

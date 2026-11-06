@@ -259,29 +259,6 @@ pub struct SimInvoice {
     pub created_at_ms: i64,
 }
 
-/// Итог шага PIN в мини-приложении CryptoBot ([`super::SimWorld::complete_webapp_payment`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WebAppPayment {
-    /// Оплачено, списано столько.
-    Paid(Money),
-    /// Неверный PIN, деньги не тронуты.
-    WrongPin {
-        attempts_left: u32,
-    },
-    /// PIN введён неверно слишком много раз — сессия закрыта.
-    Blocked,
-    AlreadyPaid,
-    Expired,
-    InsufficientFunds {
-        available: Money,
-        needed: Money,
-    },
-    /// Сессию мини-приложения уже использовали (повторная отправка формы).
-    SessionUsed,
-    /// Свой же счёт оплатить нельзя.
-    OwnInvoice,
-}
-
 /// Какой вызов транспорта ломать.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Call {
@@ -290,7 +267,6 @@ pub enum Call {
     Press,
     InlineQuery,
     SendInline,
-    OpenWebApp,
     History,
 }
 
@@ -339,8 +315,6 @@ pub enum SimError {
     UnknownInvoice(String),
     #[error("insufficient funds: need {needed}, available {available}")]
     InsufficientFunds { needed: Money, available: Money },
-    #[error("unknown webapp session: {0}")]
-    UnknownSession(String),
     #[error("invalid: {0}")]
     Invalid(String),
 }

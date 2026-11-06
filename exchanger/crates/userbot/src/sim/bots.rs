@@ -8,18 +8,13 @@ use domain::{Asset, Decimal, Money, Platform};
 
 use super::model::{
     AccountId, CheckOrigin, CheckSpec, CheckStatus, ClaimOutcome, InvoiceAmount, InvoiceSpec,
-    SimError, SimInvoiceStatus, WebAppPayment,
+    SimError, SimInvoiceStatus,
 };
-use super::state::{
-    Dialog, Draft, InlineItem, InlineQuery, Op, Outbound, PIN_ATTEMPTS, WorldState,
-};
+use super::state::{Dialog, Draft, InlineItem, InlineQuery, Op, Outbound, WorldState};
 use super::texts;
 use crate::transport::{
     ButtonKind, CallbackAnswer, Chat, InlineResult, InlineResults, RawButton, TransportError,
 };
-
-/// Хост мини-приложения оплаты CryptoBot в симуляторе (`.invalid` — заведомо не настоящий).
-pub(crate) const WEBAPP_HOST: &str = "pay.send.sim.invalid";
 
 fn callback(text: &str, data: &str) -> RawButton {
     RawButton {
@@ -428,7 +423,7 @@ pub(crate) fn on_press(
                 pay_screen(st, acc, platform, code, asset),
             )])
         }
-        ["inv", code, "pay", asset] if platform == Platform::XRocket => {
+        ["inv", code, "pay", asset] => {
             let asset = Asset::from_str(asset).map_err(|_| rpc("DATA_INVALID"))?;
             let (text, notice) = match pay_invoice(st, acc, code, asset) {
                 Ok((paid, notice)) => (texts::invoice_paid(platform, code, &paid), notice),
@@ -509,21 +504,9 @@ fn pay_screen(
     };
     let available = st.balance_money(acc, platform, asset);
     let view = card_view(inv);
-    let pay = match platform {
-        Platform::CryptoBot => RawButton {
-            text: "Оплатить".to_owned(),
-            kind: ButtonKind::WebApp(webapp_url(code, asset)),
-        },
-        Platform::XRocket => callback("Оплатить", &format!("inv:{code}:pay:{}", asset.code())),
-    };
+    // «Оплатить» — кнопка в чате у обоих кошельков (CryptoBot: «Траты без код-пароля»).
+    let pay = callback("Оплатить", &format!("inv:{code}:pay:{}", asset.code()));
     Draft::text(texts::invoice_pay_screen(&view, &due, &available)).with_buttons(vec![vec![pay]])
-}
-
-pub(crate) fn webapp_url(code: &str, asset: Asset) -> String {
-    format!(
-        "https://{WEBAPP_HOST}/invoice?code={code}&asset={}",
-        asset.code()
-    )
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -532,7 +515,12 @@ pub(crate) enum PayError {
     AlreadyPaid,
     Expired,
     Own,
-    Insufficient { available: Money, due: Money },
+    Insufficient {
+        available: Money,
+        due: Money,
+    },
+    /// CryptoBot: траты за 24 часа вместе с этой — выше лимита без код-пароля.
+    PasscodeRequired,
 }
 
 fn pay_error_text(platform: Platform, e: &PayError) -> String {
@@ -544,6 +532,7 @@ fn pay_error_text(platform: Platform, e: &PayError) -> String {
         PayError::Insufficient { available, due } => {
             texts::invoice_insufficient(platform, available, due)
         }
+        PayError::PasscodeRequired => texts::PASSCODE_REQUIRED.to_owned(),
     }
 }
 
@@ -566,6 +555,9 @@ pub(crate) fn pay_invoice(
     let platform = inv.platform;
     let creator = inv.creator;
     let due = st.invoice_due(inv, asset).ok_or(PayError::NotFound)?;
+    if platform == Platform::CryptoBot && st.passcode_needed(payer, &due) {
+        return Err(PayError::PasscodeRequired);
+    }
     match st.debit(payer, platform, due) {
         Ok(()) => {}
         Err(SimError::InsufficientFunds { available, .. }) => {
@@ -598,107 +590,6 @@ pub(crate) fn pay_invoice(
     Ok((due, notice))
 }
 
-/// Шаг PIN в мини-приложении CryptoBot.
-pub(crate) fn complete_webapp(
-    st: &mut WorldState,
-    session_id: u64,
-    pin: &str,
-) -> Result<(WebAppPayment, Vec<Outbound>), SimError> {
-    let session = st
-        .sessions
-        .get(&session_id)
-        .ok_or_else(|| SimError::UnknownSession(session_id.to_string()))?;
-    if session.used {
-        return Ok((WebAppPayment::SessionUsed, Vec::new()));
-    }
-    let (acc, code, asset) = (session.account, session.code.clone(), session.asset);
-    let expected = st.account(acc)?.pin.clone();
-    if expected.as_deref().is_some_and(|p| p != pin) {
-        let Some(session) = st.sessions.get_mut(&session_id) else {
-            return Err(SimError::UnknownSession(session_id.to_string()));
-        };
-        session.attempts_left = session.attempts_left.saturating_sub(1);
-        if session.attempts_left == 0 {
-            session.used = true;
-            return Ok((WebAppPayment::Blocked, Vec::new()));
-        }
-        return Ok((
-            WebAppPayment::WrongPin {
-                attempts_left: session.attempts_left,
-            },
-            Vec::new(),
-        ));
-    }
-    let platform = Platform::CryptoBot;
-    match pay_invoice(st, acc, &code, asset) {
-        Ok((paid, notice)) => {
-            if let Some(s) = st.sessions.get_mut(&session_id) {
-                s.used = true;
-            }
-            let mut outs = vec![reply(
-                acc,
-                platform,
-                Draft::text(texts::invoice_paid(platform, &code, &paid)),
-            )];
-            outs.extend(notice);
-            Ok((WebAppPayment::Paid(paid), outs))
-        }
-        Err(PayError::AlreadyPaid) => Ok((WebAppPayment::AlreadyPaid, Vec::new())),
-        Err(PayError::Expired) => Ok((WebAppPayment::Expired, Vec::new())),
-        Err(PayError::Own) => Ok((WebAppPayment::OwnInvoice, Vec::new())),
-        Err(PayError::Insufficient { available, due }) => Ok((
-            WebAppPayment::InsufficientFunds {
-                available,
-                needed: due,
-            },
-            Vec::new(),
-        )),
-        Err(PayError::NotFound) => Err(SimError::UnknownInvoice(code)),
-    }
-}
-
-/// `open_webapp`: открыть мини-приложение по URL кнопки «Оплатить».
-pub(crate) fn open_webapp(
-    st: &mut WorldState,
-    acc: AccountId,
-    bot: Platform,
-    button_url: &str,
-) -> Result<String, TransportError> {
-    let invalid = || rpc("WEBAPP_URL_INVALID");
-    if bot != Platform::CryptoBot {
-        return Err(invalid());
-    }
-    let rest = button_url
-        .strip_prefix("https://")
-        .and_then(|r| r.strip_prefix(WEBAPP_HOST))
-        .and_then(|r| r.strip_prefix("/invoice?"))
-        .ok_or_else(invalid)?;
-    let code = query_param(rest, "code").ok_or_else(invalid)?;
-    let asset = query_param(rest, "asset")
-        .and_then(|a| Asset::from_str(&a).ok())
-        .ok_or_else(invalid)?;
-    if !st.invoices.contains_key(&code) {
-        return Err(invalid());
-    }
-    let id = st.next_session_id();
-    st.sessions.insert(
-        id,
-        super::state::WebAppSession {
-            account: acc,
-            code: code.clone(),
-            asset,
-            attempts_left: PIN_ATTEMPTS,
-            used: false,
-        },
-    );
-    Ok(format!(
-        "https://{WEBAPP_HOST}/invoice?code={code}&asset={}&session={id}#tgWebAppData=user%3D{}",
-        asset.code(),
-        acc.0
-    ))
-}
-
-/// Значение параметра `name` из строки запроса (до `#`).
 pub(crate) fn query_param(query: &str, name: &str) -> Option<String> {
     let query = query.split('#').next()?;
     let query = query.rsplit('?').next()?;
@@ -884,10 +775,9 @@ mod tests {
 
     #[test]
     fn query_params() {
-        let url =
-            "https://pay.send.sim.invalid/invoice?code=IVx&asset=USDT&session=7#tgWebAppData=a";
-        assert_eq!(query_param(url, "code").as_deref(), Some("IVx"));
-        assert_eq!(query_param(url, "session").as_deref(), Some("7"));
-        assert_eq!(query_param(url, "tgWebAppData"), None);
+        let url = "https://t.me/send?start=IVx&ref=promo#frag";
+        assert_eq!(query_param(url, "start").as_deref(), Some("IVx"));
+        assert_eq!(query_param(url, "ref").as_deref(), Some("promo"));
+        assert_eq!(query_param(url, "frag"), None);
     }
 }

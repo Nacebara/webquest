@@ -14,14 +14,12 @@ use rust_decimal_macros::dec;
 use sqlx::PgPool;
 use storage::ledger::PostingRefs;
 use userbot::flows::FlowConfig;
-use userbot::sim::{AccountId, SimTransport, SimWebAppPayer, SimWorld};
+use userbot::sim::{AccountId, SimTransport, SimWorld};
 use userbot::{AccountGate, UserbotWallet, WalletBot};
 
 pub const CB: Platform = Platform::CryptoBot;
 pub const XR: Platform = Platform::XRocket;
 pub const CLIENT: i64 = 111;
-/// PIN кошелька CryptoBot юзербота в симуляторе (шаг мини-приложения при оплате счёта).
-pub const PIN: &str = "2580";
 
 pub fn usdt(x: Decimal) -> Money {
     Money::new(x, Asset::Usdt).unwrap()
@@ -55,15 +53,10 @@ pub async fn env(pool: PgPool) -> Env {
 
 /// То же с заданными настройками сценариев юзербота.
 pub async fn env_with(pool: PgPool, flow: FlowConfig) -> Env {
-    build(pool, flow, true).await
+    build(pool, flow).await
 }
 
-/// Без шага PIN: счёт CryptoBot платит оператор (как до записи HAR мини-приложения).
-pub async fn env_without_payer(pool: PgPool) -> Env {
-    build(pool, fast(), false).await
-}
-
-async fn build(pool: PgPool, flow: FlowConfig, payer: bool) -> Env {
+async fn build(pool: PgPool, flow: FlowConfig) -> Env {
     let world = SimWorld::new();
     let ub = world.add_account("exch_ub");
     let client = world.add_account("client");
@@ -129,6 +122,19 @@ async fn build(pool: PgPool, flow: FlowConfig, payer: bool) -> Env {
     )
     .await
     .unwrap();
+    // Лимит без код-пароля CryptoBot — как в бою: владелец ставит максимум ($30 000) и в самом
+    // CryptoBot, и в настройке (DESIGN-v0.2 Р11). Сам лимит проверяют отдельные тесты.
+    storage::settings::set(
+        &mut tx,
+        "cb_passcode_free_limit_usd",
+        &serde_json::json!(30_000),
+        None,
+    )
+    .await
+    .unwrap();
+    world
+        .set_passcode_free_limit(ub, Some(dec!(30000)))
+        .unwrap();
     storage::users::upsert(&mut tx, CLIENT, &storage::users::Profile::default())
         .await
         .unwrap();
@@ -138,14 +144,10 @@ async fn build(pool: PgPool, flow: FlowConfig, payer: bool) -> Env {
     let gate = Arc::new(AccountGate::new("ub-1"));
     let mut wallets = HashMap::new();
     let mut engine = engine;
-    world.set_pin(ub, PIN).unwrap();
     for platform in [CB, XR] {
-        let mut w =
-            UserbotWallet::new(platform, transport.clone(), gate.clone()).with_config(flow.clone());
-        if payer {
-            w = w.with_payer(Arc::new(SimWebAppPayer::new(world.clone(), PIN)));
-        }
-        let w = Arc::new(w);
+        let w = Arc::new(
+            UserbotWallet::new(platform, transport.clone(), gate.clone()).with_config(flow.clone()),
+        );
         engine = engine.with_wallet(w.clone() as Arc<dyn WalletBot>);
         wallets.insert(platform, w);
     }

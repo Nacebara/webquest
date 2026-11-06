@@ -2,8 +2,8 @@
 //! юзербота и движка без сети.
 //!
 //! Один детерминированный [`SimWorld`] (общий `Arc<Mutex<…>>`) держит балансы аккаунтов по
-//! платформам и активам, реестры чеков и счетов, сообщения в чатах, инлайн-запросы и сессии
-//! мини-приложения. [`SimTransport`] — реализация [`crate::Transport`] для одного аккаунта;
+//! платформам и активам, реестры чеков и счетов, сообщения в чатах, инлайн-запросы и траты
+//! CryptoBot для «лимита без код-пароля». [`SimTransport`] — реализация [`crate::Transport`] для одного аккаунта;
 //! экземпляров на мир может быть сколько угодно (по одному на аккаунт Telegram).
 //!
 //! Что умеют боты (тексты — [`texts`], совместимы со словарями lovec):
@@ -18,9 +18,10 @@
 //!   «Недостаточно средств»;
 //! - инлайн: `10usdt` у @send, `10` у @xrocket → результаты по активам; чек создаётся
 //!   в момент `send_inline`, сообщение «через бота» несёт URL-кнопку со ссылкой;
-//! - счета `IV…` / `inv_…`: карточка, кнопки валют, «Оплатить»; у CryptoBot — кнопка
-//!   мини-приложения: `open_webapp` даёт URL сессии, шаг PIN —
-//!   [`SimWorld::complete_webapp_payment`]; статусы оплачен / истёк, многоразовые счета;
+//! - счета `IV…` / `inv_…`: карточка, кнопки валют, «Оплатить» — кнопка в чате у обоих;
+//!   CryptoBot просит код-пароль, если траты аккаунта за 24 часа вместе с этой выше «лимита
+//!   без код-пароля» ([`SimWorld::set_passcode_free_limit`], по умолчанию $500); статусы
+//!   оплачен / истёк, многоразовые счета;
 //! - экран «Кошелёк» (`/wallet`), входящие переводы «Вы получили 5 USDT от @x.».
 //!
 //! Дубль `random_id` в `send_text` / `send_inline` → `RandomIdDuplicate` без последствий.
@@ -36,12 +37,10 @@
 
 mod bots;
 mod model;
-mod payer;
 mod state;
 pub mod texts;
 mod transport;
 
-use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
@@ -49,9 +48,8 @@ use domain::{Asset, Decimal, Money, Platform};
 
 pub use model::{
     AccountId, Call, CheckOrigin, CheckSpec, CheckStatus, ClaimOutcome, Fault, InvoiceAmount,
-    InvoicePayment, InvoiceSpec, SimCheck, SimError, SimInvoice, SimInvoiceStatus, WebAppPayment,
+    InvoicePayment, InvoiceSpec, SimCheck, SimError, SimInvoice, SimInvoiceStatus,
 };
-pub use payer::SimWebAppPayer;
 pub use transport::SimTransport;
 
 use state::{Delayed, Draft, Op, Outbound, WorldState};
@@ -145,9 +143,13 @@ impl SimWorld {
         Ok(())
     }
 
-    /// PIN мини-приложения CryptoBot. Пока не задан, подходит любой.
-    pub fn set_pin(&self, account: AccountId, pin: &str) -> Result<(), SimError> {
-        self.lock().account_mut(account)?.pin = Some(pin.to_owned());
+    /// CryptoBot «лимит без код-пароля» аккаунта (USD за 24 часа); `None` — код всегда.
+    pub fn set_passcode_free_limit(
+        &self,
+        account: AccountId,
+        limit: Option<Decimal>,
+    ) -> Result<(), SimError> {
+        self.lock().account_mut(account)?.passcode_free_limit = limit;
         Ok(())
     }
 
@@ -338,21 +340,6 @@ impl SimWorld {
             inv.status = SimInvoiceStatus::Expired;
         }
         Ok(())
-    }
-
-    /// Шаг PIN мини-приложения CryptoBot: `url` — то, что вернул `open_webapp`.
-    /// При успехе деньги списаны, счёт оплачен, в чат плательщика приходит
-    /// «✅ Счёт IV… оплачен.», создателю — уведомление.
-    pub fn complete_webapp_payment(&self, url: &str, pin: &str) -> Result<WebAppPayment, SimError> {
-        let session = bots::query_param(url, "session")
-            .and_then(|s| u64::from_str(&s).ok())
-            .filter(|_| url.contains(bots::WEBAPP_HOST))
-            .ok_or_else(|| SimError::UnknownSession(url.to_owned()))?;
-        let mut st = self.lock();
-        st.tick();
-        let (result, outs) = bots::complete_webapp(&mut st, session, pin)?;
-        st.publish_all(outs);
-        Ok(result)
     }
 
     // ---------- сообщения ----------

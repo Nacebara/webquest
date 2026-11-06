@@ -57,6 +57,11 @@ pub struct EngineConfig {
     pub stale_after: Duration,
     /// Как часто повторять сверку выплат с неизвестным исходом и искать осиротевшие.
     pub housekeeping_every: Duration,
+    /// «Лимит без код-пароля» аккаунта CryptoBot, USD за скользящие 24 часа (DESIGN-v0.2 Р11).
+    /// Должен совпадать с настройкой в самом CryptoBot («Безопасность» → «Лимит без код-пароля»).
+    /// Траты кошелька CryptoBot держим ниже него с запасом — бот не спросит код никогда.
+    /// `None` — не ограничивать (только если в CryptoBot код-пароль выключен совсем).
+    pub cb_passcode_free_limit: Option<Decimal>,
 }
 
 impl Default for EngineConfig {
@@ -70,6 +75,8 @@ impl Default for EngineConfig {
             escalate_after: Duration::from_secs(1800),
             stale_after: Duration::from_secs(900),
             housekeeping_every: Duration::from_secs(30),
+            // Значение CryptoBot по умолчанию.
+            cb_passcode_free_limit: Some(Decimal::from(500)),
         }
     }
 }

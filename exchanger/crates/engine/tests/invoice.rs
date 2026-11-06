@@ -8,7 +8,7 @@ mod common;
 
 use std::time::Duration;
 
-use common::{CB, CLIENT, Env, XR, env, env_without_payer, usdt};
+use common::{CB, CLIENT, Env, XR, env, usdt};
 use domain::fsm::{OpKind, OrderState};
 use domain::{Asset, Decimal, Direction, Money};
 use engine::{InvoiceIssue, InvoiceReject, InvoiceSubmitted, SubmitReject, Submitted};
@@ -409,9 +409,11 @@ async fn one_invoice_is_paid_once(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]
-async fn cryptobot_invoice_without_the_pin_step_goes_to_a_human(pool: PgPool) {
-    let e = env_without_payer(pool).await;
-    open_invoices(&e).await;
+async fn passcode_request_from_cryptobot_goes_to_a_human(pool: PgPool) {
+    let e = setup(pool).await;
+    // В CryptoBot лимит без код-пароля выключен, хотя движок считает его $500: бот спросит
+    // код. Код мы не вводим — заявка уходит человеку, деньги не двигались.
+    e.world.set_passcode_free_limit(e.ub, None).unwrap();
     let inv = shop_invoice(&e, InvoiceSpec::crypto(CB, usdt(dec!(10))));
     let order = quoted(&e, &inv).await;
     pay_in(&e, &order, XR, dec!(10.30)).await;
@@ -419,7 +421,7 @@ async fn cryptobot_invoice_without_the_pin_step_goes_to_a_human(pool: PgPool) {
 
     let (o, d) = e.order(order.id).await;
     assert_eq!(o.state, OrderState::ManualReview);
-    assert!(d.manual_reason.unwrap().contains("pay manually"));
+    assert!(d.manual_reason.unwrap().contains("passcode"));
     assert_eq!(
         e.world.invoice(&inv.code).unwrap().status,
         SimInvoiceStatus::Active
@@ -578,5 +580,80 @@ async fn second_check_waits_while_the_first_is_checked(pool: PgPool) {
     e.drain().await;
     let (o, _) = e.order(order.id).await;
     assert_eq!(o.state, OrderState::Completed);
+    e.assert_books_match().await;
+}
+
+// ============================== лимит без код-пароля CryptoBot (DESIGN-v0.2 Р11) ==============================
+
+async fn set_passcode_limit(e: &Env, usd: u32) {
+    let mut conn = e.pool.acquire().await.unwrap();
+    storage::settings::set(
+        &mut conn,
+        "cb_passcode_free_limit_usd",
+        &serde_json::json!(usd),
+        None,
+    )
+    .await
+    .unwrap();
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn cryptobot_spending_stays_under_the_passcode_free_limit(pool: PgPool) {
+    let e = setup(pool).await;
+    // Лимит $100 → тратим не больше $95 за 24 часа (запас 5 %), хотя резерв — 1000 USDT.
+    set_passcode_limit(&e, 100).await;
+
+    // 96 + комиссия 3 % = 98.88 — в пределах заявки (100), но больше 95.
+    let big = shop_invoice(&e, InvoiceSpec::crypto(CB, usdt(dec!(96))));
+    assert_eq!(
+        rejected(submit_invoice(&e, &big).await),
+        InvoiceReject::NoReserve { max: dec!(95) }
+    );
+
+    // Оплаченный счёт на 60 входит в траты за 24 часа.
+    let first = shop_invoice(&e, InvoiceSpec::crypto(CB, usdt(dec!(60))));
+    let order = quoted(&e, &first).await;
+    pay_in(&e, &order, XR, dec!(61.80)).await;
+    e.drain().await;
+    let (o, _) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::Completed);
+    assert_eq!(
+        e.world.invoice(&first.code).unwrap().status,
+        SimInvoiceStatus::Paid
+    );
+
+    // 60 потрачено: осталось 35. Котировка держит удержание — оно тоже считается.
+    let second = shop_invoice(&e, InvoiceSpec::crypto(CB, usdt(dec!(40))));
+    assert_eq!(
+        rejected(submit_invoice(&e, &second).await),
+        InvoiceReject::NoReserve { max: dec!(35) }
+    );
+    let third = shop_invoice(&e, InvoiceSpec::crypto(CB, usdt(dec!(30))));
+    let held_order = quoted(&e, &third).await;
+    let mut conn = e.pool.acquire().await.unwrap();
+    let (cb_wallet, _) = storage::wallets::active(&mut conn, CB)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        storage::holds::committed_spend_24h(&mut conn, cb_wallet)
+            .await
+            .unwrap(),
+        dec!(90)
+    );
+    // Котировка истекла — удержание снято, запас вернулся.
+    expire_quote(&e, held_order.id).await;
+    assert_eq!(e.engine.expire_quotes().await.unwrap(), 1);
+    assert_eq!(
+        storage::holds::committed_spend_24h(&mut conn, cb_wallet)
+            .await
+            .unwrap(),
+        dec!(60)
+    );
+    drop(conn);
+
+    // xRocket лимит CryptoBot не касается.
+    let xr = shop_invoice(&e, InvoiceSpec::crypto(XR, usdt(dec!(96))));
+    let _ = quoted(&e, &xr).await;
     e.assert_books_match().await;
 }

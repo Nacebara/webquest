@@ -14,7 +14,7 @@ use tokio::sync::broadcast;
 use userbot::flows::{FlowConfig, MemoryLog, rid};
 use userbot::sim::{
     AccountId, Call, CheckOrigin, CheckSpec, Fault, InvoiceSpec, SimInvoiceStatus, SimTransport,
-    SimWebAppPayer, SimWorld,
+    SimWorld,
 };
 use userbot::transport::{
     CallbackAnswer, Chat, InlineResults, RawMessage, Transport, TransportError,
@@ -846,33 +846,12 @@ async fn inspect_reads_the_invoice_card() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn cryptobot_invoice_without_pin_step_goes_to_a_human() {
+async fn cryptobot_invoice_is_paid_by_one_press_without_passcode() {
     let e = env();
     e.fund(CB, dec!(25));
     let code = shop_invoice(&e, CB, usdt(dec!(10)));
     let out = e
         .wallet(CB)
-        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
-        .await
-        .unwrap();
-    assert!(matches!(out, PayOutcome::NeedsHuman { .. }), "{out:?}");
-    assert_eq!(e.balance(CB), dec!(25));
-    assert_eq!(
-        e.world.invoice(&code).unwrap().status,
-        SimInvoiceStatus::Active
-    );
-}
-
-#[tokio::test(start_paused = true)]
-async fn cryptobot_invoice_is_paid_through_the_mini_app() {
-    let e = env();
-    e.fund(CB, dec!(25));
-    e.world.set_pin(e.ub, "2580").unwrap();
-    let code = shop_invoice(&e, CB, usdt(dec!(10)));
-    let wallet = e
-        .wallet(CB)
-        .with_payer(Arc::new(SimWebAppPayer::new(e.world.clone(), "2580")));
-    let out = wallet
         .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
         .await
         .unwrap();
@@ -885,20 +864,28 @@ async fn cryptobot_invoice_is_paid_through_the_mini_app() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn wrong_pin_pays_nothing_and_goes_to_a_human() {
+async fn passcode_request_pays_nothing_and_goes_to_a_human() {
     let e = env();
     e.fund(CB, dec!(25));
-    e.world.set_pin(e.ub, "2580").unwrap();
+    // Лимит без код-пароля меньше счёта: CryptoBot спросит код. Код мы не вводим никогда.
+    e.world
+        .set_passcode_free_limit(e.ub, Some(dec!(5)))
+        .unwrap();
     let code = shop_invoice(&e, CB, usdt(dec!(10)));
-    let wallet = e
+    let out = e
         .wallet(CB)
-        .with_payer(Arc::new(SimWebAppPayer::new(e.world.clone(), "0000")));
-    let out = wallet
         .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
         .await
         .unwrap();
-    assert!(matches!(out, PayOutcome::NeedsHuman { .. }), "{out:?}");
+    let PayOutcome::NeedsHuman { reason } = &out else {
+        panic!("ждали NeedsHuman: {out:?}");
+    };
+    assert!(reason.contains("passcode"), "{reason}");
     assert_eq!(e.balance(CB), dec!(25));
+    assert_eq!(
+        e.world.invoice(&code).unwrap().status,
+        SimInvoiceStatus::Active
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -1008,17 +995,14 @@ async fn invoice_problems_are_reported_without_paying() {
 async fn fiat_invoice_is_checked_against_the_amount_due() {
     let e = env();
     e.fund(CB, dec!(50));
-    e.world.set_pin(e.ub, "1111").unwrap();
     e.world.set_fiat_rate(Asset::Usdt, "USD", dec!(1));
     let code = e
         .world
         .create_invoice(InvoiceSpec::fiat(CB, dec!(10), "USD", &[Asset::Usdt]).by(e.shop))
         .unwrap()
         .code;
-    let wallet = e
+    let out = e
         .wallet(CB)
-        .with_payer(Arc::new(SimWebAppPayer::new(e.world.clone(), "1111")));
-    let out = wallet
         .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
         .await
         .unwrap();

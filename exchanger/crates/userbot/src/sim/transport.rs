@@ -206,12 +206,12 @@ impl Transport for SimTransport {
             return Err(TransportError::NotAuthorized);
         }
         st.tick();
-        let fault = st.take_fault(acc, Call::OpenWebApp);
-        if let Some(e) = before_effect(fault.as_ref()) {
-            return Err(e);
-        }
-        let url = bots::open_webapp(&mut st, acc, bot, button_url)?;
-        finish(url, fault.as_ref())
+        // Мини-приложений в денежных сценариях нет (DESIGN-v0.2 Р4): ни одной не откроем.
+        let _ = (bot, button_url);
+        Err(TransportError::Rpc {
+            code: 400,
+            name: "WEBAPP_URL_INVALID".to_owned(),
+        })
     }
 
     async fn history(

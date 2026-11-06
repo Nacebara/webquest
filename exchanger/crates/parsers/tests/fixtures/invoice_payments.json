@@ -1,5 +1,5 @@
 {
-  "about": "Ответ бота на «Оплатить» (classify_invoice_payment). Тексты синтетические. Paid — только по явной фразе успеха: голое «Счёт оплачен» может значить «оплачен кем-то раньше», это unknown. Признаки нескольких классов — unknown. class: paid | already_paid | expired | insufficient_funds | unknown.",
+  "about": "Ответ бота на «Оплатить» (classify_invoice_payment). Тексты синтетические. Paid — только по явной фразе успеха: голое «Счёт оплачен» может значить «оплачен кем-то раньше», это unknown. Признаки нескольких классов — unknown. class: paid | already_paid | expired | insufficient_funds | passcode_required | unknown. passcode_required — термин CryptoBot «код-пароль» (траты за 24 часа выше лимита без код-пароля); точный текст — после записи.",
   "cases": [
     { "platform": "cryptobot", "text": "Вы оплатили счёт на 5 USDT", "class": "paid" },
     { "platform": "cryptobot", "text": "✅ Счёт успешно оплачен", "class": "paid" },
@@ -18,6 +18,8 @@
     { "platform": "cryptobot", "text": "Счёт не оплачен", "class": "unknown" },
     { "platform": "cryptobot", "text": "Недостаточно средств, счёт истёк", "class": "unknown" },
     { "platform": "cryptobot", "text": "Ошибка, попробуйте позже", "class": "unknown" },
-    { "platform": "cryptobot", "text": "", "class": "unknown" }
+    { "platform": "cryptobot", "text": "", "class": "unknown" },
+    { "platform": "cryptobot", "text": "Траты за последние 24 часа превышают лимит. Введите код-пароль, чтобы подтвердить операцию.", "class": "passcode_required" },
+    { "platform": "cryptobot", "text": "Enter your passcode to confirm", "class": "passcode_required" }
   ]
 }

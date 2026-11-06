@@ -84,7 +84,8 @@ pub enum PayOutcome {
     AlreadyPaid,
     Expired,
     InsufficientFunds,
-    /// Нужен человек: PIN в мини-приложении без известного протокола, незнакомый экран.
+    /// Нужен человек: бот просит код-пароль, кнопка ведёт в мини-приложение, незнакомый экран.
+    /// Деньги не двигались.
     NeedsHuman {
         reason: String,
     },
@@ -138,7 +139,7 @@ pub trait WalletBot: Send + Sync {
     /// Открыть чужой счёт без оплаты.
     async fn inspect_invoice(&self, param: &str) -> Result<InvoiceInfo, BotError>;
 
-    /// Оплатить чужой счёт: валюта кнопкой → «Оплатить» → (CryptoBot) мини-приложение и PIN.
+    /// Оплатить чужой счёт: валюта кнопкой → «Оплатить» — одно нажатие, без код-пароля.
     async fn pay_invoice(
         &self,
         param: &str,

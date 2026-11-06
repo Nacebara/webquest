@@ -408,6 +408,7 @@ fn invoice_payment_fixtures() {
             "already_paid" => InvoicePayReply::AlreadyPaid,
             "expired" => InvoicePayReply::Expired,
             "insufficient_funds" => InvoicePayReply::InsufficientFunds,
+            "passcode_required" => InvoicePayReply::PasscodeRequired,
             "unknown" => InvoicePayReply::Unknown,
             other => panic!("unknown payment class in fixture: {other}"),
         };

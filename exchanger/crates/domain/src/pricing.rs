@@ -205,6 +205,18 @@ pub fn max_order_effective(limits: Limits, available: Decimal, safety: Decimal) 
     (eff >= limits.min_amount).then_some(eff)
 }
 
+/// Доля «лимита без код-пароля» CryptoBot, которую оставляем про запас: траты владельца руками
+/// в том же аккаунте и расхождение курса USD/USDT (DESIGN-v0.2 Р11).
+pub const PASSCODE_MARGIN: Decimal = Decimal::from_parts(5, 0, 0, false, 2);
+
+/// Сколько ещё можно потратить с аккаунта CryptoBot за скользящие 24 часа, чтобы бот не спросил
+/// код-пароль: `limit · (1 − PASSCODE_MARGIN) − committed`, не меньше нуля. `committed` — уже
+/// потрачено и обещано (удержания под выплаты) за 24 часа.
+pub fn passcode_free_headroom(limit: Decimal, committed: Decimal) -> Decimal {
+    let cap = limit * (Decimal::ONE - PASSCODE_MARGIN);
+    (cap - committed).max(Decimal::ZERO)
+}
+
 /// Сколько пришло относительно требуемой суммы (SPEC §4, П6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Funding {
@@ -239,6 +251,17 @@ pub fn classify_funding(received: Decimal, required: Decimal, min_refund: Decima
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn passcode_headroom_keeps_a_margin_and_never_goes_negative() {
+        assert_eq!(PASSCODE_MARGIN, dec!(0.05));
+        assert_eq!(passcode_free_headroom(dec!(500), dec!(0)), dec!(475));
+        assert_eq!(passcode_free_headroom(dec!(500), dec!(400)), dec!(75));
+        assert_eq!(passcode_free_headroom(dec!(500), dec!(475)), dec!(0));
+        assert_eq!(passcode_free_headroom(dec!(500), dec!(900)), dec!(0));
+        assert_eq!(passcode_free_headroom(dec!(0), dec!(0)), dec!(0));
+        assert_eq!(passcode_free_headroom(dec!(30000), dec!(1000)), dec!(27500));
+    }
+
     use super::*;
     use proptest::prelude::*;
     use rust_decimal_macros::dec;

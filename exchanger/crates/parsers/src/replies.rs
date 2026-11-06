@@ -433,8 +433,15 @@ pub enum InvoicePayReply {
     AlreadyPaid,
     Expired,
     InsufficientFunds,
+    /// Бот просит код-пароль: траты за 24 часа вышли за «лимит без код-пароля» CryptoBot.
+    /// Код мы не вводим никогда — оплата не состоялась, нужен человек.
+    PasscodeRequired,
     Unknown,
 }
+
+/// Термин самого CryptoBot («Траты без код-пароля», объявление владельцу, 6 ноября 2026).
+/// Точный текст запроса неизвестен до записи (docs/RECORDING.md) — пока только термин.
+const PASSCODE: &[&str] = &["код-пароль", "код пароль", "passcode"];
 
 const ALREADY_PAID: &[&str] = &[
     "уже оплачен",
@@ -471,6 +478,7 @@ pub fn classify_invoice_payment(platform: Platform, text: &str) -> InvoicePayRep
     let _ = platform;
     let t = normalize(text);
     let classes = [
+        (has(&t, PASSCODE), InvoicePayReply::PasscodeRequired),
         (has(&t, ALREADY_PAID), InvoicePayReply::AlreadyPaid),
         (has(&t, INSUFFICIENT), InvoicePayReply::InsufficientFunds),
         (affirmed(&t, &EXPIRED_WORDS), InvoicePayReply::Expired),
@@ -834,6 +842,8 @@ mod tests {
             ("Недостаточно средств", P::InsufficientFunds),
             ("Insufficient funds", P::InsufficientFunds),
             ("Not enough USDT", P::InsufficientFunds),
+            ("Введите код-пароль", P::PasscodeRequired),
+            ("Enter your passcode", P::PasscodeRequired),
             // Голое «оплачен» — кем? Не угадываем.
             ("Счёт оплачен", P::Unknown),
             ("Счёт не оплачен", P::Unknown),

@@ -224,6 +224,8 @@ pub const INVOICE_NOT_FOUND: &str = "Счёт не найден.";
 pub const INVOICE_ALREADY_PAID: &str = "Этот счёт уже оплачен.";
 pub const INVOICE_EXPIRED: &str = "Срок действия счёта истёк.";
 pub const INVOICE_OWN: &str = "Нельзя оплатить собственный счёт.";
+/// Синтетика по объявлению CryptoBot «Траты без код-пароля»; точный текст — после записи.
+pub const PASSCODE_REQUIRED: &str = "Траты за последние 24 часа превышают лимит без код-пароля. Введите код-пароль, чтобы подтвердить операцию.";
 pub const CHOOSE_PAY_ASSET: &str = "Выберите валюту для оплаты.";
 
 pub struct CardView<'a> {

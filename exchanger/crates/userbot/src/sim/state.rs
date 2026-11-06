@@ -24,9 +24,6 @@ const BROADCAST_CAPACITY: usize = 4096;
 /// Первый id сообщения аккаунта (как у живого аккаунта с историей).
 const FIRST_MSG_ID: i32 = 1000;
 const FIRST_USER_ID: i64 = 7_000_000_001;
-/// Попыток PIN в одной сессии мини-приложения.
-pub(crate) const PIN_ATTEMPTS: u32 = 3;
-
 /// Детерминированный ГПСЧ (SplitMix64): коды чеков и счетов одинаковы от запуска к запуску.
 pub(crate) struct SplitMix64(u64);
 
@@ -113,8 +110,11 @@ pub(crate) struct AccountState {
     pub username: String,
     pub premium: bool,
     pub channels: BTreeSet<String>,
-    /// PIN мини-приложения CryptoBot; `None` — подходит любой.
-    pub pin: Option<String>,
+    /// CryptoBot «Траты без код-пароля»: до этой суммы (USD за 24 часа, вместе с текущей
+    /// операцией) код не спрашивают; `None` — спрашивают всегда. По умолчанию $500.
+    pub passcode_free_limit: Option<Decimal>,
+    /// Траты CryptoBot для лимита: (мс Unix, USD).
+    pub cb_spends: Vec<(i64, Decimal)>,
     pub balances: BTreeMap<(Platform, Asset), Decimal>,
     next_msg_id: i32,
     pub chats: HashMap<Chat, Vec<RawMessage>>,
@@ -149,28 +149,18 @@ pub(crate) struct InlineQuery {
     pub items: Vec<(String, InlineItem)>,
 }
 
-pub(crate) struct WebAppSession {
-    pub account: AccountId,
-    pub code: String,
-    pub asset: Asset,
-    pub attempts_left: u32,
-    pub used: bool,
-}
-
 pub(crate) struct WorldState {
     pub now_ms: i64,
     pub tick_ms: i64,
     rng: SplitMix64,
     next_user_id: i64,
     next_query_id: i64,
-    next_session_id: u64,
     pub accounts: BTreeMap<AccountId, AccountState>,
     pub checks: BTreeMap<String, SimCheck>,
     pub check_order: Vec<String>,
     pub invoices: BTreeMap<String, SimInvoice>,
     pub invoice_order: Vec<String>,
     pub inline_queries: HashMap<i64, InlineQuery>,
-    pub sessions: HashMap<u64, WebAppSession>,
     /// Сколько единиц фиата стоит 1 единица актива: `(USDT, "USD") = 1`.
     pub fiat_rates: BTreeMap<(Asset, String), Decimal>,
     /// xRocket отвечает «не найден» на первый `/start` чека моложе этого окна (мс).
@@ -188,14 +178,12 @@ impl WorldState {
             rng: SplitMix64(seed),
             next_user_id: FIRST_USER_ID,
             next_query_id: 1,
-            next_session_id: 1,
             accounts: BTreeMap::new(),
             checks: BTreeMap::new(),
             check_order: Vec::new(),
             invoices: BTreeMap::new(),
             invoice_order: Vec::new(),
             inline_queries: HashMap::new(),
-            sessions: HashMap::new(),
             fiat_rates,
             xrocket_fresh_window_ms: None,
         }
@@ -221,7 +209,8 @@ impl WorldState {
                 username: username.trim_start_matches('@').to_owned(),
                 premium: false,
                 channels: BTreeSet::new(),
-                pin: None,
+                passcode_free_limit: Some(Decimal::from(500)),
+                cb_spends: Vec::new(),
                 balances: BTreeMap::new(),
                 next_msg_id: FIRST_MSG_ID,
                 chats: HashMap::new(),
@@ -317,7 +306,40 @@ impl WorldState {
             .entry((platform, m.asset()))
             .or_insert(Decimal::ZERO);
         *slot = (*slot - m.amount()).normalize();
+        if platform == Platform::CryptoBot {
+            let usd = self.usd_value(&m);
+            let now = self.now_ms;
+            self.account_mut(id)?.cb_spends.push((now, usd));
+        }
         Ok(())
+    }
+
+    /// Стоимость в USD по курсам мира (USDT = 1 USD); неизвестный курс — номинал.
+    fn usd_value(&self, m: &Money) -> Decimal {
+        let rate = self
+            .fiat_rates
+            .get(&(m.asset(), "USD".to_owned()))
+            .copied()
+            .unwrap_or(Decimal::ONE);
+        m.amount() * rate
+    }
+
+    /// Спросит ли CryptoBot код-пароль: траты за 24 часа вместе с `m` выше лимита.
+    pub fn passcode_needed(&self, id: AccountId, m: &Money) -> bool {
+        let Ok(acc) = self.account(id) else {
+            return true;
+        };
+        let Some(limit) = acc.passcode_free_limit else {
+            return true;
+        };
+        let since = self.now_ms - 24 * 3600 * 1000;
+        let spent: Decimal = acc
+            .cb_spends
+            .iter()
+            .filter(|(at, _)| *at > since)
+            .map(|(_, usd)| *usd)
+            .sum();
+        spent + self.usd_value(m) > limit
     }
 
     // ---------- реестры ----------
@@ -461,12 +483,6 @@ impl WorldState {
     pub fn next_query_id(&mut self) -> i64 {
         let id = self.next_query_id;
         self.next_query_id += 1;
-        id
-    }
-
-    pub fn next_session_id(&mut self) -> u64 {
-        let id = self.next_session_id;
-        self.next_session_id += 1;
         id
     }
 

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n             COALESCE((SELECT SUM(o.amount) FROM operations o JOIN assets a ON a.code = o.asset\n                        WHERE o.wallet_account_id = $1 AND a.is_stable\n                          AND o.kind IN ('create_payout_check', 'create_refund_check',\n                                         'create_excess_check', 'pay_invoice', 'withdrawal')\n                          AND o.status IN ('pending', 'dispatched', 'succeeded', 'unknown')\n                          AND COALESCE(o.dispatched_at, o.created_at) > now() - interval '24 hours'), 0)\n           + COALESCE((SELECT SUM(h.amount) FROM holds h JOIN assets a ON a.code = h.asset\n                        WHERE h.wallet_account_id = $1 AND a.is_stable AND h.state = 'active'), 0)\n           AS \"total!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "total!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int2"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0068b364895fbdd8bf0dd073611f590b5d4586659228d8d33ff664e330ff8c45"
+}

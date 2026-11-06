@@ -34,7 +34,6 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use domain::{Asset, Money, Platform};
-use serde::{Deserialize, Serialize};
 
 pub use gate::AccountGate;
 pub use issue::{is_marker, marker_text};
@@ -138,35 +137,12 @@ impl MessageLog for MemoryLog {
     }
 }
 
-/// Итог шага мини-приложения оплаты (CryptoBot: PIN и подтверждение).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum WebAppOutcome {
-    Paid,
-    AlreadyPaid,
-    Expired,
-    InsufficientFunds,
-    /// Точно не оплачено (неверный PIN, блокировка, отказ) — нужен человек.
-    NotPaid(String),
-    /// Запрос оплаты ушёл, исход неизвестен.
-    Unknown(String),
-}
-
-/// Проход мини-приложения оплаты по URL сессии из `Transport::open_webapp`.
-///
-/// Протокол мини-приложения CryptoBot неизвестен до записи HAR владельцем (HANDOVER §7,
-/// п. 4). Пока реализации нет, `pay_invoice` у CryptoBot заканчивается `NeedsHuman`.
-#[async_trait]
-pub trait WebAppPayer: Send + Sync {
-    async fn pay(&self, platform: Platform, session_url: &str) -> WebAppOutcome;
-}
-
 /// Кошелёк одной платформы на аккаунте юзербота.
 pub struct UserbotWallet<T: Transport> {
     platform: Platform,
     transport: Arc<T>,
     gate: Arc<AccountGate>,
     log: Arc<dyn MessageLog>,
-    payer: Option<Arc<dyn WebAppPayer>>,
     cfg: FlowConfig,
 }
 
@@ -187,18 +163,12 @@ impl<T: Transport> UserbotWallet<T> {
             transport,
             gate,
             log: Arc::new(NoLog),
-            payer: None,
             cfg: FlowConfig::default(),
         }
     }
 
     pub fn with_log(mut self, log: Arc<dyn MessageLog>) -> Self {
         self.log = log;
-        self
-    }
-
-    pub fn with_payer(mut self, payer: Arc<dyn WebAppPayer>) -> Self {
-        self.payer = Some(payer);
         self
     }
 
