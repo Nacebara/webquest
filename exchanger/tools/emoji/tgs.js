@@ -25,7 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { COLOR, MONO } = require('./icons');
+const { COLOR, MONO, MONO_W } = require('./icons');
 
 const SIZE = 512;
 const FPS = 60;
@@ -1063,19 +1063,16 @@ const ROOT_MONO = [KM, 0, 0, KM, 0.6 * KM, 0.6 * KM];
 
 const svgColor = (body) => `<svg viewBox="0 0 24 24">${body}</svg>`;
 const svgMono = (body) =>
-  `<svg viewBox="-0.6 -0.6 25.2 25.2"><g fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
+  `<svg viewBox="-0.6 -0.6 25.2 25.2"><g fill="none" stroke="#fff" stroke-width="${MONO_W}" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
 
-function colorLottie(key) {
-  const icon = COLOR[key];
-  if (!icon.anim) return lottieFrom(key, [svgColor(icon.svg(null))], ROOT_COLOR, false);
+// Все значки анимированы: кадр на каждый шаг петли, t = i / FRAMES (первый и последний совпадают).
+function animated(key, icon, wrap, root) {
   const svgs = [];
-  for (let i = 0; i <= FRAMES; i++) svgs.push(svgColor(icon.svg(i / FRAMES)));
-  return lottieFrom(key, svgs, ROOT_COLOR, true);
+  for (let i = 0; i <= FRAMES; i++) svgs.push(wrap(icon(i / FRAMES)));
+  return lottieFrom(key, svgs, root, true);
 }
-
-function monoLottie(key) {
-  return lottieFrom(key, [svgMono(MONO[key])], ROOT_MONO, false);
-}
+const colorLottie = (key) => animated(key, COLOR[key], svgColor, ROOT_COLOR);
+const monoLottie = (key) => animated(key, MONO[key], svgMono, ROOT_MONO);
 
 function tgs(doc) {
   return zlib.gzipSync(Buffer.from(JSON.stringify(doc)), { level: 9 });
@@ -1105,6 +1102,6 @@ function main() {
   console.log(`моно: ${sum('mono')}, цвет: ${sum('color')}; крупнейшие: ${big.map((r) => `${r.kind}/${r.key} ${r.bytes}`).join(', ')}`);
 }
 
-module.exports = { colorLottie, monoLottie, lottieFrom, drawables, parsePathD, tgs, FRAMES, STATIC_FRAMES };
+module.exports = { colorLottie, monoLottie, lottieFrom, drawables, parsePathD, tgs, FRAMES, STATIC_FRAMES, svgColor, svgMono };
 
 if (require.main === module) main();

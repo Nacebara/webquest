@@ -23,7 +23,12 @@ LIMIT = 64 * 1024
 # Средняя разница на пиксель (0..255) и доля заметно разных пикселей — после лёгкого
 # размытия: сглаживание краёв у rlottie и librsvg разное, а сдвиг формы или пропавшая
 # деталь размытие переживают.
-MAX_MEAN = 2.0
+# Разница до QUANT уровней из 255 не считается: столько даёт 8-битный градиент и сведение слоёв
+# в rlottie — ровный сдвиг цвета по всей плитке, глазом не виден. Форма и сдвиги контура дают на
+# краях десятки уровней и в среднее попадают почти целиком. Порог MAX_MEAN подобран так, что
+# сдвиг контура на 1 px из 256 уже не проходит (≈ 1,0–1,5), а чистые кадры дают до ≈ 0,35.
+QUANT = 3
+MAX_MEAN = 0.8
 MAX_BAD = 0.004
 FORBIDDEN_LAYER_TYPES = {1: "solid", 2: "image", 5: "text"}
 
@@ -89,7 +94,7 @@ def diff(a, b):
     for color in BACKGROUNDS:
         d = ImageChops.difference(on_bg(a, color).filter(blur), on_bg(b, color).filter(blur)).convert("L")
         hist = d.histogram()
-        mean = sum(i * c for i, c in enumerate(hist)) / total
+        mean = sum(max(0, i - QUANT) * c for i, c in enumerate(hist)) / total
         bad = sum(hist[40:]) / total
         if worst is None or (mean, bad) > worst[:2]:
             worst = (mean, bad, d)

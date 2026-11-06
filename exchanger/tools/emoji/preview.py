@@ -19,7 +19,7 @@ THEMES = (
 )
 BIG = 64
 SMALL = 20
-PHASES = (0.0, 0.15, 0.3, 0.5, 0.75)
+PHASES = (0.0, 0.1, 0.2, 0.3, 0.45)
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
 
