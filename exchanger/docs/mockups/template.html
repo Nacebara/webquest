@@ -243,7 +243,7 @@ figcaption span { color: var(--muted); font-size: 13.5px; }
 <div class="wrap">
   <header class="top">
     <div class="brand"><i class="ce" data-k="color/swap">🔁</i><h1>Макеты exch</h1></div>
-    <p class="lead">Версия 2. Клиент — ваш вариант B в трёх доработках и весь путь в том же стиле. Пульт — ваш вариант А, доработанный, с управлением аккаунтами юзерботов. Эмодзи на странице — наши TGS, как их покажет Telegram.</p>
+    <p class="lead">Версия 2, решения приняты: клиент — вариант B1, пульт — вариант А с управлением аккаунтами юзерботов, «в работе» — три точки. Эмодзи на странице — наши TGS, как их покажет Telegram.</p>
   </header>
   <nav class="tabs" role="tablist" aria-label="Разделы">
     <a class="tab" role="tab" href="#client" data-view="client">Клиент <span class="n" id="n-client"></span></a>
@@ -277,7 +277,7 @@ const LABELS = JSON.parse(document.getElementById('emoji-labels').textContent);
 const STR = {};
 const str = (k) => (STR[k] ||= JSON.stringify(EMOJI[k]));
 const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const FB = { process_orbit: '🔄', prog_25: '◔', prog_50: '◑', prog_75: '◕', phone: '📱', plug: '🔌', inbox: '📥', server: '🖥', wallet: '👛', done: '✅', err: '❌', warn: '⚠️', process: '🔄', wait: '⏳', swap: '🔁', sending: '📤', refund: '↩️', manual: '🔎', invoice: '🧾', usdt: '💲', fast: '⚡', alarm: '🚨', live: '🟢', confetti: '🎉', dot_ok: '🟢', dot_wait: '🟠', dot_act: '🔴', dot_work: '🔵', dot_closed: '⚪', step_done: '✅', step_now: '🔵', step_todo: '⚪', shield: '🛡', lock: '🔒', kill: '⛔', pause: '⏸', robot: '🤖', vault: '🏦', broadcast: '📣', history: '🕘', rates: '📈', support: '💬', ban: '🚫', limit: '📏', maint: '🛠', flood: '⌛', cb: '🔷', xr: '🚀' };
+const FB = { prog_25: '◔', prog_50: '◑', prog_75: '◕', phone: '📱', plug: '🔌', inbox: '📥', server: '🖥', wallet: '👛', done: '✅', err: '❌', warn: '⚠️', process: '🔄', wait: '⏳', swap: '🔁', sending: '📤', refund: '↩️', manual: '🔎', invoice: '🧾', usdt: '💲', fast: '⚡', alarm: '🚨', live: '🟢', confetti: '🎉', dot_ok: '🟢', dot_wait: '🟠', dot_act: '🔴', dot_work: '🔵', dot_closed: '⚪', step_done: '✅', step_now: '🔵', step_todo: '⚪', shield: '🛡', lock: '🔒', kill: '⛔', pause: '⏸', robot: '🤖', vault: '🏦', broadcast: '📣', history: '🕘', rates: '📈', support: '💬', ban: '🚫', limit: '📏', maint: '🛠', flood: '⌛', cb: '🔷', xr: '🚀' };
 
 // ── эмодзи: lottie по требованию, моно перекрашиваем в цвет текста ─────────────
 const io = new IntersectionObserver((entries) => {
@@ -402,7 +402,7 @@ const PROG = {
 };
 const VARIANTS = [
   {
-    id: 'B1', name: 'Как вы выбрали',
+    id: 'B1', name: 'Как вы выбрали', pick: true, badge: 'выбрано',
     idea: 'Вариант B без изменений: строка на шаг, детали — отдельной кнопкой.',
     plus: ['Самый короткий текст', 'Детали не мешают'],
     minus: ['«Детали» — лишний запрос к боту и правка сообщения'],
@@ -413,7 +413,7 @@ const VARIANTS = [
     },
   },
   {
-    id: 'B2', name: 'Детали внутри', pick: true,
+    id: 'B2', name: 'Детали внутри',
     idea: 'То же, но детали — в свёрнутой цитате Telegram: раскрываются тапом прямо в сообщении, без запроса к боту. Кнопок на одну меньше, сумма — на зелёной кнопке.',
     plus: ['Одна главная кнопка — забрать', 'Детали открываются мгновенно, даже без связи с ботом', 'Предупреждение «не пересылайте» рядом с деталями'],
     minus: ['В старых клиентах цитата раскрыта сразу — сообщение чуть длиннее'],
@@ -446,7 +446,8 @@ const FLOW = [
   { t: 'Проверяю', tag: 'одно окно', n: 'Сообщение появляется сразу и дальше только правится.', m: PROG['Проверяю'] },
   { t: 'Отправляю', n: 'Деньги уже у нас, сумма выплаты не меняется.', m: PROG['Отправляю'] },
   { t: 'Дольше обычного', n: 'Через 20 секунд добавляется строка-успокоение. Через 2 минуты — «проверяю вручную».', m: PROG['Долго'] },
-  { t: 'Готово', tag: 'вариант B2', n: 'Зелёная кнопка — забрать. Детали свёрнуты. Если прошло больше минуты — итог новым сообщением, чтобы пришло уведомление.', m: VARIANTS[1].states['Готово'] },
+  { t: 'Готово', tag: 'вариант B1', n: 'Зелёная кнопка — забрать. Детали — кнопкой. Если прошло больше минуты — итог новым сообщением, чтобы пришло уведомление.', m: VARIANTS[0].states['Готово'] },
+  { t: 'Детали', tag: 'вариант B1', n: 'По кнопке «Детали» бот правит то же сообщение: сумма, комиссия, номер заявки.', m: VARIANTS[0].states['Детали'] },
   { t: 'Курс и лимиты', tag: 'rich · /terms', n: 'Статус направления — точкой. Пауза видна сразу, не надо пробовать.',
     m: [R(`<h3>{rates} Курс и лимиты</h3><div class="tw"><table><tr><th></th><th>Куда</th><th class="r">Комиссия</th><th class="r">USDT</th></tr><tr><td>{dot_ok}</td><td>CryptoBot → xRocket</td><td class="r">2.5&nbsp;%</td><td class="r">1–500</td></tr><tr><td>{dot_ok}</td><td>xRocket → CryptoBot</td><td class="r">1.5&nbsp;%</td><td class="r">1–500</td></tr><tr><td>{dot_ok}</td><td>Счёт CryptoBot</td><td class="r">2.5&nbsp;%</td><td class="r">1–300</td></tr><tr><td>{dot_wait}</td><td>Счёт xRocket</td><td class="r">—</td><td class="r">пауза</td></tr></table></div><p>Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.</p><footer>Обновлено 14:05</footer>`, [[['Обменять', 'swap', 'primary'], ['Простой вид', 'eye']]])] },
   { t: 'Счёт: к оплате', n: 'Сумма к оплате — на синей кнопке, срок цены — одной строкой.',
@@ -527,8 +528,8 @@ ord-…-payout     unknown → failed</pre></details><details><summary>Отве�
       m: [R(`<h3>{swap} Замена ub-1 → ub-3</h3><ul class="tasks"><li>{step_done}<span>ub-3 подключён и проверен</span></li><li>{step_done}<span>Новые заявки идут на ub-2 и ub-3</span></li><li>{step_now}<span>ub-1 доводит 1 заявку…</span></li><li>{step_todo}<span>Остатки ub-1 → ub-3: 1 240.00 CB · 410.00 xR</span></li><li>{step_todo}<span>Выход ub-1, его сессии завершены</span></li></ul><footer>Перевод — внутренняя проводка, без комиссии</footer>`, [[['Отменить замену', 'close']]], { edited: true })] },
     { t: 'Вход сброшен', tag: 'critical', n: 'Сессия умерла — аккаунт сам встаёт на паузу, заявки идут через другие. Войти заново — те же 4 шага.', bot: 'ops', topic: 'Ошибки',
       m: [B(`{alarm} <b>ub-2: вход сброшен</b>\nTelegram завершил сессию. ub-2 на паузе, заявки идут через ub-1.`, [[['Войти заново', 'plug', 'primary']], [['Заменить', 'swap'], ['Отключить', 'power']]], { time: '14:15' })] },
-    { t: 'Приложение Telegram', n: 'api_id и api_hash. Общее приложение — с сервера; своё — если нужно развести аккаунты.', bot: 'ops',
-      m: [B(`<b>Приложение Telegram</b>\nОбщее для всех аккаунтов, из настроек сервера.\napi_id <code>2•••••7</code> · api_hash <code>•••••••3f</code>`, [[['Своё для ub-3', 'edit']], [['Назад', 'back']]], { time: '15:05' })] },
+    { t: 'API-ключи', n: 'Одно общее приложение Telegram на все аккаунты (ваше решение). Ключи — только в окружении сервера, в пульте их не вводят.', bot: 'ops',
+      m: [B(`<b>Приложение Telegram</b>\nОдно на все аккаунты, из настроек сервера.\napi_id <code>2•••••7</code> · api_hash <code>•••••••3f</code>`, [[['Назад', 'back']]], { time: '15:05' })] },
     { t: 'Сессии', n: 'Все входы во все аккаунты. Незнакомые — красным, завершаются одной кнопкой.', bot: 'ops',
       m: [R(`<h3>{-shield} Сессии</h3><div class="tw"><table><tr><td>{dot_ok}</td><td>ub-1 · сервер exch</td><td>DE</td><td class="r">сейчас</td></tr><tr><td>{dot_act}</td><td>ub-1 · iPhone 15</td><td>NL</td><td class="r">13:58</td></tr><tr><td>{dot_ok}</td><td>ub-2 · сервер exch</td><td>DE</td><td class="r">сейчас</td></tr></table></div>`, [[['Завершить чужие', 'ban', 'danger']], [['Обновить', 'refresh']]])] },
     { t: 'Новая авторизация', tag: 'critical', n: 'В тему «Безопасность». «Это я» закрывает тихо, «Завершить» — убивает сессию.', bot: 'ops', topic: 'Безопасность',
@@ -642,7 +643,7 @@ function stateCard(d) {
   const names = Object.keys(d.states);
   const last = d.start ?? names.indexOf('Готово');
   const first = last >= 0 ? last : 0;
-  return `<div class="dir${d.pick ? ' pick' : ''}" data-dir="${d.id}"><h3>${d.id}. ${d.name}${d.pick ? '<span class="badge">рекомендую</span>' : ''}</h3><p>${d.idea}</p><div class="chips" role="group" aria-label="Состояние">${names.map((s, i) => `<button type="button" class="chip" id="st-${d.id}-${i}" data-state="${s}" aria-pressed="${i === first}">${s}</button>`).join('')}<button type="button" class="chip play" id="st-${d.id}-play" data-play="1">▶ Проиграть</button></div><div class="slot">${phoneHTML({ m: d.states[names[first]], noinput: true, bot: d.bot })}</div><ul>${d.plus.map((x) => `<li>${x}</li>`).join('')}${d.minus.map((x) => `<li>− ${x}</li>`).join('')}</ul></div>`;
+  return `<div class="dir${d.pick ? ' pick' : ''}" data-dir="${d.id}"><h3>${d.id}. ${d.name}${d.pick ? `<span class="badge">${d.badge || 'рекомендую'}</span>` : ''}</h3><p>${d.idea}</p><div class="chips" role="group" aria-label="Состояние">${names.map((s, i) => `<button type="button" class="chip" id="st-${d.id}-${i}" data-state="${s}" aria-pressed="${i === first}">${s}</button>`).join('')}<button type="button" class="chip play" id="st-${d.id}-play" data-play="1">▶ Проиграть</button></div><div class="slot">${phoneHTML({ m: d.states[names[first]], noinput: true, bot: d.bot })}</div><ul>${d.plus.map((x) => `<li>${x}</li>`).join('')}${d.minus.map((x) => `<li>− ${x}</li>`).join('')}</ul></div>`;
 }
 function wireStates(root, list) {
   root.querySelectorAll('.dir').forEach((el) => {
@@ -671,7 +672,7 @@ function wireStates(root, list) {
 }
 function renderClient() {
   const v = document.getElementById('view-client');
-  v.innerHTML = `<div class="block"><header><h2>Вариант B — три доработки<small>B1–B3</small></h2><p>Ваш выбор — вариант B. Ниже он сам и две доработки: один обмен, чек CryptoBot на 100 USDT → чек xRocket. Переключайте шаги или нажмите «Проиграть»: в боте это одно сообщение, которое правится. Рекомендую B2.</p></header><div class="grid wide">${VARIANTS.map(stateCard).join('')}</div></div>` +
+  v.innerHTML = `<div class="block"><header><h2>Вариант B<small>выбран B1</small></h2><p>Вы выбрали B1. Рядом — две доработки для сравнения: один обмен, чек CryptoBot на 100 USDT → чек xRocket. Переключайте шаги или нажмите «Проиграть»: в боте это одно сообщение, которое правится.</p></header><div class="grid wide">${VARIANTS.map(stateCard).join('')}</div></div>` +
     block('Путь клиента', FLOW.length + ' экранов', 'Всё остальное — в том же коротком стиле: строка итога, детали свёрнуты, деньги на кнопках. Денежный поток — обычные сообщения (работают в любом Telegram), справка — rich с простым вариантом.', FLOW);
   wireStates(v, VARIANTS);
 }
@@ -679,7 +680,7 @@ function renderAdmin() {
   const v = document.getElementById('view-admin');
   const total = ADMIN.reduce((n, g) => n + g.items.length, 0);
   const dash = [
-    { t: 'Обычный день', tag: 'рекомендую', n: 'Первая строка отвечает «надо ли мне что-то делать». Счётчики — на кнопках, резерв — в процентах от цели.', bot: 'ops', m: [U('/dash', { time: '14:05' }), DASH_OK] },
+    { t: 'Обычный день', tag: 'выбрано', n: 'Первая строка отвечает «надо ли мне что-то делать». Счётчики — на кнопках, резерв — в процентах от цели.', bot: 'ops', m: [U('/dash', { time: '14:05' }), DASH_OK] },
     { t: 'Пожар', n: 'Что горит — наверху и красным: недостача, сброшенный вход, пауза выплат. Красные кнопки — только сейчас.', bot: 'ops', m: [DASH_FIRE] },
     { t: 'Тишина', n: 'Решать нечего — так и написано. Остаются цифры дня и резервы.', bot: 'ops', m: [DASH_CALM] },
   ];
@@ -704,7 +705,6 @@ function renderEmoji() {
   const nMono = keys.length - nColor;
   v.innerHTML = `<div class="block"><header><h2>Эмодзи v2<small>${keys.length}</small></h2><p>Линии тоньше, анимированы все. Правило движения одно: короткий жест в начале петли, потом покой. Постоянно двигается только то, что идёт сейчас: «в работе», «ждём», «в пути», тревога. Каждый кадр сверен с движком Telegram на тёмной и светлой теме.</p></header>
   <div class="emoji-board"><div class="inline-demo">${fmt('{done} <b>97.50 USDT</b> ждут вас &nbsp; {process} Проверяю &nbsp; {prog_50} 612 из 1 284 &nbsp; {-swap} {-history} {-settings} {-robot}')}</div></div></div>
-  <div class="block"><header><h2>«В работе» — выберите<small>2</small></h2><p>Прежний значок заменён. Предлагаю два: точки бегут волной (по умолчанию) и точка на орбите.</p></header><div class="emoji-board"><div class="egrid">${['process', 'process_orbit'].map((k) => `<div class="etile big"><i class="ce" data-k="color/${k}" aria-hidden="true">🔄</i><b>${LABELS[k]}</b><code>${k}</code></div>`).join('')}</div></div></div>
   <div class="block"><header><h2>Цветные<small>${nColor}</small></h2><p>Статусы и плитки. Telegram их не перекрашивает: цвет несёт смысл. Шкал больше нет — вместо них кольца прогресса.</p></header><div class="emoji-board"><div class="egrid">${tiles('color')}</div></div></div>
   <div class="block"><header><h2>Линейные<small>${nMono}</small></h2><p>Для кнопок и строк. Telegram красит их в цвет текста темы: на кнопках белые, в тексте — как текст.</p></header><div class="emoji-board"><div class="egrid">${tiles('mono')}</div></div></div>`;
 }

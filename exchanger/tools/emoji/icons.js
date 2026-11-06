@@ -273,14 +273,6 @@ const COLOR = {
       .join('');
     return tile('pr', C.blue, dots);
   },
-  // Другой вариант «в работе»: точка кружит по тонкой орбите, два оборота за петлю.
-  process_orbit: (t) => {
-    const a = t == null ? 0 : 720 * t;
-    const rot = Math.abs(a % 360) < 0.01 ? '' : rotAt(a % 360);
-    return tile('po', C.blue, `<circle cx="12" cy="12" r="5.6" stroke-opacity=".45"/>${grp(rot, `<circle cx="12" cy="6.4" r="1.75" fill="${W}" stroke="none"/>`)}`, {
-      sw: 1.5,
-    });
-  },
   // Ждём: минутная стрелка делает оборот за петлю.
   wait: (t) => {
     const a = t == null ? 0 : 360 * t;
@@ -607,7 +599,7 @@ const MONO = {
 
 // Подписи — для превью-листа и админки «Эмодзи».
 const LABELS = {
-  done: 'Готово', swap: 'Обмен', process: 'В работе', process_orbit: 'В работе (вариант)', wait: 'Ждём', err: 'Ошибка',
+  done: 'Готово', swap: 'Обмен', process: 'В работе', wait: 'Ждём', err: 'Ошибка',
   warn: 'Внимание', refund: 'Возврат', manual: 'Ручная проверка', invoice: 'Счёт', sending: 'Чек в пути', usdt: 'USDT',
   cb: 'CryptoBot', xr: 'xRocket', shield: 'Защита', lock: 'Приватность', rates: 'Курс', history: 'История',
   support: 'Поддержка', fast: 'Быстро', pause: 'Пауза', ban: 'Бан', alarm: 'Тревога', live: 'На связи',
