@@ -103,7 +103,10 @@ fn outcome(reply: ActivationReply, raw: RawMessage) -> ActivationOutcome {
         ActivationReply::Captcha => rejected(RejectReason::Captcha),
         ActivationReply::PasswordRequired => rejected(RejectReason::PasswordProtected),
         ActivationReply::PremiumOnly => rejected(RejectReason::PremiumOnly),
-        ActivationReply::InProgress
+        // xRocket «уже активирован вами»: чек открыл этот аккаунт раньше (прошлая попытка,
+        // ответ на которую потерялся). Деньги у нас, но этим ответом не подтверждены — сверка.
+        ActivationReply::AlreadyActivatedByUs
+        | ActivationReply::InProgress
         | ActivationReply::ClaimNotice
         | ActivationReply::IncomingTransfer { .. }
         | ActivationReply::Unknown => ActivationOutcome::Unknown { raw: Some(raw) },

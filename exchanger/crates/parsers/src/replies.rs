@@ -29,6 +29,9 @@ pub enum ActivationReply {
     },
     /// «Этот чек уже активирован».
     AlreadyActivated,
+    /// xRocket «Этот перевод уже активирован вами» — чек открыл этот же аккаунт раньше (повтор
+    /// команды после потерянного ответа). Деньги у нас, но зачислены не этим ответом: сверка.
+    AlreadyActivatedByUs,
     /// «Чек не найден», «Мульти-чек не найден», «не существует».
     NotFound,
     /// «Вы не можете активировать этот чек» — чек персональный для другого.
@@ -73,7 +76,10 @@ fn is_invisible(c: char) -> bool {
     matches!(
         c,
         '\u{00ad}'
+            | '\u{061c}'
             | '\u{200b}'..='\u{200f}'
+            | '\u{202a}'..='\u{202e}'
+            | '\u{2066}'..='\u{2069}'
             | '\u{2060}'..='\u{2064}'
             | '\u{feff}'
             | '\u{fe00}'..='\u{fe0f}'
@@ -146,6 +152,8 @@ const WRONG_PASSWORD: &[&str] = &[
     "incorrect password",
     "invalid password",
 ];
+/// Живая запись 6 ноября 2026: xRocket отличает «уже активирован вами» от «уже активирован».
+const LOST_BY_US: &[&str] = &["уже активирован вами", "already activated by you"];
 const LOST: &[&str] = &[
     "уже активирован",
     "уже получен",
@@ -192,8 +200,17 @@ const IN_PROGRESS: &[&str] = &[
 /// `lang_code = "en"`, SPEC §1.3).
 const CLAIM_SUBJECT: &[&str] = &["ваш чек", "your check", "your cheque"];
 const CLAIM_VERB: &[&str] = &["активировал", "получил", "activated", "claimed", "received"];
-/// Отправитель во входящем переводе: «Вы получили 5 USDT от @x» (lovec AUDIT.md:82).
+/// Отправитель во входящем переводе: «Вы получили 5 USDT от @x» (lovec AUDIT.md:82),
+/// «📥 Вы получили 🪙 4.77 USDT ($4.76) от Spins | Wins.» (живая запись CryptoBot: без `@`).
 const FROM_SENDER: &[&str] = &["от @", "from @", "от пользователя", "from user"];
+
+/// «… получили <сумма> … от <имя>» / «… received … from <name>»: имя отправителя после фразы
+/// получения. Победа по чеку («Вы получили 5 USDT ($4.99).») такого хвоста не имеет.
+static FROM_NAME: LazyLock<Regex> = LazyLock::new(|| {
+    // Шаблон постоянный и покрыт тестами: ошибка здесь — ошибка сборки, а не данных.
+    #[allow(clippy::expect_used)]
+    Regex::new(r"(?:получили|received)\b.*\s(?:от|from)\s+\S").expect("sender regex is valid")
+});
 /// Чек только для Telegram Premium (SPEC §1.3).
 const PREMIUM: &[&str] = &["premium", "премиум"];
 
@@ -204,7 +221,7 @@ const PREMIUM: &[&str] = &["premium", "премиум"];
 /// 1. неверный пароль — раньше всего (в нём есть «пароль», но это не новый запрос пароля);
 /// 2. «ваш чек» + «активировал»/«получил» — уведомление о нашем чеке (`ClaimNotice`);
 /// 3. «вы получили … от @» — входящий перевод, а не выигрыш (ловушка lovec AUDIT.md:82);
-/// 4. уже активирован; 5. только Premium (если нет фразы получения); 6. не для вас;
+/// 4. уже активирован (вами — отдельно); 5. только Premium (если нет фразы получения); 6. не для вас;
 /// 7. получили — `Received` только с суммой в поддерживаемом активе, иначе `Unknown`;
 /// 8. не найден; 9. капча; 10. пароль; 11. подписка; 12. обработка; иначе `Unknown`.
 pub fn classify_activation(platform: Platform, text: &str) -> ActivationReply {
@@ -221,13 +238,15 @@ pub fn classify_activation(platform: Platform, text: &str) -> ActivationReply {
         return ActivationReply::ClaimNotice;
     }
     let won = has(&t, WON);
-    if won && has(&t, FROM_SENDER) {
+    if won && (has(&t, FROM_SENDER) || FROM_NAME.is_match(&t)) {
         return match money() {
             Some((amount, asset)) => ActivationReply::IncomingTransfer { amount, asset },
             None => ActivationReply::Unknown,
         };
     }
-    if has(&t, LOST) {
+    if has(&t, LOST_BY_US) {
+        ActivationReply::AlreadyActivatedByUs
+    } else if has(&t, LOST) {
         ActivationReply::AlreadyActivated
     } else if !won && has(&t, PREMIUM) {
         ActivationReply::PremiumOnly
@@ -301,18 +320,25 @@ pub fn parse_created_check(
 // Счета
 // ---------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InvoiceStatus {
     Active,
     Paid,
     Expired,
+    #[default]
     Unknown,
 }
 
 /// Карточка чужого счёта после `/start IV…` или `/start inv_…`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InvoiceCard {
     pub status: InvoiceStatus,
+    /// Номер счёта в тексте бота: CryptoBot «IV69544493», xRocket «INV7276063» (не код ссылки).
+    #[serde(default)]
+    pub number: Option<String>,
+    /// Бот сразу предложил пополнить баланс: на нашем кошельке не хватает на этот счёт.
+    #[serde(default)]
+    pub insufficient_funds: bool,
     /// Сумма в активе, если счёт в крипте.
     pub amount: Option<(Decimal, Asset)>,
     /// Сумма в фиате и код валюты, если счёт в фиате.
@@ -400,6 +426,7 @@ pub fn parse_invoice_card(platform: Platform, text: &str) -> InvoiceCard {
         fiat,
         single_use,
         description: description(text),
+        ..InvoiceCard::default()
     }
 }
 
@@ -449,8 +476,14 @@ const ALREADY_PAID: &[&str] = &[
     "already paid",
     "already been paid",
 ];
-pub(crate) const INSUFFICIENT: &[&str] =
-    &["недостаточно", "не хватает", "insufficient", "not enough"];
+pub(crate) const INSUFFICIENT: &[&str] = &[
+    "недостаточно",
+    "не хватает",
+    "insufficient",
+    "not enough",
+    // CryptoBot (живая запись): вместо отказа сразу предлагает пополнить баланс в сети.
+    "выберите сеть для оплаты",
+];
 /// Только явные фразы успешной оплаты: голое «Счёт оплачен» может означать и «оплачен
 /// кем-то раньше» — тогда `Unknown`, и движок идёт в сверку.
 const PAID_NOW: &[&str] = &[
@@ -501,26 +534,64 @@ pub fn classify_invoice_payment(platform: Platform, text: &str) -> InvoicePayRep
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BalanceLine {
     pub asset: Asset,
+    /// Доступно: сколько можно потратить прямо сейчас (без удержанного).
     pub amount: Decimal,
+    /// На удержании: созданные, но ещё не забранные чеки (CryptoBot «На удержании: 1 USDT»).
+    #[serde(default)]
+    pub held: Decimal,
 }
+
+/// Подписи строк под балансом актива (живой экран CryptoBot «👛 Кошелёк»).
+const HELD_LABEL: &[&str] = &["на удержании", "on hold", "held"];
+const AVAILABLE_LABEL: &[&str] = &["доступно", "available"];
 
 /// Экран «Кошелёк» бота: доступные балансы по активам.
 ///
 /// Построчно: `Tether: 10.5 USDT` или `USDT: 10.5`. Неясное число в строке — строка
 /// пропускается. Актив, который встретился дважды с разными суммами, не возвращается вовсе:
 /// лучше «баланс неизвестен», чем неверный.
+///
+/// Под строкой актива CryptoBot может показать «На удержании: 1 USDT» и «Доступно: 3.28 USDT»:
+/// тогда `amount` — доступное, `held` — удержанное. Удержание без «Доступно» или строки с
+/// другим активом — баланс этого актива не возвращается.
 pub fn parse_balance(platform: Platform, text: &str) -> Vec<BalanceLine> {
     let mut out: Vec<BalanceLine> = Vec::new();
     let mut conflicted: Vec<Asset> = Vec::new();
+    // Последний актив, к которому относятся строки «На удержании» / «Доступно».
+    let mut last: Option<Asset> = None;
+    let mut held: Vec<(Asset, Decimal)> = Vec::new();
+    let mut available: Vec<(Asset, Decimal)> = Vec::new();
     for line in text.lines() {
+        let norm = normalize(line);
+        let label = if AVAILABLE_LABEL.iter().any(|l| norm.starts_with(l)) {
+            Some(&mut available)
+        } else if HELD_LABEL.iter().any(|l| norm.starts_with(l)) {
+            Some(&mut held)
+        } else {
+            None
+        };
+        if let Some(target) = label {
+            match (balance_in_line(line, platform), last) {
+                (Some((asset, v)), Some(prev)) if asset == prev => target.push((asset, v)),
+                // Подпись без суммы своего актива — не гадаем.
+                (_, Some(prev)) => conflicted.push(prev),
+                (_, None) => {}
+            }
+            continue;
+        }
         let Some((asset, amount)) = balance_in_line(line, platform) else {
             continue;
         };
+        last = Some(asset);
         if conflicted.contains(&asset) {
             continue;
         }
         match out.iter().position(|b| b.asset == asset) {
-            None => out.push(BalanceLine { asset, amount }),
+            None => out.push(BalanceLine {
+                asset,
+                amount,
+                held: Decimal::ZERO,
+            }),
             Some(i) if out[i].amount == amount => {}
             Some(i) => {
                 out.remove(i);
@@ -528,6 +599,24 @@ pub fn parse_balance(platform: Platform, text: &str) -> Vec<BalanceLine> {
             }
         }
     }
+    out.retain(|b| !conflicted.contains(&b.asset));
+    for b in &mut out {
+        let hold = held.iter().find(|(a, _)| *a == b.asset).map(|(_, v)| *v);
+        let avail = available
+            .iter()
+            .find(|(a, _)| *a == b.asset)
+            .map(|(_, v)| *v);
+        match (hold, avail) {
+            (None, None) => {}
+            (hold, Some(avail)) if avail <= b.amount => {
+                b.held = hold.unwrap_or(b.amount - avail);
+                b.amount = avail;
+            }
+            // Удержание без «Доступно» или доступно больше всего баланса — не верим.
+            _ => b.amount = Decimal::NEGATIVE_ONE,
+        }
+    }
+    out.retain(|b| b.amount >= Decimal::ZERO);
     out
 }
 
@@ -854,46 +943,61 @@ mod tests {
         }
     }
 
+    fn line(asset: Asset, amount: Decimal) -> BalanceLine {
+        BalanceLine {
+            asset,
+            amount,
+            held: Decimal::ZERO,
+        }
+    }
+
     #[test]
     fn balances() {
         let cb =
             "👛 Кошелёк\n\nTether: 10.5 USDT ≈ $10.50\nToncoin: 1.2 TON ≈ $3.00\nBitcoin: 0 BTC";
         assert_eq!(
             parse_balance(CB, cb),
-            vec![
-                BalanceLine {
-                    asset: Asset::Usdt,
-                    amount: dec!(10.5)
-                },
-                BalanceLine {
-                    asset: Asset::Ton,
-                    amount: dec!(1.2)
-                },
-            ]
+            vec![line(Asset::Usdt, dec!(10.5)), line(Asset::Ton, dec!(1.2)),]
         );
         let xr = "💎 TONCOIN: 0.5\n💵 USDT: 1 234,56";
         assert_eq!(
             parse_balance(XR, xr),
             vec![
-                BalanceLine {
-                    asset: Asset::Ton,
-                    amount: dec!(0.5)
-                },
-                BalanceLine {
-                    asset: Asset::Usdt,
-                    amount: dec!(1234.56)
-                },
+                line(Asset::Ton, dec!(0.5)),
+                line(Asset::Usdt, dec!(1234.56)),
             ]
         );
         // Один актив с разными суммами — не знаем, какая верная.
         assert_eq!(
             parse_balance(CB, "USDT: 10\nUSDT: 12\nTON: 1"),
-            vec![BalanceLine {
-                asset: Asset::Ton,
-                amount: dec!(1)
-            }]
+            vec![line(Asset::Ton, dec!(1))]
         );
         assert_eq!(parse_balance(CB, ""), vec![]);
         assert_eq!(parse_balance(CB, "USDT: 1,234"), vec![]);
+    }
+
+    /// Живой экран CryptoBot (запись 6 ноября 2026): созданный, но не забранный чек держит
+    /// деньги «на удержании» — тратить можно только «Доступно».
+    #[test]
+    fn cryptobot_wallet_with_a_hold() {
+        let text = "👛 Кошелёк\n\n🪙 Tether: 4.28271 USDT ($4.28)\nНа удержании: 1 USDT ($1)\nДоступно: 3.28271 USDT ($3.28)\n\n🪙 Gram: 0.01482 GRAM ($0.02)\n\n≈ 0.00005492 BTC ($4.30)";
+        assert_eq!(
+            parse_balance(CB, text),
+            vec![BalanceLine {
+                asset: Asset::Usdt,
+                amount: dec!(3.28271),
+                held: dec!(1),
+            }]
+        );
+        // Удержание без строки «Доступно» — баланс этого актива неизвестен.
+        assert_eq!(
+            parse_balance(CB, "🪙 Tether: 4 USDT ($4)\nНа удержании: 1 USDT ($1)"),
+            vec![]
+        );
+        // «Доступно» больше всего баланса — не верим.
+        assert_eq!(
+            parse_balance(CB, "🪙 Tether: 4 USDT\nДоступно: 5 USDT"),
+            vec![]
+        );
     }
 }

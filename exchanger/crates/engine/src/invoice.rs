@@ -201,6 +201,15 @@ impl Engine {
         // Открыть счёт, ничего не платя. Транзакция БД во время действия юзербота не держится.
         let wallet = self.wallet(link.platform)?.clone();
         let amount = match wallet.inspect_invoice(&link.param).await {
+            // Бот кошелька сразу предложил пополнить баланс: на этот счёт у нас не хватает, а сумму
+            // он не показал. Клиенту — «временно не можем», владельцу — резерв ниже нужного.
+            Ok(info) if info.card.insufficient_funds => {
+                tracing::warn!(
+                    platform = link.platform.db_name(),
+                    "our wallet cannot cover this invoice: the bot offers a top-up"
+                );
+                return Ok(InvoiceSubmitted::Rejected(InvoiceReject::WalletUnavailable));
+            }
             Ok(info) => match payable_amount(&info.card) {
                 Ok(amount) => amount,
                 Err(issue) => {
@@ -649,9 +658,8 @@ mod tests {
         InvoiceCard {
             status,
             amount: Some((dec!(10), Asset::Usdt)),
-            fiat: None,
             single_use: Some(true),
-            description: None,
+            ..InvoiceCard::default()
         }
     }
 

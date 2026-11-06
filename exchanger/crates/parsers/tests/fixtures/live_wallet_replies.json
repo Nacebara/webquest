@@ -1,0 +1,2695 @@
+{
+ "about": "Живые ответы @send и @xrocket из записи владельца 6 ноября 2026 (exch listen). Коды чеков и счетов перемешаны с сохранением формата, имена людей и магазинов заменены. Смысл каждого ответа размечен по значению. kind: activation | invoice_screen | invoice_card | check_creation | balance.",
+ "cases": [
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "📥 Вы получили 🪙 5 USDT ($4.99).",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "5",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "🦋 ⁨Ivan⁩ активировал(а) ваш чек и получил(а) 🪙 5 USDT ($4.99).",
+   "buttons": [],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "👌",
+   "buttons": [],
+   "urls": [],
+   "expect": "progress"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Вы оплатили счёт #IV17661985 на сумму 0.7226 USD (0.7234 USDT).\n\nПолучатель: Shop\n \n🧾 описание",
+   "buttons": [
+    [
+     "Перейти в бот"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/"
+   ],
+   "expect": [
+    "paid",
+    "IV17661985",
+    "0.7234",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "balance",
+   "platform": "cryptobot",
+   "text": "👛 Кошелёк\n\n🪙 Tether: 4.28271 USDT ($4.28)\nНа удержании: 1 USDT ($1)\nДоступно: 3.28271 USDT ($3.28)\n\n🪙 Gram: 0.01482 GRAM ($0.02)\n\n🪙 Solana: 0.00004789 SOL\n\n🪙 Litecoin: 0.00000617 LTC\n\n🪙 TRON: 0.0004 TRX\n\n🪙 Bitcoin: 0 BTC\n\n🪙 Ethereum: 0 ETH\n\n🪙 Dogecoin: 0 DOGE\n\n🪙 Binance Coin: 0 BNB\n\n🪙 USD Coin: 0 USDC\n\n🪙 Tether Gold: 0 XAUT\n\n≈ 0.00005492 BTC ($4.30)",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ],
+    [
+     "Пополнить",
+     "Вывести"
+    ],
+    [
+     "Скрыть мелкие балансы"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "3.28271",
+     "USDT",
+     "1"
+    ]
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "​Здесь вы можете создать чек для мгновенной отправки криптовалюты любому пользователю. Смотреть видеоинструкцию ›",
+   "buttons": [
+    [
+     "Создать чек"
+    ],
+    [
+     "Создать из чата"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": "unknown"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "Выберите сеть для оплаты счёта в USDT.",
+   "buttons": [
+    [
+     "TON (TON)"
+    ],
+    [
+     "Tron (TRC20)"
+    ],
+    [
+     "Solana (SPL)"
+    ],
+    [
+     "Ethereum (ERC20)"
+    ],
+    [
+     "BNB Smart Chain (BEP20)"
+    ],
+    [
+     "‹ Назад к оплате"
+    ]
+   ],
+   "urls": [],
+   "expect": "insufficient_funds"
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "cryptobot",
+   "text": "Выберите сеть для оплаты счёта в USDT.",
+   "buttons": [
+    [
+     "TON (TON)"
+    ],
+    [
+     "Tron (TRC20)"
+    ],
+    [
+     "Solana (SPL)"
+    ],
+    [
+     "Ethereum (ERC20)"
+    ],
+    [
+     "BNB Smart Chain (BEP20)"
+    ],
+    [
+     "‹ Назад к оплате"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": null,
+    "fiat": null,
+    "amount": null,
+    "insufficient_funds": true
+   }
+  },
+  {
+   "kind": "balance",
+   "platform": "cryptobot",
+   "text": "👛 Кошелёк\n\n🪙 Tether: 4.28271 USDT ($4.28)\n\n🪙 Gram: 0.01482 GRAM ($0.02)\n\n🪙 Solana: 0.00004789 SOL\n\n🪙 Litecoin: 0.00000617 LTC\n\n🪙 TRON: 0.0004 TRX\n\n🪙 Bitcoin: 0 BTC\n\n🪙 Ethereum: 0 ETH\n\n🪙 Dogecoin: 0 DOGE\n\n🪙 Binance Coin: 0 BNB\n\n🪙 USD Coin: 0 USDC\n\n🪙 Tether Gold: 0 XAUT\n\n≈ 0.00005527 BTC ($4.30)",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ],
+    [
+     "Пополнить",
+     "Вывести"
+    ],
+    [
+     "Скрыть мелкие балансы"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "4.28271",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Вы оплатили счёт #IV93498164 на сумму 4.27 USD (4.274303 USDT).\n\nПолучатель: Shop",
+   "buttons": [
+    [
+     "Перейти в бот"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/"
+   ],
+   "expect": [
+    "paid",
+    "IV93498164",
+    "4.274303",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "📥 Вы получили 🪙 30 USDT ($29.96).",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "30",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Вы оплатили счёт #IV32851993 на сумму 29.96 USD (29.993876 USDT).\n\nПолучатель: Shop",
+   "buttons": [
+    [
+     "Перейти в бот"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/"
+   ],
+   "expect": [
+    "paid",
+    "IV32851993",
+    "29.993876",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "📥 Вы получили 🪙 4.77 USDT ($4.76) от Shop.",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "incoming_transfer",
+    "4.77",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "Пришлите сумму USDT для оплаты счёта.\n\nМинимум: 0.2 USDT ($0.20)\nВаш баланс: 4.78453 USDT ($4.78)",
+   "buttons": [
+    [
+     "Мин. · 0.2 USDT ($0.20)"
+    ],
+    [
+     "‹ Изменить монету"
+    ]
+   ],
+   "urls": [],
+   "expect": "open_amount"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Вы оплатили счёт #IV83762703 на сумму 🪙 4.78 USDT ($4.77).\n  \n💬 комментарий",
+   "buttons": [
+    [
+     "Оплатить ещё раз"
+    ]
+   ],
+   "urls": [
+    "http://t.me/CryptoBot?start=IVWPJI89dEBJ"
+   ],
+   "expect": [
+    "paid",
+    "IV83762703",
+    "4.78",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "balance",
+   "platform": "cryptobot",
+   "text": "👛 Кошелёк\n\n🪙 Gram: 0.01482 GRAM ($0.02)\n\n🪙 Solana: 0.00004789 SOL\n\n🪙 Tether: 0.00453 USDT\n\n🪙 Litecoin: 0.00000617 LTC\n\n🪙 TRON: 0.0004 TRX\n\n🪙 Bitcoin: 0 BTC\n\n🪙 Ethereum: 0 ETH\n\n🪙 Dogecoin: 0 DOGE\n\n🪙 Binance Coin: 0 BNB\n\n🪙 USD Coin: 0 USDC\n\n🪙 Tether Gold: 0 XAUT\n\n≈ 0.00000034 BTC ($0.03)",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ],
+    [
+     "Пополнить",
+     "Вывести"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "0.00453",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "📥 Вы получили 🪙 0.04 USDT ($0.03).",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "0.04",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Вы оплатили счёт #IV30783264 на сумму 🪙 0.03 USDT ($0.02).\n\nПолучатель: Shop\n \n🧾 описание",
+   "buttons": [
+    [
+     "Вернуться"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/"
+   ],
+   "expect": [
+    "paid",
+    "IV30783264",
+    "0.03",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "balance",
+   "platform": "cryptobot",
+   "text": "👛 Кошелёк\n\n🪙 Gram: 0.01482 GRAM ($0.02)\n\n🪙 Tether: 0.01453 USDT ($0.01)\n\n🪙 Solana: 0.00004789 SOL\n\n🪙 Litecoin: 0.00000617 LTC\n\n🪙 TRON: 0.0004 TRX\n\n🪙 Bitcoin: 0 BTC\n\n🪙 Ethereum: 0 ETH\n\n🪙 Dogecoin: 0 DOGE\n\n🪙 Binance Coin: 0 BNB\n\n🪙 USD Coin: 0 USDC\n\n🪙 Tether Gold: 0 XAUT\n\n≈ 0.00000045 BTC ($0.04)",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ],
+    [
+     "Пополнить",
+     "Вывести"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "0.01453",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "Недостаточно монет. Сумма одного чека не может быть меньше чем $0.02. Сначала пополните баланс.",
+   "buttons": [
+    [
+     "‹ Назад к чекам"
+    ]
+   ],
+   "urls": [],
+   "expect": "insufficient_funds"
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "К сожалению, вы не можете получить этот подарок. Он предназначен для другого получателя.",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "not_for_you"
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "📥 Вы получили 🪙 0.1 USDT ($0.09).",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "0.1",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "🍁 Присоединяйтесь к осеннему фестивалю с 🦋 Crypto Bot!\n\n🍂 Получить баллы ›",
+   "buttons": [],
+   "urls": [
+    "https://t.me/send/app?startapp=festival"
+   ],
+   "expect": "unknown"
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "🦋 ⁨Ivan⁩ активировал(а) ваш чек и получил(а) 🪙 0.1 USDT ($0.09).",
+   "buttons": [],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "Этот чек уже активирован.",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "already_activated"
+  },
+  {
+   "kind": "balance",
+   "platform": "cryptobot",
+   "text": "👛 Кошелёк\n\n🪙 Tether: 0.1145 USDT ($0.11)\n\n🪙 Gram: 0.01482 GRAM ($0.02)\n\n🪙 Solana: 0.00004789 SOL\n\n🪙 Litecoin: 0.00000617 LTC\n\n🪙 TRON: 0.0004 TRX\n\n🪙 Bitcoin: 0 BTC\n\n🪙 Ethereum: 0 ETH\n\n🪙 Dogecoin: 0 DOGE\n\n🪙 Binance Coin: 0 BNB\n\n🪙 USD Coin: 0 USDC\n\n🪙 Tether Gold: 0 XAUT\n\n≈ 0.00000179 BTC ($0.14)",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ],
+    [
+     "Пополнить",
+     "Вывести"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "0.1145",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "​Чек\n\nСумма: 🪙 0.02 USDT ($0.01)\n\nЛюбой может активировать этот чек.\n\nСкопируйте ссылку, чтобы поделиться чеком:\nt.me/send?start=CQTUKUEVJzNw\n\n⚠️ Никогда не делайте скриншот вашего чека и не отправляйте его никому! Ссылку на чек могут использовать мошенники, чтобы получить доступ к вашим средствам.",
+   "buttons": [
+    [
+     "🎁 Конвертировать в подарок"
+    ],
+    [
+     "Поделиться чеком"
+    ],
+    [
+     "Показать QR-код"
+    ],
+    [
+     "Добавить описание"
+    ],
+    [
+     "Добавить картинку"
+    ],
+    [
+     "Ограничения"
+    ],
+    [
+     "Удалить чек"
+    ],
+    [
+     "‹ Назад к списку чеков"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "t.me/send?start=CQTUKUEVJzNw"
+   ],
+   "expect": [
+    "created",
+    "CQTUKUEVJzNw",
+    "0.02",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "🦋 ⁨Ivan⁩ активировал(а) ваш чек и получил(а) 🪙 0.02 USDT ($0.01).",
+   "buttons": [],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "​Чек\n\nСумма: 🪙 0.02 USDT ($0.01)\n\nЛюбой может активировать этот чек.\n\nСкопируйте ссылку, чтобы поделиться чеком:\nt.me/send?start=CQG0bljlq9TM\n\n⚠️ Никогда не делайте скриншот вашего чека и не отправляйте его никому! Ссылку на чек могут использовать мошенники, чтобы получить доступ к вашим средствам.",
+   "buttons": [
+    [
+     "🎁 Конвертировать в подарок"
+    ],
+    [
+     "Поделиться чеком"
+    ],
+    [
+     "Показать QR-код"
+    ],
+    [
+     "Добавить описание"
+    ],
+    [
+     "Добавить картинку"
+    ],
+    [
+     "Ограничения"
+    ],
+    [
+     "Удалить чек"
+    ],
+    [
+     "‹ Назад к списку чеков"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "t.me/send?start=CQG0bljlq9TM"
+   ],
+   "expect": [
+    "created",
+    "CQG0bljlq9TM",
+    "0.02",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "🦋 ⁨Ivan⁩ активировал(а) ваш чек и получил(а) 🪙 0.021 USDT ($0.02).",
+   "buttons": [],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "Этот перевод уже активирован.",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "already_activated"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 6.5 USDT (6.5$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 0.3 USDT (0.3$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 2.29 USDT (2.3$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 3.3 USDT (3.3$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "3.3",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "⏱ Загрузка",
+   "buttons": [],
+   "urls": [],
+   "expect": "progress"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "📋 Вы успешно оплатили счёт Shop на сумму 3.3 USDT (3.3$). ID платежа: #i9201783_4318061",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "paid",
+    null,
+    "3.3",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 3.26 USDT (3.3$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 27.7 USDT (27.7$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "balance",
+   "platform": "xrocket",
+   "text": "👛 Мой кошелёк\n\n🪙 XROCK: 0 XROCK\n\n🪙 USDT: 0 USDT\n\n🪙 USDC: 0 USDC\n\n🪙 GRAM: 0 GRAM\n\n🪙 SOL: 0 SOL\n\n🪙 ETH: 0 ETH\n\n🪙 TRX: 0 TRX\n\n🪙 BTC: 0 BTC\n\n🪙 BNB: 0 BNB\n\nЧтобы настроить отображение, нажми на кнопку \"Отображение балансов\".",
+   "buttons": [
+    [
+     "• 1 •",
+     "2",
+     "3",
+     "4 ›",
+     "7 ››"
+    ],
+    [
+     " Пополнение",
+     " Вывод"
+    ],
+    [
+     "💼 Общий баланс"
+    ],
+    [
+     "🔄️​ Перевод между балансами"
+    ],
+    [
+     " Повысить безопасность"
+    ],
+    [
+     " Отображение балансов"
+    ],
+    [
+     " В приложении удобней"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xrocket/app?startapp=wallet",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "0",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "balance",
+   "platform": "xrocket",
+   "text": "👛 Мой кошелёк\n\n🪙 XROCK: 0 XROCK\n\n🪙 USDT: 0 USDT\n\n🪙 USDC: 0 USDC\n\n🪙 GRAM: 0 GRAM\n\n🪙 SOL: 0 SOL\n\n🪙 TRX: 0 TRX\n\n🪙 ETH: 0 ETH\n\n🪙 BTC: 0 BTC\n\n🪙 BNB: 0 BNB\n\nЧтобы настроить отображение, нажми на кнопку \"Отображение балансов\".",
+   "buttons": [
+    [
+     "• 1 •",
+     "2",
+     "3",
+     "4 ›",
+     "7 ››"
+    ],
+    [
+     " Пополнение",
+     " Вывод"
+    ],
+    [
+     "💼 Общий баланс"
+    ],
+    [
+     "🔄️​ Перевод между балансами"
+    ],
+    [
+     " Повысить безопасность"
+    ],
+    [
+     " Отображение балансов"
+    ],
+    [
+     " В приложении удобней"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xrocket/app?startapp=wallet",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "0",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 10 USDT (10.0$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "10",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 10 USDT (10.0$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "balance",
+   "platform": "xrocket",
+   "text": "👛 Мой кошелёк\n\n🪙 USDT: 10 USDT (10.0$)\n\n🪙 XROCK: 0 XROCK\n\n🪙 USDC: 0 USDC\n\n🪙 GRAM: 0 GRAM\n\n🪙 SOL: 0 SOL\n\n🪙 TRX: 0 TRX\n\n🪙 ETH: 0 ETH\n\n🪙 BTC: 0 BTC\n\n🪙 BNB: 0 BNB\n\n≈ 10.0 $\n\nЧтобы настроить отображение, нажми на кнопку \"Отображение балансов\".",
+   "buttons": [
+    [
+     "• 1 •",
+     "2",
+     "3",
+     "4 ›",
+     "7 ››"
+    ],
+    [
+     " Пополнение",
+     " Вывод"
+    ],
+    [
+     "💼 Общий баланс"
+    ],
+    [
+     "🔄️​ Перевод между балансами"
+    ],
+    [
+     " Повысить безопасность"
+    ],
+    [
+     " Отображение балансов"
+    ],
+    [
+     " В приложении удобней"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xrocket/app?startapp=wallet",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "10",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 15 USDT (15.0$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "15",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "📋 Вы успешно оплатили счёт Shop на сумму 15 USDT (15.0$). ID платежа: #i1114736_0693974",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "paid",
+    null,
+    "15",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 7 USDT (7.0$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "7",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "📋 Вы успешно оплатили счёт Shop на сумму 7 USDT (7.0$). ID платежа: #i6836932_6976153",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "paid",
+    null,
+    "7",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 2 USDT (2.0$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "2",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "📋 Вы успешно оплатили счёт Shop на сумму 2 USDT (2.0$). ID платежа: #i2810834_3838036",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "paid",
+    null,
+    "2",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 0.7 USDT (0.7$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "0.7",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "📋 Вы успешно оплатили счёт Shop на сумму 0.7 USDT (0.7$). ID платежа: #i9543239_8259988",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "paid",
+    null,
+    "0.7",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 0.17 USDT (0.2$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "0.17",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 0.01 USDT (0.01$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 0.01 USDT (0.01$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "0.01",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n         \nСумма чека: 0.15 USDT (0.2$)\n\n‼️ Никогда не делайте скриншот и не передавайте ссылку на чек людям, которым вы не доверяете. Делая это, вы передаете средства в этом чеке безвозмездно, без гарантий получить что-то взамен. Мошенники могут использовать это, чтобы получить ваши монеты\n\nСсылка на чек:\nhttps://t.me/xrocket?start=t_bqBl2ZFBlwE6CwL",
+   "buttons": [
+    [
+     " Отправить"
+    ],
+    [
+     "📷 Показать QR-код"
+    ],
+    [
+     "Добавить описание"
+    ],
+    [
+     "Привязать к пользователю"
+    ],
+    [
+     "Удалить"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xrocket?start=t_bqBl2ZFBlwE6CwL"
+   ],
+   "expect": [
+    "created",
+    "t_bqBl2ZFBlwE6CwL",
+    "0.15",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 0.15 USDT (0.2$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "balance",
+   "platform": "xrocket",
+   "text": "👛 Мой кошелёк\n\n🪙 XROCK: 0 XROCK\n\n🪙 USDT: 0 USDT\n\n🪙 USDC: 0 USDC\n\n🪙 LTC: 0 LTC\n\n🪙 GRAM: 0 GRAM\n\n🪙 SOL: 0 SOL\n\n🪙 TRX: 0 TRX\n\n🪙 ETH: 0 ETH\n\n🪙 BTC: 0 BTC\n\nЧтобы настроить отображение, нажми на кнопку \"Отображение балансов\".",
+   "buttons": [
+    [
+     "• 1 •",
+     "2",
+     "3",
+     "4 ›",
+     "8 ››"
+    ],
+    [
+     " Пополнение",
+     " Вывод"
+    ],
+    [
+     "💼 Общий баланс"
+    ],
+    [
+     "🔄️​ Перевод между балансами"
+    ],
+    [
+     " Повысить безопасность"
+    ],
+    [
+     " Отображение балансов"
+    ],
+    [
+     " В приложении удобней"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xrocket/app?startapp=wallet",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "0",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "🚀 Litecoin вышел на орбиту\n\nЦифровое серебро — $LTC — уже в xRocket. Пополняйте баланс в $LTC, совершайте сделки в паре с $USDT в любое время суток или просто храните монеты в своём портфеле.\n\nЧитайте подробнее в нашем канале.",
+   "buttons": [
+    [
+     "Торговать $LTC"
+    ],
+    [
+     "Главное меню"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xRocket/app?startapp=trade-LTC-USDT-us_push-uc_ltc-um_ru",
+    "https://example.invalid/"
+   ],
+   "expect": "unknown"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 5.71 USDT (5.7$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "5.71",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 30 USDT (30.0$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "📋 Вы успешно оплатили счёт Shop на сумму 4.85 USDT (4.9$). ID платежа: #i3235049_0508855",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "paid",
+    null,
+    "4.85",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 5 USDT (5.0$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "5",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "balance",
+   "platform": "xrocket",
+   "text": "👛 Мой кошелёк\n\n🪙 USDT: 5.02 USDT (5.0$)\n\n🪙 XROCK: 0 XROCK\n\n🪙 USDC: 0 USDC\n\n🪙 LTC: 0 LTC\n\n🪙 GRAM: 0 GRAM\n\n🪙 SOL: 0 SOL\n\n🪙 TRX: 0 TRX\n\n🪙 ETH: 0 ETH\n\n🪙 BTC: 0 BTC\n\n≈ 5.02 $\n\nЧтобы настроить отображение, нажми на кнопку \"Отображение балансов\".",
+   "buttons": [
+    [
+     "• 1 •",
+     "2",
+     "3",
+     "4 ›",
+     "8 ››"
+    ],
+    [
+     " Пополнение",
+     " Вывод"
+    ],
+    [
+     "💼 Общий баланс"
+    ],
+    [
+     "🔄️​ Перевод между балансами"
+    ],
+    [
+     " Повысить безопасность"
+    ],
+    [
+     " Отображение балансов"
+    ],
+    [
+     " В приложении удобней"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xrocket/app?startapp=wallet",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "5.02",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Чеки\n    \nЧеки позволяют отправлять криптовалюту прямо в сообщениях.\n\n· Персональный чек - для отправки монет одному пользователю\n· Мульти-чек - для отправки монет нескольким пользователям с возможностью добавить условие подписки\n· Rocket-чек - улучшенный мульти-чек с наградой за распространение\n\nВыберите тип чека:",
+   "buttons": [
+    [
+     "Персональный",
+     "Мульти-чек"
+    ],
+    [
+     " Rocket-чек"
+    ],
+    [
+     " Доска чеков"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональные чеки\n  \nСоздайте персональный чек, чтобы отправить сообщение с монетами выбранному вами пользователю.",
+   "buttons": [
+    [
+     " Создать чек"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n      \nВыберите валюту чека:",
+   "buttons": [
+    [
+     " USDT"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n      \nСколько USDT вы хотите отправить пользователю с помощью чека?\n      \nМаксимум: 5.02 USDT (5.0$)\nМинимум: 0.01 USDT (0.01$)\n\nВведите сумму чека в USDT:",
+   "buttons": [
+    [
+     "Максимум · 5.02 USDT (5.0$)"
+    ],
+    [
+     "‹ Выбор валюты"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n\nСумма чека: 1 USDT (1.0$)\n\nПожалуйста, подтвердите корректность данных:",
+   "buttons": [
+    [
+     "✅ Подтверждаю",
+     "❌ Отклоняю"
+    ],
+    [
+     "‹ Изменить сумму"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "confirm",
+    "1",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n         \nСумма чека: 1 USDT (1.0$)\n\n‼️ Никогда не делайте скриншот и не передавайте ссылку на чек людям, которым вы не доверяете. Делая это, вы передаете средства в этом чеке безвозмездно, без гарантий получить что-то взамен. Мошенники могут использовать это, чтобы получить ваши монеты\n\nСсылка на чек:\nhttps://t.me/xrocket?start=t_MMvFtl8mkgsHEZv",
+   "buttons": [
+    [
+     " Отправить"
+    ],
+    [
+     "📷 Показать QR-код"
+    ],
+    [
+     "Добавить описание"
+    ],
+    [
+     "Привязать к пользователю"
+    ],
+    [
+     "Удалить"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xrocket?start=t_MMvFtl8mkgsHEZv"
+   ],
+   "expect": [
+    "created",
+    "t_MMvFtl8mkgsHEZv",
+    "1",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n      \nСколько USDT вы хотите отправить пользователю с помощью чека?\n      \nМаксимум: 5.02 USDT (5.0$)\nМинимум: 0.01 USDT (0.01$)\n\nВведите сумму чека в USDT:\n\n🔺 Недостаточно средств на балансе.",
+   "buttons": [
+    [
+     "Максимум · 5.02 USDT (5.0$)"
+    ],
+    [
+     "‹ Выбор валюты"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "insufficient_funds"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "🧾 Счёт #INV3524202\n\nСумма: 10 USDT (10.0$)\n      \n⚠️ Внимание, вы оплачиваете счёт, выставленный вам другим пользователем. @xRocket не гарантирует, что вы получите что-либо взамен после оплаты.\n\nВаш баланс: 5.02 USDT (5.0$)\n\nВыберите способ оплаты:",
+   "buttons": [
+    [
+     " xRocket",
+     " Адрес"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "choose_method",
+    "INV3524202",
+    "10",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "xrocket",
+   "text": "🧾 Счёт #INV3524202\n\nСумма: 10 USDT (10.0$)\n      \n⚠️ Внимание, вы оплачиваете счёт, выставленный вам другим пользователем. @xRocket не гарантирует, что вы получите что-либо взамен после оплаты.\n\nВаш баланс: 5.02 USDT (5.0$)\n\nВыберите способ оплаты:",
+   "buttons": [
+    [
+     " xRocket",
+     " Адрес"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": "INV3524202",
+    "fiat": null,
+    "amount": [
+     "10",
+     "USDT"
+    ],
+    "insufficient_funds": false
+   }
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "🧾 Счёт #INV3524202\n\nСумма: 10 USDT (10.0$)\n      \n⚠️ Внимание, вы оплачиваете счёт, выставленный вам другим пользователем. @xRocket не гарантирует, что вы получите что-либо взамен после оплаты.\n\nВаш баланс: 5.02 USDT (5.0$)\n     \n🔺 Недостаточно средств на балансе.",
+   "buttons": [
+    [
+     " Пополнение"
+    ],
+    [
+     "‹ Счёт"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "insufficient_funds"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "🧾 Счёт #INV9078097\n\nСумма: 2 USDT (2.0$)\n      \n⚠️ Внимание, вы оплачиваете счёт, выставленный вам другим пользователем. @xRocket не гарантирует, что вы получите что-либо взамен после оплаты.\n\nВаш баланс: 5.02 USDT (5.0$)\n\nВыберите способ оплаты:",
+   "buttons": [
+    [
+     " xRocket",
+     " Адрес"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "choose_method",
+    "INV9078097",
+    "2",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "xrocket",
+   "text": "🧾 Счёт #INV9078097\n\nСумма: 2 USDT (2.0$)\n      \n⚠️ Внимание, вы оплачиваете счёт, выставленный вам другим пользователем. @xRocket не гарантирует, что вы получите что-либо взамен после оплаты.\n\nВаш баланс: 5.02 USDT (5.0$)\n\nВыберите способ оплаты:",
+   "buttons": [
+    [
+     " xRocket",
+     " Адрес"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": "INV9078097",
+    "fiat": null,
+    "amount": [
+     "2",
+     "USDT"
+    ],
+    "insufficient_funds": false
+   }
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "🧾 Счёт #INV9078097\n\nСумма: 2 USDT (2.0$)\n      \n⚠️ Внимание, вы оплачиваете счёт, выставленный вам другим пользователем. @xRocket не гарантирует, что вы получите что-либо взамен после оплаты.\n\nВаш баланс: 5.02 USDT (5.0$)\n\n🔸 Подтвердите ваш платёж на 2 USDT (2.0$)",
+   "buttons": [
+    [
+     "Оплатить"
+    ],
+    [
+     "‹ Счёт"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "confirm",
+    "INV9078097",
+    "2",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "📋 Вы успешно оплатили счёт на сумму 2 USDT (2.0$). ID платежа: #i3219714_1349352",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "paid",
+    null,
+    "2",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "balance",
+   "platform": "xrocket",
+   "text": "👛 Мой кошелёк\n\n🪙 USDT: 3.02 USDT (3.0$)\n\n🪙 XROCK: 0 XROCK\n\n🪙 USDC: 0 USDC\n\n🪙 LTC: 0 LTC\n\n🪙 GRAM: 0 GRAM\n\n🪙 SOL: 0 SOL\n\n🪙 TRX: 0 TRX\n\n🪙 ETH: 0 ETH\n\n🪙 BTC: 0 BTC\n\n≈ 3.02 $\n\nЧтобы настроить отображение, нажми на кнопку \"Отображение балансов\".",
+   "buttons": [
+    [
+     "• 1 •",
+     "2",
+     "3",
+     "4 ›",
+     "8 ››"
+    ],
+    [
+     " Пополнение",
+     " Вывод"
+    ],
+    [
+     "💼 Общий баланс"
+    ],
+    [
+     "🔄️​ Перевод между балансами"
+    ],
+    [
+     " Повысить безопасность"
+    ],
+    [
+     " Отображение балансов"
+    ],
+    [
+     " В приложении удобней"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xrocket/app?startapp=wallet",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "3.02",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⏱ Получение 1 USDT (1.0$)",
+   "buttons": [],
+   "urls": [],
+   "expect": "in_progress"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "💰 Вы успешно получили 1 USDT (1.0$).",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "1",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 1 USDT (1.0$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "Этот перевод уже активирован вами.",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "already_activated_by_us"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "🧾 Счёт #INV3524202\n\nСумма: 10 USDT (10.0$)\n      \n⚠️ Внимание, вы оплачиваете счёт, выставленный вам другим пользователем. @xRocket не гарантирует, что вы получите что-либо взамен после оплаты.\n\nВаш баланс: 3.02 USDT (3.0$)\n\nВыберите способ оплаты:",
+   "buttons": [
+    [
+     " xRocket",
+     " Адрес"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "choose_method",
+    "INV3524202",
+    "10",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "xrocket",
+   "text": "🧾 Счёт #INV3524202\n\nСумма: 10 USDT (10.0$)\n      \n⚠️ Внимание, вы оплачиваете счёт, выставленный вам другим пользователем. @xRocket не гарантирует, что вы получите что-либо взамен после оплаты.\n\nВаш баланс: 3.02 USDT (3.0$)\n\nВыберите способ оплаты:",
+   "buttons": [
+    [
+     " xRocket",
+     " Адрес"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": "INV3524202",
+    "fiat": null,
+    "amount": [
+     "10",
+     "USDT"
+    ],
+    "insufficient_funds": false
+   }
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "xrocket",
+   "text": "Данный счёт уже оплачен.",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "already_paid"
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "xrocket",
+   "text": "Данный счёт уже оплачен.",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "paid",
+    "number": null,
+    "fiat": null,
+    "amount": null,
+    "insufficient_funds": false
+   }
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n      \nСколько USDT вы хотите отправить пользователю с помощью чека?\n      \nМаксимум: 3.02 USDT (3.0$)\nМинимум: 0.01 USDT (0.01$)\n\nВведите сумму чека в USDT:",
+   "buttons": [
+    [
+     "Максимум · 3.02 USDT (3.0$)"
+    ],
+    [
+     "‹ Выбор валюты"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n\nСумма чека: 3.02 USDT (3.0$)\n\nПожалуйста, подтвердите корректность данных:",
+   "buttons": [
+    [
+     "✅ Подтверждаю",
+     "❌ Отклоняю"
+    ],
+    [
+     "‹ Изменить сумму"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "confirm",
+    "3.02",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "xrocket",
+   "text": "🏷 Персональный чек\n         \nСумма чека: 3.02 USDT (3.0$)\n\n‼️ Никогда не делайте скриншот и не передавайте ссылку на чек людям, которым вы не доверяете. Делая это, вы передаете средства в этом чеке безвозмездно, без гарантий получить что-то взамен. Мошенники могут использовать это, чтобы получить ваши монеты\n\nСсылка на чек:\nhttps://t.me/xrocket?start=t_KE4YyUcTtFb1bVG",
+   "buttons": [
+    [
+     " Отправить"
+    ],
+    [
+     "📷 Показать QR-код"
+    ],
+    [
+     "Добавить описание"
+    ],
+    [
+     "Привязать к пользователю"
+    ],
+    [
+     "Удалить"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://t.me/xrocket?start=t_KE4YyUcTtFb1bVG"
+   ],
+   "expect": [
+    "created",
+    "t_KE4YyUcTtFb1bVG",
+    "3.02",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "⁨Ivan⁩ активировал(а) ваш чек на 3.02 USDT (3.0$)",
+   "buttons": [
+    [
+     "‹ Кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "balance",
+   "platform": "cryptobot",
+   "text": "👛 Кошелёк\n\n🪙 Tether: 0.05353 USDT ($0.05)\n\n🪙 Gram: 0.01482 GRAM ($0.02)\n\n🪙 Solana: 0.00004789 SOL\n\n🪙 Litecoin: 0.00000617 LTC\n\n🪙 TRON: 0.0004 TRX\n\n🪙 Bitcoin: 0 BTC\n\n🪙 Ethereum: 0 ETH\n\n🪙 Dogecoin: 0 DOGE\n\n🪙 Binance Coin: 0 BNB\n\n🪙 USD Coin: 0 USDC\n\n🪙 Tether Gold: 0 XAUT\n\n≈ 0.00000098 BTC ($0.07)",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ],
+    [
+     "Пополнить",
+     "Вывести"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "0.05353",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "🕘 Получение 🪙 5 USDT ($4.99)…",
+   "buttons": [],
+   "urls": [],
+   "expect": "in_progress"
+  },
+  {
+   "kind": "balance",
+   "platform": "cryptobot",
+   "text": "👛 Кошелёк\n\n🪙 Tether: 5.05353 USDT ($5.05)\n\n🪙 Gram: 0.01482 GRAM ($0.02)\n\n🪙 Solana: 0.00004789 SOL\n\n🪙 Litecoin: 0.00000617 LTC\n\n🪙 TRON: 0.0004 TRX\n\n🪙 Bitcoin: 0 BTC\n\n🪙 Ethereum: 0 ETH\n\n🪙 Dogecoin: 0 DOGE\n\n🪙 Binance Coin: 0 BNB\n\n🪙 USD Coin: 0 USDC\n\n🪙 Tether Gold: 0 XAUT\n\n≈ 0.00006656 BTC ($5.07)",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ],
+    [
+     "Пополнить",
+     "Вывести"
+    ],
+    [
+     "Скрыть мелкие балансы"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "5.05353",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "Выберите криптовалюту для создания чека.",
+   "buttons": [
+    [
+     "USDT"
+    ],
+    [
+     "‹ Назад к чекам"
+    ]
+   ],
+   "urls": [],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "Пришлите сумму чека в USDT. Если вы хотите создать мультичек, введите сумму одной активации, которой кратен ваш баланс.\n\nВаш баланс: 5.05353 USDT ($5.05)",
+   "buttons": [
+    [
+     "Мин. · 0.02 USDT"
+    ],
+    [
+     "Макс. · 5.05353 USDT"
+    ],
+    [
+     "‹ Изменить монету"
+    ]
+   ],
+   "urls": [],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "​Чек\n\nСумма: 🪙 4 USDT ($3.99)\n\nЛюбой может активировать этот чек.\n\nСкопируйте ссылку, чтобы поделиться чеком:\nt.me/send?start=CQs9CiUoXUDt\n\n⚠️ Никогда не делайте скриншот вашего чека и не отправляйте его никому! Ссылку на чек могут использовать мошенники, чтобы получить доступ к вашим средствам.",
+   "buttons": [
+    [
+     "🎁 Конвертировать в подарок"
+    ],
+    [
+     "Поделиться чеком"
+    ],
+    [
+     "Показать QR-код"
+    ],
+    [
+     "Добавить описание"
+    ],
+    [
+     "Добавить картинку"
+    ],
+    [
+     "Ограничения"
+    ],
+    [
+     "Удалить чек"
+    ],
+    [
+     "‹ Назад к списку чеков"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "t.me/send?start=CQs9CiUoXUDt"
+   ],
+   "expect": [
+    "created",
+    "CQs9CiUoXUDt",
+    "4",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "​Чек\n\nСумма: 🪙 4 USDT ($3.99)\n\nЛюбой может активировать этот чек.\n\nСкопируйте ссылку, чтобы поделиться чеком:\nt.me/send?start=CQjEFmw4VkrQ\n\n⚠️ Никогда не делайте скриншот вашего чека и не отправляйте его никому! Ссылку на чек могут использовать мошенники, чтобы получить доступ к вашим средствам.",
+   "buttons": [
+    [
+     "🎁 Конвертировать в подарок"
+    ],
+    [
+     "Поделиться чеком"
+    ],
+    [
+     "Показать QR-код"
+    ],
+    [
+     "Добавить описание"
+    ],
+    [
+     "Добавить картинку"
+    ],
+    [
+     "Ограничения"
+    ],
+    [
+     "Удалить чек"
+    ],
+    [
+     "‹ Назад к списку чеков"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "t.me/send?start=CQjEFmw4VkrQ"
+   ],
+   "expect": [
+    "created",
+    "CQjEFmw4VkrQ",
+    "4",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "🕘 Получение 🪙 4 USDT ($3.99)…",
+   "buttons": [],
+   "urls": [],
+   "expect": "in_progress"
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "🦋 ⁨Ivan⁩ активировал(а) ваш чек и получил(а) 🪙 4 USDT ($3.99).",
+   "buttons": [],
+   "urls": [],
+   "expect": "claim_notice"
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "📥 Вы получили 🪙 4 USDT ($3.99).",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "received",
+    "4",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "Недостаточно монет. Пополните баланс.\n\nВаш баланс: 5.05353 USDT ($5.05).",
+   "buttons": [
+    [
+     "‹ Изменить монету"
+    ]
+   ],
+   "urls": [],
+   "expect": "insufficient_funds"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "Выберите монету для оплаты счета #IV95554731 на сумму $5.",
+   "buttons": [
+    [
+     "USDT · 5.006321 USDT"
+    ],
+    [
+     "GRAM · 4.53015592 GRAM"
+    ],
+    [
+     "SOL · 0.05543 SOL"
+    ],
+    [
+     "TRX · 15.702903 TRX"
+    ],
+    [
+     "BTC · 0.00006564 BTC"
+    ],
+    [
+     "ETH · 0.002235 ETH"
+    ],
+    [
+     "DOGE · 69.4526823 DOGE"
+    ],
+    [
+     "LTC · 0.09545 LTC"
+    ],
+    [
+     "BNB · 0.007206 BNB"
+    ],
+    [
+     "USDC · 5.001823 USDC"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "choose_coin",
+    "IV95554731"
+   ]
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "cryptobot",
+   "text": "Выберите монету для оплаты счета #IV95554731 на сумму $5.",
+   "buttons": [
+    [
+     "USDT · 5.006321 USDT"
+    ],
+    [
+     "GRAM · 4.53015592 GRAM"
+    ],
+    [
+     "SOL · 0.05543 SOL"
+    ],
+    [
+     "TRX · 15.702903 TRX"
+    ],
+    [
+     "BTC · 0.00006564 BTC"
+    ],
+    [
+     "ETH · 0.002235 ETH"
+    ],
+    [
+     "DOGE · 69.4526823 DOGE"
+    ],
+    [
+     "LTC · 0.09545 LTC"
+    ],
+    [
+     "BNB · 0.007206 BNB"
+    ],
+    [
+     "USDC · 5.001823 USDC"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": "IV95554731",
+    "fiat": [
+     "5.",
+     "USD"
+    ],
+    "amount": [
+     "5.006321",
+     "USDT"
+    ],
+    "insufficient_funds": false
+   }
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Подтвердите оплату счёта #IV95554731\n\nОтправляете: 5.006321 USDT ($5)\n   \nВы уверены, что хотите оплатить этот счёт?",
+   "buttons": [
+    [
+     "💳 Оплатить 5.006321 USDT"
+    ],
+    [
+     "Оплатить анонимно: Нет"
+    ],
+    [
+     "Добавить комментарий"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "confirm",
+    "IV95554731",
+    "5.006321",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "👉 Вы уверены, что доверяете этому получателю? Вы не переводили ему монеты ранее.\n\nЕсли вы переводите монеты по просьбе незнакомых вам лиц, это может быть мошенничеством. Мы не отвечаем за качество услуг или товаров, предоставленных третьими лицами. Подробнее ›\n\nОбо всех мошеннических действиях сообщайте в @CryptoSupportBot.",
+   "buttons": [
+    [
+     "💸 Отправить платеж получателю"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/"
+   ],
+   "expect": "trust_recipient"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "💸",
+   "buttons": [],
+   "urls": [],
+   "expect": "progress"
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Вы оплатили счёт #IV95554731 на сумму 🪙 5.006321 USDT ($5).",
+   "buttons": [],
+   "urls": [],
+   "expect": [
+    "paid",
+    "IV95554731",
+    "5.006321",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "Выберите монету для оплаты счета #IV79114774 на сумму $10.",
+   "buttons": [
+    [
+     "USDT · 10.012642 USDT"
+    ],
+    [
+     "GRAM · 9.060311841 GRAM"
+    ],
+    [
+     "SOL · 0.1108 SOL"
+    ],
+    [
+     "TRX · 31.405806 TRX"
+    ],
+    [
+     "BTC · 0.0001312 BTC"
+    ],
+    [
+     "ETH · 0.004471 ETH"
+    ],
+    [
+     "DOGE · 138.9053646 DOGE"
+    ],
+    [
+     "LTC · 0.1909 LTC"
+    ],
+    [
+     "BNB · 0.01441 BNB"
+    ],
+    [
+     "USDC · 10.003646 USDC"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "choose_coin",
+    "IV79114774"
+   ]
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "cryptobot",
+   "text": "Выберите монету для оплаты счета #IV79114774 на сумму $10.",
+   "buttons": [
+    [
+     "USDT · 10.012642 USDT"
+    ],
+    [
+     "GRAM · 9.060311841 GRAM"
+    ],
+    [
+     "SOL · 0.1108 SOL"
+    ],
+    [
+     "TRX · 31.405806 TRX"
+    ],
+    [
+     "BTC · 0.0001312 BTC"
+    ],
+    [
+     "ETH · 0.004471 ETH"
+    ],
+    [
+     "DOGE · 138.9053646 DOGE"
+    ],
+    [
+     "LTC · 0.1909 LTC"
+    ],
+    [
+     "BNB · 0.01441 BNB"
+    ],
+    [
+     "USDC · 10.003646 USDC"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": "IV79114774",
+    "fiat": [
+     "10.",
+     "USD"
+    ],
+    "amount": [
+     "10.012642",
+     "USDT"
+    ],
+    "insufficient_funds": false
+   }
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "📥 Подтвердите оплату счёта #IV79114774\n\nОтправляете: 10.012642 USDT ($10)\n   \nВы уверены, что хотите оплатить этот счёт?",
+   "buttons": [
+    [
+     "💳 Оплатить 10.012642 USDT"
+    ],
+    [
+     "Оплатить анонимно: Нет"
+    ],
+    [
+     "Добавить комментарий"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": [
+    "confirm",
+    "IV79114774",
+    "10.012642",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "invoice_screen",
+   "platform": "cryptobot",
+   "text": "Выберите сеть для оплаты счёта в USDT.",
+   "buttons": [
+    [
+     "Tron (TRC20)"
+    ],
+    [
+     "BNB Smart Chain (BEP20)"
+    ],
+    [
+     "TON (TON)"
+    ],
+    [
+     "Solana (SPL)"
+    ],
+    [
+     "Ethereum (ERC20)"
+    ],
+    [
+     "‹ Назад к оплате"
+    ]
+   ],
+   "urls": [],
+   "expect": "insufficient_funds"
+  },
+  {
+   "kind": "invoice_card",
+   "platform": "cryptobot",
+   "text": "Выберите сеть для оплаты счёта в USDT.",
+   "buttons": [
+    [
+     "Tron (TRC20)"
+    ],
+    [
+     "BNB Smart Chain (BEP20)"
+    ],
+    [
+     "TON (TON)"
+    ],
+    [
+     "Solana (SPL)"
+    ],
+    [
+     "Ethereum (ERC20)"
+    ],
+    [
+     "‹ Назад к оплате"
+    ]
+   ],
+   "urls": [],
+   "expect": {
+    "status": "active",
+    "number": null,
+    "fiat": null,
+    "amount": null,
+    "insufficient_funds": true
+   }
+  },
+  {
+   "kind": "activation",
+   "platform": "cryptobot",
+   "text": "Чек не найден, удалён или не был создан из-за недостаточного баланса.",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ]
+   ],
+   "urls": [],
+   "expect": "not_found"
+  },
+  {
+   "kind": "balance",
+   "platform": "cryptobot",
+   "text": "👛 Кошелёк\n\n🪙 Tether: 0.0472 USDT ($0.05)\n\n🪙 Gram: 0.01482 GRAM ($0.02)\n\n🪙 Solana: 0.00004789 SOL\n\n🪙 Litecoin: 0.00000617 LTC\n\n🪙 TRON: 0.0004 TRX\n\n🪙 Bitcoin: 0 BTC\n\n🪙 Ethereum: 0 ETH\n\n🪙 Dogecoin: 0 DOGE\n\n🪙 Binance Coin: 0 BNB\n\n🪙 USD Coin: 0 USDC\n\n🪙 Tether Gold: 0 XAUT\n\n≈ 0.00000089 BTC ($0.07)",
+   "buttons": [
+    [
+     "Открыть кошелёк"
+    ],
+    [
+     "Пополнить",
+     "Вывести"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": [
+    [
+     "0.0472",
+     "USDT",
+     "0"
+    ]
+   ]
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "Этот перевод не найден.",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "not_found"
+  },
+  {
+   "kind": "activation",
+   "platform": "xrocket",
+   "text": "Мульти-чек не найден.",
+   "buttons": [
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [],
+   "expect": "not_found"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "Пришлите сумму чека в USDT. Если вы хотите создать мультичек, введите сумму одной активации, которой кратен ваш баланс.\n\nВаш баланс: 0.0472 USDT ($0.05)",
+   "buttons": [
+    [
+     "Мин. · 0.02 USDT"
+    ],
+    [
+     "Макс. · 0.0472 USDT"
+    ],
+    [
+     "‹ Изменить монету"
+    ]
+   ],
+   "urls": [],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "Пришлите количество активаций, чтобы создать мультичек (до 2 активаций).",
+   "buttons": [
+    [
+     "🎁 Создать подарок"
+    ],
+    [
+     "Пропустить ›"
+    ],
+    [
+     "Макс. кол-во · 2"
+    ],
+    [
+     "‹ Изменить сумму"
+    ]
+   ],
+   "urls": [],
+   "expect": "ask_activations"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "​Чек\n\nСумма: 🪙 0.02 USDT ($0.01)\n\nЛюбой может активировать этот чек.\n\nСкопируйте ссылку, чтобы поделиться чеком:\nt.me/send?start=CQHtisAK3gt9\n\n⚠️ Никогда не делайте скриншот вашего чека и не отправляйте его никому! Ссылку на чек могут использовать мошенники, чтобы получить доступ к вашим средствам.",
+   "buttons": [
+    [
+     "🎁 Конвертировать в подарок"
+    ],
+    [
+     "Поделиться чеком"
+    ],
+    [
+     "Показать QR-код"
+    ],
+    [
+     "Добавить описание"
+    ],
+    [
+     "Добавить картинку"
+    ],
+    [
+     "Ограничения"
+    ],
+    [
+     "Удалить чек"
+    ],
+    [
+     "‹ Назад к списку чеков"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "t.me/send?start=CQHtisAK3gt9"
+   ],
+   "expect": [
+    "created",
+    "CQHtisAK3gt9",
+    "0.02",
+    "USDT"
+   ]
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "​Здесь вы можете создать чек для мгновенной отправки криптовалюты любому пользователю. Смотреть видеоинструкцию ›",
+   "buttons": [
+    [
+     "Создать чек"
+    ],
+    [
+     "Создать из чата"
+    ],
+    [
+     "Активные чеки"
+    ],
+    [
+     "‹ Назад"
+    ]
+   ],
+   "urls": [
+    "https://example.invalid/",
+    "https://example.invalid/"
+   ],
+   "expect": "unknown"
+  },
+  {
+   "kind": "check_creation",
+   "platform": "cryptobot",
+   "text": "Здесь вы можете управлять своими созданными чеками.",
+   "buttons": [
+    [
+     "0.02 USDT "
+    ],
+    [
+     "‹ Назад к чекам"
+    ]
+   ],
+   "urls": [],
+   "expect": "unknown"
+  }
+ ]
+}

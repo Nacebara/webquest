@@ -448,6 +448,11 @@ async fn menu<T: Transport>(
                 Err(e) => unknown(e),
             },
             CheckCreationReply::InsufficientFunds => IssueOutcome::InsufficientFunds,
+            // Шаги мультичека CryptoBot и подтверждения xRocket — следующим коммитом в этом
+            // сценарии; пока без нажатий: неясный исход и сверка, повторного создания нет.
+            CheckCreationReply::AskActivations | CheckCreationReply::Confirm { .. } => {
+                unknown("check menu asks for one more step")
+            }
             CheckCreationReply::Unknown => unknown("unrecognised reply to the check amount"),
         },
     )
