@@ -1,9 +1,18 @@
 //! Эмодзи по ролям (SPEC §6.4). При Premium у владельца бота роль раскрывается в
 //! `<tg-emoji emoji-id="…">⏳</tg-emoji>` и в `icon_custom_emoji_id` кнопок; без Premium или
-//! без id для роли — в обычный символ. `custom_emoji_id` подбирает владелец
-//! (`settings.custom_emoji`), здесь только проверяется, что это число.
+//! без id для роли — в обычный символ.
+//!
+//! Откуда id ([`EmojiSettings`]):
+//! 1. свой эмодзи владельца для роли (`settings.custom_emoji`, роль → id) — любой премиум-эмодзи,
+//!    как в боте-гаранте: владелец присылает эмодзи, бот берёт его `custom_emoji_id`;
+//! 2. иначе — значок набора exch выбранной вариации (`settings.emoji_style`: анимированная,
+//!    статичная или выключено; id наборов — `settings.emoji_packs`, их пишет `exch emoji install`).
+//!    В тексте — цветная плитка ([`Emoji::text_icon`]), на кнопке — линейный значок, который
+//!    Telegram перекрашивает в цвет текста ([`Emoji::button_icon`]).
 
 use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
 
 use crate::html::Frag;
 
@@ -109,6 +118,126 @@ impl Emoji {
     pub fn from_key(key: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|e| e.key() == key)
     }
+
+    /// Значок набора exch для текста (`assets/emoji/manifest.json`, `color/…` — плитки).
+    pub const fn text_icon(self) -> &'static str {
+        match self {
+            Emoji::Wait => "color/wait",
+            Emoji::Ok => "color/done",
+            Emoji::Err => "color/err",
+            Emoji::Warn => "color/warn",
+            Emoji::Invoice => "color/invoice",
+            Emoji::Refund => "color/refund",
+            Emoji::Manual => "color/manual",
+            Emoji::Pause => "color/pause",
+            Emoji::Maintenance => "color/maint",
+            Emoji::Ban => "color/ban",
+            Emoji::Support => "color/support",
+            Emoji::Cb => "color/cb",
+            Emoji::Xr => "color/xr",
+            Emoji::Copy => "mono/copy",
+            Emoji::Exchange => "color/swap",
+            Emoji::Rates => "color/rates",
+            Emoji::History => "color/history",
+            Emoji::Privacy => "color/lock",
+            Emoji::Bell => "mono/bell",
+        }
+    }
+
+    /// Значок набора exch для кнопки: линейный, Telegram перекрашивает его в цвет текста.
+    pub const fn button_icon(self) -> &'static str {
+        match self {
+            Emoji::Wait => "mono/wait",
+            Emoji::Ok => "mono/done",
+            Emoji::Err => "mono/close",
+            Emoji::Warn => "mono/alert",
+            Emoji::Invoice => "mono/invoice",
+            Emoji::Refund => "mono/refund",
+            Emoji::Manual => "mono/eye",
+            Emoji::Pause => "mono/pause",
+            Emoji::Maintenance => "mono/maint",
+            Emoji::Ban => "mono/ban",
+            Emoji::Support => "mono/support",
+            Emoji::Cb => "mono/cb",
+            Emoji::Xr => "mono/xr",
+            Emoji::Copy => "mono/copy",
+            Emoji::Exchange => "mono/swap",
+            Emoji::Rates => "mono/rates",
+            Emoji::History => "mono/history",
+            Emoji::Privacy => "mono/lock",
+            Emoji::Bell => "mono/bell",
+        }
+    }
+}
+
+/// Вариация набора exch (`settings.emoji_style`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EmojiStyle {
+    /// Анимированные значки (TGS).
+    #[default]
+    Animated,
+    /// Статичные (PNG 100×100, кадр покоя тех же значков).
+    Static,
+    /// Без премиум-эмодзи: только обычные символы, свои эмодзи владельца тоже не показываются.
+    Off,
+}
+
+impl EmojiStyle {
+    pub const ALL: [EmojiStyle; 3] = [EmojiStyle::Animated, EmojiStyle::Static, EmojiStyle::Off];
+
+    pub const fn key(self) -> &'static str {
+        match self {
+            EmojiStyle::Animated => "animated",
+            EmojiStyle::Static => "static",
+            EmojiStyle::Off => "off",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|s| s.key() == key)
+    }
+}
+
+/// id установленных наборов exch: вариация → значок (`color/done`) → `custom_emoji_id`
+/// (`settings.emoji_packs`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EmojiPacks {
+    #[serde(default)]
+    pub animated: BTreeMap<String, String>,
+    #[serde(default, rename = "static")]
+    pub still: BTreeMap<String, String>,
+}
+
+impl EmojiPacks {
+    pub fn of(&self, style: EmojiStyle) -> Option<&BTreeMap<String, String>> {
+        match style {
+            EmojiStyle::Animated => Some(&self.animated),
+            EmojiStyle::Static => Some(&self.still),
+            EmojiStyle::Off => None,
+        }
+    }
+
+    pub fn of_mut(&mut self, style: EmojiStyle) -> Option<&mut BTreeMap<String, String>> {
+        match style {
+            EmojiStyle::Animated => Some(&mut self.animated),
+            EmojiStyle::Static => Some(&mut self.still),
+            EmojiStyle::Off => None,
+        }
+    }
+}
+
+/// Настройки эмодзи: вариация, наборы и свои эмодзи владельца по ролям (роль → id).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct EmojiSettings {
+    pub style: EmojiStyle,
+    pub packs: EmojiPacks,
+    pub custom: BTreeMap<String, String>,
+}
+
+/// `custom_emoji_id` — число до 32 цифр (ничего другого в атрибут HTML не попадёт).
+pub fn is_custom_emoji_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 32 && id.bytes().all(|b| b.is_ascii_digit())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -123,7 +252,10 @@ pub enum EmojiError {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EmojiSet {
     premium: bool,
+    /// id для текста.
     ids: BTreeMap<Emoji, String>,
+    /// id для иконок кнопок; нет — как в тексте.
+    buttons: BTreeMap<Emoji, String>,
 }
 
 impl EmojiSet {
@@ -132,12 +264,12 @@ impl EmojiSet {
         Self::default()
     }
 
-    /// С Premium: id кастомных эмодзи по ролям. Роли без id — обычными символами.
+    /// С Premium: id кастомных эмодзи по ролям (одни и те же в тексте и на кнопках). Роли
+    /// без id — обычными символами.
     pub fn premium(ids: impl IntoIterator<Item = (Emoji, String)>) -> Result<Self, EmojiError> {
         let mut map = BTreeMap::new();
         for (role, id) in ids {
-            let valid = !id.is_empty() && id.len() <= 32 && id.bytes().all(|b| b.is_ascii_digit());
-            if !valid {
+            if !is_custom_emoji_id(&id) {
                 return Err(EmojiError::BadId(role.key()));
             }
             map.insert(role, id);
@@ -145,38 +277,69 @@ impl EmojiSet {
         Ok(Self {
             premium: true,
             ids: map,
+            buttons: BTreeMap::new(),
         })
     }
 
-    /// Из настроек: `premium_ok` — результат пробной отправки при старте (SPEC §6.4),
-    /// `custom` — `settings.custom_emoji` (ключ — [`Emoji::key`]).
-    pub fn from_settings<'a>(
-        premium_ok: bool,
-        custom: impl IntoIterator<Item = (&'a str, &'a str)>,
-    ) -> Result<Self, EmojiError> {
-        let mut ids = Vec::new();
-        for (key, id) in custom {
+    /// Из настроек ([`EmojiSettings`]). `premium_ok` — у владельца бота есть Premium и
+    /// кастомные эмодзи доходят (SPEC §6.4); `false` или вариация «выключено» — обычные символы.
+    /// Свои эмодзи владельца проверяются и тогда: ошибка в настройках видна сразу.
+    pub fn from_settings(premium_ok: bool, settings: &EmojiSettings) -> Result<Self, EmojiError> {
+        let mut custom = BTreeMap::new();
+        for (key, id) in &settings.custom {
             let role =
                 Emoji::from_key(key).ok_or_else(|| EmojiError::UnknownRole(key.to_owned()))?;
-            ids.push((role, id.to_owned()));
+            if !is_custom_emoji_id(id) {
+                return Err(EmojiError::BadId(role.key()));
+            }
+            custom.insert(role, id.clone());
         }
-        if premium_ok {
-            Self::premium(ids)
-        } else {
-            // Проверяем и без Premium: ошибка в настройках видна сразу, а не после покупки.
-            Self::premium(ids)?;
-            Ok(Self::plain())
+        let Some(pack) = settings.packs.of(settings.style).filter(|_| premium_ok) else {
+            return Ok(Self::plain());
+        };
+        let from_pack = |icon: &str| pack.get(icon).filter(|id| is_custom_emoji_id(id)).cloned();
+        let mut ids = BTreeMap::new();
+        let mut buttons = BTreeMap::new();
+        for role in Emoji::ALL {
+            if let Some(id) = custom.get(&role) {
+                ids.insert(role, id.clone());
+                buttons.insert(role, id.clone());
+                continue;
+            }
+            if let Some(id) = from_pack(role.text_icon()) {
+                ids.insert(role, id);
+            }
+            if let Some(id) = from_pack(role.button_icon()) {
+                buttons.insert(role, id);
+            }
         }
+        Ok(Self {
+            premium: true,
+            ids,
+            buttons,
+        })
     }
 
     pub fn is_premium(&self) -> bool {
         self.premium
     }
 
-    /// `custom_emoji_id` роли, если Premium включён и id задан.
+    /// `custom_emoji_id` роли в тексте, если Premium включён и id задан.
     pub fn custom_id(&self, role: Emoji) -> Option<&str> {
         if self.premium {
             self.ids.get(&role).map(String::as_str)
+        } else {
+            None
+        }
+    }
+
+    /// `custom_emoji_id` иконки кнопки: свой для кнопок, иначе как в тексте.
+    pub fn button_id(&self, role: Emoji) -> Option<&str> {
+        if self.premium {
+            self.buttons
+                .get(&role)
+                .or_else(|| self.ids.get(&role))
+                .map(String::as_str)
         } else {
             None
         }
@@ -197,7 +360,7 @@ impl EmojiSet {
     pub fn button(&self, role: Option<Emoji>, label: &str) -> (String, Option<String>) {
         match role {
             None => (label.to_owned(), None),
-            Some(role) => match self.custom_id(role) {
+            Some(role) => match self.button_id(role) {
                 Some(id) => (label.to_owned(), Some(id.to_owned())),
                 None => (format!("{} {label}", role.plain()), None),
             },
@@ -242,18 +405,97 @@ mod tests {
         );
     }
 
+    fn custom(pairs: &[(&str, &str)]) -> EmojiSettings {
+        EmojiSettings {
+            custom: pairs
+                .iter()
+                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                .collect(),
+            ..EmojiSettings::default()
+        }
+    }
+
     #[test]
     fn settings_are_validated() {
         assert_eq!(
-            EmojiSet::from_settings(true, [("wiat", "1")]),
+            EmojiSet::from_settings(true, &custom(&[("wiat", "1")])),
             Err(EmojiError::UnknownRole("wiat".into()))
         );
         assert_eq!(
-            EmojiSet::from_settings(true, [("ok", "12\" onclick=\"x")]),
+            EmojiSet::from_settings(true, &custom(&[("ok", "12\" onclick=\"x")])),
             Err(EmojiError::BadId("ok"))
         );
-        let off = EmojiSet::from_settings(false, [("ok", "123")]).unwrap();
+        let off = EmojiSet::from_settings(false, &custom(&[("ok", "123")])).unwrap();
         assert!(!off.is_premium());
         assert_eq!(off.custom_id(Emoji::Ok), None);
+    }
+
+    fn packs() -> EmojiPacks {
+        let mut p = EmojiPacks::default();
+        for role in Emoji::ALL {
+            p.animated
+                .insert(role.text_icon().to_owned(), format!("1{}", role as u8));
+            p.animated
+                .insert(role.button_icon().to_owned(), format!("2{}", role as u8));
+            p.still
+                .insert(role.text_icon().to_owned(), format!("3{}", role as u8));
+        }
+        p
+    }
+
+    #[test]
+    fn variation_picks_its_pack_and_owner_emoji_wins() {
+        let mut s = EmojiSettings {
+            packs: packs(),
+            ..EmojiSettings::default()
+        };
+        let set = EmojiSet::from_settings(true, &s).unwrap();
+        let ok = Emoji::Ok as u8;
+        assert_eq!(set.custom_id(Emoji::Ok), Some(format!("1{ok}").as_str()));
+        assert_eq!(set.button_id(Emoji::Ok), Some(format!("2{ok}").as_str()));
+
+        // Статичная вариация: кнопки без своих значков берут значок текста.
+        s.style = EmojiStyle::Static;
+        let set = EmojiSet::from_settings(true, &s).unwrap();
+        assert_eq!(set.custom_id(Emoji::Ok), Some(format!("3{ok}").as_str()));
+        assert_eq!(set.button_id(Emoji::Ok), Some(format!("3{ok}").as_str()));
+
+        // Свой эмодзи владельца — и в тексте, и на кнопке, в любой вариации.
+        s.custom.insert("ok".into(), "5368324170671202286".into());
+        let set = EmojiSet::from_settings(true, &s).unwrap();
+        assert_eq!(set.custom_id(Emoji::Ok), Some("5368324170671202286"));
+        assert_eq!(set.button_id(Emoji::Ok), Some("5368324170671202286"));
+        assert_eq!(
+            set.custom_id(Emoji::Err),
+            Some(format!("3{}", Emoji::Err as u8).as_str())
+        );
+
+        // Выключено — обычные символы, свои эмодзи тоже.
+        s.style = EmojiStyle::Off;
+        let set = EmojiSet::from_settings(true, &s).unwrap();
+        assert!(!set.is_premium());
+        assert_eq!(set.frag(Emoji::Ok).plain(), "✅");
+    }
+
+    #[test]
+    fn every_role_has_icons_of_the_exch_set() {
+        let manifest = include_str!("../../../assets/emoji/manifest.json");
+        for role in Emoji::ALL {
+            for icon in [role.text_icon(), role.button_icon()] {
+                assert!(
+                    manifest.contains(&format!("\"key\": \"{icon}\"")),
+                    "{role:?}: нет значка {icon} в наборе"
+                );
+            }
+        }
+        for style in EmojiStyle::ALL {
+            assert_eq!(EmojiStyle::from_key(style.key()), Some(style));
+        }
+        let packs: EmojiPacks =
+            serde_json::from_str(r#"{"animated": {"color/done": "1"}, "static": {}}"#).unwrap();
+        assert_eq!(
+            packs.animated.get("color/done").map(String::as_str),
+            Some("1")
+        );
     }
 }

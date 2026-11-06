@@ -19,7 +19,8 @@ serde_json = "1.0.149"
 thiserror.workspace = true
 # reqwest 0.13 без aws-lc: провайдер rustls — ring, как у sqlx (`tls-rustls-ring-webpki`).
 # JSON сериализуем сами (serde_json), поэтому фича `json` не нужна.
-reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"], optional = true }
+# `multipart` — только для `uploadStickerFile` (установка набора эмодзи exch).
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "multipart"], optional = true }
 rustls = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 webpki-roots = { version = "1.0.9", optional = true }
 secrecy = { workspace = true, optional = true }

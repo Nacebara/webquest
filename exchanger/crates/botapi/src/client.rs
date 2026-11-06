@@ -22,10 +22,11 @@ use serde::de::DeserializeOwned;
 use crate::error::{Error, TransportKind, decode_response, scrub};
 use crate::keyboard::InlineKeyboardMarkup;
 use crate::methods::{
-    AnswerCallbackQuery, DeleteMessage, EditMessageText, GetMe, GetUpdates, Method, SendMessage,
-    SendRichMessage, SetMyCommands, parse_updates,
+    AddStickerToSet, AnswerCallbackQuery, CreateNewStickerSet, DeleteMessage, EditMessageText,
+    GetMe, GetStickerSet, GetUpdates, Method, SendMessage, SendRichMessage, SetMyCommands,
+    StickerFormat, parse_updates,
 };
-use crate::types::{BotCommand, Message, Update, User};
+use crate::types::{BotCommand, File, Message, StickerSet, Update, User};
 
 pub const DEFAULT_BASE_URL: &str = "https://api.telegram.org";
 /// Таймаут обычного запроса (как у lovec, account.rs:775-777).
@@ -285,6 +286,58 @@ impl BotApi {
 
     pub async fn set_my_commands(&self, commands: Vec<BotCommand>) -> Result<bool, Error> {
         self.execute(&SetMyCommands::new(commands)).await
+    }
+
+    /// `uploadStickerFile`: файл стикера для будущего набора (multipart). `file_name` — с
+    /// расширением (`done.tgs`, `done.png`): по нему Telegram узнаёт тип.
+    pub async fn upload_sticker_file(
+        &self,
+        user_id: i64,
+        format: StickerFormat,
+        file_name: &str,
+        bytes: Vec<u8>,
+    ) -> Result<File, Error> {
+        const METHOD: &str = "uploadStickerFile";
+        let token = self.token.expose_secret();
+        let url = format!("{}/bot{token}/{METHOD}", self.base_url);
+        let part = reqwest::multipart::Part::bytes(bytes).file_name(file_name.to_owned());
+        let form = reqwest::multipart::Form::new()
+            .text("user_id", user_id.to_string())
+            .text("sticker_format", format.name())
+            .part("sticker", part);
+        tracing::debug!(method = METHOD, file = file_name, "Bot API: загрузка файла");
+        let response = self
+            .http
+            .post(url)
+            .multipart(form)
+            .timeout(self.timeout)
+            .send()
+            .await
+            .map_err(|e| transport_error(METHOD, e, token))?;
+        let status = response.status().as_u16();
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| transport_error(METHOD, e, token))?;
+        decode_response(METHOD, status, &bytes).map_err(|e| e.scrub(token))
+    }
+
+    pub async fn create_new_sticker_set(
+        &self,
+        request: &CreateNewStickerSet,
+    ) -> Result<bool, Error> {
+        self.execute(request).await
+    }
+
+    pub async fn add_sticker_to_set(&self, request: &AddStickerToSet) -> Result<bool, Error> {
+        self.execute(request).await
+    }
+
+    pub async fn get_sticker_set(&self, name: &str) -> Result<StickerSet, Error> {
+        self.execute(&GetStickerSet {
+            name: name.to_owned(),
+        })
+        .await
     }
 }
 

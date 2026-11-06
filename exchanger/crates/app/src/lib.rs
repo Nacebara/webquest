@@ -6,9 +6,11 @@
 //! - [`wallet_log`] — журнал сообщений ботов кошельков в `wallet_messages`;
 //! - [`telegram`] — настройки подключения юзерботов из окружения;
 //! - [`login`] — `exch login`; [`record`] — `exch record`;
-//! - [`runtime`] — подключение юзерботов и сборка движка для `exch run`.
+//! - [`runtime`] — подключение юзерботов и сборка движка для `exch run`;
+//! - [`emoji`] — премиум-эмодзи: вариация набора, свои эмодзи по ролям, установка (`exch emoji`).
 
 pub mod config;
+pub mod emoji;
 pub mod listen;
 pub mod login;
 pub mod record;

@@ -1,9 +1,30 @@
 # Эмодзи exch
 
-Собственное семейство премиум-эмодзи бота: векторные TGS (Lottie), чёткие в любом размере.
-Готовые файлы лежат в `assets/emoji/{color,mono}/*.tgs` и коммитятся. Ставит их в набор
-(`uploadStickerFile` → `createNewStickerSet` / `addStickerToSet`) отдельная команда бота.
-Её ещё нет.
+Собственное семейство премиум-эмодзи бота в двух вариациях (решение владельца, 6 ноября 2026):
+
+- **анимированная** — векторные TGS (Lottie), `assets/emoji/{color,mono}/*.tgs`;
+- **статичная** — те же значки в позе покоя (`t = null`), PNG 100×100, как Telegram требует
+  для статичных кастомных эмодзи: `assets/emoji/static/{color,mono}/*.png` (`static.js`).
+
+`assets/emoji/manifest.json` — список значков для установки: вид, подпись, обычный эмодзи
+(Telegram просит его для каждого кастомного), файлы обеих вариаций. Всё коммитится.
+
+Установка в Telegram — `exch emoji install --owner <ваш Telegram id>` (нужен `CLIENT_BOT_TOKEN`,
+владелец должен был написать боту `/start`): четыре набора кастомных эмодзи клиентского бота —
+анимированные и статичные, плитки и линии. Линии Telegram перекрашивает в цвет текста, а это
+свойство всего набора, поэтому их наборы отдельные. Повторный запуск дописывает недостающее
+и обновляет id в `settings.emoji_packs`.
+
+| Команда | Что делает |
+|---|---|
+| `exch emoji show` | вариация, сколько значков в наборах, источник эмодзи каждой роли |
+| `exch emoji style animated` / `static` / `off` | вариация набора; `off` — обычные символы |
+| `exch emoji set <роль> <id>` | свой премиум-эмодзи на роль, сильнее набора (как в боте-гаранте) |
+| `exch emoji reset <роль>` | роль снова из набора |
+
+Клиентский бот читает настройки при старте (`exch run`). В пульте (ops-бот, M5) будут те же
+действия кнопками: вариация, «Прислать свой эмодзи» на роль — бот возьмёт `custom_emoji_id`
+из присланного сообщения.
 
 | Набор | Что это | В Telegram |
 |---|---|---|
@@ -37,6 +58,7 @@ python3 -m venv /tmp/emoji-venv && /tmp/emoji-venv/bin/pip install rlottie-pytho
 
 node tools/emoji/check.js                         # петли бесшовны, подписи есть, нет запрещённого
 node tools/emoji/tgs.js assets/emoji              # все значки; или: … assets/emoji swap,done
+node tools/emoji/static.js assets/emoji           # статичная вариация и manifest.json
 node tools/emoji/frames.js /tmp/emoji-ref 256     # эталонные кадры (librsvg)
 /tmp/emoji-venv/bin/python -I tools/emoji/verify_tgs.py assets/emoji /tmp/emoji-ref
 /tmp/emoji-venv/bin/python -I tools/emoji/preview.py assets/emoji /tmp/emoji-preview.png

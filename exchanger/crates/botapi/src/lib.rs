@@ -27,11 +27,12 @@ pub use keyboard::{
     ReplyKeyboardMarkup, ReplyKeyboardRemove, ReplyMarkup,
 };
 pub use methods::{
-    AnswerCallbackQuery, DeleteMessage, EditContent, EditMessageText, GetMe, GetUpdates,
-    LinkPreviewOptions, Method, ParseMode, RichMessage, SendMessage, SendRichMessage,
-    SetMyCommands,
+    AddStickerToSet, AnswerCallbackQuery, CreateNewStickerSet, DeleteMessage, EditContent,
+    EditMessageText, GetMe, GetStickerSet, GetUpdates, InputSticker, LinkPreviewOptions, Method,
+    ParseMode, RichMessage, SendMessage, SendRichMessage, SetMyCommands, StickerFormat,
 };
 pub use types::{
-    BotCommand, BotCommandScope, CallbackQuery, Chat, ChatType, EntityKind, Message, MessageEntity,
-    MessageOrigin, ResponseParameters, Update, UpdateKind, User,
+    BotCommand, BotCommandScope, CallbackQuery, Chat, ChatType, EntityKind, File, Message,
+    MessageEntity, MessageOrigin, ResponseParameters, Sticker, StickerSet, Update, UpdateKind,
+    User,
 };

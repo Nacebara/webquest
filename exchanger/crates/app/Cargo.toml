@@ -27,6 +27,8 @@ dotenvy.workspace = true
 engine = { path = "../engine" }
 mtproto = { path = "../mtproto" }
 secrecy.workspace = true
+# Манифест набора эмодзи (`assets/emoji/manifest.json`) для `exch emoji install`.
+serde.workspace = true
 # JSON колонок wallet_messages и строк файла `exch record`.
 serde_json = "1"
 # Уже в дереве через storage; напрямую — ради типа ошибки пула соединений.

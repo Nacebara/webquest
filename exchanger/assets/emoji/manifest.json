@@ -1,0 +1,789 @@
+{
+ "size": 100,
+ "icons": [
+  {
+   "key": "color/done",
+   "label": "Готово",
+   "emoji": "✅",
+   "animated": "color/done.tgs",
+   "static": "static/color/done.png"
+  },
+  {
+   "key": "color/swap",
+   "label": "Обмен",
+   "emoji": "🔄",
+   "animated": "color/swap.tgs",
+   "static": "static/color/swap.png"
+  },
+  {
+   "key": "color/process",
+   "label": "В работе",
+   "emoji": "⏳",
+   "animated": "color/process.tgs",
+   "static": "static/color/process.png"
+  },
+  {
+   "key": "color/wait",
+   "label": "Ждём",
+   "emoji": "⏳",
+   "animated": "color/wait.tgs",
+   "static": "static/color/wait.png"
+  },
+  {
+   "key": "color/err",
+   "label": "Ошибка",
+   "emoji": "❌",
+   "animated": "color/err.tgs",
+   "static": "static/color/err.png"
+  },
+  {
+   "key": "color/warn",
+   "label": "Внимание",
+   "emoji": "⚠️",
+   "animated": "color/warn.tgs",
+   "static": "static/color/warn.png"
+  },
+  {
+   "key": "color/refund",
+   "label": "Возврат",
+   "emoji": "↩️",
+   "animated": "color/refund.tgs",
+   "static": "static/color/refund.png"
+  },
+  {
+   "key": "color/manual",
+   "label": "Ручная проверка",
+   "emoji": "🛠",
+   "animated": "color/manual.tgs",
+   "static": "static/color/manual.png"
+  },
+  {
+   "key": "color/invoice",
+   "label": "Счёт",
+   "emoji": "🧾",
+   "animated": "color/invoice.tgs",
+   "static": "static/color/invoice.png"
+  },
+  {
+   "key": "color/sending",
+   "label": "Чек в пути",
+   "emoji": "📤",
+   "animated": "color/sending.tgs",
+   "static": "static/color/sending.png"
+  },
+  {
+   "key": "color/usdt",
+   "label": "USDT",
+   "emoji": "💵",
+   "animated": "color/usdt.tgs",
+   "static": "static/color/usdt.png"
+  },
+  {
+   "key": "color/cb",
+   "label": "CryptoBot",
+   "emoji": "🔵",
+   "animated": "color/cb.tgs",
+   "static": "static/color/cb.png"
+  },
+  {
+   "key": "color/xr",
+   "label": "xRocket",
+   "emoji": "🚀",
+   "animated": "color/xr.tgs",
+   "static": "static/color/xr.png"
+  },
+  {
+   "key": "color/shield",
+   "label": "Защита",
+   "emoji": "🛡",
+   "animated": "color/shield.tgs",
+   "static": "static/color/shield.png"
+  },
+  {
+   "key": "color/lock",
+   "label": "Приватность",
+   "emoji": "🔒",
+   "animated": "color/lock.tgs",
+   "static": "static/color/lock.png"
+  },
+  {
+   "key": "color/rates",
+   "label": "Курс",
+   "emoji": "📈",
+   "animated": "color/rates.tgs",
+   "static": "static/color/rates.png"
+  },
+  {
+   "key": "color/history",
+   "label": "История",
+   "emoji": "📜",
+   "animated": "color/history.tgs",
+   "static": "static/color/history.png"
+  },
+  {
+   "key": "color/support",
+   "label": "Поддержка",
+   "emoji": "💬",
+   "animated": "color/support.tgs",
+   "static": "static/color/support.png"
+  },
+  {
+   "key": "color/fast",
+   "label": "Быстро",
+   "emoji": "⚡",
+   "animated": "color/fast.tgs",
+   "static": "static/color/fast.png"
+  },
+  {
+   "key": "color/pause",
+   "label": "Пауза",
+   "emoji": "⏸",
+   "animated": "color/pause.tgs",
+   "static": "static/color/pause.png"
+  },
+  {
+   "key": "color/ban",
+   "label": "Бан",
+   "emoji": "⛔",
+   "animated": "color/ban.tgs",
+   "static": "static/color/ban.png"
+  },
+  {
+   "key": "color/alarm",
+   "label": "Тревога",
+   "emoji": "🚨",
+   "animated": "color/alarm.tgs",
+   "static": "static/color/alarm.png"
+  },
+  {
+   "key": "color/live",
+   "label": "На связи",
+   "emoji": "🟢",
+   "animated": "color/live.tgs",
+   "static": "static/color/live.png"
+  },
+  {
+   "key": "color/robot",
+   "label": "Юзербот",
+   "emoji": "🤖",
+   "animated": "color/robot.tgs",
+   "static": "static/color/robot.png"
+  },
+  {
+   "key": "color/vault",
+   "label": "Резерв",
+   "emoji": "🏦",
+   "animated": "color/vault.tgs",
+   "static": "static/color/vault.png"
+  },
+  {
+   "key": "color/flood",
+   "label": "Лимит Telegram",
+   "emoji": "🌊",
+   "animated": "color/flood.tgs",
+   "static": "static/color/flood.png"
+  },
+  {
+   "key": "color/kill",
+   "label": "Стоп-кран",
+   "emoji": "🛑",
+   "animated": "color/kill.tgs",
+   "static": "static/color/kill.png"
+  },
+  {
+   "key": "color/maint",
+   "label": "Обслуживание",
+   "emoji": "🛠",
+   "animated": "color/maint.tgs",
+   "static": "static/color/maint.png"
+  },
+  {
+   "key": "color/broadcast",
+   "label": "Рассылка",
+   "emoji": "📢",
+   "animated": "color/broadcast.tgs",
+   "static": "static/color/broadcast.png"
+  },
+  {
+   "key": "color/limit",
+   "label": "Лимиты",
+   "emoji": "📏",
+   "animated": "color/limit.tgs",
+   "static": "static/color/limit.png"
+  },
+  {
+   "key": "color/confetti",
+   "label": "Первый обмен",
+   "emoji": "🎉",
+   "animated": "color/confetti.tgs",
+   "static": "static/color/confetti.png"
+  },
+  {
+   "key": "color/step_done",
+   "label": "Шаг: готов",
+   "emoji": "✅",
+   "animated": "color/step_done.tgs",
+   "static": "static/color/step_done.png"
+  },
+  {
+   "key": "color/step_now",
+   "label": "Шаг: сейчас",
+   "emoji": "🔵",
+   "animated": "color/step_now.tgs",
+   "static": "static/color/step_now.png"
+  },
+  {
+   "key": "color/step_todo",
+   "label": "Шаг: впереди",
+   "emoji": "⚪",
+   "animated": "color/step_todo.tgs",
+   "static": "static/color/step_todo.png"
+  },
+  {
+   "key": "color/dot_ok",
+   "label": "Хорошо",
+   "emoji": "🟢",
+   "animated": "color/dot_ok.tgs",
+   "static": "static/color/dot_ok.png"
+  },
+  {
+   "key": "color/dot_work",
+   "label": "В работе",
+   "emoji": "🔵",
+   "animated": "color/dot_work.tgs",
+   "static": "static/color/dot_work.png"
+  },
+  {
+   "key": "color/dot_wait",
+   "label": "Ждём",
+   "emoji": "🟡",
+   "animated": "color/dot_wait.tgs",
+   "static": "static/color/dot_wait.png"
+  },
+  {
+   "key": "color/dot_act",
+   "label": "Нужен человек",
+   "emoji": "🔴",
+   "animated": "color/dot_act.tgs",
+   "static": "static/color/dot_act.png"
+  },
+  {
+   "key": "color/dot_closed",
+   "label": "Закрыто",
+   "emoji": "⚫",
+   "animated": "color/dot_closed.tgs",
+   "static": "static/color/dot_closed.png"
+  },
+  {
+   "key": "color/prog_25",
+   "label": "Прогресс 25 %",
+   "emoji": "🕒",
+   "animated": "color/prog_25.tgs",
+   "static": "static/color/prog_25.png"
+  },
+  {
+   "key": "color/prog_50",
+   "label": "Прогресс 50 %",
+   "emoji": "🕕",
+   "animated": "color/prog_50.tgs",
+   "static": "static/color/prog_50.png"
+  },
+  {
+   "key": "color/prog_75",
+   "label": "Прогресс 75 %",
+   "emoji": "🕘",
+   "animated": "color/prog_75.tgs",
+   "static": "static/color/prog_75.png"
+  },
+  {
+   "key": "mono/swap",
+   "label": "Обмен",
+   "emoji": "🔄",
+   "animated": "mono/swap.tgs",
+   "static": "static/mono/swap.png"
+  },
+  {
+   "key": "mono/ticket",
+   "label": "Чек",
+   "emoji": "🎫",
+   "animated": "mono/ticket.tgs",
+   "static": "static/mono/ticket.png"
+  },
+  {
+   "key": "mono/invoice",
+   "label": "Счёт",
+   "emoji": "🧾",
+   "animated": "mono/invoice.tgs",
+   "static": "static/mono/invoice.png"
+  },
+  {
+   "key": "mono/rates",
+   "label": "Курс",
+   "emoji": "📈",
+   "animated": "mono/rates.tgs",
+   "static": "static/mono/rates.png"
+  },
+  {
+   "key": "mono/history",
+   "label": "История",
+   "emoji": "📜",
+   "animated": "mono/history.tgs",
+   "static": "static/mono/history.png"
+  },
+  {
+   "key": "mono/support",
+   "label": "Поддержка",
+   "emoji": "💬",
+   "animated": "mono/support.tgs",
+   "static": "static/mono/support.png"
+  },
+  {
+   "key": "mono/help",
+   "label": "Помощь",
+   "emoji": "❓",
+   "animated": "mono/help.tgs",
+   "static": "static/mono/help.png"
+  },
+  {
+   "key": "mono/copy",
+   "label": "Копировать",
+   "emoji": "📋",
+   "animated": "mono/copy.tgs",
+   "static": "static/mono/copy.png"
+  },
+  {
+   "key": "mono/claim",
+   "label": "Забрать",
+   "emoji": "📥",
+   "animated": "mono/claim.tgs",
+   "static": "static/mono/claim.png"
+  },
+  {
+   "key": "mono/cb",
+   "label": "CryptoBot",
+   "emoji": "🔵",
+   "animated": "mono/cb.tgs",
+   "static": "static/mono/cb.png"
+  },
+  {
+   "key": "mono/xr",
+   "label": "xRocket",
+   "emoji": "🚀",
+   "animated": "mono/xr.tgs",
+   "static": "static/mono/xr.png"
+  },
+  {
+   "key": "mono/usdt",
+   "label": "USDT",
+   "emoji": "💵",
+   "animated": "mono/usdt.tgs",
+   "static": "static/mono/usdt.png"
+  },
+  {
+   "key": "mono/done",
+   "label": "Готово",
+   "emoji": "✅",
+   "animated": "mono/done.tgs",
+   "static": "static/mono/done.png"
+  },
+  {
+   "key": "mono/close",
+   "label": "Закрыть",
+   "emoji": "❌",
+   "animated": "mono/close.tgs",
+   "static": "static/mono/close.png"
+  },
+  {
+   "key": "mono/back",
+   "label": "Назад",
+   "emoji": "◀️",
+   "animated": "mono/back.tgs",
+   "static": "static/mono/back.png"
+  },
+  {
+   "key": "mono/home",
+   "label": "Главная",
+   "emoji": "🏠",
+   "animated": "mono/home.tgs",
+   "static": "static/mono/home.png"
+  },
+  {
+   "key": "mono/refresh",
+   "label": "Обновить",
+   "emoji": "🔄",
+   "animated": "mono/refresh.tgs",
+   "static": "static/mono/refresh.png"
+  },
+  {
+   "key": "mono/refund",
+   "label": "Возврат",
+   "emoji": "↩️",
+   "animated": "mono/refund.tgs",
+   "static": "static/mono/refund.png"
+  },
+  {
+   "key": "mono/wait",
+   "label": "Ждём",
+   "emoji": "⏳",
+   "animated": "mono/wait.tgs",
+   "static": "static/mono/wait.png"
+  },
+  {
+   "key": "mono/spin",
+   "label": "Загрузка",
+   "emoji": "🌀",
+   "animated": "mono/spin.tgs",
+   "static": "static/mono/spin.png"
+  },
+  {
+   "key": "mono/fast",
+   "label": "Быстро",
+   "emoji": "⚡",
+   "animated": "mono/fast.tgs",
+   "static": "static/mono/fast.png"
+  },
+  {
+   "key": "mono/gift",
+   "label": "Подарок",
+   "emoji": "🎁",
+   "animated": "mono/gift.tgs",
+   "static": "static/mono/gift.png"
+  },
+  {
+   "key": "mono/star",
+   "label": "Звезда",
+   "emoji": "⭐",
+   "animated": "mono/star.tgs",
+   "static": "static/mono/star.png"
+  },
+  {
+   "key": "mono/globe",
+   "label": "Язык",
+   "emoji": "🌐",
+   "animated": "mono/globe.tgs",
+   "static": "static/mono/globe.png"
+  },
+  {
+   "key": "mono/link",
+   "label": "Ссылка",
+   "emoji": "🔗",
+   "animated": "mono/link.tgs",
+   "static": "static/mono/link.png"
+  },
+  {
+   "key": "mono/dash",
+   "label": "Сводка",
+   "emoji": "📊",
+   "animated": "mono/dash.tgs",
+   "static": "static/mono/dash.png"
+  },
+  {
+   "key": "mono/queue",
+   "label": "Очередь",
+   "emoji": "📋",
+   "animated": "mono/queue.tgs",
+   "static": "static/mono/queue.png"
+  },
+  {
+   "key": "mono/order",
+   "label": "Заявка",
+   "emoji": "📄",
+   "animated": "mono/order.tgs",
+   "static": "static/mono/order.png"
+  },
+  {
+   "key": "mono/user",
+   "label": "Клиент",
+   "emoji": "👤",
+   "animated": "mono/user.tgs",
+   "static": "static/mono/user.png"
+  },
+  {
+   "key": "mono/users",
+   "label": "Клиенты",
+   "emoji": "👥",
+   "animated": "mono/users.tgs",
+   "static": "static/mono/users.png"
+  },
+  {
+   "key": "mono/ban",
+   "label": "Бан",
+   "emoji": "🚫",
+   "animated": "mono/ban.tgs",
+   "static": "static/mono/ban.png"
+  },
+  {
+   "key": "mono/search",
+   "label": "Поиск",
+   "emoji": "🔍",
+   "animated": "mono/search.tgs",
+   "static": "static/mono/search.png"
+  },
+  {
+   "key": "mono/filter",
+   "label": "Фильтр",
+   "emoji": "🔽",
+   "animated": "mono/filter.tgs",
+   "static": "static/mono/filter.png"
+  },
+  {
+   "key": "mono/settings",
+   "label": "Настройки",
+   "emoji": "⚙️",
+   "animated": "mono/settings.tgs",
+   "static": "static/mono/settings.png"
+  },
+  {
+   "key": "mono/bell",
+   "label": "Алерты",
+   "emoji": "🔔",
+   "animated": "mono/bell.tgs",
+   "static": "static/mono/bell.png"
+  },
+  {
+   "key": "mono/vault",
+   "label": "Резерв",
+   "emoji": "🏦",
+   "animated": "mono/vault.tgs",
+   "static": "static/mono/vault.png"
+  },
+  {
+   "key": "mono/robot",
+   "label": "Юзербот",
+   "emoji": "🤖",
+   "animated": "mono/robot.tgs",
+   "static": "static/mono/robot.png"
+  },
+  {
+   "key": "mono/megaphone",
+   "label": "Рассылка",
+   "emoji": "📣",
+   "animated": "mono/megaphone.tgs",
+   "static": "static/mono/megaphone.png"
+  },
+  {
+   "key": "mono/journal",
+   "label": "Журнал",
+   "emoji": "📓",
+   "animated": "mono/journal.tgs",
+   "static": "static/mono/journal.png"
+  },
+  {
+   "key": "mono/chart",
+   "label": "Статистика",
+   "emoji": "📊",
+   "animated": "mono/chart.tgs",
+   "static": "static/mono/chart.png"
+  },
+  {
+   "key": "mono/export",
+   "label": "Экспорт",
+   "emoji": "📤",
+   "animated": "mono/export.tgs",
+   "static": "static/mono/export.png"
+  },
+  {
+   "key": "mono/emoji",
+   "label": "Эмодзи",
+   "emoji": "😀",
+   "animated": "mono/emoji.tgs",
+   "static": "static/mono/emoji.png"
+  },
+  {
+   "key": "mono/staff",
+   "label": "Персонал",
+   "emoji": "👔",
+   "animated": "mono/staff.tgs",
+   "static": "static/mono/staff.png"
+  },
+  {
+   "key": "mono/key",
+   "label": "Ключи",
+   "emoji": "🔑",
+   "animated": "mono/key.tgs",
+   "static": "static/mono/key.png"
+  },
+  {
+   "key": "mono/power",
+   "label": "Стоп-кран",
+   "emoji": "🛑",
+   "animated": "mono/power.tgs",
+   "static": "static/mono/power.png"
+  },
+  {
+   "key": "mono/pause",
+   "label": "Пауза",
+   "emoji": "⏸",
+   "animated": "mono/pause.tgs",
+   "static": "static/mono/pause.png"
+  },
+  {
+   "key": "mono/play",
+   "label": "Пуск",
+   "emoji": "▶️",
+   "animated": "mono/play.tgs",
+   "static": "static/mono/play.png"
+  },
+  {
+   "key": "mono/maint",
+   "label": "Обслуживание",
+   "emoji": "🛠",
+   "animated": "mono/maint.tgs",
+   "static": "static/mono/maint.png"
+  },
+  {
+   "key": "mono/shield",
+   "label": "Защита",
+   "emoji": "🛡",
+   "animated": "mono/shield.tgs",
+   "static": "static/mono/shield.png"
+  },
+  {
+   "key": "mono/lock",
+   "label": "Приватность",
+   "emoji": "🔒",
+   "animated": "mono/lock.tgs",
+   "static": "static/mono/lock.png"
+  },
+  {
+   "key": "mono/eye",
+   "label": "Смотреть",
+   "emoji": "👁",
+   "animated": "mono/eye.tgs",
+   "static": "static/mono/eye.png"
+  },
+  {
+   "key": "mono/edit",
+   "label": "Изменить",
+   "emoji": "✏️",
+   "animated": "mono/edit.tgs",
+   "static": "static/mono/edit.png"
+  },
+  {
+   "key": "mono/plus",
+   "label": "Добавить",
+   "emoji": "➕",
+   "animated": "mono/plus.tgs",
+   "static": "static/mono/plus.png"
+  },
+  {
+   "key": "mono/minus",
+   "label": "Убрать",
+   "emoji": "➖",
+   "animated": "mono/minus.tgs",
+   "static": "static/mono/minus.png"
+  },
+  {
+   "key": "mono/trash",
+   "label": "Удалить",
+   "emoji": "🗑",
+   "animated": "mono/trash.tgs",
+   "static": "static/mono/trash.png"
+  },
+  {
+   "key": "mono/calendar",
+   "label": "Период",
+   "emoji": "📅",
+   "animated": "mono/calendar.tgs",
+   "static": "static/mono/calendar.png"
+  },
+  {
+   "key": "mono/limit",
+   "label": "Лимиты",
+   "emoji": "📏",
+   "animated": "mono/limit.tgs",
+   "static": "static/mono/limit.png"
+  },
+  {
+   "key": "mono/alert",
+   "label": "Внимание",
+   "emoji": "⚠️",
+   "animated": "mono/alert.tgs",
+   "static": "static/mono/alert.png"
+  },
+  {
+   "key": "mono/flag",
+   "label": "Отметить",
+   "emoji": "🚩",
+   "animated": "mono/flag.tgs",
+   "static": "static/mono/flag.png"
+  },
+  {
+   "key": "mono/pin",
+   "label": "Закрепить",
+   "emoji": "📌",
+   "animated": "mono/pin.tgs",
+   "static": "static/mono/pin.png"
+  },
+  {
+   "key": "mono/topic",
+   "label": "Тема",
+   "emoji": "💭",
+   "animated": "mono/topic.tgs",
+   "static": "static/mono/topic.png"
+  },
+  {
+   "key": "mono/ack",
+   "label": "Принял",
+   "emoji": "👍",
+   "animated": "mono/ack.tgs",
+   "static": "static/mono/ack.png"
+  },
+  {
+   "key": "mono/take",
+   "label": "Взять",
+   "emoji": "✋",
+   "animated": "mono/take.tgs",
+   "static": "static/mono/take.png"
+  },
+  {
+   "key": "mono/coin",
+   "label": "Деньги",
+   "emoji": "🪙",
+   "animated": "mono/coin.tgs",
+   "static": "static/mono/coin.png"
+  },
+  {
+   "key": "mono/sparkle",
+   "label": "Новое",
+   "emoji": "✨",
+   "animated": "mono/sparkle.tgs",
+   "static": "static/mono/sparkle.png"
+  },
+  {
+   "key": "mono/phone",
+   "label": "Телефон",
+   "emoji": "📱",
+   "animated": "mono/phone.tgs",
+   "static": "static/mono/phone.png"
+  },
+  {
+   "key": "mono/plug",
+   "label": "Подключить",
+   "emoji": "🔌",
+   "animated": "mono/plug.tgs",
+   "static": "static/mono/plug.png"
+  },
+  {
+   "key": "mono/inbox",
+   "label": "Обращения",
+   "emoji": "📥",
+   "animated": "mono/inbox.tgs",
+   "static": "static/mono/inbox.png"
+  },
+  {
+   "key": "mono/server",
+   "label": "Система",
+   "emoji": "🖥",
+   "animated": "mono/server.tgs",
+   "static": "static/mono/server.png"
+  },
+  {
+   "key": "mono/wallet",
+   "label": "Кошелёк",
+   "emoji": "👛",
+   "animated": "mono/wallet.tgs",
+   "static": "static/mono/wallet.png"
+  }
+ ]
+}

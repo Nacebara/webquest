@@ -25,7 +25,9 @@ pub mod texts;
 
 pub use callback::Callback;
 pub use command::Command;
-pub use emoji::{Emoji, EmojiError, EmojiSet};
+pub use emoji::{
+    Emoji, EmojiError, EmojiPacks, EmojiSet, EmojiSettings, EmojiStyle, is_custom_emoji_id,
+};
 pub use fmt::{Clock, TimeFormat};
 pub use model::{
     Breakdown, DirectionStatus, DirectionTerms, Excess, FiatAmount, HistoryRow, InvoiceProblem,

@@ -717,4 +717,6 @@ INSERT INTO settings (key, value) VALUES
     ('min_refund_amount',      '0.50'),
     ('reconcile_tolerance',    '{"warn": "0.01", "pause": "1.00"}'),
     ('rebalance_whitelist',    '[]'),
-    ('custom_emoji',           '{}');
+    ('custom_emoji',           '{}'),
+    ('emoji_style',            '"animated"'),
+    ('emoji_packs',            '{}');

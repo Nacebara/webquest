@@ -110,9 +110,10 @@ pub fn client_bot(
     token: secrecy::SecretString,
     engine: Arc<engine::Engine>,
     support_contact: Option<String>,
+    emoji: ui::EmojiSet,
 ) -> anyhow::Result<tgbot::ClientBot> {
     let api = botapi::BotApi::new(token).context("cannot build the Bot API client")?;
-    let ui = ui::Ui::builtin(ui::EmojiSet::plain(), ui::UiConfig::default())
+    let ui = ui::Ui::builtin(emoji, ui::UiConfig::default())
         .context("built-in client texts are invalid")?;
     let cfg = tgbot::ClientBotConfig {
         support_contact,
@@ -121,6 +122,25 @@ pub fn client_bot(
         ..tgbot::ClientBotConfig::default()
     };
     Ok(tgbot::ClientBot::new(api, ui, engine, pool.clone(), cfg))
+}
+
+/// Эмодзи клиентского бота из настроек (`exch emoji`). Вариация «off» или битые настройки —
+/// обычные символы: интерфейс от этого не ломается, ошибка — в лог.
+pub async fn emoji_set(pool: &PgPool) -> ui::EmojiSet {
+    let loaded = async {
+        let mut conn = pool.acquire().await?;
+        let settings = crate::emoji::load(&mut conn).await?;
+        let premium = settings.style != ui::EmojiStyle::Off;
+        anyhow::Ok(ui::EmojiSet::from_settings(premium, &settings)?)
+    }
+    .await;
+    match loaded {
+        Ok(set) => set,
+        Err(e) => {
+            tracing::error!(error = %e, "emoji settings are invalid, plain emoji are used");
+            ui::EmojiSet::plain()
+        }
+    }
 }
 
 /// Движок с кошельками подключённых юзерботов.

@@ -352,3 +352,96 @@ pub fn parse_updates(raw: Vec<serde_json::Value>) -> Vec<Update> {
         })
         .collect()
 }
+
+// ---------------------------------------------------------------------------------------------
+// Наборы кастомных эмодзи (установка своего набора exch: `exch emoji install`)
+// ---------------------------------------------------------------------------------------------
+
+/// Формат файла стикера.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StickerFormat {
+    /// PNG или WEBP; для кастомного эмодзи — 100×100.
+    Static,
+    /// TGS (Lottie).
+    Animated,
+}
+
+impl StickerFormat {
+    pub const fn name(self) -> &'static str {
+        match self {
+            StickerFormat::Static => "static",
+            StickerFormat::Animated => "animated",
+        }
+    }
+}
+
+/// Стикер для `createNewStickerSet` / `addStickerToSet`: файл уже загружен
+/// (`uploadStickerFile` → `file_id`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct InputSticker {
+    pub sticker: String,
+    pub format: StickerFormat,
+    pub emoji_list: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CreateNewStickerSet {
+    /// Владелец набора — человек, который писал боту.
+    pub user_id: i64,
+    /// Имя набора: латиница, цифры, `_`, кончается на `_by_<имя бота>`.
+    pub name: String,
+    pub title: String,
+    /// До 50 стикеров; остальные — `addStickerToSet`.
+    pub stickers: Vec<InputSticker>,
+    pub sticker_type: &'static str,
+    /// Перекрашивать в цвет текста (линейные значки).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub needs_repainting: bool,
+}
+
+impl CreateNewStickerSet {
+    pub fn custom_emoji(
+        user_id: i64,
+        name: impl Into<String>,
+        title: impl Into<String>,
+        stickers: Vec<InputSticker>,
+        needs_repainting: bool,
+    ) -> Self {
+        Self {
+            user_id,
+            name: name.into(),
+            title: title.into(),
+            stickers,
+            sticker_type: "custom_emoji",
+            needs_repainting,
+        }
+    }
+}
+
+impl Method for CreateNewStickerSet {
+    const NAME: &'static str = "createNewStickerSet";
+    type Response = bool;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AddStickerToSet {
+    pub user_id: i64,
+    pub name: String,
+    pub sticker: InputSticker,
+}
+
+impl Method for AddStickerToSet {
+    const NAME: &'static str = "addStickerToSet";
+    type Response = bool;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct GetStickerSet {
+    pub name: String,
+}
+
+impl Method for GetStickerSet {
+    const NAME: &'static str = "getStickerSet";
+    type Response = crate::types::StickerSet;
+}

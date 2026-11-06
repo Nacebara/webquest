@@ -71,6 +71,39 @@ enum Command {
         #[arg(long, default_value_t = 300)]
         history: u32,
     },
+    /// Премиум-эмодзи клиентского бота (до пульта): вариация набора, свои эмодзи по ролям,
+    /// установка наборов exch в Telegram. Клиентский бот читает настройки при старте.
+    #[command(subcommand)]
+    Emoji(EmojiCommand),
+}
+
+#[derive(Debug, Subcommand)]
+enum EmojiCommand {
+    /// Вариация, наборы и источник эмодзи каждой роли.
+    Show,
+    /// Вариация набора: animated, static или off (обычные символы).
+    Style {
+        #[arg(value_parser = parse_style)]
+        style: ui::EmojiStyle,
+    },
+    /// Свой премиум-эмодзи на роль (сильнее набора): `exch emoji set ok 5368324170671202286`.
+    /// id — из сущности `custom_emoji` сообщения с этим эмодзи.
+    Set { role: String, id: String },
+    /// Вернуть роли эмодзи набора.
+    Reset { role: String },
+    /// Создать или дописать наборы exch (анимированные и статичные) от имени клиентского бота
+    /// и сохранить их id. Владелец набора — `--owner` (Telegram id, писал боту /start).
+    Install {
+        #[arg(long)]
+        owner: i64,
+        /// Папка набора (`manifest.json`, `color/`, `mono/`, `static/`).
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+}
+
+fn parse_style(s: &str) -> Result<ui::EmojiStyle, String> {
+    ui::EmojiStyle::from_key(s).ok_or_else(|| format!("unknown style {s}: animated, static or off"))
 }
 
 fn parse_platform(s: &str) -> Result<domain::Platform, String> {
@@ -93,7 +126,7 @@ fn main() -> ExitCode {
         }
     }
     // У слушателя на ноутбуке вывод для человека: короткие строки, только предупреждения.
-    let human = matches!(cli.command, Command::Listen { .. });
+    let human = matches!(cli.command, Command::Listen { .. } | Command::Emoji(_));
     init_tracing(human);
 
     let runtime = match tokio::runtime::Builder::new_multi_thread()
@@ -118,6 +151,7 @@ fn main() -> ExitCode {
                 history,
             } => record(label, out, history).await,
             Command::Listen { out, history } => listen(out, history).await,
+            Command::Emoji(cmd) => emoji(cmd).await,
         }
     });
     match result {
@@ -154,6 +188,57 @@ fn init_tracing(human: bool) {
 
 async fn listen(out: PathBuf, history: u32) -> anyhow::Result<()> {
     app::listen::run(&out, history).await
+}
+
+async fn emoji(cmd: EmojiCommand) -> anyhow::Result<()> {
+    let cfg = load_config()?;
+    let pool = connect_and_migrate(&cfg).await?;
+    let mut conn = pool.acquire().await?;
+    match cmd {
+        EmojiCommand::Show => {
+            print!(
+                "{}",
+                app::emoji::describe(&app::emoji::load(&mut conn).await?)
+            );
+        }
+        EmojiCommand::Style { style } => {
+            app::emoji::set_style(&mut conn, style).await?;
+            println!("Вариация: {}. Перезапустите exch run.", style.key());
+        }
+        EmojiCommand::Set { role, id } => {
+            let role = app::emoji::parse_role(&role)?;
+            app::emoji::set_custom(&mut conn, role, &id).await?;
+            println!("{}: свой эмодзи {id}. Перезапустите exch run.", role.key());
+        }
+        EmojiCommand::Reset { role } => {
+            let role = app::emoji::parse_role(&role)?;
+            let removed = app::emoji::reset_custom(&mut conn, role).await?;
+            println!(
+                "{}: {}",
+                role.key(),
+                if removed {
+                    "снова из набора"
+                } else {
+                    "своего эмодзи не было"
+                }
+            );
+        }
+        EmojiCommand::Install { owner, dir } => {
+            let token = cfg
+                .client_bot_token
+                .clone()
+                .context("CLIENT_BOT_TOKEN is not set: the sets belong to the client bot")?;
+            let bot = botapi::BotApi::new(token).context("cannot build the Bot API client")?;
+            let dir = dir.unwrap_or_else(app::emoji::default_dir);
+            let packs = app::emoji::install(&mut conn, &bot, owner, &dir).await?;
+            println!(
+                "Наборы установлены: анимированных {}, статичных {}. Перезапустите exch run.",
+                packs.animated.len(),
+                packs.still.len()
+            );
+        }
+    }
+    Ok(())
 }
 
 fn load_config() -> anyhow::Result<Config> {
@@ -305,11 +390,13 @@ async fn run() -> anyhow::Result<()> {
                         tracing::warn!("CLIENT_BOT_TOKEN is not set: the client bot is not started")
                     }
                     Some(token) => {
+                        let emoji = app::runtime::emoji_set(&pool).await;
                         let bot = app::runtime::client_bot(
                             &pool,
                             token,
                             engine,
                             cfg.support_contact.clone(),
+                            emoji,
                         )?;
                         tasks.spawn(supervise(
                             "client-bot",

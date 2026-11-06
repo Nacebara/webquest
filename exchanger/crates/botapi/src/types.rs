@@ -332,3 +332,31 @@ mod tests {
         assert_eq!(utf16_slice(text, u32::MAX, u32::MAX), None);
     }
 }
+
+/// Набор стикеров (`getStickerSet`): стикеры по порядку добавления.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StickerSet {
+    pub name: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub sticker_type: String,
+    #[serde(default)]
+    pub stickers: Vec<Sticker>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Sticker {
+    pub file_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub emoji: Option<String>,
+    /// У кастомного эмодзи — его id для `<tg-emoji>` и `icon_custom_emoji_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_emoji_id: Option<String>,
+}
+
+/// Загруженный файл (`uploadStickerFile`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct File {
+    pub file_id: String,
+}
