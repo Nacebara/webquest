@@ -14,6 +14,6 @@ pub mod wallet;
 pub use flows::{AccountGate, FlowConfig, MessageLog, UserbotWallet};
 pub use transport::{Chat, RawMessage, Transport, TransportError};
 pub use wallet::{
-    ActivationOutcome, BotError, IssueMethod, IssueOutcome, IssuedCheck, OpTag, PayOutcome,
+    ActivationOutcome, BotError, IssueMethod, IssueOutcome, IssuedCheck, OpTag, PayDue, PayOutcome,
     RejectReason, WalletBot,
 };

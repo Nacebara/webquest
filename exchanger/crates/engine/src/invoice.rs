@@ -13,8 +13,11 @@
 //! 5. Котировка истекла ([`Engine::expire_quotes`]) или клиент отменил
 //!    ([`Engine::cancel_invoice`]): денег нет — `EXPIRED` / `CANCELLED`, часть пришла — возврат.
 //!
-//! Фиатные счета пока не принимаем: сценарий оплаты платит только ровно ту сумму, под которую
-//! клиент прислал деньги, а у фиатного счёта сумма в USDT плавает (HANDOVER §8.1).
+//! Счёт в фиате (CryptoBot, «на сумму $5», решение владельца 6 ноября 2026, SPEC П5): сумма —
+//! точная сумма в USDT с кнопки монеты (`A`), по ней котировка `X`. Пока клиент шлёт чек, курс
+//! чуть плавает: при оплате бот снова покажет сумму в USDT. Не больше `A · (1 + fiat_buffer_pct)`
+//! (и не больше `X`) — платим, разницу покрывает сервис из комиссии; больше — ничего не
+//! нажимаем, возврат «курс сдвинулся» (`rate_moved`). Удержание — на `A` с запасом.
 
 use chrono::Utc;
 use domain::fsm::{Event, Flow, MoneyRole, OpKind, OrderState, Settlement};
@@ -44,7 +47,7 @@ pub enum InvoiceIssue {
     NoAmount,
     /// Не в USDT.
     UnsupportedAsset,
-    /// В фиате: сумма в USDT плавает, такие пока не оплачиваем.
+    /// В фиате, но кошелёк не показал сумму в USDT до оплаты (SPEC П5: такие не принимаем).
     Fiat,
     /// Карточка не прочиталась.
     Unreadable,
@@ -120,6 +123,40 @@ pub fn direction_for_invoice(platform: Platform) -> Direction {
     }
 }
 
+/// Сколько можно заплатить по счёту в фиате: `A · (1 + buffer %)`, но не больше `X`.
+pub fn fiat_cap(amount: Decimal, buffer_pct: Decimal, client_pays: Decimal) -> Decimal {
+    let with_buffer =
+        amount * (Decimal::ONE_HUNDRED + buffer_pct.max(Decimal::ZERO)) / Decimal::ONE_HUNDRED;
+    with_buffer.min(client_pays).max(amount).normalize()
+}
+
+/// Сколько можно заплатить по счёту заявки: в USDT — ровно `A`; в фиате — от `A · (1 − buffer)`
+/// до [`fiat_cap`] (SPEC П5).
+pub fn pay_due(
+    amount: Money,
+    fiat: bool,
+    buffer_pct: Decimal,
+    client_pays: Option<Decimal>,
+) -> Result<userbot::PayDue, EngineError> {
+    if !fiat {
+        return Ok(userbot::PayDue::exact(amount));
+    }
+    let buffer = buffer_pct.max(Decimal::ZERO);
+    let cap = fiat_cap(
+        amount.amount(),
+        buffer,
+        client_pays.unwrap_or(amount.amount()),
+    );
+    let floor = (amount.amount() * (Decimal::ONE_HUNDRED - buffer.min(Decimal::ONE_HUNDRED))
+        / Decimal::ONE_HUNDRED)
+        .normalize();
+    Ok(userbot::PayDue {
+        expected: amount,
+        min: Money::new(floor, amount.asset())?,
+        max: Money::new(cap, amount.asset())?,
+    })
+}
+
 /// Сумма счёта, если его можно оплатить.
 pub fn payable_amount(card: &InvoiceCard) -> Result<Decimal, InvoiceIssue> {
     match card.status {
@@ -131,10 +168,8 @@ pub fn payable_amount(card: &InvoiceCard) -> Result<Decimal, InvoiceIssue> {
     if card.single_use == Some(false) {
         return Err(InvoiceIssue::Reusable);
     }
-    if card.fiat.is_some() {
-        return Err(InvoiceIssue::Fiat);
-    }
     match card.amount {
+        None if card.fiat.is_some() => Err(InvoiceIssue::Fiat),
         None => Err(InvoiceIssue::NoAmount),
         Some((_, asset)) if asset != Asset::Usdt => Err(InvoiceIssue::UnsupportedAsset),
         Some((amount, _)) if amount <= Decimal::ZERO => Err(InvoiceIssue::Unreadable),
@@ -200,7 +235,7 @@ impl Engine {
 
         // Открыть счёт, ничего не платя. Транзакция БД во время действия юзербота не держится.
         let wallet = self.wallet(link.platform)?.clone();
-        let amount = match wallet.inspect_invoice(&link.param).await {
+        let (amount, fiat) = match wallet.inspect_invoice(&link.param).await {
             // Бот кошелька сразу предложил пополнить баланс: на этот счёт у нас не хватает, а сумму
             // он не показал. Клиенту — «временно не можем», владельцу — резерв ниже нужного.
             Ok(info) if info.card.insufficient_funds => {
@@ -211,7 +246,7 @@ impl Engine {
                 return Ok(InvoiceSubmitted::Rejected(InvoiceReject::WalletUnavailable));
             }
             Ok(info) => match payable_amount(&info.card) {
-                Ok(amount) => amount,
+                Ok(amount) => (amount, info.card.fiat.clone()),
                 Err(issue) => {
                     tracing::info!(
                         ?issue,
@@ -262,6 +297,12 @@ impl Engine {
             Some(limit) => Some(limit - storage::orders::user_volume_24h(&mut tx, user_id).await?),
             None => None,
         };
+        // Счёт в фиате: держим сумму с запасом на курс (её может потребовать бот при оплате),
+        // но не больше, чем пришлёт клиент.
+        let hold = match &fiat {
+            Some(_) => fiat_cap(amount, dir.fiat_buffer_pct, quote.client_pays),
+            None => amount,
+        };
         let room = available - self.cfg.reserve_safety;
         let reject = if quote.client_pays < dir.min_amount {
             Some(InvoiceReject::BelowMinimum {
@@ -271,7 +312,7 @@ impl Engine {
             Some(InvoiceReject::AboveMaximum { max: per_order })
         } else if daily_left.is_some_and(|left| quote.client_pays > left) {
             Some(InvoiceReject::DailyLimit)
-        } else if amount > room {
+        } else if hold > room {
             Some(InvoiceReject::NoReserve {
                 max: room.max(Decimal::ZERO),
             })
@@ -316,6 +357,8 @@ impl Engine {
             fee_amount: Some(quote.fee),
             // У оплаты счёта «выплата» — сам счёт.
             payout_amount: Some(amount),
+            invoice_fiat: fiat.as_ref().map(|(_, currency)| currency.as_str()),
+            invoice_fiat_amount: fiat.as_ref().map(|(value, _)| *value),
             ..OrderPatch::default()
         };
         let (order, _) = transit(
@@ -325,13 +368,13 @@ impl Engine {
             &patch,
             None,
             EffectCtx {
-                hold: Some((wallet_id, amount)),
+                hold: Some((wallet_id, hold)),
                 ..EffectCtx::default()
             },
         )
         .await?;
         tx.commit().await?;
-        tracing::info!(order = order.id, %amount, to_pay = %quote.client_pays, "invoice quoted");
+        tracing::info!(order = order.id, %amount, to_pay = %quote.client_pays, fiat = fiat.is_some(), "invoice quoted");
         self.notify(&order);
         Ok(InvoiceSubmitted::Quoted(order))
     }
@@ -683,11 +726,20 @@ mod tests {
             ..card(InvoiceStatus::Active)
         };
         assert_eq!(payable_amount(&reusable), Err(InvoiceIssue::Reusable));
+        // Счёт в фиате с суммой в USDT на кнопке монеты — по ней (решение владельца).
         let fiat = InvoiceCard {
-            fiat: Some((dec!(900), "RUB".to_owned())),
+            fiat: Some((dec!(5), "USD".to_owned())),
+            amount: Some((dec!(5.006321), Asset::Usdt)),
             ..card(InvoiceStatus::Active)
         };
-        assert_eq!(payable_amount(&fiat), Err(InvoiceIssue::Fiat));
+        assert_eq!(payable_amount(&fiat), Ok(dec!(5.006321)));
+        // Сумму в USDT кошелёк не показал — не принимаем.
+        let fiat_blind = InvoiceCard {
+            fiat: Some((dec!(900), "RUB".to_owned())),
+            amount: None,
+            ..card(InvoiceStatus::Active)
+        };
+        assert_eq!(payable_amount(&fiat_blind), Err(InvoiceIssue::Fiat));
         let ton = InvoiceCard {
             amount: Some((dec!(3), Asset::Ton)),
             ..card(InvoiceStatus::Active)
@@ -698,5 +750,24 @@ mod tests {
             ..card(InvoiceStatus::Active)
         };
         assert_eq!(payable_amount(&none), Err(InvoiceIssue::NoAmount));
+    }
+
+    #[test]
+    fn fiat_invoices_may_be_paid_within_the_buffer_but_never_above_what_the_client_sent() {
+        let a = Money::new(dec!(5.006321), Asset::Usdt).unwrap();
+        let exact = pay_due(a, false, dec!(1), Some(dec!(5.21))).unwrap();
+        assert_eq!((exact.min, exact.max), (a, a));
+        let due = pay_due(a, true, dec!(1), Some(dec!(5.21))).unwrap();
+        assert_eq!(due.max.amount(), dec!(5.05638421));
+        assert_eq!(due.min.amount(), dec!(4.95625779));
+        assert!(due.fits(dec!(5.0064), Asset::Usdt));
+        assert!(
+            !due.fits(dec!(5.06), Asset::Usdt),
+            "курс сдвинулся больше запаса"
+        );
+        assert!(!due.fits(dec!(5.0064), Asset::Ton));
+        // Запас не выше суммы, которую пришлёт клиент: комиссия не уходит в минус.
+        assert_eq!(fiat_cap(dec!(10), dec!(5), dec!(10.2)), dec!(10.2));
+        assert_eq!(fiat_cap(dec!(10), dec!(0), dec!(10.3)), dec!(10));
     }
 }

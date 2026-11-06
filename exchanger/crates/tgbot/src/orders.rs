@@ -120,6 +120,7 @@ fn refund_reason(view: &OrderView, extra: &Extra) -> RefundReason {
         (Some("quote_expired"), _, _) => RefundReason::Underpaid,
         (Some("client_cancelled"), _, _) => RefundReason::ClientRequest,
         (Some("invoice_unpayable"), _, _) => RefundReason::InvoiceExpired,
+        (Some("rate_moved"), _, _) => RefundReason::RateMoved,
         _ => RefundReason::Operator,
     }
 }
@@ -163,7 +164,14 @@ pub(crate) fn quote(view: &OrderView) -> Option<InvoiceQuote> {
             direction: view.direction,
         },
         invoice_amount: money(view, view.invoice_amount)?,
-        fiat: None,
+        fiat: match (&view.invoice_fiat, view.invoice_fiat_amount) {
+            (Some(currency), Some(amount)) => Some(ui::FiatAmount {
+                amount,
+                currency: currency.clone(),
+                buffer_pct: view.fiat_buffer_pct,
+            }),
+            _ => None,
+        },
         description: None,
         fee_pct: view.fee_pct_applied?.normalize(),
         fee: money(view, view.fee_amount)?,
@@ -574,6 +582,9 @@ mod tests {
             invoice_amount: None,
             quote_amount_in: None,
             quote_expires_at: None,
+            invoice_fiat: None,
+            invoice_fiat_amount: None,
+            fiat_buffer_pct: dec!(1),
             last_check_rejected: false,
             payout_check_url: None,
             failure_code: None,

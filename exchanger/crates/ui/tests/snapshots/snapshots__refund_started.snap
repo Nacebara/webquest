@@ -91,7 +91,7 @@ expression: refunds.trim_end()
 ### plain
 --- html
 ↩️ <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: курс сдвинулся больше чем на 1 %.
+Причина: курс доллара сдвинулся сильнее запаса, пока шёл чек.
 Заявка <code>A1B2C3D4E5</code>.
 --- keyboard: inline
 [{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
@@ -99,7 +99,7 @@ expression: refunds.trim_end()
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: курс сдвинулся больше чем на 1 %.
+Причина: курс доллара сдвинулся сильнее запаса, пока шёл чек.
 Заявка <code>A1B2C3D4E5</code>.
 --- keyboard: inline
 [{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]

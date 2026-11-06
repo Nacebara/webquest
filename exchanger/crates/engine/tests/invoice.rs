@@ -504,12 +504,17 @@ async fn restart_in_the_middle_of_a_payment_never_pays_twice(pool: PgPool) {
         .pay_invoice(
             op.start_param.as_deref().unwrap(),
             Asset::Usdt,
-            &usdt(dec!(10)),
+            &userbot::PayDue::exact(usdt(dec!(10))),
             &tag,
         )
         .await
         .unwrap();
-    assert_eq!(out, userbot::PayOutcome::Paid);
+    assert_eq!(
+        out,
+        userbot::PayOutcome::Paid {
+            amount: usdt(dec!(10))
+        }
+    );
 
     e.engine.recover().await.unwrap();
     e.drain().await;
@@ -656,5 +661,107 @@ async fn cryptobot_spending_stays_under_the_passcode_free_limit(pool: PgPool) {
     // xRocket лимит CryptoBot не касается.
     let xr = shop_invoice(&e, InvoiceSpec::crypto(XR, usdt(dec!(96))));
     let _ = quoted(&e, &xr).await;
+    e.assert_books_match().await;
+}
+
+// ---------- счета в долларах (решение владельца 6 ноября 2026, SPEC П5) ----------
+
+/// Счёт CryptoBot на $10; курс USDT/USD у кошелька 0.998 → на кнопке USDT 10.03.
+async fn dollar_invoice(e: &Env) -> (SimInvoice, OrderRow) {
+    e.world.set_fiat_rate(Asset::Usdt, "USD", dec!(0.998));
+    let inv = shop_invoice(e, InvoiceSpec::fiat(CB, dec!(10), "USD", &[Asset::Usdt]));
+    let order = quoted(e, &inv).await;
+    let (_, d) = e.order(order.id).await;
+    assert_eq!(
+        d.invoice_amount,
+        Some(dec!(10.03)),
+        "точная сумма с кнопки USDT"
+    );
+    assert_eq!(d.invoice_fiat.as_deref(), Some("USD"));
+    assert_eq!(d.invoice_fiat_amount, Some(dec!(10)));
+    // 10.03 + 3 % = 10.3309 → вверх до шага xRocket.
+    assert_eq!(d.quote_amount_in, Some(dec!(10.34)));
+    // Удержание — с запасом на курс 1 %: 10.1303.
+    assert_eq!(held(e, order.id).await, Some(dec!(10.1303)));
+    (inv, order)
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn dollar_invoice_is_quoted_and_paid_by_the_usdt_button(pool: PgPool) {
+    let e = setup(pool).await;
+    let (inv, order) = dollar_invoice(&e).await;
+    pay_in(&e, &order, XR, dec!(10.34)).await;
+    e.drain().await;
+    let (o, d) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::Completed);
+    let paid = e.world.invoice(&inv.code).unwrap();
+    assert_eq!(paid.status, SimInvoiceStatus::Paid);
+    assert_eq!(paid.payments.len(), 1);
+    assert_eq!(paid.payments[0].paid, usdt(dec!(10.03)));
+    assert_eq!(d.invoice_amount, Some(dec!(10.03)));
+    assert_eq!(e.ledger("asset:cb:USDT").await, dec!(989.97));
+    assert_eq!(e.ledger("revenue:fee:USDT").await, dec!(-0.31));
+    assert_eq!(e.ledger("liability:payable:USDT").await, dec!(0));
+    assert_eq!(held(&e, order.id).await, None);
+    e.assert_books_match().await;
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn dollar_invoice_rate_moved_within_the_buffer_is_paid_from_the_fee(pool: PgPool) {
+    let e = setup(pool).await;
+    let (inv, order) = dollar_invoice(&e).await;
+    // Пока клиент слал чек, курс сдвинулся: 10 / 0.99 = 10.1010… → 10.11 (запас — до 10.1303).
+    e.world.set_fiat_rate(Asset::Usdt, "USD", dec!(0.99));
+    pay_in(&e, &order, XR, dec!(10.34)).await;
+    e.drain().await;
+    let (o, d) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::Completed);
+    let paid = e.world.invoice(&inv.code).unwrap();
+    assert_eq!(paid.payments.len(), 1);
+    assert_eq!(paid.payments[0].paid, usdt(dec!(10.11)));
+    // Клиент заплатил ровно котировку, разницу курса покрыл сервис из комиссии.
+    assert_eq!(d.invoice_amount, Some(dec!(10.11)));
+    assert_eq!(d.fee_amount, Some(dec!(0.23)));
+    assert_eq!(e.ledger("revenue:fee:USDT").await, dec!(-0.23));
+    assert_eq!(e.ledger("liability:payable:USDT").await, dec!(0));
+    e.assert_books_match().await;
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn dollar_invoice_rate_moved_beyond_the_buffer_is_refunded_unpaid(pool: PgPool) {
+    let e = setup(pool).await;
+    let (inv, order) = dollar_invoice(&e).await;
+    // 10 / 0.97 = 10.309… → 10.31 > 10.1303: «Оплатить» не нажимается.
+    e.world.set_fiat_rate(Asset::Usdt, "USD", dec!(0.97));
+    pay_in(&e, &order, XR, dec!(10.34)).await;
+    e.drain().await;
+    let (o, d) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::Refunded);
+    assert_eq!(d.failure_code.as_deref(), Some("rate_moved"));
+    assert!(e.world.invoice(&inv.code).unwrap().payments.is_empty());
+    assert_eq!(
+        e.world.invoice(&inv.code).unwrap().status,
+        SimInvoiceStatus::Active
+    );
+    // Деньги клиента вернулись чеком xRocket.
+    let url = d.payout_check_url.expect("чек возврата");
+    e.world.claim_check(e.client, &url).unwrap();
+    assert_eq!(e.world.balance(e.client, XR, Asset::Usdt), dec!(10.34));
+    assert_eq!(held(&e, order.id).await, None);
+    assert_eq!(e.ledger("liability:payable:USDT").await, dec!(0));
+    e.assert_books_match().await;
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn dollar_invoice_pay_press_timeout_pays_once(pool: PgPool) {
+    let e = setup(pool).await;
+    let (inv, order) = dollar_invoice(&e).await;
+    e.world
+        .inject(e.ub, Call::PayPress, Fault::TimeoutAfterEffect, 1);
+    pay_in(&e, &order, XR, dec!(10.34)).await;
+    e.drain().await;
+    let (o, _) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::Completed);
+    assert_eq!(e.world.invoice(&inv.code).unwrap().payments.len(), 1);
     e.assert_books_match().await;
 }

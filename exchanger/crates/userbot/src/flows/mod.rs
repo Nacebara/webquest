@@ -41,7 +41,7 @@ pub use issue::{is_marker, marker_text};
 
 use crate::transport::{RawMessage, Transport};
 use crate::wallet::{
-    ActivationOutcome, BotError, InvoiceInfo, IssueOutcome, IssuedCheck, OpTag, PayOutcome,
+    ActivationOutcome, BotError, InvoiceInfo, IssueOutcome, IssuedCheck, OpTag, PayDue, PayOutcome,
     WalletBot,
 };
 
@@ -218,10 +218,10 @@ impl<T: Transport> WalletBot for UserbotWallet<T> {
         &self,
         param: &str,
         asset: Asset,
-        expected: &Money,
+        due: &PayDue,
         tag: &OpTag,
     ) -> Result<PayOutcome, BotError> {
-        invoice::pay(self, param, asset, expected, tag).await
+        invoice::pay(self, param, asset, due, tag).await
     }
 
     async fn balances(&self) -> Result<Vec<Money>, BotError> {

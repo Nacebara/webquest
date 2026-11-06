@@ -85,7 +85,16 @@ pub struct InvoiceInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PayOutcome {
-    Paid,
+    /// Оплачено; `amount` — сколько списано (у счёта в фиате может отличаться от ожидаемого
+    /// в пределах [`PayDue`]).
+    Paid {
+        amount: Money,
+    },
+    /// Сумма к оплате вне допустимой ([`PayDue`]): у счёта в фиате сдвинулся курс. Ничего не
+    /// нажато, деньги не двигались.
+    AmountChanged {
+        due: Money,
+    },
     AlreadyPaid,
     Expired,
     InsufficientFunds,
@@ -98,6 +107,35 @@ pub enum PayOutcome {
     Unknown {
         detail: String,
     },
+}
+
+/// Сколько можно заплатить по счёту. Счёт в USDT — ровно его сумма; счёт в фиате (USD) — сумма
+/// в USDT с кнопки монеты на момент котировки, а при оплате — то, что покажет бот, если это не
+/// больше `max` (запас на курс, его покрывает сервис) и не меньше `min`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PayDue {
+    pub expected: Money,
+    pub min: Money,
+    pub max: Money,
+}
+
+impl PayDue {
+    /// Ровно эта сумма.
+    pub fn exact(m: Money) -> Self {
+        Self {
+            expected: m,
+            min: m,
+            max: m,
+        }
+    }
+
+    /// Подходит ли сумма на экране бота.
+    pub fn fits(&self, amount: domain::Decimal, asset: Asset) -> bool {
+        asset == self.expected.asset()
+            && amount > domain::Decimal::ZERO
+            && amount >= self.min.amount()
+            && amount <= self.max.amount()
+    }
 }
 
 /// Операция не выполнялась: деньги не двигались, движок может закрыть операцию как
@@ -151,7 +189,7 @@ pub trait WalletBot: Send + Sync {
         &self,
         param: &str,
         asset: Asset,
-        expected: &Money,
+        due: &PayDue,
         tag: &OpTag,
     ) -> Result<PayOutcome, BotError>;
 

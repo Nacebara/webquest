@@ -16,6 +16,8 @@ pub struct DirectionRow {
     pub min_amount: Decimal,
     pub max_amount: Decimal,
     pub new_user_max_amount: Decimal,
+    /// Запас на движение курса у счёта в фиате, % (SPEC П5): сервис доплачивает до него сам.
+    pub fiat_buffer_pct: Decimal,
     pub is_open: bool,
     pub auto_paused: bool,
     pub pause_reason: Option<String>,
@@ -35,7 +37,7 @@ pub async fn get(
     let r = sqlx::query!(
         r#"
         SELECT fee_pct, min_fee, skew_k_pct, fee_floor_pct, fee_cap_pct, min_amount, max_amount,
-               new_user_max_amount, is_open, auto_paused, pause_reason
+               new_user_max_amount, fiat_buffer_pct, is_open, auto_paused, pause_reason
           FROM directions WHERE code = $1
         "#,
         direction.code()
@@ -52,6 +54,7 @@ pub async fn get(
         min_amount: r.min_amount,
         max_amount: r.max_amount,
         new_user_max_amount: r.new_user_max_amount,
+        fiat_buffer_pct: r.fiat_buffer_pct,
         is_open: r.is_open,
         auto_paused: r.auto_paused,
         pause_reason: r.pause_reason,

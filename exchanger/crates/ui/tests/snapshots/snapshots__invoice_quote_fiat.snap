@@ -8,7 +8,7 @@ expression: "both(p, q)"
 
 Пришлите чек xRocket на <code>10.30 USDT</code> — и я оплачу этот счёт.
 <blockquote>Счёт: <code>10.00 USDT</code>
-(= <code>950 RUB</code> по курсу CryptoBot с запасом 1 %; что останется — верну)
+(= <code>950 RUB</code>: точная сумма в USDT от CryptoBot; сдвинется курс больше чем на 1 % — верну деньги)
 Комиссия 3 %: <code>0.30 USDT</code>
 К оплате вами: <code>10.30 USDT</code></blockquote>
 Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>. Деньги пока не списаны.
@@ -22,7 +22,7 @@ expression: "both(p, q)"
 
 Пришлите чек xRocket на <code>10.30 USDT</code> — и я оплачу этот счёт.
 <blockquote>Счёт: <code>10.00 USDT</code>
-(= <code>950 RUB</code> по курсу CryptoBot с запасом 1 %; что останется — верну)
+(= <code>950 RUB</code>: точная сумма в USDT от CryptoBot; сдвинется курс больше чем на 1 % — верну деньги)
 Комиссия 3 %: <code>0.30 USDT</code>
 К оплате вами: <code>10.30 USDT</code></blockquote>
 Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>. Деньги пока не списаны.

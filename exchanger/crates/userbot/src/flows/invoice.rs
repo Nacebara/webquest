@@ -29,7 +29,7 @@ use super::conv::{Conv, SendError};
 use super::gate::Pace;
 use super::{UserbotWallet, rid, typed_amount};
 use crate::transport::{ButtonKind, Chat, RawButton, RawMessage, Transport};
-use crate::wallet::{BotError, InvoiceInfo, OpTag, PayOutcome};
+use crate::wallet::{BotError, InvoiceInfo, OpTag, PayDue, PayOutcome};
 
 /// Сколько экранов без денег (монета, способ оплаты) можно пройти до подтверждения.
 const MAX_STEPS: usize = 3;
@@ -119,6 +119,19 @@ pub(crate) async fn inspect<T: Transport>(
     })
 }
 
+/// Сумма на экране не подходит: ничего не нажато.
+fn changed(amount: domain::Decimal, asset: Asset, expected: &Money) -> PayOutcome {
+    match Money::new(amount, asset) {
+        Ok(due) => PayOutcome::AmountChanged { due },
+        Err(_) => needs_human(format!(
+            "invoice shows {amount} {}, expected {} {}",
+            asset.code(),
+            typed_amount(expected),
+            expected.asset().code()
+        )),
+    }
+}
+
 fn needs_human(reason: impl Into<String>) -> PayOutcome {
     PayOutcome::NeedsHuman {
         reason: reason.into(),
@@ -203,9 +216,10 @@ pub(crate) async fn pay<T: Transport>(
     w: &UserbotWallet<T>,
     param: &str,
     asset: Asset,
-    expected: &Money,
+    due: &PayDue,
     tag: &OpTag,
 ) -> Result<PayOutcome, BotError> {
+    let expected = &due.expected;
     let platform = w.platform;
     let chat = Chat::WalletBot(platform);
     let mut conv = Conv::open(w, Some(&tag.key)).await;
@@ -242,14 +256,10 @@ pub(crate) async fn pay<T: Transport>(
             break;
         }
         // Сумма видна уже здесь (карточка xRocket, кнопка монеты CryptoBot): не та — дальше не идём.
-        if let Some(shown) = shown_amount(&msg, &screen, asset)
-            && shown != (expected.amount(), expected.asset())
+        if let Some((amount, shown_asset)) = shown_amount(&msg, &screen, asset)
+            && !due.fits(amount, shown_asset)
         {
-            return Ok(needs_human(format!(
-                "invoice shows {shown:?}, expected {} {}",
-                typed_amount(expected),
-                expected.asset().code()
-            )));
+            return Ok(changed(amount, shown_asset, expected));
         }
         let Some(data) = next_button(&msg, &screen, asset).map(<[u8]>::to_vec) else {
             return Ok(needs_human(format!(
@@ -283,17 +293,19 @@ pub(crate) async fn pay<T: Transport>(
         screen = screen_of(platform, &msg);
         invoice_number = number(&screen).or(invoice_number);
     }
-    let InvoiceScreen::Confirm { amount: due, .. } = screen else {
+    let InvoiceScreen::Confirm {
+        amount: due_amount, ..
+    } = screen
+    else {
         return Ok(needs_human("no payment confirmation screen"));
     };
 
-    // Сумма к оплате должна совпасть с той, под которую клиент прислал деньги.
-    if due != Some((expected.amount(), expected.asset())) {
-        return Ok(needs_human(format!(
-            "amount due {due:?} differs from expected {} {}",
-            typed_amount(expected),
-            expected.asset().code()
-        )));
+    // Сумма к оплате — та, под которую клиент прислал деньги (у счёта в фиате — в пределах
+    // запаса на курс).
+    match due_amount {
+        Some((amount, a)) if due.fits(amount, a) => {}
+        Some((amount, a)) => return Ok(changed(amount, a, expected)),
+        None => return Ok(needs_human("no amount on the payment confirmation")),
     }
     let Some(button) = msg
         .buttons
@@ -313,7 +325,7 @@ pub(crate) async fn pay<T: Transport>(
     let paying = Paying {
         cmd_id,
         number: invoice_number,
-        expected: *expected,
+        due: *due,
     };
     paying.press(&mut conv, msg.id, &data, "pay").await
 }
@@ -322,7 +334,7 @@ pub(crate) async fn pay<T: Transport>(
 struct Paying {
     cmd_id: i32,
     number: Option<String>,
-    expected: Money,
+    due: PayDue,
 }
 
 impl Paying {
@@ -404,15 +416,14 @@ impl Paying {
                     return unknown(format!("receipt is for #{got}, expected #{want}"));
                 }
                 match amount {
-                    Some((a, asset))
-                        if *a == self.expected.amount() && *asset == self.expected.asset() =>
-                    {
-                        PayOutcome::Paid
-                    }
+                    Some((a, asset)) if self.due.fits(*a, *asset) => match Money::new(*a, *asset) {
+                        Ok(amount) => PayOutcome::Paid { amount },
+                        Err(e) => unknown(format!("paid amount {a}: {e}")),
+                    },
                     other => unknown(format!(
                         "paid {other:?}, expected {} {}",
-                        typed_amount(&self.expected),
-                        self.expected.asset().code()
+                        typed_amount(&self.due.expected),
+                        self.due.expected.asset().code()
                     )),
                 }
             }

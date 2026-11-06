@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT intake_start_param, invoice_start_param, intake_amount, intake_asset, fee_pct_applied,\n               fee_amount, payout_amount, refund_amount, invoice_amount, quote_amount_in,\n               quote_expires_at, payout_check_url, failure_code, manual_reason\n          FROM orders WHERE id = $1\n        ",
+  "query": "\n        SELECT intake_start_param, invoice_start_param, intake_amount, intake_asset, fee_pct_applied,\n               fee_amount, payout_amount, refund_amount, invoice_amount, quote_amount_in,\n               quote_expires_at, payout_check_url, failure_code, manual_reason, invoice_fiat,\n               invoice_fiat_amount\n          FROM orders WHERE id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -156,6 +156,28 @@
             "name": "manual_reason"
           }
         }
+      },
+      {
+        "ordinal": 14,
+        "name": "invoice_fiat",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "invoice_fiat"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "invoice_fiat_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "invoice_fiat_amount"
+          }
+        }
       }
     ],
     "parameters": {
@@ -177,8 +199,10 @@
       true,
       true,
       true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "db8a25a291fc4b7a35ea4d712406f53f2bc0580c80bc96da3b8150af6d399e82"
+  "hash": "026f77d9954b7801439ce595ba9d0fe6ceb54e1479169ac13f50ac45b462bfaa"
 }

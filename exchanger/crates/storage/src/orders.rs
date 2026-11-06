@@ -74,6 +74,9 @@ pub struct OrderPatch<'a> {
     /// Сколько клиент должен прислать (`X`).
     pub quote_amount_in: Option<Decimal>,
     pub quote_expires_at: Option<DateTime<Utc>>,
+    /// Счёт в фиате: валюта (`USD`) и сумма в ней; `invoice_amount` — сумма в USDT с кнопки монеты.
+    pub invoice_fiat: Option<&'a str>,
+    pub invoice_fiat_amount: Option<Decimal>,
 }
 
 /// Создать заявку в состоянии `NEW` и записать первый переход в журнал.
@@ -191,6 +194,8 @@ pub async fn apply_event(
                invoice_amount  = COALESCE($17, invoice_amount),
                quote_amount_in = COALESCE($18, quote_amount_in),
                quote_expires_at = COALESCE($19, quote_expires_at),
+               invoice_fiat    = COALESCE($20, invoice_fiat),
+               invoice_fiat_amount = COALESCE($21, invoice_fiat_amount),
                received_at     = CASE WHEN $12 AND received_at IS NULL THEN now() ELSE received_at END,
                finished_at     = CASE WHEN $4 THEN now() ELSE finished_at END
          WHERE id = $1 AND version = $2 AND state = $13
@@ -215,6 +220,8 @@ pub async fn apply_event(
         patch.invoice_amount,
         patch.quote_amount_in,
         patch.quote_expires_at,
+        patch.invoice_fiat,
+        patch.invoice_fiat_amount,
     )
     .fetch_optional(&mut *conn)
     .await
@@ -265,6 +272,9 @@ pub struct OrderDetails {
     pub payout_check_url: Option<String>,
     pub failure_code: Option<String>,
     pub manual_reason: Option<String>,
+    /// Счёт в фиате (`USD`) и его сумма в фиате.
+    pub invoice_fiat: Option<String>,
+    pub invoice_fiat_amount: Option<Decimal>,
 }
 
 pub async fn details(conn: &mut PgConnection, id: i64) -> Result<OrderDetails, StorageError> {
@@ -272,7 +282,8 @@ pub async fn details(conn: &mut PgConnection, id: i64) -> Result<OrderDetails, S
         r#"
         SELECT intake_start_param, invoice_start_param, intake_amount, intake_asset, fee_pct_applied,
                fee_amount, payout_amount, refund_amount, invoice_amount, quote_amount_in,
-               quote_expires_at, payout_check_url, failure_code, manual_reason
+               quote_expires_at, payout_check_url, failure_code, manual_reason, invoice_fiat,
+               invoice_fiat_amount
           FROM orders WHERE id = $1
         "#,
         id
@@ -301,6 +312,8 @@ pub async fn details(conn: &mut PgConnection, id: i64) -> Result<OrderDetails, S
         payout_check_url: r.payout_check_url,
         failure_code: r.failure_code,
         manual_reason: r.manual_reason,
+        invoice_fiat: r.invoice_fiat,
+        invoice_fiat_amount: r.invoice_fiat_amount,
     })
 }
 

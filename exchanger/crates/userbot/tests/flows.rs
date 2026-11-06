@@ -18,7 +18,7 @@ use userbot::sim::{
 };
 use userbot::transport::{CallbackAnswer, Chat, RawMessage, Transport, TransportError};
 use userbot::{
-    AccountGate, ActivationOutcome, BotError, IssueMethod, IssueOutcome, OpTag, PayOutcome,
+    AccountGate, ActivationOutcome, BotError, IssueMethod, IssueOutcome, OpTag, PayDue, PayOutcome,
     RejectReason, UserbotWallet, WalletBot,
 };
 
@@ -832,10 +832,15 @@ async fn cryptobot_invoice_is_paid_without_passcode_trusting_a_new_recipient_onc
     let code = shop_invoice(&e, CB, usdt(dec!(10)));
     let wallet = e.wallet(CB);
     let out = wallet
-        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
+        .pay_invoice(
+            &code,
+            Asset::Usdt,
+            &PayDue::exact(usdt(dec!(10))),
+            &tag("ord-1-pay"),
+        )
         .await
         .unwrap();
-    assert_eq!(out, PayOutcome::Paid);
+    assert!(matches!(out, PayOutcome::Paid { .. }), "{out:?}");
     let inv = e.world.invoice(&code).unwrap();
     assert_eq!(inv.status, SimInvoiceStatus::Paid);
     assert_eq!(inv.payments.len(), 1);
@@ -844,10 +849,15 @@ async fn cryptobot_invoice_is_paid_without_passcode_trusting_a_new_recipient_onc
     // Знакомый получатель — без вопроса о доверии.
     let code = shop_invoice(&e, CB, usdt(dec!(5)));
     let out = wallet
-        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(5)), &tag("ord-2-pay"))
+        .pay_invoice(
+            &code,
+            Asset::Usdt,
+            &PayDue::exact(usdt(dec!(5))),
+            &tag("ord-2-pay"),
+        )
         .await
         .unwrap();
-    assert_eq!(out, PayOutcome::Paid);
+    assert!(matches!(out, PayOutcome::Paid { .. }), "{out:?}");
     assert_eq!(e.balance(CB), dec!(10));
 }
 
@@ -862,7 +872,12 @@ async fn passcode_request_pays_nothing_and_goes_to_a_human() {
     let code = shop_invoice(&e, CB, usdt(dec!(10)));
     let out = e
         .wallet(CB)
-        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
+        .pay_invoice(
+            &code,
+            Asset::Usdt,
+            &PayDue::exact(usdt(dec!(10))),
+            &tag("ord-1-pay"),
+        )
         .await
         .unwrap();
     let PayOutcome::NeedsHuman { reason } = &out else {
@@ -883,16 +898,26 @@ async fn xrocket_invoice_is_paid_by_one_press() {
     let code = shop_invoice(&e, XR, usdt(dec!(10)));
     let wallet = e.wallet(XR);
     let out = wallet
-        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
+        .pay_invoice(
+            &code,
+            Asset::Usdt,
+            &PayDue::exact(usdt(dec!(10))),
+            &tag("ord-1-pay"),
+        )
         .await
         .unwrap();
-    assert_eq!(out, PayOutcome::Paid);
+    assert!(matches!(out, PayOutcome::Paid { .. }), "{out:?}");
     assert_eq!(e.world.invoice(&code).unwrap().payments.len(), 1);
     assert_eq!(e.balance(XR), dec!(15));
 
     // Повторная операция по тому же счёту: «уже оплачен», второй оплаты нет.
     let out = wallet
-        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-2-pay"))
+        .pay_invoice(
+            &code,
+            Asset::Usdt,
+            &PayDue::exact(usdt(dec!(10))),
+            &tag("ord-2-pay"),
+        )
         .await
         .unwrap();
     assert_eq!(out, PayOutcome::AlreadyPaid);
@@ -909,12 +934,20 @@ async fn pay_press_timeout_is_never_pressed_again() {
             .inject(e.ub, Call::PayPress, Fault::TimeoutAfterEffect, 1);
         let out = e
             .wallet(platform)
-            .pay_invoice(&paid, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
+            .pay_invoice(
+                &paid,
+                Asset::Usdt,
+                &PayDue::exact(usdt(dec!(10))),
+                &tag("ord-1-pay"),
+            )
             .await
             .unwrap();
         // CryptoBot: таймаут на «Оплатить», которое показало вопрос о доверии; дальше —
         // одно нажатие «Отправить платеж».
-        assert_eq!(out, PayOutcome::Paid, "{platform:?}: ответ бота пришёл");
+        assert!(
+            matches!(out, PayOutcome::Paid { .. }),
+            "{platform:?}: ответ бота пришёл: {out:?}"
+        );
         assert_eq!(e.world.invoice(&paid).unwrap().payments.len(), 1);
 
         // Нажатие сработало, а бот промолчал: исход неизвестен, второго нажатия нет.
@@ -922,7 +955,12 @@ async fn pay_press_timeout_is_never_pressed_again() {
         e.world.inject(e.ub, Call::PayPress, Fault::NoReply, 1);
         let out = e
             .wallet(platform)
-            .pay_invoice(&silent, Asset::Usdt, &usdt(dec!(10)), &tag("ord-2-pay"))
+            .pay_invoice(
+                &silent,
+                Asset::Usdt,
+                &PayDue::exact(usdt(dec!(10))),
+                &tag("ord-2-pay"),
+            )
             .await
             .unwrap();
         assert!(
@@ -948,18 +986,19 @@ async fn invoice_problems_are_reported_without_paying() {
             let wallet = &wallet;
             async move {
                 wallet
-                    .pay_invoice(&code, Asset::Usdt, &expected, &tag(key))
+                    .pay_invoice(&code, Asset::Usdt, &PayDue::exact(expected), &tag(key))
                     .await
                     .unwrap()
             }
         };
 
+        // На счёте другая сумма: ничего не нажато, исход — «сумма изменилась» с суммой счёта.
         let code = shop_invoice(&e, platform, usdt(dec!(10)));
-        assert!(
-            matches!(
-                pay(code.clone(), usdt(dec!(9)), "ord-1-pay").await,
-                PayOutcome::NeedsHuman { .. }
-            ),
+        assert_eq!(
+            pay(code.clone(), usdt(dec!(9)), "ord-1-pay").await,
+            PayOutcome::AmountChanged {
+                due: usdt(dec!(10))
+            },
             "{platform:?}: другая сумма"
         );
         assert_eq!(
@@ -999,21 +1038,59 @@ async fn fiat_invoice_is_checked_against_the_amount_on_the_coin_button() {
     let info = wallet.inspect_invoice(&code).await.unwrap();
     assert_eq!(info.card.fiat, Some((dec!(10), "USD".to_owned())));
     assert_eq!(info.card.amount, Some((dec!(10), Asset::Usdt)));
-    // Курс сдвинулся: на кнопке уже не та сумма — не платим.
+    // Курс сдвинулся: на кнопке уже 10.11 вместо 10, а платить можно ровно 10 — не платим.
     e.world.set_fiat_rate(Asset::Usdt, "USD", dec!(0.99));
     let out = wallet
-        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-1-pay"))
+        .pay_invoice(
+            &code,
+            Asset::Usdt,
+            &PayDue::exact(usdt(dec!(10))),
+            &tag("ord-1-pay"),
+        )
         .await
         .unwrap();
-    assert!(matches!(out, PayOutcome::NeedsHuman { .. }), "{out:?}");
+    assert_eq!(
+        out,
+        PayOutcome::AmountChanged {
+            due: usdt(dec!(10.11))
+        }
+    );
     assert_eq!(e.balance(CB), dec!(50));
+    // С запасом на курс до 10.20 — платим то, что просит бот.
+    let within = PayDue {
+        expected: usdt(dec!(10)),
+        min: usdt(dec!(9.9)),
+        max: usdt(dec!(10.2)),
+    };
+    let out = wallet
+        .pay_invoice(&code, Asset::Usdt, &within, &tag("ord-3-pay"))
+        .await
+        .unwrap();
+    assert_eq!(
+        out,
+        PayOutcome::Paid {
+            amount: usdt(dec!(10.11))
+        }
+    );
+    assert_eq!(e.balance(CB), dec!(39.89));
+    e.world.set_fiat_rate(Asset::Usdt, "USD", dec!(1));
+    let code = e
+        .world
+        .create_invoice(InvoiceSpec::fiat(CB, dec!(10), "USD", &[Asset::Usdt]).by(e.shop))
+        .unwrap()
+        .code;
     e.world.set_fiat_rate(Asset::Usdt, "USD", dec!(1));
     let out = wallet
-        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &tag("ord-2-pay"))
+        .pay_invoice(
+            &code,
+            Asset::Usdt,
+            &PayDue::exact(usdt(dec!(10))),
+            &tag("ord-2-pay"),
+        )
         .await
         .unwrap();
-    assert_eq!(out, PayOutcome::Paid);
-    assert_eq!(e.balance(CB), dec!(40));
+    assert!(matches!(out, PayOutcome::Paid { .. }), "{out:?}");
+    assert_eq!(e.balance(CB), dec!(29.89), "второй счёт — ровно 10");
 }
 
 // ============================== баланс ==============================
@@ -1103,12 +1180,12 @@ async fn paying_again_with_the_same_tag_never_presses_twice() {
     let t = tag("ord-1-pay-1");
     let wallet = e.wallet(XR);
     let first = wallet
-        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &t)
+        .pay_invoice(&code, Asset::Usdt, &PayDue::exact(usdt(dec!(10))), &t)
         .await
         .unwrap();
-    assert_eq!(first, PayOutcome::Paid);
+    assert!(matches!(first, PayOutcome::Paid { .. }), "{first:?}");
     let again = wallet
-        .pay_invoice(&code, Asset::Usdt, &usdt(dec!(10)), &t)
+        .pay_invoice(&code, Asset::Usdt, &PayDue::exact(usdt(dec!(10))), &t)
         .await
         .unwrap();
     assert!(matches!(again, PayOutcome::Unknown { .. }), "{again:?}");

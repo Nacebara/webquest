@@ -31,7 +31,7 @@ use storage::directions::Side;
 use storage::operations::{OpStatus, OperationRow};
 use storage::orders::{OrderPatch, OrderRow};
 use userbot::{
-    ActivationOutcome, BotError, IssueOutcome, IssuedCheck, OpTag, PayOutcome, RejectReason,
+    ActivationOutcome, BotError, IssueOutcome, IssuedCheck, OpTag, PayDue, PayOutcome, RejectReason,
 };
 
 use crate::effects::{EffectCtx, transit};
@@ -164,7 +164,8 @@ impl Engine {
                 let param = op.start_param.as_deref().ok_or_else(|| {
                     EngineError::Invariant(format!("operation {} has no invoice", op.id))
                 })?;
-                let result = wallet.pay_invoice(param, money.asset(), &money, &tag).await;
+                let due = self.pay_due(op, money).await?;
+                let result = wallet.pay_invoice(param, money.asset(), &due, &tag).await;
                 self.on_payment(op, result).await
             }
         }
@@ -797,6 +798,18 @@ impl Engine {
         }
     }
 
+    /// Сколько можно заплатить по счёту операции: в USDT — ровно сумму счёта, в фиате — с
+    /// запасом направления на курс (SPEC П5).
+    async fn pay_due(&self, op: &OperationRow, money: Money) -> Result<PayDue, EngineError> {
+        let mut conn = self.pool.acquire().await?;
+        let order = storage::orders::get(&mut conn, order_id(op)?, false).await?;
+        let d = storage::orders::details(&mut conn, order.id).await?;
+        let buffer = storage::directions::get(&mut conn, order.direction)
+            .await?
+            .fiat_buffer_pct;
+        crate::invoice::pay_due(money, d.invoice_fiat.is_some(), buffer, d.quote_amount_in)
+    }
+
     async fn on_payment(
         &self,
         op: &OperationRow,
@@ -806,8 +819,34 @@ impl Engine {
             Ok(outcome) => outcome,
             Err(e) => return self.release(op, &e).await,
         };
+        let fiat = {
+            let mut conn = self.pool.acquire().await?;
+            storage::orders::details(&mut conn, order_id(op)?)
+                .await?
+                .invoice_fiat
+                .is_some()
+        };
         let (status, event, reason): (OpStatus, Event, Option<String>) = match &outcome {
-            PayOutcome::Paid => (OpStatus::Succeeded, Event::InvoicePaid, None),
+            PayOutcome::Paid { .. } => (OpStatus::Succeeded, Event::InvoicePaid, None),
+            // Счёт в фиате: курс сдвинулся больше запаса — ничего не нажато, деньги клиенту.
+            PayOutcome::AmountChanged { due } if fiat => (
+                OpStatus::Failed,
+                Event::InvoiceUnpayable,
+                Some(format!(
+                    "rate moved: the invoice now asks {} {}",
+                    due.amount(),
+                    due.asset().code()
+                )),
+            ),
+            PayOutcome::AmountChanged { due } => (
+                OpStatus::Failed,
+                Event::InvoicePayNeedsHuman,
+                Some(format!(
+                    "the invoice now asks {} {}, not its amount: check it",
+                    due.amount(),
+                    due.asset().code()
+                )),
+            ),
             PayOutcome::Expired => (
                 OpStatus::Failed,
                 Event::InvoiceUnpayable,
@@ -863,12 +902,37 @@ impl Engine {
             }
             _ => None,
         };
+        // Оплачено не ровно сумму счёта (фиат, курс в пределах запаса): проводка и комиссия —
+        // по фактически списанному, разница — в доходе сервиса или из него.
+        let (invoice_amount, fee_amount) = match &outcome {
+            PayOutcome::Paid { amount } => {
+                let d = storage::orders::details(&mut tx, order.id).await?;
+                if d.invoice_amount == Some(amount.amount()) {
+                    (None, None)
+                } else {
+                    let to_pay = d.quote_amount_in.ok_or_else(|| {
+                        EngineError::Invariant(format!("invoice order {}: no quote", order.id))
+                    })?;
+                    tracing::info!(order = order.id, paid = %amount.amount(), quoted = ?d.invoice_amount, "invoice paid at the rate of the moment");
+                    (Some(amount.amount()), Some(to_pay - amount.amount()))
+                }
+            }
+            _ => (None, None),
+        };
+        let failure_code = match &outcome {
+            PayOutcome::AmountChanged { .. } if event == Event::InvoiceUnpayable => {
+                Some("rate_moved")
+            }
+            _ => (event == Event::InvoiceUnpayable).then_some("invoice_unpayable"),
+        };
         let patch = OrderPatch {
             manual_reason: reason
                 .as_deref()
                 .filter(|_| event == Event::InvoicePayNeedsHuman),
-            failure_code: (event == Event::InvoiceUnpayable).then_some("invoice_unpayable"),
+            failure_code,
             refund_amount,
+            invoice_amount,
+            fee_amount,
             ..OrderPatch::default()
         };
         let (order, _) = transit(

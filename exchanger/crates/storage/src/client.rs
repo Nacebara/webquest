@@ -38,6 +38,10 @@ pub struct OrderView {
     /// Оплата счёта: сколько прислать (`X`) и до какого времени держится цена.
     pub quote_amount_in: Option<Decimal>,
     pub quote_expires_at: Option<DateTime<Utc>>,
+    /// Счёт в фиате: валюта и сумма в ней; запас направления на курс, %.
+    pub invoice_fiat: Option<String>,
+    pub invoice_fiat_amount: Option<Decimal>,
+    pub fiat_buffer_pct: Decimal,
     /// Последний переход — «чек не принят» (оплата счёта ждёт другой чек).
     pub last_check_rejected: bool,
     /// Ссылка на чек выплаты или возврата.
@@ -162,6 +166,9 @@ struct ViewRow {
     invoice_amount: Option<Decimal>,
     quote_amount_in: Option<Decimal>,
     quote_expires_at: Option<DateTime<Utc>>,
+    invoice_fiat: Option<String>,
+    invoice_fiat_amount: Option<Decimal>,
+    fiat_buffer_pct: Decimal,
     last_check_rejected: bool,
     payout_check_url: Option<String>,
     failure_code: Option<String>,
@@ -189,6 +196,9 @@ impl ViewRow {
             invoice_amount: self.invoice_amount,
             quote_amount_in: self.quote_amount_in,
             quote_expires_at: self.quote_expires_at,
+            invoice_fiat: self.invoice_fiat,
+            invoice_fiat_amount: self.invoice_fiat_amount,
+            fiat_buffer_pct: self.fiat_buffer_pct,
             last_check_rejected: self.last_check_rejected,
             payout_check_url: self.payout_check_url,
             failure_code: self.failure_code,
@@ -211,6 +221,9 @@ pub async fn order_view(
         SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.state,
                o.intake_amount, o.fee_pct_applied, o.fee_amount, o.payout_amount,
                o.refund_amount, o.invoice_amount, o.quote_amount_in, o.quote_expires_at,
+               o.invoice_fiat, o.invoice_fiat_amount,
+               COALESCE((SELECT d.fiat_buffer_pct FROM directions d WHERE d.code = o.direction),
+                        0) AS "fiat_buffer_pct!",
                COALESCE((SELECT t.data->>'event' = 'CheckRejected' FROM order_transitions t
                           WHERE t.order_id = o.id ORDER BY t.id DESC LIMIT 1),
                         FALSE) AS "last_check_rejected!",
@@ -241,6 +254,9 @@ pub async fn order_view_for_user(
         SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.state,
                o.intake_amount, o.fee_pct_applied, o.fee_amount, o.payout_amount,
                o.refund_amount, o.invoice_amount, o.quote_amount_in, o.quote_expires_at,
+               o.invoice_fiat, o.invoice_fiat_amount,
+               COALESCE((SELECT d.fiat_buffer_pct FROM directions d WHERE d.code = o.direction),
+                        0) AS "fiat_buffer_pct!",
                COALESCE((SELECT t.data->>'event' = 'CheckRejected' FROM order_transitions t
                           WHERE t.order_id = o.id ORDER BY t.id DESC LIMIT 1),
                         FALSE) AS "last_check_rejected!",
