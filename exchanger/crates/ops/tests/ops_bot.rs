@@ -1,7 +1,8 @@
-//! Пульт целиком: поддельный Bot API на локальном TCP, движок с юзерботом на симуляторе
-//! кошельков, живой PostgreSQL. Сотрудник нажимает кнопки и пишет ответы — проверяем, что
-//! изменения проходят только через предпросмотр и одноразовое подтверждение, пишутся в журнал,
-//! а посторонним пульт не отвечает.
+//! Пульт целиком — внутри клиентского бота, как в бою: поддельный Bot API на локальном TCP,
+//! клиентский бот с крючком пульта, движок с юзерботом на симуляторе кошельков, живой
+//! PostgreSQL. Сотрудник нажимает кнопки и пишет ответы — проверяем, что изменения проходят
+//! только через предпросмотр и одноразовое подтверждение, пишутся в журнал, а посторонние
+//! пульта не видят.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -44,7 +45,11 @@ impl Call {
     }
 
     fn text(&self) -> String {
-        self.body["text"].as_str().unwrap_or_default().to_owned()
+        match self.body["text"].as_str() {
+            Some(t) => t.to_owned(),
+            // rich-сообщение клиентского бота: смотрим всё тело.
+            None => self.body.to_string(),
+        }
     }
 
     /// Данные кнопки, текст которой содержит `label`.
@@ -181,8 +186,10 @@ impl FakeTelegram {
     async fn screen(&self, since: usize, chat: i64, needle: &str) -> Call {
         for _ in 0..400 {
             if let Some(c) = self.calls().into_iter().skip(since).find(|c| {
-                matches!(c.method.as_str(), "sendMessage" | "editMessageText")
-                    && c.chat() == Some(chat)
+                matches!(
+                    c.method.as_str(),
+                    "sendMessage" | "editMessageText" | "sendRichMessage"
+                ) && c.chat() == Some(chat)
                     && c.text().contains(needle)
             }) {
                 return c;
@@ -216,7 +223,11 @@ impl FakeTelegram {
         }
         let mut s = self.lock();
         let (result, message_id) = match method {
-            "sendMessage" => {
+            "getMe" => (
+                json!({ "id": 999, "is_bot": true, "first_name": "Exch", "username": "exch_test_bot" }),
+                None,
+            ),
+            "sendMessage" | "sendRichMessage" => {
                 s.next_message += 1;
                 let id = s.next_message;
                 (
@@ -320,17 +331,33 @@ async fn ops(pool: PgPool) -> Ops {
         engine.clone(),
         pool.clone(),
         OpsConfig {
-            poll_timeout_secs: 0,
             alert_every: Duration::from_millis(50),
             ..OpsConfig::default()
         },
     )
     .unwrap();
+    // Один бот: клиентский бот отдаёт обновления пульту первым.
+    let client = tgbot::ClientBot::new(
+        tg.api(),
+        ui::Ui::builtin(ui::EmojiSet::plain(), ui::UiConfig::default()).unwrap(),
+        engine.clone(),
+        pool.clone(),
+        tgbot::ClientBotConfig {
+            poll_timeout_secs: 0,
+            rich_messages: false,
+            ..tgbot::ClientBotConfig::default()
+        },
+    )
+    .with_hook(Arc::new(bot.clone()));
     let cancel = CancellationToken::new();
     {
         let bot = bot.clone();
         let cancel = cancel.clone();
         tokio::spawn(async move { bot.run(cancel).await });
+    }
+    {
+        let cancel = cancel.clone();
+        tokio::spawn(async move { client.run(cancel).await });
     }
     Ops {
         pool,
@@ -381,24 +408,53 @@ impl Ops {
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]
-async fn strangers_are_ignored_and_staff_gets_the_panel(pool: PgPool) {
+async fn one_bot_staff_see_the_panel_clients_do_not(pool: PgPool) {
     let o = ops(pool).await;
-    o.tg.writes(STRANGER, "/start");
-    let panel = o.say(OWNER, "/start", "Пульт exch").await;
+    // Владелец открывает бота как обычно: у него в меню есть вход в админ-панель.
+    let welcome = o.say(OWNER, "/start", "Обмен CryptoBot").await;
+    assert!(
+        welcome.body.to_string().contains("🛠 Админ-панель"),
+        "{}",
+        welcome.body
+    );
+    // Кнопка меню открывает пульт.
+    let panel = o.say(OWNER, "🛠 Админ-панель", "Админ-панель exch").await;
     assert!(panel.text().contains("Владелец"));
     assert!(panel.button("Персонал").is_some(), "владельцу — персонал");
-    let admin = o.say(ADMIN, "/start", "Пульт exch").await;
+    assert!(panel.buttons().iter().all(|b| b.starts_with("a:")));
+    let admin = o.say(ADMIN, "/admin", "Админ-панель exch").await;
     assert!(admin.button("Персонал").is_none());
+    // Клиент: обычное приветствие без кнопки, на /admin пульт не отвечает.
+    let client = o.say(STRANGER, "/start", "Обмен CryptoBot").await;
+    assert!(!client.body.to_string().contains("Админ-панель"));
+    let mark = o.tg.mark();
+    o.tg.writes(STRANGER, "/admin");
+    o.tg.writes(STRANGER, "/start");
+    o.tg.screen(mark, STRANGER, "Обмен CryptoBot").await;
     assert!(
-        o.tg.calls().iter().all(|c| c.chat() != Some(STRANGER)),
-        "постороннему пульт молчит"
+        o.tg.calls()
+            .iter()
+            .skip(mark)
+            .all(|c| !c.text().contains("Админ-панель exch")),
+        "постороннему пульт не виден"
+    );
+    // Кнопка пульта от постороннего (подделка) — ничего не делает.
+    let mark = o.tg.mark();
+    o.tg.presses(STRANGER, 1, "a:dash");
+    o.tg.writes(STRANGER, "/start");
+    o.tg.screen(mark, STRANGER, "Обмен CryptoBot").await;
+    assert!(
+        o.tg.calls()
+            .iter()
+            .skip(mark)
+            .all(|c| !c.text().contains("Сводка"))
     );
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn fee_change_needs_a_preview_and_a_single_use_confirmation(pool: PgPool) {
     let o = ops(pool).await;
-    let panel = o.say(OWNER, "/start", "Пульт exch").await;
+    let panel = o.say(OWNER, "/admin", "Админ-панель exch").await;
     let dirs = o
         .press(OWNER, &panel, "Направления", "Комиссия, ступени")
         .await;
@@ -530,7 +586,7 @@ async fn settings_toggle_the_newcomer_limit_and_the_kill_switch(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn promo_hint_arrives_and_one_button_switches_the_promo_on(pool: PgPool) {
     let o = ops(pool).await;
-    o.say(OWNER, "/start", "Пульт exch").await;
+    o.say(OWNER, "/admin", "Админ-панель exch").await;
     {
         let mut conn = o.pool.acquire().await.unwrap();
         for (platform, target) in [(CB, dec!(400)), (XR, dec!(2000))] {
@@ -573,7 +629,7 @@ async fn promo_hint_arrives_and_one_button_switches_the_promo_on(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
     let o = ops(pool).await;
-    o.say(OWNER, "/start", "Пульт exch").await;
+    o.say(OWNER, "/admin", "Админ-панель exch").await;
     // Выплата не удалась: в кошельке xRocket 5 USDT вместо 1000.
     o.world.set_balance(o.ub, XR, Asset::Usdt, dec!(5)).unwrap();
     let url = o.world.client_check(CB, usdt(dec!(100))).unwrap();
@@ -651,8 +707,8 @@ async fn client_card_sets_a_personal_fee(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn owner_top_up_is_posted_from_the_reconciliation_alert(pool: PgPool) {
     let o = ops(pool).await;
-    o.say(OWNER, "/start", "Пульт exch").await;
-    o.say(ADMIN, "/start", "Пульт exch").await;
+    o.say(OWNER, "/admin", "Админ-панель exch").await;
+    o.say(ADMIN, "/admin", "Админ-панель exch").await;
     // Владелец пополнил CryptoBot на 250 — леджер об этом не знает.
     o.world
         .set_balance(o.ub, CB, Asset::Usdt, dec!(1250))

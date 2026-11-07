@@ -20,8 +20,23 @@ const HISTORY_PAGE: i64 = 10;
 impl Inner {
     /// Экран обычным HTML.
     pub(crate) async fn reply(&self, chat: i64, screen: &Screen) -> Result<(), TgBotError> {
-        self.api.send_html(chat, screen).await?;
+        let screen = self.with_menu_button(chat, screen).await;
+        self.api.send_html(chat, &screen).await?;
         Ok(())
+    }
+
+    /// Главное меню персонала — с кнопкой входа в админ-панель (чат лички = id пользователя).
+    async fn with_menu_button(&self, chat: i64, screen: &Screen) -> Screen {
+        let mut screen = screen.clone();
+        if let ui::Keyboard::Reply(markup) = &mut screen.keyboard
+            && let Some(hook) = self.hook()
+            && let Some(label) = hook.menu_button(chat).await
+        {
+            markup
+                .keyboard
+                .push(vec![botapi::KeyboardButton::new(label)]);
+        }
+        screen
     }
 
     pub(crate) async fn reply_error(&self, chat: i64, error: &UiError) -> Result<(), TgBotError> {
@@ -34,6 +49,7 @@ impl Inner {
             Some(rich) if !self.prefers_plain(user) => rich,
             _ => return self.reply(chat, screen).await,
         };
+        let screen = &self.with_menu_button(chat, screen).await;
         let keyboard = self.ui().rich_keyboard(screen);
         let (message, sent_rich) = self.api.send_rich(chat, rich, &keyboard, screen).await?;
         if sent_rich {
@@ -274,6 +290,12 @@ impl Inner {
 
 /// Одно обновление.
 pub(crate) async fn handle(inner: &Arc<Inner>, update: Update) -> Result<(), TgBotError> {
+    // Админ-панель первой: её кнопки, команды и ответы на её вопросы.
+    if let Some(hook) = inner.hook()
+        && hook.try_handle(&update).await
+    {
+        return Ok(());
+    }
     if let Some(query) = update.callback_query {
         return callback(inner, query).await;
     }

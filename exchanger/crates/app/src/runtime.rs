@@ -124,7 +124,8 @@ pub fn client_bot(
     Ok(tgbot::ClientBot::new(api, ui, engine, pool.clone(), cfg))
 }
 
-/// Пульт (ops-бот). Владелец из `OWNER_TG_ID` создаётся при старте, если его ещё нет.
+/// Админ-панель в клиентском боте (тот же токен). Владелец из `OWNER_TG_ID` создаётся при
+/// старте, если его ещё нет.
 pub fn ops_bot(
     pool: &PgPool,
     token: secrecy::SecretString,

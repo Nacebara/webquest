@@ -8,6 +8,8 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+# Крючок клиентского бота (`tgbot::UpdateHook`, асинхронный трейт): пульт в том же боте.
+async-trait = "0.1.92"
 botapi = { path = "../botapi" }
 chrono.workspace = true
 domain.workspace = true
@@ -26,6 +28,8 @@ tokio-util.workspace = true
 tracing.workspace = true
 # Экранирование HTML и роли эмодзи — общие с клиентским ботом.
 ui = { path = "../ui" }
+# Пульт живёт в клиентском боте: крючок `UpdateHook`.
+tgbot = { path = "../tgbot" }
 
 [dev-dependencies]
 rust_decimal_macros.workspace = true

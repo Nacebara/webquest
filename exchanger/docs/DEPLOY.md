@@ -12,7 +12,7 @@
 | Выделенный аккаунт Telegram для юзербота (один на оба кошелька или два) | номер телефона; руками этим аккаунтом не пользоваться |
 | Облачный пароль (2FA) на этом аккаунте | Telegram → Настройки → Конфиденциальность → Облачный пароль |
 | `TG_API_ID`, `TG_API_HASH` | my.telegram.org → API development tools (одно приложение на все аккаунты) |
-| Клиентский бот и бот-пульт | @BotFather → `/newbot` дважды; токены — `CLIENT_BOT_TOKEN`, `OPS_BOT_TOKEN` |
+| Бот | @BotFather → `/newbot` → токен `CLIENT_BOT_TOKEN`. Бот один: клиенты и ваша админ-панель в нём же |
 | Ваш Telegram ID | @userinfobot → `OWNER_TG_ID` |
 | В CryptoBot у аккаунта юзербота — «Лимит без код-пароля» | CryptoBot → Кошелёк → Настройки → Безопасность; то же число — `cb_passcode_free_limit_usd` (по умолчанию 500) |
 
@@ -44,7 +44,6 @@ TG_API_ID=<…>
 TG_API_HASH=<…>
 SESSION_KEY=<openssl rand -base64 32>
 CLIENT_BOT_TOKEN=<…>
-OPS_BOT_TOKEN=<…>
 SUPPORT_CONTACT=<@username для «Поддержки»>
 TZ_OWNER=Europe/Moscow
 RUST_LOG=info
@@ -80,14 +79,14 @@ docker compose up -d
 docker compose logs -f exch    # ждём: migrations applied, engine, client-bot, ops-bot
 ```
 
-Напишите `/start` обоим ботам со своего аккаунта. Премиум-эмодзи (один раз, нужен `/start`
-клиентскому боту от владельца):
+Напишите боту `/start` со своего аккаунта: в меню появится «🛠 Админ-панель» (только у вас и
+персонала). Премиум-эмодзи (один раз):
 
 ```bash
 docker compose run --rm exch emoji install --owner <ваш Telegram ID>
 ```
 
-## 6. Пульт: первая настройка
+## 6. Админ-панель: первая настройка
 
 1. **Капитал.** Пополните кошельки юзербота (CryptoBot и xRocket) — чеком со своего аккаунта
    или переводом. Через ≤ 10 минут сверка пришлёт «Баланс … не сходится: +N» — нажмите
@@ -106,7 +105,7 @@ docker compose run --rm exch emoji install --owner <ваш Telegram ID>
 
 | Что | Как | Ожидаем |
 |---|---|---|
-| CryptoBot → xRocket | `@send 1usdt` в любом чате → чек → ссылку клиентскому боту | одно сообщение заявки, затем «Ваш чек xRocket на 0.97…» и кнопка «Забрать» |
+| CryptoBot → xRocket | `@send 1usdt` в любом чате → чек → ссылку боту | одно сообщение заявки, затем «Ваш чек xRocket на 0.97…» и кнопка «Забрать» |
 | xRocket → CryptoBot | `@xrocket 1` → чек USDT → ссылку боту | чек CryptoBot |
 | Оплата счёта xRocket | счёт xRocket на 1 USDT → ссылку боту | сумма к оплате → прислать чек CryptoBot → «Счёт оплачен» |
 | Оплата счёта CryptoBot | счёт CryptoBot на 1 USDT → ссылку боту | то же, чек xRocket |

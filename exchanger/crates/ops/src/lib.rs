@@ -1,7 +1,10 @@
 //! Пульт exch — ops-бот (SPEC §7–§8, DESIGN-v0.2 Р15–Р16).
 //!
-//! Отдельный бот со своим токеном в том же процессе. Отвечает только действующему персоналу
-//! (`staff`), остальных молча игнорирует. Разделы: сводка, направления (комиссия, ступени,
+//! Живёт в том же боте, что и клиенты (решение владельца 7 ноября 2026: один бот, как гарант):
+//! клиентский бот отдаёт пульту каждое обновление первым ([`tgbot::UpdateHook`]). Персоналу в
+//! главном меню — кнопка «🛠 Админ-панель» и команда `/admin`; кнопки пульта — с префиксом `a:`;
+//! остальное (ссылки на чеки, `/start`) идёт обычным клиентским путём. Посторонним пульт не
+//! виден и не отвечает. Разделы: сводка, направления (комиссия, ступени,
 //! фикс, рычаг, лимиты, пауза), встречный поток (режим, курс, пороги, цели резерва, включение
 //! по направлению), ручной разбор (решения по заявке через `engine::operator`), клиенты
 //! (личные условия, суточный лимит, бан, заметка), настройки (лимит новичка, обслуживание,
@@ -28,8 +31,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use botapi::{
-    AnswerCallbackQuery, BotApi, BotCommand, EditMessageText, GetUpdates, InlineKeyboardButton,
-    InlineKeyboardMarkup, Message, ReplyMarkup, SendMessage, Update, UpdateKind,
+    AnswerCallbackQuery, BotApi, EditMessageText, InlineKeyboardButton, InlineKeyboardMarkup,
+    Message, ReplyMarkup, SendMessage, Update,
 };
 use engine::Engine;
 use sqlx::PgPool;
@@ -44,8 +47,6 @@ use crate::actions::{Action, Input};
 /// Настройки пульта.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OpsConfig {
-    /// Сколько секунд Telegram держит `getUpdates`.
-    pub poll_timeout_secs: u32,
     /// Как часто проверять и рассылать события.
     pub alert_every: Duration,
     /// Сколько живёт кнопка «Подтвердить» (SPEC §7.4: 60 с).
@@ -59,7 +60,6 @@ pub struct OpsConfig {
 impl Default for OpsConfig {
     fn default() -> Self {
         Self {
-            poll_timeout_secs: 30,
             alert_every: Duration::from_secs(5),
             confirm_ttl: Duration::from_secs(60),
             input_ttl: Duration::from_secs(600),
@@ -179,20 +179,19 @@ impl OpsBot {
         })
     }
 
-    /// Работать до отмены: приём обновлений и рассылка событий.
+    /// Работать до отмены: владелец из окружения и рассылка событий персоналу. Обновления
+    /// пульт получает через клиентский бот ([`tgbot::UpdateHook`]): бот один.
     pub async fn run(&self, cancel: CancellationToken) -> Result<(), OpsError> {
         let inner = self.inner.clone();
         inner.startup().await?;
-        let alerts = {
-            let inner = inner.clone();
-            let cancel = cancel.clone();
-            tokio::spawn(async move { inner.alert_loop(cancel).await })
-        };
-        inner.poll(cancel).await;
-        if let Err(e) = alerts.await {
-            tracing::error!(error = %e, "ops alert loop crashed");
-        }
+        inner.alert_loop(cancel).await;
         Ok(())
+    }
+
+    /// Обработать обновление, если оно для пульта. `false` — не для пульта: пусть его
+    /// обработает клиентский бот.
+    pub async fn handle_update(&self, update: &Update) -> Result<bool, OpsError> {
+        self.inner.handle(update).await
     }
 
     /// Один проход рассылки событий (тесты и ручной вызов).
@@ -220,53 +219,10 @@ impl Inner {
                 );
             }
         }
-        let t = &self.texts;
-        let commands = [
-            "start", "dash", "queue", "order", "user", "dir", "promo", "settings", "bots", "staff",
-            "audit",
-        ]
-        .into_iter()
-        .map(|c| BotCommand::new(c, t.t(&format!("commands.{c}"))))
-        .collect();
-        if let Err(e) = self.api.set_my_commands(commands).await {
-            tracing::warn!(error = %e, "ops setMyCommands failed");
-        }
         Ok(())
     }
 
-    async fn poll(self: &Arc<Self>, cancel: CancellationToken) {
-        let mut last: Option<i64> = None;
-        loop {
-            let request = GetUpdates {
-                allowed_updates: Some(vec![UpdateKind::Message, UpdateKind::CallbackQuery]),
-                ..GetUpdates::after(last, self.cfg.poll_timeout_secs)
-            };
-            let updates = tokio::select! {
-                () = cancel.cancelled() => return,
-                r = self.api.get_updates(&request) => r,
-            };
-            match updates {
-                Ok(updates) => {
-                    for update in updates {
-                        last = Some(update.update_id);
-                        // Пульт — несколько человек: обновления по порядку, без гонок.
-                        if let Err(e) = self.handle(update).await {
-                            tracing::warn!(error = %e, "ops update failed");
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "ops getUpdates failed");
-                    tokio::select! {
-                        () = cancel.cancelled() => return,
-                        () = tokio::time::sleep(Duration::from_secs(2)) => {}
-                    }
-                }
-            }
-        }
-    }
-
-    async fn alert_loop(self: Arc<Self>, cancel: CancellationToken) {
+    async fn alert_loop(&self, cancel: CancellationToken) {
         let mut tick = tokio::time::interval(self.cfg.alert_every);
         loop {
             tokio::select! {
@@ -285,43 +241,73 @@ impl Inner {
         Ok(storage::staff::active(&mut conn, user).await?)
     }
 
-    async fn handle(self: &Arc<Self>, update: Update) -> Result<(), OpsError> {
-        if let Some(query) = update.callback_query {
+    /// Команды пульта в общем боте. Остальные команды (`/start`, `/help` …) — клиентские.
+    const COMMANDS: [&'static str; 13] = [
+        "admin", "panel", "dash", "queue", "order", "find", "user", "dir", "promo", "settings",
+        "bots", "staff", "audit",
+    ];
+
+    fn has_awaiting(&self, staff: i64) -> bool {
+        self.state(|s| {
+            s.awaiting
+                .get(&staff)
+                .is_some_and(|a| a.until > Instant::now())
+        })
+    }
+
+    /// Обновление для пульта? Да — обработать и вернуть `true`.
+    async fn handle(self: &Arc<Self>, update: &Update) -> Result<bool, OpsError> {
+        if let Some(query) = &update.callback_query {
+            // Кнопки пульта — только с префиксом `a:`; клиентские не трогаем.
+            let Some(cb) = query.data.as_deref().and_then(Cb::parse) else {
+                return Ok(false);
+            };
             let _ = self
                 .api
                 .answer_callback_query(&AnswerCallbackQuery::ack(query.id.clone()))
                 .await;
             let Some(staff) = self.staff(query.from.id).await? else {
-                tracing::info!(user = query.from.id, "ops: not staff, ignored");
-                return Ok(());
+                tracing::info!(
+                    user = query.from.id,
+                    "ops button from a non-staff user, ignored"
+                );
+                return Ok(true);
             };
-            let Some(message) = query.message else {
-                return Ok(());
-            };
-            let Some(cb) = query.data.as_deref().and_then(Cb::parse) else {
-                return Ok(());
+            let Some(message) = &query.message else {
+                return Ok(true);
             };
             let chat = message.chat.id;
-            let screen = self.on_callback(&staff, chat, &message, cb).await?;
-            if let Some(screen) = screen {
+            if let Some(screen) = self.on_callback(&staff, chat, message, cb).await? {
                 self.edit(chat, message.message_id, &screen).await?;
             }
-            return Ok(());
+            return Ok(true);
         }
-        let Some(message) = update.message else {
-            return Ok(());
+        let Some(message) = &update.message else {
+            return Ok(false);
         };
+        if message.chat.kind != botapi::ChatType::Private {
+            return Ok(false);
+        }
         let Some(from) = message.from.as_ref() else {
-            return Ok(());
+            return Ok(false);
         };
         let Some(staff) = self.staff(from.id).await? else {
-            tracing::info!(user = from.id, "ops: not staff, ignored");
-            return Ok(());
+            return Ok(false);
         };
-        let chat = message.chat.id;
-        let screen = self.on_message(&staff, &message).await?;
-        self.send(chat, &screen).await?;
-        Ok(())
+        let text = message.text.as_deref().unwrap_or("").trim();
+        let command = text
+            .strip_prefix('/')
+            .map(|c| c.split([' ', '@']).next().unwrap_or(c));
+        let ours = match command {
+            Some(name) => Self::COMMANDS.contains(&name),
+            None => text == self.texts.t("menu.open") || self.has_awaiting(staff.tg_user_id),
+        };
+        if !ours {
+            return Ok(false);
+        }
+        let screen = self.on_message(&staff, message).await?;
+        self.send(message.chat.id, &screen).await?;
+        Ok(true)
     }
 
     async fn send(&self, chat: i64, screen: &Screen) -> Result<Message, OpsError> {
@@ -417,6 +403,10 @@ impl Inner {
         message: &Message,
     ) -> Result<Screen, OpsError> {
         let text = message.text.as_deref().unwrap_or("").trim();
+        if text == self.texts.t("menu.open") {
+            self.clear_awaiting(staff.tg_user_id);
+            return self.menu(staff).await;
+        }
         if let Some(command) = text.strip_prefix('/') {
             self.clear_awaiting(staff.tg_user_id);
             let (name, arg) = command.split_once(' ').unwrap_or((command, ""));
@@ -503,6 +493,27 @@ impl Inner {
             return Ok(denied);
         }
         self.apply(&staff, action, previous_failed).await
+    }
+}
+
+#[async_trait::async_trait]
+impl tgbot::UpdateHook for OpsBot {
+    async fn try_handle(&self, update: &Update) -> bool {
+        match self.inner.handle(update).await {
+            Ok(handled) => handled,
+            Err(e) => {
+                // Решили, что это пульту, и упали посередине: клиентскому боту не отдаём.
+                tracing::warn!(error = %e, "ops update failed");
+                true
+            }
+        }
+    }
+
+    async fn menu_button(&self, user: i64) -> Option<String> {
+        match self.inner.staff(user).await {
+            Ok(Some(_)) => Some(self.inner.texts.t("menu.open")),
+            _ => None,
+        }
     }
 }
 

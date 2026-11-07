@@ -34,7 +34,6 @@ pub struct Config {
     pub database_url: SecretString,
     pub owner_tg_id: i64,
     pub client_bot_token: Option<SecretString>,
-    pub ops_bot_token: Option<SecretString>,
     pub tg_api_id: Option<i32>,
     pub tg_api_hash: Option<SecretString>,
     pub session_key: Option<SessionKey>,
@@ -81,7 +80,6 @@ impl Config {
             database_url,
             owner_tg_id,
             client_bot_token: secret("CLIENT_BOT_TOKEN"),
-            ops_bot_token: secret("OPS_BOT_TOKEN"),
             tg_api_id: parse_num("TG_API_ID", get("TG_API_ID"))?,
             tg_api_hash: secret("TG_API_HASH"),
             session_key: get("SESSION_KEY").map(parse_session_key).transpose()?,
@@ -97,12 +95,11 @@ impl Config {
     pub fn pending(&self) -> Vec<Pending> {
         // Вехи — docs/HANDOVER.md §5. Peer id ботов кошельков закреплены в `mtproto::config`;
         // переменные `*_PEER_ID` — только для сверки, поэтому в этом списке их нет.
-        let checks: [(&'static str, &'static str, bool); 6] = [
+        let checks: [(&'static str, &'static str, bool); 5] = [
             ("TG_API_ID", "M2", self.tg_api_id.is_some()),
             ("TG_API_HASH", "M2", self.tg_api_hash.is_some()),
             ("SESSION_KEY", "M2", self.session_key.is_some()),
             ("CLIENT_BOT_TOKEN", "M4", self.client_bot_token.is_some()),
-            ("OPS_BOT_TOKEN", "M5", self.ops_bot_token.is_some()),
             ("HEALTHCHECK_URL", "M5", self.healthcheck_url.is_some()),
         ];
         checks
@@ -171,7 +168,8 @@ mod tests {
             "blank values count as unset"
         );
         assert_eq!(cfg.tz_owner, "UTC");
-        assert_eq!(cfg.pending().len(), 6);
+        // TG_API_ID, TG_API_HASH, SESSION_KEY, CLIENT_BOT_TOKEN, HEALTHCHECK_URL (бот один, DESIGN Р17).
+        assert_eq!(cfg.pending().len(), 5);
     }
 
     #[test]
@@ -222,7 +220,6 @@ mod tests {
         let secrets = [
             ("DATABASE_URL", "postgres://u:hunter2@db/exch"),
             ("CLIENT_BOT_TOKEN", "123:client-secret"),
-            ("OPS_BOT_TOKEN", "456:ops-secret"),
             ("TG_API_HASH", "hash-secret"),
             ("SESSION_KEY", KEY_B64),
         ];

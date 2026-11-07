@@ -42,6 +42,17 @@ use ui::{Screen, Ui};
 
 pub use limits::RateLimits;
 
+/// Обработчик, который видит каждое обновление раньше клиентского бота: админ-панель
+/// персонала живёт в этом же боте (решение владельца 7 ноября 2026: один бот, как гарант).
+#[async_trait::async_trait]
+pub trait UpdateHook: Send + Sync {
+    /// `true` — обновление обработано (команда или кнопка пульта, ответ на его вопрос),
+    /// клиентский бот его не трогает.
+    async fn try_handle(&self, update: &botapi::Update) -> bool;
+    /// Дополнительная кнопка главного меню для пользователя (персоналу — вход в пульт).
+    async fn menu_button(&self, user: i64) -> Option<String>;
+}
+
 /// Настройки клиентского бота.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientBotConfig {
@@ -132,6 +143,7 @@ impl ClientBot {
                 api: api::Api::new(api),
                 ui: std::sync::RwLock::new(Arc::new(ui)),
                 emoji_seen: Mutex::new(None),
+                hook: std::sync::RwLock::new(None),
                 engine,
                 pool,
                 cfg,
@@ -143,6 +155,14 @@ impl ClientBot {
                 memory: Mutex::new(Memory::default()),
             }),
         }
+    }
+
+    /// Подключить админ-панель (или другой обработчик), который видит обновления первым.
+    pub fn with_hook(self, hook: Arc<dyn UpdateHook>) -> Self {
+        if let Ok(mut slot) = self.inner.hook.write() {
+            *slot = Some(hook);
+        }
+        self
     }
 
     /// Работать до отмены `cancel`: приём обновлений и правка сообщений заявок. Возвращается
@@ -197,6 +217,8 @@ pub(crate) struct Inner {
     ui: std::sync::RwLock<Arc<Ui>>,
     /// Последние прочитанные настройки эмодзи (отпечаток), чтобы не пересобирать зря.
     emoji_seen: Mutex<Option<String>>,
+    /// Админ-панель: видит обновления раньше клиентского бота.
+    hook: std::sync::RwLock<Option<Arc<dyn UpdateHook>>>,
     engine: Arc<Engine>,
     pool: PgPool,
     cfg: ClientBotConfig,
@@ -212,6 +234,13 @@ impl Inner {
     /// Текущий интерфейс.
     pub(crate) fn ui(&self) -> Arc<Ui> {
         match self.ui.read() {
+            Ok(g) => g.clone(),
+            Err(p) => p.into_inner().clone(),
+        }
+    }
+
+    pub(crate) fn hook(&self) -> Option<Arc<dyn UpdateHook>> {
+        match self.hook.read() {
             Ok(g) => g.clone(),
             Err(p) => p.into_inner().clone(),
         }

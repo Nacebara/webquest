@@ -233,7 +233,16 @@ fn bit(b: bool) -> &'static str {
 }
 
 impl Cb {
+    /// Данные кнопки: префикс `a:` отделяет кнопки пульта от клиентских в общем боте.
     pub fn encode(&self) -> String {
+        format!("a:{}", self.encode_body())
+    }
+
+    pub fn parse(s: &str) -> Option<Cb> {
+        Self::parse_body(s.strip_prefix("a:")?)
+    }
+
+    fn encode_body(&self) -> String {
         match self {
             Cb::Menu => "m".into(),
             Cb::Dash => "dash".into(),
@@ -288,7 +297,7 @@ impl Cb {
         }
     }
 
-    pub fn parse(s: &str) -> Option<Cb> {
+    fn parse_body(s: &str) -> Option<Cb> {
         let parts: Vec<&str> = s.split(':').collect();
         let id = |i: usize| parts.get(i).and_then(|p| p.parse::<i64>().ok());
         let dir = |i: usize| parts.get(i).and_then(|p| dir_of(p));
@@ -436,7 +445,10 @@ mod tests {
             assert!(s.len() <= 64, "{s}");
             assert_eq!(Cb::parse(&s), Some(cb), "{s}");
         }
-        assert_eq!(Cb::parse("d:zz"), None);
-        assert_eq!(Cb::parse("o:x"), None);
+        assert_eq!(Cb::parse("a:d:zz"), None);
+        assert_eq!(Cb::parse("a:o:x"), None);
+        // Клиентские кнопки — не пульту.
+        assert_eq!(Cb::parse("dir:cb_to_xr_check"), None);
+        assert_eq!(Cb::parse("m"), None);
     }
 }
