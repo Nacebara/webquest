@@ -135,6 +135,13 @@
    "static": "static/color/fast.png"
   },
   {
+   "key": "color/fire",
+   "label": "Выгодно",
+   "emoji": "🔥",
+   "animated": "color/fire.tgs",
+   "static": "static/color/fire.png"
+  },
+  {
    "key": "color/pause",
    "label": "Пауза",
    "emoji": "⏸",
@@ -784,6 +791,27 @@
    "emoji": "👛",
    "animated": "mono/wallet.tgs",
    "static": "static/mono/wallet.png"
+  },
+  {
+   "key": "mono/fire",
+   "label": "Выгодно",
+   "emoji": "🔥",
+   "animated": "mono/fire.tgs",
+   "static": "static/mono/fire.png"
+  },
+  {
+   "key": "mono/scale",
+   "label": "Встречный поток",
+   "emoji": "⚖️",
+   "animated": "mono/scale.tgs",
+   "static": "static/mono/scale.png"
+  },
+  {
+   "key": "mono/tiers",
+   "label": "Ступени",
+   "emoji": "📶",
+   "animated": "mono/tiers.tgs",
+   "static": "static/mono/tiers.png"
   }
  ]
 }

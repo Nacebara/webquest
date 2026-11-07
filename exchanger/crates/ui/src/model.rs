@@ -18,13 +18,33 @@ pub enum DirectionStatus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirectionTerms {
     pub direction: Direction,
-    /// Текущая комиссия, `2.5` = 2,5 %.
+    /// Текущая комиссия, `2.5` = 2,5 %. Со ступенями — ставка самой дешёвой ступени.
     pub fee_pct: Decimal,
     pub min_fee: Decimal,
     pub min: Decimal,
     /// Эффективный максимум с учётом резерва (`max_eff`).
     pub max: Decimal,
     pub status: DirectionStatus,
+    /// Ступени комиссии по сумме (с рычагом резерва); пусто — одна ставка на любую сумму.
+    pub tiers: Vec<TierTerms>,
+    /// Выгодный курс встречного потока сейчас (DESIGN-v0.2 Р15).
+    pub promo: Option<PromoTerms>,
+    /// У клиента личные условия на этом направлении.
+    pub personal: bool,
+}
+
+/// Ступень: «от суммы `from` — `fee_pct`».
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TierTerms {
+    pub from: Decimal,
+    pub fee_pct: Decimal,
+}
+
+/// Выгодный курс: `fee_pct` на сумму до `up_to`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PromoTerms {
+    pub fee_pct: Decimal,
+    pub up_to: Decimal,
 }
 
 /// Условия всех направлений.

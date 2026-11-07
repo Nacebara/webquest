@@ -268,7 +268,15 @@ fn every_screen_is_valid_in_both_modes() {
 #[test]
 fn money_flow_is_plain_html_reference_screens_have_fallback() {
     let ui = common::plain_ui();
-    let rich = ["welcome", "terms", "history", "order_card", "privacy"];
+    let rich = [
+        "welcome",
+        "terms",
+        "history",
+        "order_card",
+        "privacy",
+        "terms_with_offers",
+        "welcome_with_offers",
+    ];
     for (name, screen) in common::gallery(&ui) {
         let expect_rich = rich
             .iter()

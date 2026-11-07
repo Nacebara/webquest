@@ -46,8 +46,58 @@ impl Ui {
     /// Комиссия открытого направления или его статус.
     fn fee_or_status(&self, t: &DirectionTerms) -> Frag {
         match t.status {
-            DirectionStatus::Open => self.pct(t.fee_pct),
+            DirectionStatus::Open => self.fee_frag(t),
             other => Frag::text(self.status_text(other)),
+        }
+    }
+
+    /// Комиссия: одна ставка или «от …» по самой дешёвой ступени.
+    fn fee_frag(&self, t: &DirectionTerms) -> Frag {
+        if t.tiers.len() > 1 {
+            let cheapest = t.tiers.iter().map(|x| x.fee_pct).min().unwrap_or(t.fee_pct);
+            self.fill(&self.texts.terms.fee_from, &[("fee", &self.pct(cheapest))])
+        } else {
+            self.pct(t.fee_pct)
+        }
+    }
+
+    /// Ступени одной строкой: «до 100 USDT — 2,5 % · от 100 USDT — 1,8 %».
+    fn tiers_frag(&self, t: &DirectionTerms) -> Frag {
+        let x = &self.texts.terms;
+        let mut out = Frag::default();
+        for (i, tier) in t.tiers.iter().enumerate() {
+            if i > 0 {
+                out.push(&self.fill(&x.tier_sep, &[]));
+            }
+            let fee = self.pct(tier.fee_pct);
+            let part = if i == 0 {
+                let to = t.tiers.get(1).map_or(t.max, |n| n.from);
+                self.fill(&x.tier_first, &[("to", &self.usdt(to)), ("fee", &fee)])
+            } else {
+                self.fill(
+                    &x.tier_next,
+                    &[("from", &self.usdt(tier.from)), ("fee", &fee)],
+                )
+            };
+            out.push(&part);
+        }
+        out
+    }
+
+    /// «🔥 Сейчас выгодно…» для открытых направлений с выгодным курсом.
+    fn promo_paras(&self, terms: &Terms, doc: &mut Doc) {
+        for d in terms.open() {
+            if let Some(p) = d.promo {
+                doc.para(&self.fill(
+                    &self.texts.terms.promo,
+                    &[
+                        ("icon", &self.emoji.frag(Emoji::Promo)),
+                        ("direction", &self.direction_name(d.direction)),
+                        ("fee", &self.pct(p.fee_pct)),
+                        ("up_to", &self.usdt(p.up_to)),
+                    ],
+                ));
+            }
         }
     }
 
@@ -102,6 +152,7 @@ impl Ui {
             plain_quote: true,
         });
 
+        self.promo_paras(terms, &mut doc);
         let open: Vec<&DirectionTerms> = terms.open().collect();
         let min = open.iter().map(|d| d.min).min();
         let max = open.iter().map(|d| d.max).max();
@@ -147,7 +198,7 @@ impl Ui {
             .iter()
             .map(|d| {
                 let direction = self.direction_name(d.direction);
-                let fee = self.pct(d.fee_pct);
+                let fee = self.fee_frag(d);
                 let status = Frag::text(self.status_text(d.status));
                 let min = Frag::text(&fmt::amount(d.min, domain::Asset::Usdt));
                 let max = Frag::text(&fmt::amount(d.max, domain::Asset::Usdt));
@@ -179,7 +230,32 @@ impl Ui {
             right: &[1, 2, 3],
             plain_quote: true,
         });
+        self.promo_paras(terms, &mut doc);
+        if terms.directions.iter().any(|d| d.personal) {
+            doc.para(&self.fill(&t.personal, &[]));
+        }
         doc.gap();
+
+        let tiered: Vec<&DirectionTerms> = terms
+            .directions
+            .iter()
+            .filter(|d| d.tiers.len() > 1)
+            .collect();
+        if !tiered.is_empty() {
+            let lines: Vec<Frag> = tiered
+                .iter()
+                .map(|d| {
+                    self.fill(
+                        &t.tier_line,
+                        &[
+                            ("direction", &self.direction_name(d.direction)),
+                            ("tiers", &self.tiers_frag(d)),
+                        ],
+                    )
+                })
+                .collect();
+            doc.details(&self.fill(&t.tiers_title, &[]), true, |d| d.list(&lines));
+        }
 
         let mut checks: Vec<Frag> = t.checks.iter().map(|s| self.fill(s, &[])).collect();
         if let Some(name) = terms
@@ -230,11 +306,23 @@ impl Ui {
                     &[
                         ("icon", &icon),
                         ("direction", &name),
-                        ("fee", &self.pct(d.fee_pct)),
+                        ("fee", &self.fee_frag(d)),
                         ("min", &self.usdt(d.min)),
                         ("max", &self.usdt(d.max)),
                     ],
                 ));
+                if let Some(p) = d.promo {
+                    body.push(&Frag::trusted("\n"));
+                    body.push(&self.fill(
+                        &t.promo,
+                        &[
+                            ("icon", &self.emoji.frag(Emoji::Promo)),
+                            ("direction", &name),
+                            ("fee", &self.pct(p.fee_pct)),
+                            ("up_to", &self.usdt(p.up_to)),
+                        ],
+                    ));
+                }
             } else {
                 body.push(&self.fill(&t.line_paused, &[("icon", &icon), ("direction", &name)]));
             }
@@ -629,6 +717,9 @@ mod tests {
             min,
             max,
             status: DirectionStatus::Open,
+            tiers: Vec::new(),
+            promo: None,
+            personal: false,
         }
     }
 

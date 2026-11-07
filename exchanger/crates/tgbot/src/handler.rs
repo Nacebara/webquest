@@ -71,7 +71,26 @@ impl Inner {
         self.reply(chat, screen).await
     }
 
-    /// Условия направлений (кэш на `terms_ttl`).
+    /// Условия направлений для клиента: с личными условиями — свои (без кэша), иначе общие.
+    pub(crate) async fn terms_for(&self, user: i64) -> Result<TermsSnapshot, TgBotError> {
+        let personal = {
+            let mut conn = self.pool.acquire().await?;
+            storage::user_terms::has_any(&mut conn, user).await?
+        };
+        if !personal {
+            return self.terms().await;
+        }
+        let mut conn = self.pool.acquire().await?;
+        crate::terms::load(
+            &mut conn,
+            self.cfg.reserve_safety,
+            self.cfg.bind_username.as_deref(),
+            Some(user),
+        )
+        .await
+    }
+
+    /// Общие условия направлений (кэш на `terms_ttl`).
     pub(crate) async fn terms(&self) -> Result<TermsSnapshot, TgBotError> {
         let ttl = self.cfg.terms_ttl;
         let cached = {
@@ -93,6 +112,7 @@ impl Inner {
                 &mut conn,
                 self.cfg.reserve_safety,
                 self.cfg.bind_username.as_deref(),
+                None,
             )
             .await?
         };
@@ -204,16 +224,16 @@ impl Inner {
     async fn menu(&self, chat: i64, user: i64, action: MenuAction) -> Result<(), TgBotError> {
         match action {
             MenuAction::Exchange => {
-                let terms = self.terms().await?;
+                let terms = self.terms_for(user).await?;
                 self.reply(chat, &self.ui.exchange_menu(&terms.terms)).await
             }
             MenuAction::PayInvoice => {
-                let terms = self.terms().await?;
+                let terms = self.terms_for(user).await?;
                 self.reply(chat, &self.ui.invoice_prompt(&terms.terms))
                     .await
             }
             MenuAction::Rates => {
-                let terms = self.terms().await?;
+                let terms = self.terms_for(user).await?;
                 self.reply_doc(chat, user, &self.ui.terms(&terms.terms))
                     .await
             }
@@ -228,18 +248,18 @@ impl Inner {
     async fn command(&self, chat: i64, user: i64, command: Command) -> Result<(), TgBotError> {
         match command {
             Command::Start(_) => {
-                let terms = self.terms().await?;
+                let terms = self.terms_for(user).await?;
                 self.reply_doc(chat, user, &self.ui.welcome(&terms.terms))
                     .await
             }
             Command::Terms => {
-                let terms = self.terms().await?;
+                let terms = self.terms_for(user).await?;
                 self.reply_doc(chat, user, &self.ui.terms(&terms.terms))
                     .await
             }
             Command::History => self.history(chat, user, 0).await,
             Command::Help => {
-                let terms = self.terms().await?;
+                let terms = self.terms_for(user).await?;
                 self.reply(chat, &self.ui.help(&terms.terms)).await
             }
             Command::Privacy => self.reply_doc(chat, user, &self.ui.privacy()).await,
@@ -326,12 +346,12 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
     let user = from.id;
     match action {
         Callback::Direction(direction) => {
-            let terms = inner.terms().await?;
+            let terms = inner.terms_for(user).await?;
             let screen = inner.ui.send_check(&terms.terms, direction);
             inner.replace(chat, message, &screen).await
         }
         Callback::HowTo(direction) => {
-            let terms = inner.terms().await?;
+            let terms = inner.terms_for(user).await?;
             let screen = inner.ui.check_howto(&terms.terms, direction);
             inner.replace(chat, message, &screen).await
         }

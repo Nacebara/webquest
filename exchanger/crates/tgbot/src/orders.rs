@@ -293,7 +293,9 @@ impl Inner {
         match view.state {
             OrderState::RefundPending => {
                 let mut conn = self.pool.acquire().await?;
-                let dir = storage::directions::get(&mut conn, view.direction).await?;
+                let dir = storage::user_terms::effective(&mut conn, view.direction, view.user_id)
+                    .await?
+                    .dir;
                 let new_user = storage::orders::is_new_user(&mut conn, view.user_id).await?;
                 extra.min_amount = Some(dir.min_amount);
                 extra.max_amount = Some(if new_user {
@@ -302,7 +304,7 @@ impl Inner {
                     dir.max_amount
                 });
                 if view.failure_code.as_deref() == Some("above_reserved_amount") {
-                    let terms = self.terms().await?;
+                    let terms = self.terms_for(view.user_id).await?;
                     extra.max_amount = terms
                         .terms
                         .get(view.direction)
@@ -311,7 +313,12 @@ impl Inner {
                 }
             }
             OrderState::Rejected => {
-                extra.room = self.terms().await?.room.get(&view.direction).copied();
+                extra.room = self
+                    .terms_for(view.user_id)
+                    .await?
+                    .room
+                    .get(&view.direction)
+                    .copied();
             }
             OrderState::Completed if view.direction.flow() == Flow::InvoicePayment => {
                 let mut conn = self.pool.acquire().await?;

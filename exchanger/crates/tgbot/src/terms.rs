@@ -1,14 +1,17 @@
-//! Условия направлений для экранов (`ui::Terms`): комиссия по рычагу резерва, лимиты с учётом
-//! резерва целевого кошелька, статус. Те же формулы, что у движка при приёме чека
-//! (`domain::pricing::max_order_effective`, `Lever`) — экран не обещает больше, чем движок примет.
+//! Условия направлений для экранов (`ui::Terms`): комиссия по рычагу резерва (одна ставка или
+//! ступени), выгодный курс встречного потока, лимиты с учётом резерва целевого кошелька, статус,
+//! личные условия клиента. Те же формулы, что у движка при приёме чека
+//! (`domain::fees`, `domain::pricing::max_order_effective`) — экран не обещает больше, чем движок
+//! примет.
 
 use std::collections::HashMap;
 
-use domain::pricing::{Lever, Limits, max_order_effective};
+use domain::fees::{FeeMode, LeverInput};
+use domain::pricing::{Limits, max_order_effective};
 use domain::{Asset, Decimal, Direction};
 use rust_decimal::RoundingStrategy;
 use sqlx::PgConnection;
-use ui::{DirectionStatus, DirectionTerms, Terms};
+use ui::{DirectionStatus, DirectionTerms, PromoTerms, Terms, TierTerms};
 
 use crate::TgBotError;
 
@@ -31,6 +34,7 @@ pub(crate) async fn load(
     conn: &mut PgConnection,
     safety: Decimal,
     bind_username: Option<&str>,
+    user: Option<i64>,
 ) -> Result<TermsSnapshot, TgBotError> {
     let asset = Asset::Usdt;
     let mut directions = Vec::new();
@@ -42,35 +46,75 @@ pub(crate) async fn load(
         Direction::PayCbInvoice,
         Direction::PayXrInvoice,
     ] {
-        let row = storage::directions::get(&mut *conn, direction).await?;
+        // Условия этого клиента (личная ставка, лимиты) или общие.
+        let (row, personal) = match user {
+            Some(user) => {
+                let e = storage::user_terms::effective(&mut *conn, direction, user).await?;
+                (e.dir, Some(e.personal))
+            }
+            None => (storage::directions::get(&mut *conn, direction).await?, None),
+        };
         let wallet = storage::wallets::active(&mut *conn, direction.target()).await?;
-        let (fee_pct, effective, free) = match wallet {
+        let (lever, effective, free) = match wallet {
             Some((wallet, _)) => {
                 let available = storage::holds::available(&mut *conn, wallet, asset).await?;
                 let target = storage::directions::reserve_target(&mut *conn, wallet, asset).await?;
-                let fee = match target {
-                    Some(target) => Lever {
-                        base_pct: row.fee_pct,
-                        k_pct: row.skew_k_pct,
-                        floor_pct: row.fee_floor_pct,
-                        cap_pct: row.fee_cap_pct,
-                    }
-                    .effective_fee_pct(available, target)
-                    .unwrap_or(row.fee_pct),
-                    None => row.fee_pct,
-                };
+                let lever = target.map(|target| LeverInput {
+                    k_pct: row.skew_k_pct,
+                    floor_pct: row.fee_floor_pct,
+                    cap_pct: row.fee_cap_pct,
+                    available,
+                    target,
+                });
                 let limits = Limits {
                     min_amount: row.min_amount,
                     max_amount: row.max_amount,
                 };
                 (
-                    fee,
+                    lever,
                     max_order_effective(limits, available, safety),
                     available - safety,
                 )
             }
-            None => (row.fee_pct, None, Decimal::ZERO),
+            None => (None, None, Decimal::ZERO),
         };
+        // Ставка с рычагом для базы; ошибка настройки рычага — базовая (экран не падает).
+        let levered = |base: Decimal| {
+            domain::fees::levered_pct(row.fee_pct, base, lever)
+                .unwrap_or(base)
+                .normalize()
+        };
+        let personal_pct = personal.as_ref().and_then(|p| p.fee_pct);
+        let tiers: Vec<TierTerms> = match (personal_pct, row.fee_mode, row.fee_tiers.as_ref()) {
+            (None, FeeMode::Tiers, Some(schedule)) if schedule.tiers().len() > 1 => schedule
+                .tiers()
+                .iter()
+                .map(|t| TierTerms {
+                    from: t.from.max(row.min_amount),
+                    fee_pct: levered(t.fee_pct),
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
+        let fee_pct = match (personal_pct, tiers.first()) {
+            (Some(p), _) => levered(p),
+            (None, Some(first)) => first.fee_pct,
+            (None, None) => levered(row.fee_pct),
+        };
+        let cheapest = tiers.iter().map(|t| t.fee_pct).fold(fee_pct, Decimal::min);
+        let promo =
+            engine::fees::active_promo(&mut *conn, direction, asset, Decimal::ZERO, Decimal::ZERO)
+                .await
+                .map_err(|e| match e {
+                    engine::EngineError::Storage(s) => TgBotError::Storage(s),
+                    other => TgBotError::Engine(other),
+                })?
+                .filter(|p| p.fee_pct < cheapest)
+                .map(|p| PromoTerms {
+                    fee_pct: p.fee_pct.normalize(),
+                    up_to: floor_cents(p.room).normalize(),
+                })
+                .filter(|p| p.up_to > Decimal::ZERO);
         let status = if !row.is_open {
             DirectionStatus::Off
         } else if row.auto_paused || effective.is_none() {
@@ -81,11 +125,14 @@ pub(crate) async fn load(
         room.insert(direction, floor_cents(free));
         directions.push(DirectionTerms {
             direction,
-            fee_pct: fee_pct.normalize(),
+            fee_pct,
             min_fee: row.min_fee.normalize(),
             min: row.min_amount.normalize(),
             max: floor_cents(effective.unwrap_or(row.max_amount)).normalize(),
             status,
+            tiers,
+            promo,
+            personal: personal.is_some_and(|p| p.is_personal()),
         });
     }
     Ok(TermsSnapshot {

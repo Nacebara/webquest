@@ -376,7 +376,7 @@ mod tests {
     fn the_manifest_covers_every_role_and_has_both_files() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/emoji");
         let manifest = read_manifest(&dir).unwrap();
-        assert_eq!(manifest.icons.len(), 112);
+        assert_eq!(manifest.icons.len(), 116);
         for icon in &manifest.icons {
             assert!(dir.join(&icon.animated).is_file(), "{}", icon.animated);
             assert!(dir.join(&icon.still).is_file(), "{}", icon.still);

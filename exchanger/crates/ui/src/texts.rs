@@ -195,6 +195,16 @@ pub struct TermsTexts {
     pub rules_title: String,
     pub rules: String,
     pub footer: String,
+    /// Комиссия со ступенями: «от 1,2 %».
+    pub fee_from: String,
+    pub tiers_title: String,
+    pub tier_line: String,
+    pub tier_first: String,
+    pub tier_next: String,
+    pub tier_sep: String,
+    /// Выгодный курс встречного потока.
+    pub promo: String,
+    pub personal: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -205,6 +215,7 @@ pub struct ExchangeTexts {
     pub line: String,
     pub line_paused: String,
     pub footer: String,
+    pub promo: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

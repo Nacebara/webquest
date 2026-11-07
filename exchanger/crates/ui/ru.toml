@@ -130,6 +130,14 @@ invoices = [
 rules_title = "Правила"
 rules = "Нельзя: средства от мошенничества, даркнета, миксеров, санкционных площадок. Могу отказать и вернуть деньги — туда же, откуда они пришли."
 footer = "Комиссия меняется раз в минуту от загрузки направления. В заявке она фиксируется на 15 минут."
+fee_from = "от {fee}"
+tiers_title = "Комиссия по сумме"
+tier_line = "{direction}: {tiers}"
+tier_first = "до {to} USDT — {fee}"
+tier_next = "от {from} USDT — {fee}"
+tier_sep = " · "
+promo = "{icon} <b>Сейчас выгодно:</b> {direction} — {fee} на сумму до {up_to} USDT, сверх неё — обычная комиссия."
+personal = "Для вас действуют личные условия — они уже учтены в таблице."
 
 [exchange]
 title = "<b>Обменять чек</b>"
@@ -137,6 +145,7 @@ lead = "Выберите направление:"
 line = "{icon} <b>{direction}</b> — {fee}, от {min} до {max} USDT"
 line_paused = "{icon} <b>{direction}</b> — на паузе, сейчас не принимаю"
 footer = "Курс 1:1. Выплата — чеком другого кошелька: забрать его можно одной кнопкой."
+promo = "{icon} <b>{direction}</b> сейчас выгоднее: {fee} на сумму до {up_to} USDT"
 
 [send_check]
 title = "<b>{direction}</b>"

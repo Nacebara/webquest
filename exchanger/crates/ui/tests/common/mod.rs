@@ -53,6 +53,9 @@ fn dir(
         min: dec!(2),
         max,
         status,
+        tiers: Vec::new(),
+        promo: None,
+        personal: false,
     }
 }
 
@@ -98,6 +101,31 @@ pub fn terms_partly_paused() -> Terms {
     t.directions[1].status = DirectionStatus::Paused;
     t.directions[3].status = DirectionStatus::Off;
     t.bind_username = None;
+    t
+}
+
+/// Ступени на основном направлении, выгодный курс встречного потока, личные условия.
+pub fn terms_with_offers() -> Terms {
+    let mut t = terms();
+    t.directions[0].tiers = vec![
+        ui::TierTerms {
+            from: dec!(2),
+            fee_pct: dec!(2.5),
+        },
+        ui::TierTerms {
+            from: dec!(100),
+            fee_pct: dec!(1.8),
+        },
+        ui::TierTerms {
+            from: dec!(250),
+            fee_pct: dec!(1.2),
+        },
+    ];
+    t.directions[1].promo = Some(ui::PromoTerms {
+        fee_pct: dec!(0.3),
+        up_to: dec!(450),
+    });
+    t.directions[1].personal = true;
     t
 }
 
@@ -440,6 +468,12 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
         ("terms", ui.terms(&t)),
         ("terms_partly_paused", ui.terms(&terms_partly_paused())),
         ("exchange_menu", ui.exchange_menu(&t)),
+        ("terms_with_offers", ui.terms(&terms_with_offers())),
+        (
+            "exchange_menu_with_offers",
+            ui.exchange_menu(&terms_with_offers()),
+        ),
+        ("welcome_with_offers", ui.welcome(&terms_with_offers())),
         (
             "exchange_menu_paused",
             ui.exchange_menu(&terms_partly_paused()),
