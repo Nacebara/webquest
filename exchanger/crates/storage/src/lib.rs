@@ -17,6 +17,7 @@ pub mod client;
 pub mod directions;
 pub mod error;
 pub mod holds;
+pub mod invest;
 pub mod ledger;
 pub mod operations;
 pub mod orders;

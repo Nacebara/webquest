@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COALESCE(-sum(e.amount), 0) AS \"balance!\",\n               COALESCE(-sum(e.amount) FILTER (WHERE t.kind = 'invest_accrual'), 0) AS \"profit!\",\n               COALESCE(-sum(e.amount) FILTER (WHERE t.kind = 'invest_accrual'\n                                                AND t.created_at > now() - interval '24 hours'), 0)\n                   AS \"profit_24h!\"\n          FROM ledger_entries e\n          JOIN ledger_accounts a ON a.id = e.account_id\n          JOIN ledger_transactions t ON t.id = e.tx_id\n         WHERE a.code = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "balance!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "profit!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "profit_24h!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "37ff375b12a291ca1677264cf5f75cbe993707b1f574a29c5cc2d5b14e538e1f"
+}

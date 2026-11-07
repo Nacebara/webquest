@@ -16,6 +16,7 @@
 
 mod effects;
 pub mod fees;
+pub mod invest;
 mod invoice;
 pub mod operator;
 pub mod reconcile;
@@ -63,6 +64,8 @@ pub struct EngineConfig {
     pub housekeeping_every: Duration,
     /// Как часто сверять балансы кошельков с леджером (SPEC П14).
     pub reconcile_every: Duration,
+    /// Как часто начислять инвесторам прибыль (DESIGN-v0.2 Р18).
+    pub invest_accrual_every: Duration,
     /// «Лимит без код-пароля» аккаунта CryptoBot, USD за скользящие 24 часа (DESIGN-v0.2 Р11).
     /// Должен совпадать с настройкой в самом CryptoBot («Безопасность» → «Лимит без код-пароля»).
     /// Траты кошелька CryptoBot держим ниже него с запасом — бот не спросит код никогда.
@@ -82,6 +85,7 @@ impl Default for EngineConfig {
             stale_after: Duration::from_secs(900),
             housekeeping_every: Duration::from_secs(30),
             reconcile_every: Duration::from_secs(600),
+            invest_accrual_every: Duration::from_secs(3600),
             // Значение CryptoBot по умолчанию.
             cb_passcode_free_limit: Some(Decimal::from(500)),
         }
@@ -126,6 +130,8 @@ pub struct Engine {
     wallets: HashMap<Platform, Arc<dyn WalletBot>>,
     cfg: EngineConfig,
     updates: broadcast::Sender<OrderUpdate>,
+    /// Движения инвесторов (пополнения, выводы) — для бота.
+    invest_updates: broadcast::Sender<invest::InvestUpdate>,
     /// Идёт самопроверка: сверка балансов молчит.
     selftest_running: std::sync::atomic::AtomicBool,
 }
@@ -142,11 +148,13 @@ impl std::fmt::Debug for Engine {
 impl Engine {
     pub fn new(pool: PgPool, cfg: EngineConfig) -> Self {
         let (updates, _) = broadcast::channel(1024);
+        let (invest_updates, _) = broadcast::channel(256);
         Self {
             pool,
             wallets: HashMap::new(),
             cfg,
             updates,
+            invest_updates,
             selftest_running: std::sync::atomic::AtomicBool::new(false),
         }
     }
@@ -211,6 +219,7 @@ impl Engine {
                 AccountCode::revenue(Revenue::Retained, asset),
                 AccountCode::equity(domain::ledger::Equity::Capital, asset),
                 AccountCode::equity(domain::ledger::Equity::OwnerWithdrawals, asset),
+                AccountCode::expense(domain::ledger::Expense::InvestorShare, asset),
             ] {
                 storage::ledger::ensure_account(&mut tx, &code, asset, None).await?;
             }
@@ -245,6 +254,8 @@ impl Engine {
         let mut reconcile = tokio::time::interval(self.cfg.reconcile_every);
         // Первый замер — не сразу после старта: восстановление ещё доводит операции.
         reconcile.tick().await;
+        let mut accrual = tokio::time::interval(self.cfg.invest_accrual_every);
+        accrual.tick().await;
         loop {
             while self.process_due().await? > 0 {}
             tokio::select! {
@@ -261,6 +272,11 @@ impl Engine {
                 _ = reconcile.tick() => {
                     if let Err(e) = self.reconcile_balances().await {
                         tracing::warn!(error = %e, "balance reconciliation failed");
+                    }
+                }
+                _ = accrual.tick() => {
+                    if let Err(e) = self.invest_accrue().await {
+                        tracing::warn!(error = %e, "investor profit accrual failed");
                     }
                 }
                 note = listener.recv() => {

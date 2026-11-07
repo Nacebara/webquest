@@ -33,6 +33,11 @@ impl AccountCode {
         Self(format!("liability:payable:{}", asset.code()))
     }
 
+    /// Долг сервиса перед инвестором: его пополнения и начисленная прибыль минус выводы.
+    pub fn investor(user_id: i64, asset: Asset) -> Self {
+        Self(format!("liability:investor:{user_id}:{}", asset.code()))
+    }
+
     pub fn revenue(kind: Revenue, asset: Asset) -> Self {
         Self(format!("revenue:{}:{}", kind.as_str(), asset.code()))
     }
@@ -87,6 +92,8 @@ pub enum Expense {
     PlatformFee,
     Loss,
     Referral,
+    /// Прибыль, начисленная инвесторам.
+    InvestorShare,
 }
 
 impl Expense {
@@ -96,6 +103,7 @@ impl Expense {
             Expense::PlatformFee => "platform_fee",
             Expense::Loss => "loss",
             Expense::Referral => "referral",
+            Expense::InvestorShare => "investor_share",
         }
     }
 }
@@ -127,6 +135,9 @@ pub enum TxKind {
     CapitalIn,
     CapitalOut,
     ManualClose,
+    InvestDeposit,
+    InvestAccrual,
+    InvestWithdrawal,
 }
 
 impl TxKind {
@@ -141,6 +152,9 @@ impl TxKind {
             TxKind::CapitalIn => "capital_in",
             TxKind::CapitalOut => "capital_out",
             TxKind::ManualClose => "manual_close",
+            TxKind::InvestDeposit => "invest_deposit",
+            TxKind::InvestAccrual => "invest_accrual",
+            TxKind::InvestWithdrawal => "invest_withdrawal",
         }
     }
 }
@@ -345,6 +359,60 @@ pub fn manual_close(asset: Asset, amount: Decimal) -> Result<Posting, PostingErr
     )
 }
 
+/// Инвестор пополнил: Дт кошелёк / Кт liability:investor.
+pub fn invest_deposit(
+    platform: Platform,
+    asset: Asset,
+    user_id: i64,
+    amount: Decimal,
+) -> Result<Posting, PostingError> {
+    let a = positive(amount)?;
+    Posting::new(
+        TxKind::InvestDeposit,
+        vec![
+            line(AccountCode::wallet(platform, asset), asset, a),
+            line(AccountCode::investor(user_id, asset), asset, -a),
+        ],
+    )
+}
+
+/// Прибыль инвестору: Дт expense:investor_share / Кт liability:investor (капитализируется).
+pub fn invest_accrual(
+    asset: Asset,
+    user_id: i64,
+    amount: Decimal,
+) -> Result<Posting, PostingError> {
+    let a = positive(amount)?;
+    Posting::new(
+        TxKind::InvestAccrual,
+        vec![
+            line(
+                AccountCode::expense(Expense::InvestorShare, asset),
+                asset,
+                a,
+            ),
+            line(AccountCode::investor(user_id, asset), asset, -a),
+        ],
+    )
+}
+
+/// Вывод инвестору чеком: Дт liability:investor / Кт кошелёк.
+pub fn invest_withdrawal(
+    platform: Platform,
+    asset: Asset,
+    user_id: i64,
+    amount: Decimal,
+) -> Result<Posting, PostingError> {
+    let a = positive(amount)?;
+    Posting::new(
+        TxKind::InvestWithdrawal,
+        vec![
+            line(AccountCode::investor(user_id, asset), asset, a),
+            line(AccountCode::wallet(platform, asset), asset, -a),
+        ],
+    )
+}
+
 /// Владелец забрал деньги с кошелька: Дт equity:owner_withdrawals / Кт кошелёк.
 pub fn capital_out(
     platform: Platform,
@@ -511,6 +579,9 @@ mod tests {
                 manual_close(Asset::Usdt, a),
                 capital_in(p, Asset::Usdt, a),
                 capital_out(p, Asset::Usdt, a),
+                invest_deposit(p, Asset::Usdt, 7, a),
+                invest_accrual(Asset::Usdt, 7, a),
+                invest_withdrawal(p, Asset::Usdt, 7, a),
                 invoice_paid(p, Asset::Usdt, big, small),
                 payout(p, Asset::Usdt, big + small, big, small),
             ];

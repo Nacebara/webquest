@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COALESCE(-sum(e.amount), 0) AS \"sum!\"\n          FROM ledger_entries e JOIN ledger_accounts a ON a.id = e.account_id\n         WHERE a.code = $1 AND e.tx_id > $2 AND e.tx_id <= $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "sum!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "cbf2bc3ea1451e246feec69fe4fb70da80fcc449297af4ddc4742d18ce8082b6"
+}

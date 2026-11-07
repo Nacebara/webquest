@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO investors (user_id, share_pct, lock_days, min_deposit, auto_withdraw_max,\n                               is_active, granted_by)\n        VALUES ($1, $2, $3, $4, $5, $6, $7)\n        ON CONFLICT (user_id) DO UPDATE\n           SET share_pct = EXCLUDED.share_pct, lock_days = EXCLUDED.lock_days,\n               min_deposit = EXCLUDED.min_deposit, auto_withdraw_max = EXCLUDED.auto_withdraw_max,\n               is_active = EXCLUDED.is_active, updated_at = now()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Numeric",
+        "Int4",
+        "Numeric",
+        "Numeric",
+        "Bool",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c61c0aa32b9bd7c2414140ce5fc3f8032beec6709c723dec64965e550cc48f7e"
+}

@@ -1,0 +1,49 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT (SELECT count(*) FROM investors WHERE is_active) AS \"investors!\",\n               (SELECT COALESCE(-sum(e.amount), 0)\n                  FROM ledger_entries e JOIN ledger_accounts a ON a.id = e.account_id\n                 WHERE a.code LIKE 'liability:investor:%') AS \"balance!\",\n               (SELECT COALESCE(-sum(e.amount), 0)\n                  FROM ledger_entries e\n                  JOIN ledger_accounts a ON a.id = e.account_id\n                  JOIN ledger_transactions t ON t.id = e.tx_id\n                 WHERE a.code LIKE 'liability:investor:%' AND t.kind = 'invest_accrual'\n                   AND t.created_at > now() - interval '24 hours') AS \"accrued_24h!\",\n               (SELECT count(*) FROM invest_moves WHERE status = 'requested') AS \"requested!\",\n               (SELECT count(*) FROM invest_moves WHERE status = 'manual') AS \"manual!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "investors!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "balance!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "accrued_24h!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "requested!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "manual!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "3653dea57ccad001f99b950d7a394116a9573c506524291606c21439a33252c2"
+}

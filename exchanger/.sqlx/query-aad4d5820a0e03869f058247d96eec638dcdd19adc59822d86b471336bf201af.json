@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE operations o\n           SET status = 'dispatched', attempts = o.attempts + 1, dispatched_at = now()\n          FROM (SELECT id FROM operations\n                 WHERE status = 'pending' AND next_attempt_at <= now()\n                   AND kind = ANY($2) AND money_role IN ('intake', 'settle', 'excess_refund')\n                 ORDER BY next_attempt_at, id\n                 LIMIT $1\n                 FOR UPDATE SKIP LOCKED) due\n         WHERE o.id = due.id\n        RETURNING o.id, o.order_id, o.kind, o.money_role, o.platform, o.wallet_account_id,\n                  o.status, o.idempotency_key, o.start_param, o.amount, o.asset, o.request,\n                  o.attempts, o.max_attempts, o.external_id, o.dispatched_at,\n                  o.releases, o.first_released_at\n        ",
+  "query": "\n        UPDATE operations o\n           SET status = 'dispatched', attempts = o.attempts + 1, dispatched_at = now()\n          FROM (SELECT id FROM operations\n                 WHERE status = 'pending' AND next_attempt_at <= now()\n                   AND kind = ANY($2) AND money_role IN ('intake', 'settle', 'excess_refund')\n                 ORDER BY next_attempt_at, id\n                 LIMIT $1\n                 FOR UPDATE SKIP LOCKED) due\n         WHERE o.id = due.id\n        RETURNING o.id, o.order_id, o.invest_move_id, o.kind, o.money_role, o.platform, o.wallet_account_id,\n                  o.status, o.idempotency_key, o.start_param, o.amount, o.asset, o.request,\n                  o.attempts, o.max_attempts, o.external_id, o.dispatched_at,\n                  o.releases, o.first_released_at\n        ",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,17 @@
       },
       {
         "ordinal": 2,
+        "name": "invest_move_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "invest_move_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
         "name": "kind",
         "type_info": "Text",
         "origin": {
@@ -37,7 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "money_role",
         "type_info": "Text",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "platform",
         "type_info": "Text",
         "origin": {
@@ -59,7 +70,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "wallet_account_id",
         "type_info": "Int2",
         "origin": {
@@ -70,7 +81,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "status",
         "type_info": "Text",
         "origin": {
@@ -81,7 +92,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "idempotency_key",
         "type_info": "Text",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "start_param",
         "type_info": "Text",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "amount",
         "type_info": "Numeric",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "asset",
         "type_info": "Text",
         "origin": {
@@ -125,7 +136,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "request",
         "type_info": "Jsonb",
         "origin": {
@@ -136,7 +147,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "attempts",
         "type_info": "Int4",
         "origin": {
@@ -147,7 +158,7 @@
         }
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "max_attempts",
         "type_info": "Int4",
         "origin": {
@@ -158,7 +169,7 @@
         }
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "external_id",
         "type_info": "Text",
         "origin": {
@@ -169,7 +180,7 @@
         }
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "dispatched_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -180,7 +191,7 @@
         }
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "releases",
         "type_info": "Int4",
         "origin": {
@@ -191,7 +202,7 @@
         }
       },
       {
-        "ordinal": 17,
+        "ordinal": 18,
         "name": "first_released_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -211,6 +222,7 @@
     "nullable": [
       false,
       true,
+      true,
       false,
       false,
       false,
@@ -229,5 +241,5 @@
       true
     ]
   },
-  "hash": "38bbdbfd37e9c44b018f949397918bb2a4bfdbbc675f02b1bf1b4cc3c63afe3b"
+  "hash": "aad4d5820a0e03869f058247d96eec638dcdd19adc59822d86b471336bf201af"
 }

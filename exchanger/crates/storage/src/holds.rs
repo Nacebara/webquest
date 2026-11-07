@@ -170,3 +170,47 @@ pub async fn place_unchecked(
     .await?;
     Ok(())
 }
+
+/// Удержать резерв под вывод инвестора (после [`lock_wallet`] в той же транзакции).
+pub async fn place_invest(
+    conn: &mut PgConnection,
+    invest_move_id: i64,
+    wallet_account_id: i16,
+    asset: Asset,
+    amount: Decimal,
+) -> Result<(), StorageError> {
+    let free = available(&mut *conn, wallet_account_id, asset).await?;
+    if free < amount {
+        return Err(StorageError::InsufficientReserve {
+            available: free,
+            needed: amount,
+        });
+    }
+    sqlx::query!(
+        "INSERT INTO holds (invest_move_id, wallet_account_id, asset, amount) VALUES ($1, $2, $3, $4)",
+        invest_move_id,
+        wallet_account_id,
+        asset.code(),
+        amount,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// Закрыть удержание вывода инвестора: чек создан (`consumed`) или вывод не состоялся.
+pub async fn close_invest(
+    conn: &mut PgConnection,
+    invest_move_id: i64,
+    consumed: bool,
+) -> Result<(), StorageError> {
+    let state = if consumed { "consumed" } else { "released" };
+    sqlx::query!(
+        "UPDATE holds SET state = $2, closed_at = now() WHERE invest_move_id = $1 AND state = 'active'",
+        invest_move_id,
+        state,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}

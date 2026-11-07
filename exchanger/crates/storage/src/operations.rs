@@ -74,6 +74,8 @@ pub struct NewOperation<'a> {
 pub struct OperationRow {
     pub id: i64,
     pub order_id: Option<i64>,
+    /// Пополнение или вывод инвестора (`invest_moves`); тогда `order_id` пуст.
+    pub invest_move_id: Option<i64>,
     pub kind: OpKind,
     pub role: MoneyRole,
     pub platform: Platform,
@@ -96,6 +98,7 @@ pub struct OperationRow {
 struct RawRow {
     id: i64,
     order_id: Option<i64>,
+    invest_move_id: Option<i64>,
     kind: String,
     money_role: String,
     platform: String,
@@ -126,6 +129,7 @@ impl TryFrom<RawRow> for OperationRow {
         Ok(Self {
             id: r.id,
             order_id: r.order_id,
+            invest_move_id: r.invest_move_id,
             kind: OpKind::from_db_str(&r.kind)
                 .ok_or_else(|| StorageError::corrupt("operations.kind", &r.kind))?,
             role: MoneyRole::from_db_str(&r.money_role)
@@ -167,6 +171,60 @@ pub async fn insert(conn: &mut PgConnection, op: &NewOperation<'_>) -> Result<i6
         RETURNING id
         "#,
         op.order_id,
+        op.kind.as_db_str(),
+        op.role.as_db_str(),
+        op.platform.db_name(),
+        op.wallet_account_id,
+        op.idempotency_key,
+        op.start_param,
+        op.amount,
+        op.asset.code(),
+        request,
+        max_attempts,
+    )
+    .fetch_one(&mut *conn)
+    .await
+    .map_err(|e| match unique_violation(&e) {
+        Some("operations_check_once") => StorageError::CheckActivatedBefore,
+        _ => StorageError::Db(e),
+    })?;
+    sqlx::query!("SELECT pg_notify('exch_operations', $1)", id.to_string())
+        .execute(&mut *conn)
+        .await?;
+    Ok(id)
+}
+
+/// Операция пополнения или вывода инвестора (`invest_moves`).
+#[derive(Debug, Clone)]
+pub struct NewInvestOperation<'a> {
+    pub invest_move_id: i64,
+    pub kind: OpKind,
+    pub role: MoneyRole,
+    pub platform: Platform,
+    pub wallet_account_id: i16,
+    pub idempotency_key: &'a str,
+    pub start_param: Option<&'a str>,
+    pub amount: Option<Decimal>,
+    pub asset: Asset,
+    pub random_id: i64,
+}
+
+/// Вставить операцию инвестора. Те же правила: выводящие деньги — одна попытка, один чек —
+/// одна активация (`operations_check_once`).
+pub async fn insert_invest(
+    conn: &mut PgConnection,
+    op: &NewInvestOperation<'_>,
+) -> Result<i64, StorageError> {
+    let max_attempts: i32 = if op.kind.retry_is_safe() { 8 } else { 1 };
+    let request = serde_json::json!({ "random_id": op.random_id });
+    let id = sqlx::query_scalar!(
+        r#"
+        INSERT INTO operations (invest_move_id, kind, money_role, platform, wallet_account_id,
+                                idempotency_key, start_param, amount, asset, request, max_attempts)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING id
+        "#,
+        op.invest_move_id,
         op.kind.as_db_str(),
         op.role.as_db_str(),
         op.platform.db_name(),
@@ -258,7 +316,7 @@ pub async fn claim_due(
                  LIMIT $1
                  FOR UPDATE SKIP LOCKED) due
          WHERE o.id = due.id
-        RETURNING o.id, o.order_id, o.kind, o.money_role, o.platform, o.wallet_account_id,
+        RETURNING o.id, o.order_id, o.invest_move_id, o.kind, o.money_role, o.platform, o.wallet_account_id,
                   o.status, o.idempotency_key, o.start_param, o.amount, o.asset, o.request,
                   o.attempts, o.max_attempts, o.external_id, o.dispatched_at,
                   o.releases, o.first_released_at
@@ -282,7 +340,7 @@ pub async fn in_flight(conn: &mut PgConnection) -> Result<Vec<OperationRow>, Sto
     let rows = sqlx::query_as!(
         RawRow,
         r#"
-        SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,
+        SELECT id, order_id, invest_move_id, kind, money_role, platform, wallet_account_id, status,
                idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
                external_id, dispatched_at, releases, first_released_at
           FROM operations
@@ -301,7 +359,7 @@ pub async fn get(conn: &mut PgConnection, id: i64) -> Result<OperationRow, Stora
     let row = sqlx::query_as!(
         RawRow,
         r#"
-        SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,
+        SELECT id, order_id, invest_move_id, kind, money_role, platform, wallet_account_id, status,
                idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
                external_id, dispatched_at, releases, first_released_at
           FROM operations WHERE id = $1
@@ -322,12 +380,32 @@ pub async fn for_order(
     let rows = sqlx::query_as!(
         RawRow,
         r#"
-        SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,
+        SELECT id, order_id, invest_move_id, kind, money_role, platform, wallet_account_id, status,
                idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
                external_id, dispatched_at, releases, first_released_at
           FROM operations WHERE order_id = $1 ORDER BY id
         "#,
         order_id
+    )
+    .fetch_all(conn)
+    .await?;
+    rows.into_iter().map(OperationRow::try_from).collect()
+}
+
+/// Операции движения инвестора, по порядку.
+pub async fn for_invest_move(
+    conn: &mut PgConnection,
+    invest_move_id: i64,
+) -> Result<Vec<OperationRow>, StorageError> {
+    let rows = sqlx::query_as!(
+        RawRow,
+        r#"
+        SELECT id, order_id, invest_move_id, kind, money_role, platform, wallet_account_id, status,
+               idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
+               external_id, dispatched_at, releases, first_released_at
+          FROM operations WHERE invest_move_id = $1 ORDER BY id
+        "#,
+        invest_move_id
     )
     .fetch_all(conn)
     .await?;

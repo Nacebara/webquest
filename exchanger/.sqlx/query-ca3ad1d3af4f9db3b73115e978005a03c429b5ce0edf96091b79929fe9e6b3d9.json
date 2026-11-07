@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE invest_moves\n           SET status = $2, amount = COALESCE($3, amount), check_url = COALESCE($4, check_url),\n               note = COALESCE($5, note), decided_by = COALESCE($6, decided_by),\n               finished_at = CASE WHEN $7 THEN now() ELSE finished_at END\n         WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Numeric",
+        "Text",
+        "Text",
+        "Int8",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ca3ad1d3af4f9db3b73115e978005a03c429b5ce0edf96091b79929fe9e6b3d9"
+}

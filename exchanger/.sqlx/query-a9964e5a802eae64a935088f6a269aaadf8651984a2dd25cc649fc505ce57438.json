@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, order_id, kind, money_role, platform, wallet_account_id, status,\n               idempotency_key, start_param, amount, asset, request, attempts, max_attempts,\n               external_id, dispatched_at, releases, first_released_at\n          FROM operations WHERE order_id = $1 ORDER BY id\n        ",
+  "query": "\n        SELECT id, order_id, invest_move_id, kind, money_role, platform, wallet_account_id, status,\n               idempotency_key, start_param, amount, asset, request, attempts, max_attempts,\n               external_id, dispatched_at, releases, first_released_at\n          FROM operations WHERE id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,17 @@
       },
       {
         "ordinal": 2,
+        "name": "invest_move_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "invest_move_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
         "name": "kind",
         "type_info": "Text",
         "origin": {
@@ -37,7 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "money_role",
         "type_info": "Text",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "platform",
         "type_info": "Text",
         "origin": {
@@ -59,7 +70,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "wallet_account_id",
         "type_info": "Int2",
         "origin": {
@@ -70,7 +81,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "status",
         "type_info": "Text",
         "origin": {
@@ -81,7 +92,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "idempotency_key",
         "type_info": "Text",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "start_param",
         "type_info": "Text",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "amount",
         "type_info": "Numeric",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "asset",
         "type_info": "Text",
         "origin": {
@@ -125,7 +136,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "request",
         "type_info": "Jsonb",
         "origin": {
@@ -136,7 +147,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "attempts",
         "type_info": "Int4",
         "origin": {
@@ -147,7 +158,7 @@
         }
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "max_attempts",
         "type_info": "Int4",
         "origin": {
@@ -158,7 +169,7 @@
         }
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "external_id",
         "type_info": "Text",
         "origin": {
@@ -169,7 +180,7 @@
         }
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "dispatched_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -180,7 +191,7 @@
         }
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "releases",
         "type_info": "Int4",
         "origin": {
@@ -191,7 +202,7 @@
         }
       },
       {
-        "ordinal": 17,
+        "ordinal": 18,
         "name": "first_released_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -209,6 +220,7 @@
     },
     "nullable": [
       false,
+      true,
       true,
       false,
       false,
@@ -228,5 +240,5 @@
       true
     ]
   },
-  "hash": "a2f6a624250c0976dd49fa278ea7d9f50c0728f77a7ab5422df2476b2992064c"
+  "hash": "a9964e5a802eae64a935088f6a269aaadf8651984a2dd25cc649fc505ce57438"
 }

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COALESCE(sum(e.amount), 0) AS \"sum!\"\n          FROM ledger_entries e JOIN ledger_accounts a ON a.id = e.account_id\n         WHERE a.type = 'asset' AND a.wallet_account_id IS NOT NULL AND a.asset = 'USDT'\n           AND e.tx_id <= $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "sum!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ee549c297ef15b86e958ca647ab0ec31aa5e7a51c7a4fc788be7af61a561a762"
+}

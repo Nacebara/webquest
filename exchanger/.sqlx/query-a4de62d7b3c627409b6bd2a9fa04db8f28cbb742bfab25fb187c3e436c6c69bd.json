@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE holds SET state = $2, closed_at = now() WHERE invest_move_id = $1 AND state = 'active'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a4de62d7b3c627409b6bd2a9fa04db8f28cbb742bfab25fb187c3e436c6c69bd"
+}

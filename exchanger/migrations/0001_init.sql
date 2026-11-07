@@ -133,6 +133,46 @@ CREATE TABLE bans (
 CREATE UNIQUE INDEX bans_one_active ON bans (user_id) WHERE lifted_at IS NULL;
 
 -- ---------------------------------------------------------------------
+-- Инвесторы (по приглашению владельца, DESIGN-v0.2 Р18)
+-- ---------------------------------------------------------------------
+
+-- Доступ к «💼 Инвестициям» выдаёт владелец. Деньги инвестора — долг сервиса перед ним
+-- (`liability:investor:<id>:USDT`): пополнения, начисленная прибыль, выводы.
+CREATE TABLE investors (
+    user_id             BIGINT PRIMARY KEY REFERENCES users(tg_user_id),
+    share_pct           NUMERIC(9,6) NOT NULL CHECK (share_pct >= 0 AND share_pct <= 100),  -- доля прибыли на его капитал
+    lock_days           INTEGER NOT NULL DEFAULT 14 CHECK (lock_days BETWEEN 0 AND 365),   -- пополнение выводится не раньше
+    min_deposit         NUMERIC(38,18) NOT NULL DEFAULT 10 CHECK (min_deposit > 0),
+    auto_withdraw_max   NUMERIC(38,18) NOT NULL DEFAULT 0 CHECK (auto_withdraw_max >= 0),  -- 0 — выводы только вручную
+    is_active           BOOLEAN NOT NULL DEFAULT TRUE,
+    granted_by          BIGINT REFERENCES staff(tg_user_id),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Пополнение (чек инвестора активирует юзербот) и вывод (юзербот создаёт чек инвестору).
+CREATE TABLE invest_moves (
+    id                  BIGSERIAL PRIMARY KEY,
+    user_id             BIGINT NOT NULL REFERENCES investors(user_id),
+    kind                TEXT NOT NULL CHECK (kind IN ('deposit', 'withdrawal')),
+    status              TEXT NOT NULL CHECK (status IN ('requested', 'processing', 'done', 'rejected', 'failed', 'manual')),
+    platform            TEXT NOT NULL CHECK (platform IN ('cryptobot', 'xrocket')),
+    amount              NUMERIC(38,18) CHECK (amount > 0),
+    start_param         TEXT,                       -- чек пополнения (CQ… / t_…)
+    check_url           TEXT,                       -- чек вывода
+    note                TEXT,
+    decided_by          BIGINT REFERENCES staff(tg_user_id),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at         TIMESTAMPTZ,
+    CHECK (kind = 'withdrawal' OR start_param IS NOT NULL),
+    CHECK (kind = 'deposit' OR amount IS NOT NULL)
+);
+CREATE INDEX invest_moves_user ON invest_moves (user_id, created_at DESC);
+-- Одна незакрытая заявка на вывод на инвестора.
+CREATE UNIQUE INDEX invest_moves_one_open_withdrawal ON invest_moves (user_id)
+    WHERE kind = 'withdrawal' AND status IN ('requested', 'processing', 'manual');
+
+-- ---------------------------------------------------------------------
 -- Направления и цены
 -- ---------------------------------------------------------------------
 
@@ -359,6 +399,7 @@ CREATE TABLE operations (
     id                  BIGSERIAL PRIMARY KEY,
     order_id            BIGINT REFERENCES orders(id),
     rebalance_id        BIGINT REFERENCES rebalances(id),
+    invest_move_id      BIGINT REFERENCES invest_moves(id),   -- пополнение или вывод инвестора
     kind                TEXT NOT NULL CHECK (kind IN (
                             'activate_check',                -- /start <чек> боту кошелька
                             'open_invoice', 'pay_invoice',   -- чужой счёт: просмотр и оплата
@@ -391,7 +432,7 @@ CREATE TABLE operations (
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     dispatched_at       TIMESTAMPTZ,
     finished_at         TIMESTAMPTZ,
-    CHECK ((order_id IS NULL) <> (rebalance_id IS NULL) OR kind = 'read_balance'),
+    CHECK (num_nonnulls(order_id, rebalance_id, invest_move_id) = 1 OR kind = 'read_balance'),
     -- Операции, которые выводят деньги, — одна попытка: у действий юзербота нет ключа
     -- идемпотентности на стороне кошелька. Повторять можно только активацию чека,
     -- просмотр счёта и чтение баланса (повтор не стоит нам денег).
@@ -408,6 +449,10 @@ CREATE UNIQUE INDEX operations_one_excess_refund_per_order
 CREATE UNIQUE INDEX operations_check_once
     ON operations (platform, start_param)
     WHERE kind = 'activate_check' AND status IN ('pending', 'dispatched', 'unknown', 'succeeded');
+-- У движения инвестора не больше одной живой или успешной операции.
+CREATE UNIQUE INDEX operations_one_per_invest_move
+    ON operations (invest_move_id)
+    WHERE invest_move_id IS NOT NULL AND status IN ('pending', 'dispatched', 'unknown', 'succeeded');
 -- Чужой счёт оплачивается не больше одной операцией за всё время.
 CREATE UNIQUE INDEX operations_invoice_pay_once
     ON operations (platform, start_param)
@@ -464,7 +509,8 @@ CREATE TABLE ledger_transactions (
     kind                TEXT NOT NULL CHECK (kind IN (
                             'intake', 'payout', 'refund', 'excess_refund', 'excess_kept', 'invoice_paid',
                             'rebalance_out', 'rebalance_in', 'network_fee', 'platform_fee',
-                            'capital_in', 'capital_out', 'profit_sweep', 'manual_close', 'adjustment', 'loss')),
+                            'capital_in', 'capital_out', 'profit_sweep', 'manual_close', 'adjustment', 'loss',
+                            'invest_deposit', 'invest_accrual', 'invest_withdrawal')),
     order_id            BIGINT REFERENCES orders(id),
     rebalance_id        BIGINT REFERENCES rebalances(id),
     operation_id        BIGINT REFERENCES operations(id),
@@ -546,16 +592,19 @@ CREATE TRIGGER order_transitions_append_only BEFORE UPDATE OR DELETE ON order_tr
 
 CREATE TABLE holds (
     id                  BIGSERIAL PRIMARY KEY,
-    order_id            BIGINT NOT NULL REFERENCES orders(id),
+    order_id            BIGINT REFERENCES orders(id),
+    invest_move_id      BIGINT REFERENCES invest_moves(id),   -- вывод инвестора
     wallet_account_id   SMALLINT NOT NULL REFERENCES wallet_accounts(id),
     asset               TEXT NOT NULL REFERENCES assets(code),
     amount              NUMERIC(38,18) NOT NULL CHECK (amount > 0),
     state               TEXT NOT NULL DEFAULT 'active' CHECK (state IN ('active', 'consumed', 'released')),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     closed_at           TIMESTAMPTZ,
-    CHECK ((state = 'active') = (closed_at IS NULL))
+    CHECK ((state = 'active') = (closed_at IS NULL)),
+    CHECK ((order_id IS NULL) <> (invest_move_id IS NULL))
 );
 CREATE UNIQUE INDEX holds_one_active_per_order ON holds (order_id) WHERE state = 'active';
+CREATE UNIQUE INDEX holds_one_active_per_invest_move ON holds (invest_move_id) WHERE state = 'active';
 CREATE INDEX holds_active_wallet ON holds (wallet_account_id, asset) WHERE state = 'active';
 
 -- Доступный резерв = баланс по леджеру − активные hold'ы.
@@ -750,4 +799,6 @@ INSERT INTO settings (key, value) VALUES
     -- Встречный поток вместо ребалансировки через сеть (DESIGN-v0.2 Р15): mode off | hint | auto.
     ('rebalance_promo',        '{"mode": "hint", "fee_pct": "0.3", "min_fee": "0.05", "trigger_pct": "30", "release_pct": "10"}'),
     -- Где выгодный курс включён сейчас: {"<direction>": {"on": true, "by": "auto"|"manual", "since": "…", "staff": id}}.
-    ('rebalance_promo_active', '{}');
+    ('rebalance_promo_active', '{}'),
+    -- Начисление прибыли инвесторам: до какой проводки выручка уже распределена.
+    ('invest_accrual',         '{"last_tx": 0}');

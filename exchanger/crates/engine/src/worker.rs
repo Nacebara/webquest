@@ -38,14 +38,14 @@ use crate::effects::{EffectCtx, transit};
 use crate::settle::{Decision, decide};
 use crate::{Engine, EngineError};
 
-fn tag(op: &OperationRow) -> OpTag {
+pub(crate) fn tag(op: &OperationRow) -> OpTag {
     OpTag {
         key: op.idempotency_key.clone(),
         random_id: op.random_id,
     }
 }
 
-fn reject_code(reason: RejectReason) -> &'static str {
+pub(crate) fn reject_code(reason: RejectReason) -> &'static str {
     match reason {
         RejectReason::AlreadyActivated => "check_already_activated",
         RejectReason::NotFound => "check_not_found",
@@ -82,7 +82,7 @@ fn is_money_out(kind: OpKind) -> bool {
     )
 }
 
-fn older_than(op: &OperationRow, age: std::time::Duration) -> bool {
+pub(crate) fn older_than(op: &OperationRow, age: std::time::Duration) -> bool {
     let age = chrono::Duration::from_std(age).unwrap_or_default();
     op.dispatched_at.is_some_and(|t| Utc::now() - t >= age)
 }
@@ -185,7 +185,7 @@ impl Engine {
 
     /// Действие не выполнялось: вернуть операцию в очередь. Аккаунт ограничен или
     /// разлогинен, или операция не выполняется дольше `escalate_after` — к человеку и пауза.
-    async fn release(&self, op: &OperationRow, e: &BotError) -> Result<(), EngineError> {
+    pub(crate) async fn release(&self, op: &OperationRow, e: &BotError) -> Result<(), EngineError> {
         let fatal = matches!(e, BotError::AccountRestricted | BotError::NotAuthorized);
         let stuck = op.first_released_at.is_some_and(|t| {
             Utc::now() - t
@@ -244,6 +244,15 @@ impl Engine {
             Ok(()) | Err(StorageError::OperationState(_)) => {}
             Err(e) => return Err(e.into()),
         }
+        if let Some(move_id) = op.invest_move_id {
+            let m = storage::invest::get(&mut tx, move_id, true).await?;
+            if m.status == storage::invest::MoveStatus::Processing {
+                self.invest_manual(&mut tx, &m, reason).await?;
+            }
+            tx.commit().await?;
+            tracing::error!(op = op.id, move_id, %reason, "investor move handed to a human");
+            return Ok(());
+        }
         let Some(id) = op.order_id else {
             tx.commit().await?;
             return Ok(());
@@ -294,6 +303,9 @@ impl Engine {
         op: &OperationRow,
         result: Result<ActivationOutcome, BotError>,
     ) -> Result<(), EngineError> {
+        if let Some(move_id) = op.invest_move_id {
+            return self.invest_on_activation(op, move_id, result).await;
+        }
         let mut outcome = match result {
             Ok(outcome) => outcome,
             Err(e) => return self.release(op, &e).await,
@@ -568,6 +580,9 @@ impl Engine {
         money: &Money,
         result: Result<IssueOutcome, BotError>,
     ) -> Result<(), EngineError> {
+        if let Some(move_id) = op.invest_move_id {
+            return self.invest_on_issue(op, move_id, result).await;
+        }
         let outcome = match result {
             Ok(outcome) => outcome,
             Err(e) => return self.release(op, &e).await,
@@ -985,6 +1000,13 @@ impl Engine {
                 if op.status != OpStatus::Unknown {
                     continue;
                 }
+                // Вывод инвестора: сверяем, пока автоматика не сдалась (`give_up`).
+                if op.invest_move_id.is_some() {
+                    if op.kind == OpKind::CreatePayoutCheck {
+                        out.push(op);
+                    }
+                    continue;
+                }
                 let order = storage::orders::get(&mut conn, order_id(&op)?, false).await?;
                 let waiting = match op.kind {
                     OpKind::CreatePayoutCheck | OpKind::CreateRefundCheck => matches!(
@@ -1002,6 +1024,13 @@ impl Engine {
             out
         };
         for op in pending {
+            if let Some(move_id) = op.invest_move_id {
+                if let Err(e) = self.invest_reconcile(&op, move_id).await {
+                    tracing::error!(op = op.id, error = %e, "investor withdrawal reconciliation failed");
+                    self.park(&op, &format!("сверка не удалась: {e}")).await;
+                }
+                continue;
+            }
             let result = match op_money(&op) {
                 Ok(money) => self.reconcile_issue(&op, &money).await,
                 Err(e) => Err(e),

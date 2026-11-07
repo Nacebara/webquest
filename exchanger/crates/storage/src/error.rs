@@ -34,6 +34,9 @@ pub enum StorageError {
     /// Итог операции уже записан или она не в том статусе.
     #[error("operation {0} is not in a state that allows this change")]
     OperationState(i64),
+    /// У инвестора уже есть незакрытая заявка на вывод (`invest_moves_one_open_withdrawal`).
+    #[error("the investor already has an open withdrawal")]
+    OpenWithdrawal,
     /// Нет активного удержания нужного размера.
     #[error("order {0} has no matching active hold")]
     HoldState(i64),
