@@ -90,5 +90,6 @@ Windows может показать «Система Windows защитила в
 | `required environment variable … is not set` | заполните эту строку в `.env` |
 | `cannot read .env` | в `.env` опечатка — строка должна быть вида `ИМЯ=значение` |
 | `SESSION_KEY is invalid` | строка должна быть одна: `SESSION_KEY=…` из `0-key.bat`, без пробелов и кавычек |
+| `migration 1 was previously applied but has been modified` | база создана прошлой версией бота до первого запуска; данных в ней нет — SQL Shell (psql) → `DROP DATABASE exch;` → снова `2-database.bat` |
 | `password authentication failed` | пароль в `DATABASE_URL` не тот, что у PostgreSQL; задать новый — SQL Shell (psql) → `ALTER USER postgres PASSWORD 'новый';` (с точкой с запятой) |
 | бот не отвечает | окно `4-run.bat` закрыто или ноутбук уснул |
