@@ -353,7 +353,10 @@ async fn run() -> anyhow::Result<()> {
         ));
     }
 
-    // Юзерботы и движок: без них процесс только держит пульс и миграции.
+    // Движок, которым пользуется пульт: с кошельками, если юзерботы подключены; иначе — без
+    // них (решения по заявкам пишут операции в outbox, исполнит их движок с кошельками).
+    let mut ops_engine: Option<Arc<engine::Engine>> = None;
+    // Юзерботы и движок: без них процесс только держит пульс, миграции и пульт.
     match TelegramSettings::from_config(&cfg) {
         Err(e) => {
             tracing::warn!(error = %e, "userbots are not configured: the engine is not started")
@@ -371,6 +374,7 @@ async fn run() -> anyhow::Result<()> {
             } else {
                 let engine = Arc::new(app::runtime::engine(&pool, &userbots));
                 engine.ensure_ledger_accounts().await?;
+                ops_engine = Some(engine.clone());
                 {
                     let engine = engine.clone();
                     tasks.spawn(supervise(
@@ -410,6 +414,31 @@ async fn run() -> anyhow::Result<()> {
                     }
                 }
             }
+        }
+    }
+
+    // Пульт: свой токен, тот же процесс (SPEC §7.1).
+    match cfg.ops_bot_token.clone() {
+        None => tracing::warn!("OPS_BOT_TOKEN is not set: the ops bot is not started"),
+        Some(token) => {
+            let engine = match ops_engine {
+                Some(engine) => engine,
+                None => {
+                    let engine = engine::Engine::new(pool.clone(), engine::EngineConfig::default());
+                    engine.ensure_ledger_accounts().await?;
+                    Arc::new(engine)
+                }
+            };
+            let bot = app::runtime::ops_bot(&pool, token, engine, cfg.owner_tg_id)?;
+            tasks.spawn(supervise(
+                "ops-bot",
+                cancel.clone(),
+                RestartPolicy::default(),
+                move |token| {
+                    let bot = bot.clone();
+                    async move { bot.run(token).await.map_err(anyhow::Error::from) }
+                },
+            ));
         }
     }
 

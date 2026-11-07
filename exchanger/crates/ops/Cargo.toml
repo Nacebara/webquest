@@ -1,0 +1,37 @@
+[package]
+name = "ops"
+description = "Пульт exch (ops-бот): сводка, направления и комиссии, встречный поток, разбор заявок, клиенты, настройки, персонал, события (SPEC §7–§8)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+botapi = { path = "../botapi" }
+chrono.workspace = true
+domain.workspace = true
+engine = { path = "../engine" }
+# Ссылки на чеки в доказательствах и в поиске заявки.
+parsers = { path = "../parsers" }
+rust_decimal.workspace = true
+serde_json = "1"
+sqlx.workspace = true
+storage.workspace = true
+thiserror.workspace = true
+# Тексты пульта — ops/ru.toml, как у клиента (CLAUDE.md п. 18).
+toml = { version = "1.1.6", default-features = false, features = ["std", "serde", "parse"] }
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+# Экранирование HTML и роли эмодзи — общие с клиентским ботом.
+ui = { path = "../ui" }
+
+[dev-dependencies]
+rust_decimal_macros.workspace = true
+secrecy.workspace = true
+tokio = { workspace = true, features = ["net", "io-util"] }
+userbot = { path = "../userbot", features = ["sim"] }
+
+[lints]
+workspace = true

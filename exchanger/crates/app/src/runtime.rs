@@ -124,6 +124,21 @@ pub fn client_bot(
     Ok(tgbot::ClientBot::new(api, ui, engine, pool.clone(), cfg))
 }
 
+/// Пульт (ops-бот). Владелец из `OWNER_TG_ID` создаётся при старте, если его ещё нет.
+pub fn ops_bot(
+    pool: &PgPool,
+    token: secrecy::SecretString,
+    engine: Arc<engine::Engine>,
+    owner_tg_id: i64,
+) -> anyhow::Result<ops::OpsBot> {
+    let api = botapi::BotApi::new(token).context("cannot build the Bot API client")?;
+    let cfg = ops::OpsConfig {
+        owner_id: Some(owner_tg_id),
+        ..ops::OpsConfig::default()
+    };
+    ops::OpsBot::new(api, engine, pool.clone(), cfg).context("built-in ops texts are invalid")
+}
+
 /// Эмодзи клиентского бота из настроек (`exch emoji`). Вариация «off» или битые настройки —
 /// обычные символы: интерфейс от этого не ломается, ошибка — в лог.
 pub async fn emoji_set(pool: &PgPool) -> ui::EmojiSet {

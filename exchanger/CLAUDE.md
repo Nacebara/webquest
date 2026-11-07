@@ -41,11 +41,11 @@ domain ─┬─ parsers ── userbot (Transport, WalletBot, flows, sim) ─�
         ├─ storage (PostgreSQL, миграции)
         └─ botapi (Bot API 10.3) ── ui (экраны, клавиатуры)
 engine (FSM-драйвер, outbox, сверка) ← userbot + storage
-tgbot (клиентский бот) ← ui + botapi + engine;  ops (ops-бот) ← botapi + engine
+tgbot (клиентский бот) ← ui + botapi + engine;  ops (пульт) ← botapi + engine + ui
 app (бинарник exch) ← всё
 ```
 
-Есть: `domain`, `storage`, `app`, `parsers`, `userbot` (с `flows` и `sim`), `mtproto`, `botapi`, `ui`, `engine`, `tgbot`. Нет: `ops`. Пустые крейты заранее не создаём.
+Есть: `domain`, `storage`, `app`, `parsers`, `userbot` (с `flows` и `sim`), `mtproto`, `botapi`, `ui`, `engine`, `tgbot`, `ops`. Пустые крейты заранее не создаём.
 В `domain` нет tokio, sqlx, reqwest. `userbot` и `engine` не знают про grammers — только трейт `Transport`.
 
 ## Правила, которые нельзя нарушать
@@ -76,7 +76,7 @@ app (бинарник exch) ← всё
 17. `.env` никогда не коммитится; новые переменные — в `.env.example` без значений и в `app::config`.
 
 ### Интерфейс
-18. Тексты — в `crates/ui/ru.toml`, не в коде. Telegram HTML: только разрешённые теги, все подстановки экранированы (тест `ui/tests/html_valid.rs`). Денежный поток — обычные HTML-сообщения; rich — только справочные экраны, у каждого есть HTML-фолбэк.
+18. Тексты — в `crates/ui/ru.toml` (клиент) и `crates/ops/ru.toml` (пульт), не в коде. Telegram HTML: только разрешённые теги, все подстановки экранированы (тест `ui/tests/html_valid.rs`). Денежный поток — обычные HTML-сообщения; rich — только справочные экраны, у каждого есть HTML-фолбэк.
 19. Каждая ошибка говорит, где деньги клиента и что делать.
 
 ## Ошибки и стиль

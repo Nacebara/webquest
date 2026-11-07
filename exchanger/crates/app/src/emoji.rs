@@ -24,32 +24,12 @@ use serde::Deserialize;
 use sqlx::PgConnection;
 use ui::{Emoji, EmojiPacks, EmojiSettings, EmojiStyle, is_custom_emoji_id};
 
-pub const STYLE_KEY: &str = "emoji_style";
-pub const PACKS_KEY: &str = "emoji_packs";
-pub const CUSTOM_KEY: &str = "custom_emoji";
+pub use tgbot::emoji::{CUSTOM_KEY, PACKS_KEY, STYLE_KEY};
 
-/// Настройки эмодзи из базы. Битое значение — ошибка: лучше узнать сразу.
+/// Настройки эмодзи из базы. Битое значение — ошибка: лучше узнать сразу. Правило чтения —
+/// одно с клиентским ботом, который подхватывает изменения пульта на ходу.
 pub async fn load(conn: &mut PgConnection) -> anyhow::Result<EmojiSettings> {
-    let style = match storage::settings::get(conn, STYLE_KEY).await? {
-        Some(v) => {
-            let key = v.as_str().context("emoji_style must be a string")?;
-            EmojiStyle::from_key(key).with_context(|| format!("unknown emoji_style {key:?}"))?
-        }
-        None => EmojiStyle::default(),
-    };
-    let packs: EmojiPacks = match storage::settings::get(conn, PACKS_KEY).await? {
-        Some(v) => serde_json::from_value(v).context("emoji_packs is malformed")?,
-        None => EmojiPacks::default(),
-    };
-    let custom: BTreeMap<String, String> = match storage::settings::get(conn, CUSTOM_KEY).await? {
-        Some(v) => serde_json::from_value(v).context("custom_emoji must map roles to ids")?,
-        None => BTreeMap::new(),
-    };
-    Ok(EmojiSettings {
-        style,
-        packs,
-        custom,
-    })
+    Ok(tgbot::emoji::load(conn).await?.0)
 }
 
 async fn save(conn: &mut PgConnection, key: &str, value: serde_json::Value) -> anyhow::Result<()> {

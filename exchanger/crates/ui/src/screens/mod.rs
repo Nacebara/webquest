@@ -71,6 +71,11 @@ impl Ui {
         &self.emoji
     }
 
+    /// Тот же интерфейс с другим набором эмодзи (пульт сменил вариацию или свой эмодзи).
+    pub fn with_emoji(&self, emoji: EmojiSet) -> Self {
+        Self::new(self.texts.clone(), emoji, self.config.clone())
+    }
+
     /// Главное меню: reply-клавиатура, постоянная и компактная (DESIGN-v0.2 §6). При Premium —
     /// иконки `icon_custom_emoji_id` вместо эмодзи в тексте и `primary` у главных действий.
     pub fn main_menu(&self) -> ReplyKeyboardMarkup {

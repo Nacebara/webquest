@@ -128,6 +128,18 @@ impl Engine {
             .await;
             return Ok(());
         }
+        // Аккаунт юзербота на паузе (пульт: ручные действия в аккаунте) — ничего не делаем,
+        // попытку не тратим, ждём снятия паузы. Сверку и повтор не двигаем.
+        if let Some(wallet) = op.wallet_account_id {
+            let mut conn = self.pool.acquire().await?;
+            if storage::wallets::userbot_paused(&mut conn, wallet).await? {
+                let at = Utc::now()
+                    + chrono::Duration::from_std(self.cfg.unavailable_backoff).unwrap_or_default();
+                storage::operations::postpone(&mut conn, op.id, at, "аккаунт юзербота на паузе")
+                    .await?;
+                return Ok(());
+            }
+        }
         if is_money_out(op.kind) {
             let mut conn = self.pool.acquire().await?;
             if storage::settings::flag_on(&mut conn, "kill_switch_payouts").await? {

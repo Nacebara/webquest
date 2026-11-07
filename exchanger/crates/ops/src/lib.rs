@@ -1,0 +1,663 @@
+//! Пульт exch — ops-бот (SPEC §7–§8, DESIGN-v0.2 Р15–Р16).
+//!
+//! Отдельный бот со своим токеном в том же процессе. Отвечает только действующему персоналу
+//! (`staff`), остальных молча игнорирует. Разделы: сводка, направления (комиссия, ступени,
+//! фикс, рычаг, лимиты, пауза), встречный поток (режим, курс, пороги, цели резерва, включение
+//! по направлению), ручной разбор (решения по заявке через `engine::operator`), клиенты
+//! (личные условия, суточный лимит, бан, заметка), настройки (лимит новичка, обслуживание,
+//! стоп-кран, премиум-эмодзи), юзерботы, персонал, журнал; события (`alerts`) — в личку
+//! персоналу.
+//!
+//! Правила:
+//! - кнопка не меняет ничего сама: она открывает ввод или предпросмотр «было → станет»;
+//!   изменение — только кнопкой «Подтвердить» с одноразовым nonce (живёт `confirm_ttl`, привязан
+//!   к сотруднику);
+//! - права проверяются и при показе кнопки, и при подтверждении (роль могли сменить);
+//! - каждое изменение — запись в `admin_audit` в той же транзакции; решения по заявке пишет
+//!   движок;
+//! - деньги заявки двигает только движок (`Engine::operator_decide`), пульт — нет.
+
+mod actions;
+mod alerts;
+mod cb;
+mod texts;
+mod views;
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+use botapi::{
+    AnswerCallbackQuery, BotApi, BotCommand, EditMessageText, GetUpdates, InlineKeyboardButton,
+    InlineKeyboardMarkup, Message, ReplyMarkup, SendMessage, Update, UpdateKind,
+};
+use engine::Engine;
+use sqlx::PgPool;
+use storage::staff::{Role, StaffMember};
+use tokio_util::sync::CancellationToken;
+
+pub use cb::Cb;
+pub use texts::Texts;
+
+use crate::actions::{Action, Input};
+
+/// Настройки пульта.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpsConfig {
+    /// Сколько секунд Telegram держит `getUpdates`.
+    pub poll_timeout_secs: u32,
+    /// Как часто проверять и рассылать события.
+    pub alert_every: Duration,
+    /// Сколько живёт кнопка «Подтвердить» (SPEC §7.4: 60 с).
+    pub confirm_ttl: Duration,
+    /// Сколько ждать ответа на вопрос пульта.
+    pub input_ttl: Duration,
+    /// Владелец из окружения (`OWNER_TG_ID`): создаётся при старте, если владельца ещё нет.
+    pub owner_id: Option<i64>,
+}
+
+impl Default for OpsConfig {
+    fn default() -> Self {
+        Self {
+            poll_timeout_secs: 30,
+            alert_every: Duration::from_secs(5),
+            confirm_ttl: Duration::from_secs(60),
+            input_ttl: Duration::from_secs(600),
+            owner_id: None,
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum OpsError {
+    #[error(transparent)]
+    Api(#[from] botapi::Error),
+    #[error(transparent)]
+    Storage(#[from] storage::StorageError),
+    #[error(transparent)]
+    Db(#[from] sqlx::Error),
+    #[error(transparent)]
+    Engine(#[from] engine::EngineError),
+    #[error("ops texts: {0}")]
+    Texts(String),
+}
+
+/// Экран пульта: HTML и инлайн-клавиатура.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Screen {
+    pub text: String,
+    pub keyboard: Vec<Vec<InlineKeyboardButton>>,
+}
+
+impl Screen {
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            keyboard: Vec::new(),
+        }
+    }
+
+    pub fn row(mut self, row: Vec<InlineKeyboardButton>) -> Self {
+        if !row.is_empty() {
+            self.keyboard.push(row);
+        }
+        self
+    }
+
+    fn markup(&self) -> Option<InlineKeyboardMarkup> {
+        (!self.keyboard.is_empty()).then(|| InlineKeyboardMarkup::new(self.keyboard.clone()))
+    }
+}
+
+pub(crate) fn btn(text: impl Into<String>, cb: &Cb) -> InlineKeyboardButton {
+    InlineKeyboardButton::callback(text, cb.encode())
+}
+
+/// Ждём ответа сотрудника.
+#[derive(Debug, Clone)]
+pub(crate) struct Awaiting {
+    pub input: Input,
+    pub until: Instant,
+}
+
+/// Предпросмотр, ждущий подтверждения.
+#[derive(Debug, Clone)]
+pub(crate) struct Pending {
+    pub staff: i64,
+    pub until: Instant,
+    pub action: Action,
+}
+
+#[derive(Default)]
+pub(crate) struct State {
+    awaiting: HashMap<i64, Awaiting>,
+    pending: HashMap<String, Pending>,
+    /// Сообщения событий у персонала: id события → (чат, сообщение).
+    delivered: HashMap<i64, Vec<(i64, i32)>>,
+}
+
+/// Пульт. Дешёвый `Clone`.
+#[derive(Clone)]
+pub struct OpsBot {
+    inner: Arc<Inner>,
+}
+
+impl std::fmt::Debug for OpsBot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpsBot")
+            .field("cfg", &self.inner.cfg)
+            .finish_non_exhaustive()
+    }
+}
+
+pub(crate) struct Inner {
+    api: BotApi,
+    engine: Arc<Engine>,
+    pool: PgPool,
+    texts: Texts,
+    cfg: OpsConfig,
+    state: Mutex<State>,
+}
+
+impl OpsBot {
+    pub fn new(
+        api: BotApi,
+        engine: Arc<Engine>,
+        pool: PgPool,
+        cfg: OpsConfig,
+    ) -> Result<Self, OpsError> {
+        let texts = Texts::builtin().map_err(|e| OpsError::Texts(e.to_string()))?;
+        Ok(Self {
+            inner: Arc::new(Inner {
+                api,
+                engine,
+                pool,
+                texts,
+                cfg,
+                state: Mutex::new(State::default()),
+            }),
+        })
+    }
+
+    /// Работать до отмены: приём обновлений и рассылка событий.
+    pub async fn run(&self, cancel: CancellationToken) -> Result<(), OpsError> {
+        let inner = self.inner.clone();
+        inner.startup().await?;
+        let alerts = {
+            let inner = inner.clone();
+            let cancel = cancel.clone();
+            tokio::spawn(async move { inner.alert_loop(cancel).await })
+        };
+        inner.poll(cancel).await;
+        if let Err(e) = alerts.await {
+            tracing::error!(error = %e, "ops alert loop crashed");
+        }
+        Ok(())
+    }
+
+    /// Один проход рассылки событий (тесты и ручной вызов).
+    pub async fn deliver_alerts(&self) -> Result<(), OpsError> {
+        self.inner.alerts_once().await
+    }
+}
+
+impl Inner {
+    fn state<R>(&self, f: impl FnOnce(&mut State) -> R) -> R {
+        let mut guard = match self.state.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        f(&mut guard)
+    }
+
+    async fn startup(&self) -> Result<(), OpsError> {
+        if let Some(owner) = self.cfg.owner_id {
+            let mut conn = self.pool.acquire().await?;
+            let o = storage::staff::ensure_owner(&mut conn, owner, "Владелец").await?;
+            if o.tg_user_id != owner {
+                tracing::warn!(
+                    "OWNER_TG_ID differs from the owner in the database; the database wins"
+                );
+            }
+        }
+        let t = &self.texts;
+        let commands = [
+            "start", "dash", "queue", "order", "user", "dir", "promo", "settings", "bots", "staff",
+            "audit",
+        ]
+        .into_iter()
+        .map(|c| BotCommand::new(c, t.t(&format!("commands.{c}"))))
+        .collect();
+        if let Err(e) = self.api.set_my_commands(commands).await {
+            tracing::warn!(error = %e, "ops setMyCommands failed");
+        }
+        Ok(())
+    }
+
+    async fn poll(self: &Arc<Self>, cancel: CancellationToken) {
+        let mut last: Option<i64> = None;
+        loop {
+            let request = GetUpdates {
+                allowed_updates: Some(vec![UpdateKind::Message, UpdateKind::CallbackQuery]),
+                ..GetUpdates::after(last, self.cfg.poll_timeout_secs)
+            };
+            let updates = tokio::select! {
+                () = cancel.cancelled() => return,
+                r = self.api.get_updates(&request) => r,
+            };
+            match updates {
+                Ok(updates) => {
+                    for update in updates {
+                        last = Some(update.update_id);
+                        // Пульт — несколько человек: обновления по порядку, без гонок.
+                        if let Err(e) = self.handle(update).await {
+                            tracing::warn!(error = %e, "ops update failed");
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "ops getUpdates failed");
+                    tokio::select! {
+                        () = cancel.cancelled() => return,
+                        () = tokio::time::sleep(Duration::from_secs(2)) => {}
+                    }
+                }
+            }
+        }
+    }
+
+    async fn alert_loop(self: Arc<Self>, cancel: CancellationToken) {
+        let mut tick = tokio::time::interval(self.cfg.alert_every);
+        loop {
+            tokio::select! {
+                () = cancel.cancelled() => return,
+                _ = tick.tick() => {}
+            }
+            if let Err(e) = self.alerts_once().await {
+                tracing::warn!(error = %e, "ops alerts failed");
+            }
+        }
+    }
+
+    /// Действующий сотрудник или `None` (посторонний — молча).
+    async fn staff(&self, user: i64) -> Result<Option<StaffMember>, OpsError> {
+        let mut conn = self.pool.acquire().await?;
+        Ok(storage::staff::active(&mut conn, user).await?)
+    }
+
+    async fn handle(self: &Arc<Self>, update: Update) -> Result<(), OpsError> {
+        if let Some(query) = update.callback_query {
+            let _ = self
+                .api
+                .answer_callback_query(&AnswerCallbackQuery::ack(query.id.clone()))
+                .await;
+            let Some(staff) = self.staff(query.from.id).await? else {
+                tracing::info!(user = query.from.id, "ops: not staff, ignored");
+                return Ok(());
+            };
+            let Some(message) = query.message else {
+                return Ok(());
+            };
+            let Some(cb) = query.data.as_deref().and_then(Cb::parse) else {
+                return Ok(());
+            };
+            let chat = message.chat.id;
+            let screen = self.on_callback(&staff, chat, &message, cb).await?;
+            if let Some(screen) = screen {
+                self.edit(chat, message.message_id, &screen).await?;
+            }
+            return Ok(());
+        }
+        let Some(message) = update.message else {
+            return Ok(());
+        };
+        let Some(from) = message.from.as_ref() else {
+            return Ok(());
+        };
+        let Some(staff) = self.staff(from.id).await? else {
+            tracing::info!(user = from.id, "ops: not staff, ignored");
+            return Ok(());
+        };
+        let chat = message.chat.id;
+        let screen = self.on_message(&staff, &message).await?;
+        self.send(chat, &screen).await?;
+        Ok(())
+    }
+
+    async fn send(&self, chat: i64, screen: &Screen) -> Result<Message, OpsError> {
+        let mut request = SendMessage::html(chat, screen.text.clone());
+        request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
+        Ok(self.api.send_message(&request).await?)
+    }
+
+    /// Править экран на месте; не вышло (старое сообщение) — новым сообщением.
+    async fn edit(&self, chat: i64, message_id: i32, screen: &Screen) -> Result<(), OpsError> {
+        let mut request = EditMessageText::html(chat, message_id, screen.text.clone());
+        request.reply_markup = screen.markup();
+        match self.api.edit_message_text(&request).await {
+            Ok(_) => Ok(()),
+            Err(e) if e.is_not_modified() => Ok(()),
+            Err(e) if e.is_rejection() || e.is_message_gone() => {
+                self.send(chat, screen).await?;
+                Ok(())
+            }
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    pub(crate) fn role_name(&self, role: Role) -> String {
+        self.texts.t(&format!("roles.{}", role.as_db_str()))
+    }
+
+    /// Нет прав — экран с отказом.
+    pub(crate) fn deny(&self, staff: &StaffMember, need: Role) -> Option<Screen> {
+        (staff.role < need).then(|| {
+            Screen::new(
+                self.texts
+                    .f("common.not_allowed", &[("role", &self.role_name(need))]),
+            )
+            .row(vec![btn(self.texts.t("common.home"), &Cb::Menu)])
+        })
+    }
+
+    pub(crate) fn ask(&self, staff: i64, input: Input) {
+        let until = Instant::now() + self.cfg.input_ttl;
+        self.state(|s| {
+            s.awaiting.insert(staff, Awaiting { input, until });
+        });
+    }
+
+    fn take_awaiting(&self, staff: i64) -> Option<Input> {
+        self.state(|s| {
+            let a = s.awaiting.remove(&staff)?;
+            (a.until > Instant::now()).then_some(a.input)
+        })
+    }
+
+    pub(crate) fn clear_awaiting(&self, staff: i64) {
+        self.state(|s| {
+            s.awaiting.remove(&staff);
+        });
+    }
+
+    /// Положить действие на подтверждение: одноразовый nonce, привязан к сотруднику.
+    pub(crate) fn hold(&self, staff: i64, action: Action) -> String {
+        let nonce = nonce();
+        let until = Instant::now() + self.cfg.confirm_ttl;
+        self.state(|s| {
+            let now = Instant::now();
+            s.pending.retain(|_, p| p.until > now);
+            s.pending.insert(
+                nonce.clone(),
+                Pending {
+                    staff,
+                    until,
+                    action,
+                },
+            );
+        });
+        nonce
+    }
+
+    /// Забрать действие по nonce: только свой, только живой, только один раз.
+    fn take_pending(&self, staff: i64, nonce: &str) -> Option<Action> {
+        self.state(|s| {
+            // Чужое нажатие не трогает подтверждение: иначе любой сотрудник мог бы его сжечь.
+            if s.pending.get(nonce).is_none_or(|p| p.staff != staff) {
+                return None;
+            }
+            let p = s.pending.remove(nonce)?;
+            (p.until > Instant::now()).then_some(p.action)
+        })
+    }
+
+    async fn on_message(
+        self: &Arc<Self>,
+        staff: &StaffMember,
+        message: &Message,
+    ) -> Result<Screen, OpsError> {
+        let text = message.text.as_deref().unwrap_or("").trim();
+        if let Some(command) = text.strip_prefix('/') {
+            self.clear_awaiting(staff.tg_user_id);
+            let (name, arg) = command.split_once(' ').unwrap_or((command, ""));
+            let name = name.split('@').next().unwrap_or(name);
+            let arg = arg.trim();
+            return match name {
+                "dash" => self.dash().await,
+                "queue" => self.queue().await,
+                "dir" => self.dirs().await,
+                "promo" => self.promo().await,
+                "settings" => self.settings().await,
+                "bots" => self.bots().await,
+                "staff" => self.staff_list(staff).await,
+                "audit" => self.audit().await,
+                "order" | "find" if !arg.is_empty() => self.find_order(arg).await,
+                "order" | "find" => Ok(self.prompt(staff, Input::OrderSearch, "order.ask")),
+                "user" if !arg.is_empty() => self.find_user(arg).await,
+                "user" => Ok(self.prompt(staff, Input::UserSearch, "user.ask")),
+                _ => self.menu(staff).await,
+            };
+        }
+        match self.take_awaiting(staff.tg_user_id) {
+            Some(input) => self.on_input(staff, input, message).await,
+            None => self.menu(staff).await,
+        }
+    }
+
+    /// Вопрос сотруднику с кнопкой «Отмена».
+    pub(crate) fn prompt(&self, staff: &StaffMember, input: Input, key: &str) -> Screen {
+        self.ask(staff.tg_user_id, input);
+        let t = &self.texts;
+        Screen::new(format!("{}\n\n{}", t.t(key), t.t("common.input_hint")))
+            .row(vec![btn(t.t("common.cancel"), &Cb::Cancel)])
+    }
+
+    pub(crate) fn prompt_with(&self, staff: &StaffMember, input: Input, text: String) -> Screen {
+        self.ask(staff.tg_user_id, input);
+        let t = &self.texts;
+        Screen::new(format!("{text}\n\n{}", t.t("common.input_hint")))
+            .row(vec![btn(t.t("common.cancel"), &Cb::Cancel)])
+    }
+
+    async fn on_callback(
+        self: &Arc<Self>,
+        staff: &StaffMember,
+        _chat: i64,
+        _message: &Message,
+        cb: Cb,
+    ) -> Result<Option<Screen>, OpsError> {
+        let screen = match cb {
+            Cb::Menu => self.menu(staff).await?,
+            Cb::Cancel => {
+                self.clear_awaiting(staff.tg_user_id);
+                Screen::new(self.texts.t("common.cancelled"))
+                    .row(vec![btn(self.texts.t("common.home"), &Cb::Menu)])
+            }
+            Cb::Confirm(nonce) => self.confirm(staff, &nonce, false).await?,
+            Cb::ConfirmUnknown(nonce) => self.confirm(staff, &nonce, true).await?,
+            Cb::Ack(id) => {
+                self.ack(staff, id).await?;
+                return Ok(None);
+            }
+            other => self.navigate(staff, other).await?,
+        };
+        Ok(Some(screen))
+    }
+
+    async fn confirm(
+        &self,
+        staff: &StaffMember,
+        nonce: &str,
+        previous_failed: bool,
+    ) -> Result<Screen, OpsError> {
+        let Some(action) = self.take_pending(staff.tg_user_id, nonce) else {
+            return Ok(Screen::new(self.texts.t("common.expired"))
+                .row(vec![btn(self.texts.t("common.home"), &Cb::Menu)]));
+        };
+        // Права — заново: роль могли сменить, пока висел предпросмотр.
+        let staff = match self.staff(staff.tg_user_id).await? {
+            Some(s) => s,
+            None => return Ok(Screen::new(self.texts.t("common.expired"))),
+        };
+        if let Some(denied) = self.deny(&staff, action.min_role()) {
+            return Ok(denied);
+        }
+        self.apply(&staff, action, previous_failed).await
+    }
+}
+
+/// Одноразовый ключ подтверждения: 12 символов из времени и счётчика, перемешанных
+/// `RandomState` (свой ключ на процесс) — подобрать чужой нельзя, а угадывать незачем: nonce
+/// привязан к сотруднику.
+fn nonce() -> String {
+    use std::hash::{BuildHasher, Hasher};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let mut h = std::collections::hash_map::RandomState::new().build_hasher();
+    h.write_u64(n);
+    h.write_u128(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos()),
+    );
+    let mut x = h.finish();
+    const ALPHABET: &[u8] = b"abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let mut out = String::with_capacity(12);
+    for _ in 0..12 {
+        out.push(char::from(ALPHABET[(x % ALPHABET.len() as u64) as usize]));
+        x /= ALPHABET.len() as u64;
+        if x == 0 {
+            x = h.finish().rotate_left(17) ^ n;
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use domain::Direction;
+    use domain::fsm::OrderState;
+    use ui::Emoji;
+
+    use super::*;
+
+    /// Ключи вида `раздел.ключ` в кавычках из исходников пульта.
+    fn used_keys() -> Vec<String> {
+        let sources = [
+            include_str!("lib.rs"),
+            include_str!("views.rs"),
+            include_str!("actions.rs"),
+            include_str!("alerts.rs"),
+        ];
+        let sections = [
+            "common",
+            "roles",
+            "names",
+            "states",
+            "op_status",
+            "commands",
+            "menu",
+            "dash",
+            "status",
+            "dir",
+            "promo",
+            "queue",
+            "order",
+            "refusal",
+            "user",
+            "settings",
+            "emoji_roles",
+            "bots",
+            "staff",
+            "audit",
+            "alert",
+        ];
+        // Действия журнала (`admin_audit.action`) похожи на ключи, но это не тексты.
+        let audit = [
+            "order.take",
+            "direction.set",
+            "direction.open",
+            "direction.close",
+            "direction.clear_auto_pause",
+            "promo.settings",
+            "promo.switch",
+            "reserve.target",
+            "user.terms",
+            "user.daily_limit",
+            "user.note",
+            "user.ban",
+            "user.unban",
+            "settings.flag",
+            "settings.emoji_style",
+            "settings.custom_emoji",
+            "userbot.pause",
+            "userbot.resume",
+            "staff.add",
+            "staff.role",
+            "staff.disable",
+        ];
+        let mut keys = Vec::new();
+        for src in sources {
+            for piece in src.split('"').skip(1).step_by(2) {
+                let Some((section, key)) = piece.split_once('.') else {
+                    continue;
+                };
+                if sections.contains(&section)
+                    && !audit.contains(&piece)
+                    && !key.is_empty()
+                    && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                {
+                    keys.push(piece.to_owned());
+                }
+            }
+        }
+        keys
+    }
+
+    #[test]
+    fn every_used_text_exists() {
+        let t = Texts::builtin().unwrap();
+        let keys = used_keys();
+        assert!(keys.len() > 150, "{}", keys.len());
+        for key in keys {
+            assert!(t.has(&key), "ops/ru.toml has no {key}");
+        }
+        // Ключи, которые собираются в коде.
+        for d in Direction::ALL {
+            assert!(t.has(&format!("names.{}", d.code())));
+        }
+        for p in domain::Platform::ALL {
+            assert!(t.has(&format!("names.{}", p.db_name())));
+        }
+        for s in OrderState::ALL {
+            assert!(t.has(&format!("states.{}", s.as_db_str())), "{s:?}");
+        }
+        for s in [
+            "pending",
+            "dispatched",
+            "succeeded",
+            "failed",
+            "unknown",
+            "cancelled",
+        ] {
+            assert!(t.has(&format!("op_status.{s}")));
+        }
+        for r in Role::ALL {
+            assert!(t.has(&format!("roles.{}", r.as_db_str())));
+        }
+        for e in Emoji::ALL {
+            assert!(t.has(&format!("emoji_roles.{}", e.key())), "{e:?}");
+        }
+    }
+
+    #[test]
+    fn nonces_are_distinct() {
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..10_000 {
+            let n = nonce();
+            assert_eq!(n.len(), 12);
+            assert!(seen.insert(n));
+        }
+    }
+}

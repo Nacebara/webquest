@@ -20,6 +20,7 @@
 //! клиента и что делать (CLAUDE.md, правило 19). Ссылки на чеки в логи не пишутся.
 
 mod api;
+pub mod emoji;
 mod handler;
 mod intake;
 mod limits;
@@ -129,7 +130,8 @@ impl ClientBot {
         Self {
             inner: Arc::new(Inner {
                 api: api::Api::new(api),
-                ui,
+                ui: std::sync::RwLock::new(Arc::new(ui)),
+                emoji_seen: Mutex::new(None),
                 engine,
                 pool,
                 cfg,
@@ -153,8 +155,10 @@ impl ClientBot {
         let updates = inner.engine.subscribe();
         let stop = cancel.child_token();
         let listener = tokio::spawn(orders::listen(inner.clone(), updates, stop.clone()));
+        let reload = tokio::spawn(emoji::watch(inner.clone(), stop.clone()));
         poll::run(inner, cancel).await;
         stop.cancel();
+        let _ = reload.await;
         if let Err(e) = listener.await {
             tracing::error!(error = %e, "order message listener crashed");
         }
@@ -189,7 +193,10 @@ pub(crate) enum Notice {
 
 pub(crate) struct Inner {
     api: api::Api,
-    ui: Ui,
+    /// Интерфейс; набор эмодзи меняется из пульта без перезапуска ([`emoji`]).
+    ui: std::sync::RwLock<Arc<Ui>>,
+    /// Последние прочитанные настройки эмодзи (отпечаток), чтобы не пересобирать зря.
+    emoji_seen: Mutex<Option<String>>,
     engine: Arc<Engine>,
     pool: PgPool,
     cfg: ClientBotConfig,
@@ -202,6 +209,21 @@ pub(crate) struct Inner {
 }
 
 impl Inner {
+    /// Текущий интерфейс.
+    pub(crate) fn ui(&self) -> Arc<Ui> {
+        match self.ui.read() {
+            Ok(g) => g.clone(),
+            Err(p) => p.into_inner().clone(),
+        }
+    }
+
+    pub(crate) fn set_ui(&self, ui: Ui) {
+        match self.ui.write() {
+            Ok(mut g) => *g = Arc::new(ui),
+            Err(p) => *p.into_inner() = Arc::new(ui),
+        }
+    }
+
     /// Имя бота (для `/cmd@bot`) и меню команд. Сбой не мешает работать.
     async fn startup(&self) {
         match self.api.bot().get_me().await {
@@ -214,7 +236,12 @@ impl Inner {
                 tracing::warn!(error = %e, "getMe failed, commands with @mention are accepted for any bot")
             }
         }
-        if let Err(e) = self.api.bot().set_my_commands(self.ui.bot_commands()).await {
+        if let Err(e) = self
+            .api
+            .bot()
+            .set_my_commands(self.ui().bot_commands())
+            .await
+        {
             tracing::warn!(error = %e, "setMyCommands failed");
         }
     }

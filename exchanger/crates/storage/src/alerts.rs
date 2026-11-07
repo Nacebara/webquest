@@ -124,6 +124,27 @@ pub async fn raise(conn: &mut PgConnection, a: &NewAlert<'_>) -> Result<i64, Sto
     Ok(id)
 }
 
+/// Открыть событие, если открытого с этим ключом ещё нет (без счётчика повторов): для
+/// состояний, которые проверяются по кругу (заявка на разборе). `true` — открыто сейчас.
+pub async fn ensure(conn: &mut PgConnection, a: &NewAlert<'_>) -> Result<bool, StorageError> {
+    let n = sqlx::query!(
+        r#"
+        INSERT INTO alerts (level, topic, dedup_key, title, payload)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (dedup_key) WHERE acked_at IS NULL DO NOTHING
+        "#,
+        a.level.as_db_str(),
+        a.topic.as_db_str(),
+        a.dedup_key,
+        a.title,
+        a.payload,
+    )
+    .execute(conn)
+    .await?
+    .rows_affected();
+    Ok(n == 1)
+}
+
 struct Raw {
     id: i64,
     level: String,

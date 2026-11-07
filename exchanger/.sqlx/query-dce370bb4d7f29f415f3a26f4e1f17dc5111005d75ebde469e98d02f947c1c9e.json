@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO alerts (level, topic, dedup_key, title, payload)\n        VALUES ($1, $2, $3, $4, $5)\n        ON CONFLICT (dedup_key) WHERE acked_at IS NULL DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dce370bb4d7f29f415f3a26f4e1f17dc5111005d75ebde469e98d02f947c1c9e"
+}

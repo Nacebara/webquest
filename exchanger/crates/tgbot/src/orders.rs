@@ -410,7 +410,7 @@ pub(crate) async fn ensure_message(
         sla: chrono::Duration::from_std(inner.cfg.manual_review_sla).unwrap_or_default(),
         bind_username: inner.cfg.bind_username.as_deref(),
     };
-    let screen = render(&inner.ui, &cfg, &view, &extra);
+    let screen = render(&inner.ui(), &cfg, &view, &extra);
     let digest = digest(&screen);
     match view.progress {
         Some(p) => {
@@ -461,7 +461,7 @@ pub(crate) async fn show_awaiting(inner: &Arc<Inner>, view: &OrderView) -> Resul
         return Ok(());
     };
     let _guard = inner.locks.lock(view.id).await;
-    let screen = inner.ui.invoice_awaiting(&q);
+    let screen = inner.ui().invoice_awaiting(&q);
     match inner.api.edit_html(p.chat_id, p.message_id, &screen).await {
         Ok(_) => {
             inner.remember_rendered(view, digest(&screen));

@@ -748,3 +748,42 @@ async fn confirm_intake_then_pay_out_when_the_wallet_stayed_silent(pool: PgPool)
     assert_eq!(d.payout_amount, Some(dec!(29.55)));
     e.assert_books_match().await;
 }
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn paused_userbot_account_postpones_operations_without_spending_attempts(pool: PgPool) {
+    let e = env(pool).await;
+    let ub_id: i16 = sqlx::query_scalar("SELECT id FROM userbot_accounts LIMIT 1")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    {
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::admin::set_userbot_paused(&mut conn, ub_id, true)
+            .await
+            .unwrap();
+    }
+    let url = e.world.client_check(CB, usdt(dec!(20))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    e.engine.process_due().await.unwrap();
+    let (now, _) = e.order(order.id).await;
+    assert_eq!(now.state, OrderState::IntakePending);
+    let op = &e.ops(order.id).await[0];
+    assert_eq!(op.status, OpStatus::Pending);
+    assert_eq!(op.attempts, 0, "попытка не потрачена");
+    assert!(
+        e.world
+            .messages(e.ub, userbot::Chat::WalletBot(CB))
+            .iter()
+            .all(|m| !m.out),
+        "в кошелёк ничего не отправлено"
+    );
+    {
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::admin::set_userbot_paused(&mut conn, ub_id, false)
+            .await
+            .unwrap();
+    }
+    e.drain().await;
+    assert_eq!(e.order(order.id).await.0.state, OrderState::Completed);
+    e.assert_books_match().await;
+}

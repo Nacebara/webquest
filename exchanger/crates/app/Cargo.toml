@@ -35,6 +35,8 @@ serde_json = "1"
 sqlx.workspace = true
 storage.workspace = true
 tgbot = { path = "../tgbot" }
+# Пульт (ops-бот), M5.
+ops = { path = "../ops" }
 thiserror.workspace = true
 # fs, io-util — запись файла `exch record` без блокировки рантайма.
 tokio = { workspace = true, features = ["fs", "io-util"] }

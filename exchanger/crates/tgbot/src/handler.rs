@@ -25,7 +25,7 @@ impl Inner {
     }
 
     pub(crate) async fn reply_error(&self, chat: i64, error: &UiError) -> Result<(), TgBotError> {
-        self.reply(chat, &self.ui.error(error)).await
+        self.reply(chat, &self.ui().error(error)).await
     }
 
     /// Справочный экран: rich, если он есть и клиент не просил простой вид; иначе HTML.
@@ -34,7 +34,7 @@ impl Inner {
             Some(rich) if !self.prefers_plain(user) => rich,
             _ => return self.reply(chat, screen).await,
         };
-        let keyboard = self.ui.rich_keyboard(screen);
+        let keyboard = self.ui().rich_keyboard(screen);
         let (message, sent_rich) = self.api.send_rich(chat, rich, &keyboard, screen).await?;
         if sent_rich {
             self.remember_rich(message.chat.id, message.message_id, screen);
@@ -204,7 +204,7 @@ impl Inner {
             })
             .collect();
         let next = more.then(|| page.saturating_add(1));
-        self.reply_doc(chat, user, &self.ui.history(&rows, next))
+        self.reply_doc(chat, user, &self.ui().history(&rows, next))
             .await
     }
 
@@ -218,29 +218,34 @@ impl Inner {
             return Ok(());
         };
         let card = crate::orders::card(&view);
-        self.reply_doc(chat, user, &self.ui.order_card(&card)).await
+        self.reply_doc(chat, user, &self.ui().order_card(&card))
+            .await
     }
 
     async fn menu(&self, chat: i64, user: i64, action: MenuAction) -> Result<(), TgBotError> {
         match action {
             MenuAction::Exchange => {
                 let terms = self.terms_for(user).await?;
-                self.reply(chat, &self.ui.exchange_menu(&terms.terms)).await
+                self.reply(chat, &self.ui().exchange_menu(&terms.terms))
+                    .await
             }
             MenuAction::PayInvoice => {
                 let terms = self.terms_for(user).await?;
-                self.reply(chat, &self.ui.invoice_prompt(&terms.terms))
+                self.reply(chat, &self.ui().invoice_prompt(&terms.terms))
                     .await
             }
             MenuAction::Rates => {
                 let terms = self.terms_for(user).await?;
-                self.reply_doc(chat, user, &self.ui.terms(&terms.terms))
+                self.reply_doc(chat, user, &self.ui().terms(&terms.terms))
                     .await
             }
             MenuAction::History => self.history(chat, user, 0).await,
             MenuAction::Support => {
-                self.reply(chat, &self.ui.support(self.cfg.support_contact.as_deref()))
-                    .await
+                self.reply(
+                    chat,
+                    &self.ui().support(self.cfg.support_contact.as_deref()),
+                )
+                .await
             }
         }
     }
@@ -249,20 +254,20 @@ impl Inner {
         match command {
             Command::Start(_) => {
                 let terms = self.terms_for(user).await?;
-                self.reply_doc(chat, user, &self.ui.welcome(&terms.terms))
+                self.reply_doc(chat, user, &self.ui().welcome(&terms.terms))
                     .await
             }
             Command::Terms => {
                 let terms = self.terms_for(user).await?;
-                self.reply_doc(chat, user, &self.ui.terms(&terms.terms))
+                self.reply_doc(chat, user, &self.ui().terms(&terms.terms))
                     .await
             }
             Command::History => self.history(chat, user, 0).await,
             Command::Help => {
                 let terms = self.terms_for(user).await?;
-                self.reply(chat, &self.ui.help(&terms.terms)).await
+                self.reply(chat, &self.ui().help(&terms.terms)).await
             }
-            Command::Privacy => self.reply_doc(chat, user, &self.ui.privacy()).await,
+            Command::Privacy => self.reply_doc(chat, user, &self.ui().privacy()).await,
         }
     }
 }
@@ -302,7 +307,7 @@ async fn message_update(inner: &Arc<Inner>, message: &Message) -> Result<(), TgB
         return inner.command(chat, from.id, command).await;
     }
     if message.forward_origin.is_none()
-        && let Some(action) = inner.ui.parse_menu(text)
+        && let Some(action) = inner.ui().parse_menu(text)
     {
         return inner.menu(chat, from.id, action).await;
     }
@@ -314,7 +319,7 @@ async fn message_update(inner: &Arc<Inner>, message: &Message) -> Result<(), TgB
         found.push(bare);
     }
     if found.is_empty() {
-        return inner.reply(chat, &inner.ui.no_link()).await;
+        return inner.reply(chat, &inner.ui().no_link()).await;
     }
     intake::process(inner, chat, from.id, &found).await
 }
@@ -347,12 +352,12 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
     match action {
         Callback::Direction(direction) => {
             let terms = inner.terms_for(user).await?;
-            let screen = inner.ui.send_check(&terms.terms, direction);
+            let screen = inner.ui().send_check(&terms.terms, direction);
             inner.replace(chat, message, &screen).await
         }
         Callback::HowTo(direction) => {
             let terms = inner.terms_for(user).await?;
-            let screen = inner.ui.check_howto(&terms.terms, direction);
+            let screen = inner.ui().check_howto(&terms.terms, direction);
             inner.replace(chat, message, &screen).await
         }
         Callback::Exchange => inner.menu(chat, user, MenuAction::Exchange).await,
@@ -363,7 +368,7 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
         Callback::Support(_) => inner.menu(chat, user, MenuAction::Support).await,
         Callback::Cancel(None) => {
             inner
-                .replace(chat, message, &inner.ui.cancelled(None))
+                .replace(chat, message, &inner.ui().cancelled(None))
                 .await
         }
         Callback::PlainView => plain_view(inner, chat, user, message).await,

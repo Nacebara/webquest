@@ -126,3 +126,21 @@ pub async fn active(
     .await?;
     Ok(row.map(|r| (r.id, r.userbot_id)))
 }
+
+/// Аккаунт юзербота этого кошелька на паузе (`userbot_accounts.status = 'disabled'`, пульт).
+pub async fn userbot_paused(
+    conn: &mut PgConnection,
+    wallet_account_id: i16,
+) -> Result<bool, StorageError> {
+    Ok(sqlx::query_scalar!(
+        r#"
+        SELECT u.status = 'disabled' AS "paused!"
+          FROM wallet_accounts w JOIN userbot_accounts u ON u.id = w.userbot_id
+         WHERE w.id = $1
+        "#,
+        wallet_account_id
+    )
+    .fetch_optional(conn)
+    .await?
+    .unwrap_or(false))
+}
