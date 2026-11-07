@@ -23,14 +23,15 @@ pub mod screen;
 mod screens;
 pub mod texts;
 
-pub use callback::Callback;
+pub use callback::{Callback, InvestAction};
 pub use command::Command;
 pub use emoji::{
     Emoji, EmojiError, EmojiPacks, EmojiSet, EmojiSettings, EmojiStyle, is_custom_emoji_id,
 };
 pub use fmt::{Clock, TimeFormat};
 pub use model::{
-    Breakdown, DirectionStatus, DirectionTerms, Excess, FiatAmount, HistoryRow, InvoiceProblem,
+    Breakdown, DirectionStatus, DirectionTerms, Excess, FiatAmount, HistoryRow, InvestHome,
+    InvestMoveKind, InvestMoveRow, InvestMoveStatus, InvestNotice, InvestProblem, InvoiceProblem,
     InvoiceQuote, InvoiceRefusal, OrderCard, OrderRef, PromoTerms, RefundReason, Terms, TierTerms,
     UiError,
 };

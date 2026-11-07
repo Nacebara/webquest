@@ -61,7 +61,16 @@ impl Config {
     pub fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
         let get = |k: &str| {
             lookup(k)
-                .map(|v| v.trim().to_owned())
+                .map(|v| {
+                    // Частая ошибка: строку `KEY=…` из `0-key.bat` вставили после `KEY=`
+                    // шаблона — получилось `KEY=KEY=…`. Имя переменной в значении не бывает.
+                    let prefix = format!("{k}=");
+                    let mut v = v.trim();
+                    while let Some(rest) = v.strip_prefix(prefix.as_str()) {
+                        v = rest.trim();
+                    }
+                    v.to_owned()
+                })
                 .filter(|v| !v.is_empty())
         };
         let secret = |k: &str| get(k).map(SecretString::from);
@@ -212,6 +221,20 @@ mod tests {
         .unwrap();
         let key = cfg.session_key.unwrap();
         assert_eq!(key.secret().expose_secret()[31], 31);
+    }
+
+    /// `SESSION_KEY=SESSION_KEY=…` (строку ключа вставили после имени в шаблоне) — принимаем.
+    #[test]
+    fn doubled_variable_name_is_forgiven() {
+        let doubled = format!("SESSION_KEY={KEY_B64}");
+        let cfg = Config::from_lookup(env(&[
+            ("DATABASE_URL", "x"),
+            ("OWNER_TG_ID", "OWNER_TG_ID= 7"),
+            ("SESSION_KEY", &doubled),
+        ]))
+        .unwrap();
+        assert_eq!(cfg.owner_tg_id, 7);
+        assert_eq!(cfg.session_key.unwrap().secret().expose_secret()[31], 31);
     }
 
     /// Debug конфигурации не раскрывает ни одного секрета (CLAUDE.md п. 13).

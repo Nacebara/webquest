@@ -43,10 +43,12 @@ pub enum Emoji {
     Bell,
     /// Выгодный курс встречного потока (DESIGN-v0.2 Р15).
     Promo,
+    /// Инвестиции (DESIGN-v0.2 Р18).
+    Invest,
 }
 
 impl Emoji {
-    pub const ALL: [Emoji; 20] = [
+    pub const ALL: [Emoji; 21] = [
         Emoji::Wait,
         Emoji::Ok,
         Emoji::Err,
@@ -67,6 +69,7 @@ impl Emoji {
         Emoji::Privacy,
         Emoji::Bell,
         Emoji::Promo,
+        Emoji::Invest,
     ];
 
     pub const fn key(self) -> &'static str {
@@ -91,6 +94,7 @@ impl Emoji {
             Emoji::Privacy => "privacy",
             Emoji::Bell => "bell",
             Emoji::Promo => "promo",
+            Emoji::Invest => "invest",
         }
     }
 
@@ -117,6 +121,7 @@ impl Emoji {
             Emoji::Privacy => "🔒",
             Emoji::Bell => "🔔",
             Emoji::Promo => "🔥",
+            Emoji::Invest => "💼",
         }
     }
 
@@ -147,6 +152,7 @@ impl Emoji {
             Emoji::Privacy => "color/lock",
             Emoji::Bell => "mono/bell",
             Emoji::Promo => "color/fire",
+            Emoji::Invest => "color/vault",
         }
     }
 
@@ -173,6 +179,7 @@ impl Emoji {
             Emoji::Privacy => "mono/lock",
             Emoji::Bell => "mono/bell",
             Emoji::Promo => "mono/fire",
+            Emoji::Invest => "mono/vault",
         }
     }
 }

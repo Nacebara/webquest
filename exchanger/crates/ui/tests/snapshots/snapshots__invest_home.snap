@@ -1,0 +1,41 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+💼 <b>Инвестиции</b>
+В обороте: <code>1250.75 USDT</code>
+Прибыль за всё время: <code>50.75 USDT</code> · за 24 ч: <code>2.50 USDT</code>
+Ваш процент прибыли: <b>50 %</b> · пополнение выводится через 14 дн.
+Можно вывести сейчас: <code>950.75 USDT</code>
+Ещё <code>300.00 USDT</code> — свежие пополнения: станут доступны к выводу по сроку, а работают уже сейчас.
+
+<b>Последние движения</b>
+<blockquote><tg-time unix="1791378600" format="dt">07.10 16:10 МСК</tg-time> · вывод <code>500.00 USDT</code> · ждёт владельца
+<tg-time unix="1791374400" format="dt">07.10 15:00 МСК</tg-time> · пополнение <code>300.00 USDT</code> · готово
+<tg-time unix="1791372600" format="dt">07.10 14:30 МСК</tg-time> · вывод <code>40.00 USDT</code> · готово · <a href="https://t.me/send?start=CQ5mN8pQ2rT7">забрать чек</a>
+<tg-time unix="1791370800" format="dt">07.10 14:00 МСК</tg-time> · пополнение · в работе</blockquote>
+--- keyboard: inline
+[{"callback_data":"inv:dep","style":"primary","text":"Пополнить"},{"callback_data":"inv:out","text":"Вывести"}]
+[{"callback_data":"inv:how","text":"Как это работает?"}]
+[{"callback_data":"inv","text":"Обновить"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000020">💼</tg-emoji> <b>Инвестиции</b>
+В обороте: <code>1250.75 USDT</code>
+Прибыль за всё время: <code>50.75 USDT</code> · за 24 ч: <code>2.50 USDT</code>
+Ваш процент прибыли: <b>50 %</b> · пополнение выводится через 14 дн.
+Можно вывести сейчас: <code>950.75 USDT</code>
+Ещё <code>300.00 USDT</code> — свежие пополнения: станут доступны к выводу по сроку, а работают уже сейчас.
+
+<b>Последние движения</b>
+<blockquote><tg-time unix="1791378600" format="dt">07.10 16:10 МСК</tg-time> · вывод <code>500.00 USDT</code> · ждёт владельца
+<tg-time unix="1791374400" format="dt">07.10 15:00 МСК</tg-time> · пополнение <code>300.00 USDT</code> · готово
+<tg-time unix="1791372600" format="dt">07.10 14:30 МСК</tg-time> · вывод <code>40.00 USDT</code> · готово · <a href="https://t.me/send?start=CQ5mN8pQ2rT7">забрать чек</a>
+<tg-time unix="1791370800" format="dt">07.10 14:00 МСК</tg-time> · пополнение · в работе</blockquote>
+--- keyboard: inline
+[{"callback_data":"inv:dep","style":"primary","text":"Пополнить"},{"callback_data":"inv:out","text":"Вывести"}]
+[{"callback_data":"inv:how","text":"Как это работает?"}]
+[{"callback_data":"inv","text":"Обновить"}]

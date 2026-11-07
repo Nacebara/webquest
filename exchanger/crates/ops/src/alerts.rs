@@ -243,6 +243,48 @@ impl Inner {
                 ]);
                 sc
             }
+            "invest_withdrawal" | "invest_manual" | "invest_failed" => {
+                let id = p["move_id"].as_i64().unwrap_or_default();
+                let kind = t.t(if s(p, "kind") == "deposit" {
+                    "invest.kind_deposit"
+                } else {
+                    "invest.kind_withdrawal"
+                });
+                let wallet = p["platform"]
+                    .as_str()
+                    .and_then(domain::Platform::from_db_name)
+                    .map_or_else(|| esc(&s(p, "platform")), |x| self.platform_name(x));
+                let amount = p["amount"]
+                    .as_str()
+                    .and_then(|a| a.parse().ok())
+                    .map_or_else(|| "—".to_owned(), usdt);
+                let key = match a.title.as_str() {
+                    "invest_withdrawal" => "alert.invest_withdrawal",
+                    "invest_manual" => "alert.invest_manual",
+                    _ => "alert.invest_failed",
+                };
+                let mut sc = Screen::new(t.f(
+                    key,
+                    &[
+                        ("id", &id),
+                        ("user", &p["user_id"].as_i64().unwrap_or_default()),
+                        ("kind", &kind),
+                        ("wallet", &wallet),
+                        ("amount", &amount),
+                        ("note", &esc(&s(p, "note"))),
+                    ],
+                ));
+                if a.title == "invest_withdrawal" {
+                    sc = sc.row(vec![
+                        btn(t.t("invest.b_approve"), &Cb::InvestApprove(id)),
+                        btn(t.t("invest.b_reject"), &Cb::InvestReject(id)),
+                    ]);
+                }
+                sc.row(vec![
+                    btn(t.t("alert.b_open"), &Cb::InvestMove(id)),
+                    btn(t.t("alert.b_ack"), &Cb::Ack(a.id)),
+                ])
+            }
             _ => Screen::new(t.f(
                 "alert.generic",
                 &[

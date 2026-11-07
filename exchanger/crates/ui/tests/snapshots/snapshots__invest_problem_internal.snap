@@ -1,0 +1,15 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+❌ Что-то пошло не так у меня. Ничего не списано — попробуйте через минуту.
+--- keyboard: inline
+[{"callback_data":"inv","text":"💼 Инвестиции"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> Что-то пошло не так у меня. Ничего не списано — попробуйте через минуту.
+--- keyboard: inline
+[{"callback_data":"inv","icon_custom_emoji_id":"5368000000000000020","text":"Инвестиции"}]

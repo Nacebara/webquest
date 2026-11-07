@@ -1,0 +1,13 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+⏳ Чек принят — активирую и зачисляю в инвестиции…
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> Чек принят — активирую и зачисляю в инвестиции…
+--- keyboard: none

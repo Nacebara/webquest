@@ -121,6 +121,8 @@ pub struct MenuTexts {
     pub rates: String,
     pub history: String,
     pub support: String,
+    /// Только у инвесторов (DESIGN-v0.2 Р18).
+    pub invest: String,
     pub placeholder: String,
 }
 
@@ -444,6 +446,90 @@ pub struct MiscTexts {
     pub invoice_soon: String,
 }
 
+/// Раздел «💼 Инвестиции» (DESIGN-v0.2 Р18).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InvestTexts {
+    pub title: String,
+    pub balance: String,
+    pub profit: String,
+    pub terms: String,
+    pub terms_no_lock: String,
+    pub withdrawable: String,
+    pub locked: String,
+    pub empty: String,
+    pub moves_title: String,
+    pub move_line: String,
+    pub kind_deposit: String,
+    pub kind_withdrawal: String,
+    pub status_requested: String,
+    pub status_processing: String,
+    pub status_done: String,
+    pub status_rejected: String,
+    pub status_failed: String,
+    pub status_manual: String,
+    pub check_link: String,
+
+    pub deposit: String,
+    pub deposit_accepted: String,
+    pub deposit_done: String,
+    pub deposit_manual: String,
+    pub withdraw: String,
+    pub withdraw_nothing: String,
+    pub withdraw_amount: String,
+    pub withdraw_auto_note: String,
+    pub withdraw_owner_note: String,
+    pub withdraw_requested: String,
+    pub withdraw_processing: String,
+    pub withdraw_done: String,
+    pub withdraw_rejected: String,
+    pub withdraw_failed: String,
+    pub withdraw_manual: String,
+
+    pub not_a_check: String,
+    pub bad_amount: String,
+    pub over_withdrawable: String,
+    pub open_withdrawal: String,
+    pub wallet_unavailable: String,
+    pub internal: String,
+
+    pub btn_deposit: String,
+    pub btn_withdraw: String,
+    pub btn_howto: String,
+    pub btn_refresh: String,
+    pub btn_all: String,
+    pub btn_home: String,
+
+    pub howto_title: String,
+    pub howto_lead: String,
+    pub howto_example_title: String,
+    pub howto_col_what: String,
+    pub howto_col_amount: String,
+    pub howto_row: String,
+    pub ex_deposit: String,
+    pub ex_capital: String,
+    pub ex_part: String,
+    pub ex_turnover: String,
+    pub ex_revenue: String,
+    pub ex_on_you: String,
+    pub ex_share: String,
+    pub ex_day: String,
+    pub ex_month: String,
+    pub howto_example_note: String,
+    pub howto_accrual_title: String,
+    pub howto_accrual: Vec<String>,
+    pub howto_withdraw_title: String,
+    pub howto_withdraw_lock: String,
+    pub howto_withdraw_no_lock: String,
+    pub howto_withdraw_auto: String,
+    pub howto_withdraw_owner: String,
+    pub howto_withdraw_owner_all: String,
+    pub howto_withdraw_one: String,
+    pub howto_risks_title: String,
+    pub howto_risks: Vec<String>,
+    pub howto_footer: String,
+}
+
 /// Все тексты клиентского бота.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -476,6 +562,7 @@ pub struct Texts {
     pub privacy: PrivacyTexts,
     pub support: SupportTexts,
     pub misc: MiscTexts,
+    pub invest: InvestTexts,
 }
 
 impl Texts {

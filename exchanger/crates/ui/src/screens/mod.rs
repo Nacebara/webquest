@@ -7,6 +7,7 @@
 
 mod errors;
 mod flow;
+mod invest;
 mod reference;
 
 use botapi::{BotCommand, ButtonStyle, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup};
@@ -120,6 +121,7 @@ impl Ui {
             MenuAction::Rates => (Emoji::Rates, &m.rates),
             MenuAction::History => (Emoji::History, &m.history),
             MenuAction::Support => (Emoji::Support, &m.support),
+            MenuAction::Invest => (Emoji::Invest, &m.invest),
         }
     }
 

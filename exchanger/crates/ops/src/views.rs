@@ -131,6 +131,9 @@ impl Inner {
                 btn(t.t("menu.bots"), &Cb::Bots),
             ]);
         let mut last = vec![btn(t.t("menu.audit"), &Cb::Audit)];
+        if staff.role >= Role::Admin {
+            last.insert(0, btn(t.t("menu.investors"), &Cb::Investors));
+        }
         if staff.role == Role::Owner {
             last.insert(0, btn(t.t("menu.staff"), &Cb::Staff));
         }
@@ -239,6 +242,26 @@ impl Inner {
         ));
         let alerts = storage::alerts::open(&mut conn, 100).await?.len();
         lines.push(t.f("dash.alerts", &[("n", &alerts)]));
+        let invest = storage::invest::totals(&mut conn).await?;
+        if invest.investors > 0 || invest.requested + invest.manual > 0 {
+            let waiting = invest.requested + invest.manual;
+            lines.push(t.f(
+                "dash.invest",
+                &[
+                    ("n", &invest.investors),
+                    ("balance", &usdt(invest.balance)),
+                    ("accrued", &usdt(invest.accrued_24h)),
+                    (
+                        "waiting",
+                        &if waiting > 0 {
+                            t.f("dash.invest_waiting", &[("n", &waiting)])
+                        } else {
+                            String::new()
+                        },
+                    ),
+                ],
+            ));
+        }
 
         Ok(Screen::new(lines.join("\n"))
             .row(vec![
@@ -1085,7 +1108,8 @@ impl Inner {
                         btn(t.t("user.b_ban"), &Cb::UserBan(id))
                     },
                     btn(t.t("user.b_note"), &Cb::UserNote(id)),
-                ]);
+                ])
+                .row(vec![btn(t.t("user.b_invest"), &Cb::Invest(id))]);
         }
         Ok(s.row(vec![
             btn(t.t("common.refresh"), &Cb::User(id)),
@@ -1471,6 +1495,21 @@ impl Inner {
             Cb::Staff => self.staff_list(staff).await,
             Cb::Member(id) => self.member(staff, id).await,
             Cb::Audit => self.audit().await,
+            Cb::Investors | Cb::Invest(_) | Cb::InvestMove(_) => {
+                if let Some(denied) = self.deny(staff, Role::Admin) {
+                    return Ok(denied);
+                }
+                match cb {
+                    Cb::Invest(id) => self.invest_card(staff, id).await,
+                    Cb::InvestMove(id) => self.invest_move(staff, id).await,
+                    _ => self.investors().await,
+                }
+            }
+            Cb::InvestEdit(_)
+            | Cb::InvestAccess(..)
+            | Cb::InvestApprove(_)
+            | Cb::InvestReject(_)
+            | Cb::InvestResolve(..) => self.invest_entry(staff, cb).await,
             Cb::Reconcile => {
                 if let Some(denied) = self.deny(staff, Role::Admin) {
                     return Ok(denied);

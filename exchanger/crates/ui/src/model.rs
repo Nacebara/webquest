@@ -293,3 +293,113 @@ pub struct OrderCard {
     /// Ссылка на чек выплаты или возврата, пока клиент его не забрал.
     pub check_url: Option<String>,
 }
+
+/// Вид движения инвестора.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InvestMoveKind {
+    Deposit,
+    Withdrawal,
+}
+
+/// Статус движения инвестора.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InvestMoveStatus {
+    /// Вывод ждёт решения владельца.
+    Requested,
+    /// Чек активируется или создаётся.
+    Processing,
+    Done,
+    Rejected,
+    Failed,
+    /// Неясный исход — разбирает владелец.
+    Manual,
+}
+
+/// Строка «последних движений».
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvestMoveRow {
+    pub kind: InvestMoveKind,
+    pub status: InvestMoveStatus,
+    pub platform: Platform,
+    /// У пополнения — после зачисления.
+    pub amount: Option<Decimal>,
+    pub at: DateTime<Utc>,
+    /// Чек вывода, если создан: ссылка в строке — на случай, если уведомление потерялось.
+    pub check_url: Option<String>,
+}
+
+/// Экран инвестора (DESIGN-v0.2 Р18). Суммы — в USDT.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvestHome {
+    /// Доля прибыли на его капитал, `50` = 50 %.
+    pub share_pct: Decimal,
+    /// Пополнение выводится не раньше, чем через столько дней.
+    pub lock_days: i32,
+    pub min_deposit: Decimal,
+    /// Вывод до этой суммы — сам, без владельца; 0 — только через владельца.
+    pub auto_withdraw_max: Decimal,
+    /// Сколько его денег в обороте.
+    pub balance: Decimal,
+    pub profit: Decimal,
+    pub profit_24h: Decimal,
+    /// Пополнения моложе срока блокировки.
+    pub locked: Decimal,
+    pub withdrawable: Decimal,
+    pub moves: Vec<InvestMoveRow>,
+}
+
+/// Событие по движению инвестора — сообщение ему.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InvestNotice {
+    /// Чек пополнения принят, активирую.
+    DepositAccepted,
+    DepositDone {
+        amount: Decimal,
+        balance: Decimal,
+    },
+    /// Чек не открыт или не принят — экран ошибки чека.
+    DepositRejected(UiError),
+    DepositManual,
+    /// Заявка ушла владельцу.
+    WithdrawRequested {
+        amount: Decimal,
+        platform: Platform,
+    },
+    /// Чек создаётся (сразу или после одобрения).
+    WithdrawProcessing {
+        amount: Decimal,
+        platform: Platform,
+    },
+    WithdrawDone {
+        amount: Decimal,
+        platform: Platform,
+        check_url: String,
+    },
+    WithdrawRejected {
+        amount: Decimal,
+        reason: String,
+    },
+    WithdrawFailed {
+        amount: Decimal,
+    },
+    WithdrawManual {
+        amount: Decimal,
+    },
+}
+
+/// Почему действие инвестора не принято. Деньги не тронуты.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InvestProblem {
+    /// Прислали не чек (счёт, мусор).
+    NotACheck,
+    /// Сумма не разобрана или ≤ 0.
+    BadAmount,
+    /// Больше, чем можно вывести сейчас.
+    OverWithdrawable { max: Decimal },
+    /// Уже есть заявка на вывод в работе.
+    OpenWithdrawal,
+    /// Кошелёк этой платформы сейчас недоступен.
+    WalletUnavailable { platform: Platform },
+    /// Сбой у сервиса.
+    Internal,
+}

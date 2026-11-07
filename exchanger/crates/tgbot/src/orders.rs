@@ -69,7 +69,7 @@ fn breakdown(view: &OrderView) -> Option<Breakdown> {
 }
 
 /// Почему чек не принят кошельком (`failure_code` из движка).
-fn intake_failure(code: Option<&str>, bind_username: Option<&str>) -> UiError {
+pub(crate) fn intake_failure(code: Option<&str>, bind_username: Option<&str>) -> UiError {
     match code {
         Some("check_already_activated") => UiError::AlreadyActivated,
         Some("check_not_found") => UiError::NotFound,

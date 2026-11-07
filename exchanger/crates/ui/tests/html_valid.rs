@@ -276,6 +276,7 @@ fn money_flow_is_plain_html_reference_screens_have_fallback() {
         "privacy",
         "terms_with_offers",
         "welcome_with_offers",
+        "invest_howto",
     ];
     for (name, screen) in common::gallery(&ui) {
         let expect_rich = rich

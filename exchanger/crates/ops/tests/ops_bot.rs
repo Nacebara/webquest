@@ -749,3 +749,57 @@ async fn selftest_from_the_panel_reports_every_step(pool: PgPool) {
         assert_eq!(o.world.balance(o.ub, platform, Asset::Usdt), dec!(1000));
     }
 }
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn owner_grants_investor_access_and_admin_approves_a_withdrawal(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/admin", "Админ-панель exch").await;
+    o.say(ADMIN, "/admin", "Админ-панель exch").await;
+
+    // Админ видит карточку, но выдать доступ не может — кнопки нет.
+    let card = o
+        .say(ADMIN, &format!("/user {}", common::CLIENT), "Клиент")
+        .await;
+    let invest = o.press(ADMIN, &card, "Инвестиции", "Доступа нет").await;
+    assert!(invest.button("Дать доступ").is_none());
+
+    // Владелец: «Дать доступ» → условия одной строкой → предпросмотр → подтвердить.
+    let card = o
+        .say(OWNER, &format!("/user {}", common::CLIENT), "Клиент")
+        .await;
+    let invest = o.press(OWNER, &card, "Инвестиции", "Доступа нет").await;
+    o.press(OWNER, &invest, "Дать доступ", "одной строкой")
+        .await;
+    let bad = o.say(OWNER, "500 0 10", "Не понял формат").await;
+    assert!(bad.text().contains("доля от 0 до 100"));
+    let preview = o.say(OWNER, "50 0 10", "Дать доступ").await;
+    let card = o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
+    assert!(card.text().contains("50\u{a0}%"), "{}", card.text());
+    assert_eq!(o.audit("invest.terms").await.len(), 1);
+
+    // Инвестор пополнил на 100 и просит 40 — выше автолимита 10: решение за персоналом.
+    let url = o.world.client_check(CB, usdt(dec!(100))).unwrap();
+    let link = parsers::links::parse_url(&url).unwrap();
+    o.engine
+        .invest_deposit(common::CLIENT, &link)
+        .await
+        .unwrap();
+    o.drain().await;
+    let mark = o.tg.mark();
+    let w = o
+        .engine
+        .invest_withdraw(common::CLIENT, XR, dec!(40))
+        .await
+        .unwrap();
+    assert_eq!(w.status, storage::invest::MoveStatus::Requested);
+    let alert = o.tg.screen(mark, ADMIN, "Заявка на вывод").await;
+    let preview = o.press(ADMIN, &alert, "Одобрить", "Одобрить вывод").await;
+    o.press(ADMIN, &preview, "Подтвердить", "Готово").await;
+    o.drain().await;
+    let mut conn = o.pool.acquire().await.unwrap();
+    let m = storage::invest::get(&mut conn, w.id, false).await.unwrap();
+    assert_eq!(m.status, storage::invest::MoveStatus::Done);
+    assert_eq!(m.decided_by, Some(ADMIN));
+    assert_eq!(o.world.checks_created_by(o.ub).len(), 1, "один чек вывода");
+    assert_eq!(o.audit("invest.approve").await.len(), 1);
+}

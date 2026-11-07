@@ -70,15 +70,18 @@ pub enum MenuAction {
     Rates,
     History,
     Support,
+    /// «💼 Инвестиции» — только у инвесторов (DESIGN-v0.2 Р18); бот проверяет доступ.
+    Invest,
 }
 
 impl MenuAction {
-    pub const ALL: [MenuAction; 5] = [
+    pub const ALL: [MenuAction; 6] = [
         MenuAction::Exchange,
         MenuAction::PayInvoice,
         MenuAction::Rates,
         MenuAction::History,
         MenuAction::Support,
+        MenuAction::Invest,
     ];
 }
 

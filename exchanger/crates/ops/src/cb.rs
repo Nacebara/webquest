@@ -190,6 +190,20 @@ pub enum Cb {
     Selftest,
     /// Провести расхождение из события сверки как взнос или вывод владельца.
     Capital(i64),
+    /// Все инвесторы и движения, ждущие решения.
+    Investors,
+    /// «💼 Инвестиции» клиента.
+    Invest(i64),
+    /// Выдать доступ или поменять условия.
+    InvestEdit(i64),
+    /// Включить или отключить доступ.
+    InvestAccess(i64, bool),
+    /// Карточка движения.
+    InvestMove(i64),
+    InvestApprove(i64),
+    InvestReject(i64),
+    /// Неясное движение: было (`true`) или не было.
+    InvestResolve(i64, bool),
 }
 
 fn dir_code(d: Direction) -> &'static str {
@@ -294,6 +308,14 @@ impl Cb {
             Cb::Reconcile => "rc".into(),
             Cb::Selftest => "stt".into(),
             Cb::Capital(id) => format!("cap:{id}"),
+            Cb::Investors => "iv".into(),
+            Cb::Invest(id) => format!("iv:{id}"),
+            Cb::InvestEdit(id) => format!("ivt:{id}"),
+            Cb::InvestAccess(id, on) => format!("iva:{id}:{}", bit(*on)),
+            Cb::InvestMove(id) => format!("im:{id}"),
+            Cb::InvestApprove(id) => format!("ima:{id}"),
+            Cb::InvestReject(id) => format!("imr:{id}"),
+            Cb::InvestResolve(id, yes) => format!("imx:{id}:{}", bit(*yes)),
         }
     }
 
@@ -370,6 +392,14 @@ impl Cb {
             ["rc"] => Cb::Reconcile,
             ["stt"] => Cb::Selftest,
             ["cap", _] => Cb::Capital(id(1)?),
+            ["iv"] => Cb::Investors,
+            ["iv", _] => Cb::Invest(id(1)?),
+            ["ivt", _] => Cb::InvestEdit(id(1)?),
+            ["iva", _, _] => Cb::InvestAccess(id(1)?, on(2)?),
+            ["im", _] => Cb::InvestMove(id(1)?),
+            ["ima", _] => Cb::InvestApprove(id(1)?),
+            ["imr", _] => Cb::InvestReject(id(1)?),
+            ["imx", _, _] => Cb::InvestResolve(id(1)?, on(2)?),
             _ => return None,
         })
     }
@@ -418,6 +448,16 @@ mod tests {
             Cb::BotPause(i16::MAX, true),
             Cb::PromoTarget(Platform::CryptoBot),
             Cb::PromoTarget(Platform::XRocket),
+            Cb::Investors,
+            Cb::Invest(big),
+            Cb::InvestEdit(big),
+            Cb::InvestAccess(big, true),
+            Cb::InvestAccess(big, false),
+            Cb::InvestMove(big),
+            Cb::InvestApprove(big),
+            Cb::InvestReject(big),
+            Cb::InvestResolve(big, true),
+            Cb::InvestResolve(big, false),
         ];
         for d in Direction::ALL {
             all.extend([

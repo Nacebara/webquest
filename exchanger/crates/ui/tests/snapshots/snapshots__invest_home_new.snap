@@ -1,0 +1,31 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+💼 <b>Инвестиции</b>
+В обороте: <code>0.00 USDT</code>
+Прибыль за всё время: <code>0.00 USDT</code> · за 24 ч: <code>0.00 USDT</code>
+Ваш процент прибыли: <b>40 %</b> · выводить можно в любой момент
+Можно вывести сейчас: <code>0.00 USDT</code>
+
+Пока пусто. Нажмите «Пополнить» и пришлите чек USDT — деньги начнут работать со следующего часа.
+--- keyboard: inline
+[{"callback_data":"inv:dep","style":"primary","text":"Пополнить"},{"callback_data":"inv:out","text":"Вывести"}]
+[{"callback_data":"inv:how","text":"Как это работает?"}]
+[{"callback_data":"inv","text":"Обновить"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000020">💼</tg-emoji> <b>Инвестиции</b>
+В обороте: <code>0.00 USDT</code>
+Прибыль за всё время: <code>0.00 USDT</code> · за 24 ч: <code>0.00 USDT</code>
+Ваш процент прибыли: <b>40 %</b> · выводить можно в любой момент
+Можно вывести сейчас: <code>0.00 USDT</code>
+
+Пока пусто. Нажмите «Пополнить» и пришлите чек USDT — деньги начнут работать со следующего часа.
+--- keyboard: inline
+[{"callback_data":"inv:dep","style":"primary","text":"Пополнить"},{"callback_data":"inv:out","text":"Вывести"}]
+[{"callback_data":"inv:how","text":"Как это работает?"}]
+[{"callback_data":"inv","text":"Обновить"}]

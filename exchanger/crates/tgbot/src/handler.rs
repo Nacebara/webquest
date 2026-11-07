@@ -25,16 +25,21 @@ impl Inner {
         Ok(())
     }
 
-    /// Главное меню персонала — с кнопкой входа в админ-панель (чат лички = id пользователя).
+    /// Главное меню инвестора — с «💼 Инвестиции», персонала — с входом в админ-панель
+    /// (чат лички = id пользователя).
     async fn with_menu_button(&self, chat: i64, screen: &Screen) -> Screen {
         let mut screen = screen.clone();
-        if let ui::Keyboard::Reply(markup) = &mut screen.keyboard
-            && let Some(hook) = self.hook()
-            && let Some(label) = hook.menu_button(chat).await
-        {
-            markup
-                .keyboard
-                .push(vec![botapi::KeyboardButton::new(label)]);
+        if let ui::Keyboard::Reply(markup) = &mut screen.keyboard {
+            if self.is_investor(chat).await {
+                markup.keyboard.push(vec![self.ui().invest_menu_button()]);
+            }
+            if let Some(hook) = self.hook()
+                && let Some(label) = hook.menu_button(chat).await
+            {
+                markup
+                    .keyboard
+                    .push(vec![botapi::KeyboardButton::new(label)]);
+            }
         }
         screen
     }
@@ -44,7 +49,12 @@ impl Inner {
     }
 
     /// Справочный экран: rich, если он есть и клиент не просил простой вид; иначе HTML.
-    async fn reply_doc(&self, chat: i64, user: i64, screen: &Screen) -> Result<(), TgBotError> {
+    pub(crate) async fn reply_doc(
+        &self,
+        chat: i64,
+        user: i64,
+        screen: &Screen,
+    ) -> Result<(), TgBotError> {
         let rich = match &screen.rich_html {
             Some(rich) if !self.prefers_plain(user) => rich,
             _ => return self.reply(chat, screen).await,
@@ -60,7 +70,7 @@ impl Inner {
 
     /// Заменить экран навигации (выбор направления, инструкция) в том же сообщении. Сообщение
     /// заявки не трогаем никогда: в нём может быть ссылка на чек выплаты.
-    async fn replace(
+    pub(crate) async fn replace(
         &self,
         chat: i64,
         message: Option<&Message>,
@@ -239,7 +249,10 @@ impl Inner {
     }
 
     async fn menu(&self, chat: i64, user: i64, action: MenuAction) -> Result<(), TgBotError> {
+        // Любая кнопка меню отменяет ожидание чека пополнения или суммы вывода.
+        self.invest_forget(user);
         match action {
+            MenuAction::Invest => self.invest_open(chat, user, None).await,
             MenuAction::Exchange => {
                 let terms = self.terms_for(user).await?;
                 self.reply(chat, &self.ui().exchange_menu(&terms.terms))
@@ -267,6 +280,7 @@ impl Inner {
     }
 
     async fn command(&self, chat: i64, user: i64, command: Command) -> Result<(), TgBotError> {
+        self.invest_forget(user);
         match command {
             Command::Start(_) => {
                 let terms = self.terms_for(user).await?;
@@ -339,6 +353,12 @@ async fn message_update(inner: &Arc<Inner>, message: &Message) -> Result<(), TgB
         && let Some(bare) = parse_bare_code(text)
     {
         found.push(bare);
+    }
+    // Инвестор нажал «Пополнить» или выбрал кошелёк вывода: чек или сумма — туда.
+    if (message.forward_origin.is_none() || !found.is_empty())
+        && inner.invest_message(chat, from.id, text, &found).await?
+    {
+        return Ok(());
     }
     if found.is_empty() {
         return inner.reply(chat, &inner.ui().no_link()).await;
@@ -418,6 +438,7 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
         }
         // Подписки «сообщить, когда заработает» пока нет — только ответ на нажатие.
         Callback::Notify(_) => Ok(()),
+        Callback::Invest(action) => inner.invest_callback(chat, user, message, action).await,
     }
 }
 

@@ -23,6 +23,7 @@ mod api;
 pub mod emoji;
 mod handler;
 mod intake;
+mod invest;
 mod limits;
 mod locks;
 mod orders;
@@ -173,12 +174,15 @@ impl ClientBot {
         inner.startup().await;
         // Подписка — до пересинхронизации: изменение между ними не потеряется.
         let updates = inner.engine.subscribe();
+        let invest_updates = inner.engine.subscribe_invest();
         let stop = cancel.child_token();
         let listener = tokio::spawn(orders::listen(inner.clone(), updates, stop.clone()));
+        let investors = tokio::spawn(invest::listen(inner.clone(), invest_updates, stop.clone()));
         let reload = tokio::spawn(emoji::watch(inner.clone(), stop.clone()));
         poll::run(inner, cancel).await;
         stop.cancel();
         let _ = reload.await;
+        let _ = investors.await;
         if let Err(e) = listener.await {
             tracing::error!(error = %e, "order message listener crashed");
         }
@@ -200,6 +204,8 @@ pub(crate) struct Memory {
     unreachable: HashSet<i64>,
     /// Когда клиенту последний раз показали уведомление (бан, лимит).
     notices: HashMap<(i64, Notice), Instant>,
+    /// Инвестор нажал «Пополнить» или выбрал кошелёк вывода: чего ждём и с какого момента.
+    invest_wait: HashMap<i64, (invest::Wait, Instant)>,
 }
 
 /// Сколько rich-сообщений помнить для «Не отображается?».

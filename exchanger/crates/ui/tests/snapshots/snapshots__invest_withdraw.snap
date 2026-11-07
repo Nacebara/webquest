@@ -1,0 +1,21 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+💼 <b>Вывод</b>
+Можно вывести: <code>950.75 USDT</code>. В какой кошелёк прислать чек?
+Заявки до <code>200.00 USDT</code> исполняются сразу, крупнее — после подтверждения владельца.
+--- keyboard: inline
+[{"callback_data":"inv:to:cryptobot","text":"🔵 CryptoBot"},{"callback_data":"inv:to:xrocket","text":"🚀 xRocket"}]
+[{"callback_data":"inv","text":"Отмена"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000020">💼</tg-emoji> <b>Вывод</b>
+Можно вывести: <code>950.75 USDT</code>. В какой кошелёк прислать чек?
+Заявки до <code>200.00 USDT</code> исполняются сразу, крупнее — после подтверждения владельца.
+--- keyboard: inline
+[{"callback_data":"inv:to:cryptobot","icon_custom_emoji_id":"5368000000000000011","text":"CryptoBot"},{"callback_data":"inv:to:xrocket","icon_custom_emoji_id":"5368000000000000012","text":"xRocket"}]
+[{"callback_data":"inv","text":"Отмена"}]

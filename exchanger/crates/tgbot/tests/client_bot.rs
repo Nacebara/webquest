@@ -509,6 +509,10 @@ impl Env {
         .unwrap_or_default()
     }
 
+    fn calls_contain(&self, needle: &str) -> bool {
+        self.fake.calls().iter().any(|c| c.contains(needle))
+    }
+
     async fn assert_books_match(&self) {
         assert_eq!(
             self.ledger("asset:cb:USDT").await,
@@ -840,4 +844,132 @@ async fn xrocket_multi_check_is_refused_and_never_opened(pool: PgPool) {
         "юзербот ничего не отправлял боту xRocket"
     );
     assert!(e.world.check(&multi.code).unwrap().claimed_by.is_empty());
+}
+
+// ---------------------------------------------------------------------------------------------
+// Инвестиции (DESIGN-v0.2 Р18)
+
+/// Выдать клиенту доступ к инвестициям: доля 50 %, без блокировки, автовывод до 100 USDT.
+async fn grant_investor(e: &Env) {
+    let mut conn = e.pool.acquire().await.unwrap();
+    let owner = storage::staff::ensure_owner(&mut conn, 1, "Owner")
+        .await
+        .unwrap();
+    storage::users::upsert(&mut conn, CLIENT, &storage::users::Profile::default())
+        .await
+        .unwrap();
+    drop(conn);
+    e.engine
+        .invest_save_terms(
+            &owner,
+            &storage::invest::Investor {
+                user_id: CLIENT,
+                share_pct: dec!(50),
+                lock_days: 0,
+                min_deposit: dec!(10),
+                auto_withdraw_max: dec!(100),
+                is_active: true,
+                granted_by: None,
+                created_at: chrono::Utc::now(),
+            },
+        )
+        .await
+        .unwrap();
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn the_invest_section_is_hidden_from_regular_clients(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    e.fake.client_writes("/start");
+    let welcome = e
+        .fake
+        .wait_for("welcome", |c| c.method == "sendMessage")
+        .await;
+    assert!(
+        !welcome.contains("Инвестиции"),
+        "кнопки нет у обычного клиента"
+    );
+    e.fake.client_writes("💼 Инвестиции");
+    e.fake
+        .wait_for("hint", |c| {
+            c.method == "sendMessage" && c.contains("Пришлите чек")
+        })
+        .await;
+    e.fake.client_presses(1000, "inv:dep");
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    bot.stop().await;
+    assert!(
+        !e.calls_contain("Пополнение"),
+        "чужая кнопка раздела ничего не открывает"
+    );
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn investor_deposits_by_check_and_withdraws_a_check(pool: PgPool) {
+    let e = env(pool).await;
+    grant_investor(&e).await;
+    let bot = e.start_bot();
+
+    e.fake.client_writes("/start");
+    e.fake
+        .wait_for("menu with the invest button", |c| {
+            c.method == "sendMessage" && c.contains("Инвестиции")
+        })
+        .await;
+    e.fake.client_writes("💼 Инвестиции");
+    e.fake
+        .wait_for("invest home", |c| {
+            c.method == "sendMessage" && c.contains("В обороте")
+        })
+        .await;
+
+    // Пополнить → чек → зачислено.
+    e.fake.client_presses(1001, "inv:dep");
+    e.fake
+        .wait_for("deposit prompt", |c| c.contains("Пополнение"))
+        .await;
+    let url = e.world.client_check(CB, usdt(dec!(200))).unwrap();
+    e.fake.client_writes(&url);
+    e.fake
+        .wait_for("deposit accepted", |c| c.contains("Чек принят"))
+        .await;
+    e.drain().await;
+    e.fake
+        .wait_for("deposit credited", |c| {
+            c.method == "sendMessage" && c.contains("Зачислено") && c.contains("200.00 USDT")
+        })
+        .await;
+    assert!(
+        e.orders().await.is_empty(),
+        "чек пополнения — не заявка обмена"
+    );
+
+    // Вывести → xRocket → 50 → чек.
+    e.fake.client_presses(1001, "inv:to:xrocket");
+    e.fake
+        .wait_for("amount prompt", |c| c.contains("Сколько вывести"))
+        .await;
+    e.fake.client_writes("50");
+    e.fake
+        .wait_for("withdrawal started", |c| c.contains("Создаю чек"))
+        .await;
+    e.drain().await;
+    let checks = e.world.checks_created_by(e.ub);
+    assert_eq!(checks.len(), 1, "один чек вывода");
+    let check_url = checks[0].url.clone();
+    e.fake
+        .wait_for("withdrawal check", |c| {
+            c.method == "sendMessage" && c.contains(&check_url) && c.contains("готов")
+        })
+        .await;
+    bot.stop().await;
+
+    e.world.claim_check(e.client, &check_url).unwrap();
+    assert_eq!(e.world.balance(e.client, XR, Asset::Usdt), dec!(50));
+    assert_eq!(
+        e.ledger(&format!("liability:investor:{CLIENT}:USDT")).await,
+        dec!(-150)
+    );
+    e.assert_books_match().await;
 }

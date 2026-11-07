@@ -6,6 +6,7 @@ use domain::{Asset, Decimal, Direction, Money, OrderState, Platform};
 use rust_decimal_macros::dec;
 use ui::{
     Breakdown, DirectionStatus, DirectionTerms, Emoji, EmojiSet, Excess, FiatAmount, HistoryRow,
+    InvestHome, InvestMoveKind, InvestMoveRow, InvestMoveStatus, InvestNotice, InvestProblem,
     InvoiceProblem, InvoiceQuote, InvoiceRefusal, OrderCard, OrderRef, RefundReason, Screen, Terms,
     Ui, UiConfig, UiError,
 };
@@ -590,5 +591,171 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
             ui.refund_started(&order(cb), &usdt(dec!(750)), &reason),
         ));
     }
+    out.extend(invest_gallery(ui));
     out
+}
+
+/// Инвестор: 1 250 в обороте, из них 300 — свежее пополнение под блокировкой.
+pub fn investor() -> InvestHome {
+    InvestHome {
+        share_pct: dec!(50),
+        lock_days: 14,
+        min_deposit: dec!(10),
+        auto_withdraw_max: dec!(200),
+        balance: dec!(1250.75),
+        profit: dec!(50.75),
+        profit_24h: dec!(2.5),
+        locked: dec!(300),
+        withdrawable: dec!(950.75),
+        moves: vec![
+            InvestMoveRow {
+                kind: InvestMoveKind::Withdrawal,
+                status: InvestMoveStatus::Requested,
+                platform: Platform::XRocket,
+                amount: Some(dec!(500)),
+                at: at(13, 10),
+                check_url: None,
+            },
+            InvestMoveRow {
+                kind: InvestMoveKind::Deposit,
+                status: InvestMoveStatus::Done,
+                platform: Platform::CryptoBot,
+                amount: Some(dec!(300)),
+                at: at(12, 0),
+                check_url: None,
+            },
+            InvestMoveRow {
+                kind: InvestMoveKind::Withdrawal,
+                status: InvestMoveStatus::Done,
+                platform: Platform::CryptoBot,
+                amount: Some(dec!(40)),
+                at: at(11, 30),
+                check_url: Some(REFUND_URL.to_owned()),
+            },
+            InvestMoveRow {
+                kind: InvestMoveKind::Deposit,
+                status: InvestMoveStatus::Processing,
+                platform: Platform::CryptoBot,
+                amount: None,
+                at: at(11, 0),
+                check_url: None,
+            },
+        ],
+    }
+}
+
+/// Новый инвестор: ничего нет, без блокировки, выводы только через владельца.
+pub fn new_investor() -> InvestHome {
+    InvestHome {
+        share_pct: dec!(40),
+        lock_days: 0,
+        min_deposit: dec!(50),
+        auto_withdraw_max: dec!(0),
+        balance: dec!(0),
+        profit: dec!(0),
+        profit_24h: dec!(0),
+        locked: dec!(0),
+        withdrawable: dec!(0),
+        moves: Vec::new(),
+    }
+}
+
+pub fn invest_gallery(ui: &Ui) -> Vec<(String, Screen)> {
+    let i = investor();
+    let n = new_investor();
+    let xr = Platform::XRocket;
+    let screens = vec![
+        ("invest_home", ui.invest_home(&i)),
+        ("invest_home_new", ui.invest_home(&n)),
+        ("invest_howto", ui.invest_howto(&i)),
+        ("invest_howto_new", ui.invest_howto(&n)),
+        ("invest_deposit", ui.invest_deposit_prompt(&i)),
+        ("invest_withdraw", ui.invest_withdraw_menu(&i)),
+        ("invest_withdraw_nothing", ui.invest_withdraw_menu(&n)),
+        ("invest_withdraw_amount", ui.invest_withdraw_amount(&i, xr)),
+        (
+            "invest_notice_deposit_accepted",
+            ui.invest_notice(&InvestNotice::DepositAccepted),
+        ),
+        (
+            "invest_notice_deposit_done",
+            ui.invest_notice(&InvestNotice::DepositDone {
+                amount: dec!(300),
+                balance: dec!(1250.75),
+            }),
+        ),
+        (
+            "invest_notice_deposit_rejected",
+            ui.invest_notice(&InvestNotice::DepositRejected(UiError::AlreadyActivated)),
+        ),
+        (
+            "invest_notice_deposit_manual",
+            ui.invest_notice(&InvestNotice::DepositManual),
+        ),
+        (
+            "invest_notice_withdraw_requested",
+            ui.invest_notice(&InvestNotice::WithdrawRequested {
+                amount: dec!(500),
+                platform: xr,
+            }),
+        ),
+        (
+            "invest_notice_withdraw_processing",
+            ui.invest_notice(&InvestNotice::WithdrawProcessing {
+                amount: dec!(50),
+                platform: xr,
+            }),
+        ),
+        (
+            "invest_notice_withdraw_done",
+            ui.invest_notice(&InvestNotice::WithdrawDone {
+                amount: dec!(50),
+                platform: xr,
+                check_url: CHECK_URL.to_owned(),
+            }),
+        ),
+        (
+            "invest_notice_withdraw_rejected",
+            ui.invest_notice(&InvestNotice::WithdrawRejected {
+                amount: dec!(500),
+                reason: "рано, подождите неделю <b>&".to_owned(),
+            }),
+        ),
+        (
+            "invest_notice_withdraw_failed",
+            ui.invest_notice(&InvestNotice::WithdrawFailed { amount: dec!(50) }),
+        ),
+        (
+            "invest_notice_withdraw_manual",
+            ui.invest_notice(&InvestNotice::WithdrawManual { amount: dec!(50) }),
+        ),
+        (
+            "invest_problem_not_a_check",
+            ui.invest_problem(&InvestProblem::NotACheck),
+        ),
+        (
+            "invest_problem_bad_amount",
+            ui.invest_problem(&InvestProblem::BadAmount),
+        ),
+        (
+            "invest_problem_over",
+            ui.invest_problem(&InvestProblem::OverWithdrawable { max: dec!(950.75) }),
+        ),
+        (
+            "invest_problem_open",
+            ui.invest_problem(&InvestProblem::OpenWithdrawal),
+        ),
+        (
+            "invest_problem_wallet",
+            ui.invest_problem(&InvestProblem::WalletUnavailable { platform: xr }),
+        ),
+        (
+            "invest_problem_internal",
+            ui.invest_problem(&InvestProblem::Internal),
+        ),
+    ];
+    screens
+        .into_iter()
+        .map(|(name, screen)| (name.to_owned(), screen))
+        .collect()
 }

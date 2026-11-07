@@ -23,6 +23,7 @@
 mod actions;
 mod alerts;
 mod cb;
+mod invest;
 mod texts;
 mod views;
 
@@ -560,6 +561,7 @@ mod tests {
             include_str!("views.rs"),
             include_str!("actions.rs"),
             include_str!("alerts.rs"),
+            include_str!("invest.rs"),
         ];
         let sections = [
             "common",
@@ -586,6 +588,7 @@ mod tests {
             "recon",
             "selftest",
             "capital",
+            "invest",
         ];
         // Действия журнала (`admin_audit.action`) похожи на ключи, но это не тексты.
         let audit = [
@@ -619,8 +622,10 @@ mod tests {
                 let Some((section, key)) = piece.split_once('.') else {
                     continue;
                 };
+                // `include_str!("invest.rs")` выше — имя файла, а не ключ.
                 if sections.contains(&section)
                     && !audit.contains(&piece)
+                    && !piece.ends_with(".rs")
                     && !key.is_empty()
                     && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
                 {

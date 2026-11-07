@@ -1,0 +1,15 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+⏳ Заявка на вывод <code>500.00 USDT</code> в xRocket отправлена владельцу. Пока он решает, деньги работают — напишу здесь.
+--- keyboard: inline
+[{"callback_data":"inv","text":"💼 Инвестиции"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> Заявка на вывод <code>500.00 USDT</code> в xRocket отправлена владельцу. Пока он решает, деньги работают — напишу здесь.
+--- keyboard: inline
+[{"callback_data":"inv","icon_custom_emoji_id":"5368000000000000020","text":"Инвестиции"}]

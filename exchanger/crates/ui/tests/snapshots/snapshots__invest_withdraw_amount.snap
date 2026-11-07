@@ -1,0 +1,19 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+Сколько вывести в xRocket? Напишите сумму, например <code>100</code>, или нажмите «Всё доступное».
+Доступно: <code>950.75 USDT</code>.
+--- keyboard: inline
+[{"callback_data":"inv:all:xrocket","style":"primary","text":"🚀 Всё доступное · 950.75"}]
+[{"callback_data":"inv","text":"Отмена"}]
+
+### premium
+--- html
+Сколько вывести в xRocket? Напишите сумму, например <code>100</code>, или нажмите «Всё доступное».
+Доступно: <code>950.75 USDT</code>.
+--- keyboard: inline
+[{"callback_data":"inv:all:xrocket","icon_custom_emoji_id":"5368000000000000012","style":"primary","text":"Всё доступное · 950.75"}]
+[{"callback_data":"inv","text":"Отмена"}]

@@ -49,6 +49,7 @@ pub(crate) enum Input {
     Note(i64),
     EmojiFor(Emoji),
     StaffAdd,
+    Invest(crate::invest::InvestInput),
 }
 
 /// Изменение, ждущее подтверждения.
@@ -149,6 +150,7 @@ pub(crate) enum Action {
     Selftest {
         amount: Decimal,
     },
+    Invest(crate::invest::InvestOp),
 }
 
 /// Базовая ставка на примерных суммах: рост или падение больше 1 п.п. — решение владельца
@@ -204,6 +206,7 @@ impl Action {
             | Action::StaffDisable { .. }
             | Action::Capital { .. }
             | Action::Selftest { .. } => Role::Owner,
+            Action::Invest(op) => op.min_role(),
             _ => Role::Admin,
         }
     }
@@ -331,6 +334,7 @@ impl Inner {
         let text = message.text.as_deref().unwrap_or("").trim().to_owned();
         let t = &self.texts;
         let action = match input.clone() {
+            Input::Invest(i) => return self.invest_input(staff, i, &text).await,
             Input::OrderSearch => return self.find_order(&text).await,
             Input::UserSearch => return self.find_user(&text).await,
             Input::Dir(d, field) => {
@@ -1094,6 +1098,7 @@ impl Inner {
                 ],
             ),
             Action::Selftest { amount } => t.f("selftest.preview", &[("amount", &usdt(*amount))]),
+            Action::Invest(op) => self.invest_preview(op),
         };
         let mut s = Screen::new(text);
         if staff.role >= need {
@@ -1177,6 +1182,9 @@ impl Inner {
 
         if let Action::Selftest { amount } = &action {
             return self.run_selftest(*amount).await;
+        }
+        if let Action::Invest(op) = action {
+            return self.invest_apply(staff, op).await;
         }
 
         let mut tx = self.pool.begin().await?;
@@ -1507,7 +1515,9 @@ impl Inner {
                 )
             }
             // Решения по заявке и самопроверка применены выше.
-            Action::Decide { .. } | Action::Selftest { .. } => return self.menu(staff).await,
+            Action::Decide { .. } | Action::Selftest { .. } | Action::Invest(_) => {
+                return self.menu(staff).await;
+            }
         };
         storage::audit::record(
             &mut tx,

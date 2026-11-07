@@ -1,0 +1,15 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+⏸ xRocket сейчас недоступен. Ничего не списано — попробуйте позже или выберите другой кошелёк.
+--- keyboard: inline
+[{"callback_data":"inv","text":"💼 Инвестиции"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> xRocket сейчас недоступен. Ничего не списано — попробуйте позже или выберите другой кошелёк.
+--- keyboard: inline
+[{"callback_data":"inv","icon_custom_emoji_id":"5368000000000000020","text":"Инвестиции"}]
