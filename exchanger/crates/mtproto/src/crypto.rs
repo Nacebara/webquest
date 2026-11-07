@@ -49,6 +49,15 @@ impl SessionKey {
         Ok(Self::from_bytes(0, &bytes))
     }
 
+    /// Новый случайный ключ для `SESSION_KEY` (`exch gen-session-key`): 32 байта из
+    /// системного генератора.
+    pub fn random_bytes() -> Result<[u8; 32], CryptoError> {
+        let generated = chacha20poly1305::Key::try_generate().map_err(|_| CryptoError::Random)?;
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(generated.as_slice());
+        Ok(bytes)
+    }
+
     /// Второй экземпляр того же ключа: `login` и `GrammersTransport::connect` забирают свой.
     pub fn duplicate(&self) -> Self {
         Self::from_bytes(self.version, self.key.expose_secret())

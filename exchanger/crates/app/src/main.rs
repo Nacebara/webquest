@@ -49,6 +49,9 @@ enum Command {
         #[arg(long, value_parser = parse_platform)]
         platform: domain::Platform,
     },
+    /// Напечатать новый случайный ключ для `SESSION_KEY` (вставить в .env один раз; потеряете —
+    /// юзерботам придётся войти заново).
+    GenSessionKey,
     /// Самопроверка на живых кошельках: на каждом — чек через меню на `amount` USDT и его же
     /// активация; деньги возвращаются, леджер не меняется. Запускать при остановленном
     /// `exch run` (одна сессия Telegram — один процесс) или кнопкой «Самопроверка» в пульте.
@@ -119,23 +122,33 @@ fn parse_platform(s: &str) -> Result<domain::Platform, String> {
         .ok_or_else(|| format!("unknown platform {s}: use cryptobot or xrocket"))
 }
 
+/// Прочитать файл переменных. Блокнот Windows сохраняет UTF-8 с BOM в начале — его убираем,
+/// иначе первая строка не разберётся.
+fn load_env_file(path: &std::path::Path) -> Result<(), String> {
+    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
+    dotenvy::from_read(std::io::Cursor::new(text.as_bytes())).map_err(|e| e.to_string())
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    match &cli.env_file {
-        Some(path) => {
-            if let Err(e) = dotenvy::from_path(path) {
-                eprintln!("cannot read {}: {e}", path.display());
-                return ExitCode::FAILURE;
-            }
-        }
-        None => {
-            // .env необязателен: на сервере переменные приходят из docker compose.
-            let _ = dotenvy::dotenv();
-        }
+    // .env необязателен: на сервере переменные приходят из docker compose. Но если файл
+    // есть и в нём ошибка — сказать об этом, а не молча работать без него.
+    let env_file = cli.env_file.clone().or_else(|| {
+        let default = PathBuf::from(".env");
+        default.is_file().then_some(default)
+    });
+    if let Some(path) = &env_file
+        && let Err(e) = load_env_file(path)
+    {
+        eprintln!("cannot read {}: {e}", path.display());
+        return ExitCode::FAILURE;
     }
     // У слушателя на ноутбуке вывод для человека: короткие строки, только предупреждения.
     let human = matches!(cli.command, Command::Listen { .. } | Command::Emoji(_));
-    init_tracing(human);
+    // LOG_FORMAT=text — обычный текст вместо JSON (запуск на ноутбуке, docs/LAPTOP.md).
+    let text = std::env::var("LOG_FORMAT").is_ok_and(|v| v.eq_ignore_ascii_case("text"));
+    init_tracing(human, text);
 
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -153,6 +166,16 @@ fn main() -> ExitCode {
             Command::Migrate => migrate().await,
             Command::CheckConfig => check_config().await,
             Command::Selftest { amount } => selftest(amount).await,
+            Command::GenSessionKey => {
+                use base64::Engine as _;
+                let key = mtproto::SessionKey::random_bytes()
+                    .map_err(|e| anyhow::anyhow!("cannot generate a key: {e}"))?;
+                println!(
+                    "SESSION_KEY={}",
+                    base64::engine::general_purpose::STANDARD.encode(key)
+                );
+                Ok(())
+            }
             Command::Login { label, platform } => login(label, platform).await,
             Command::Record {
                 label,
@@ -176,11 +199,14 @@ fn main() -> ExitCode {
     }
 }
 
-fn init_tracing(human: bool) {
-    if human {
-        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
+fn init_tracing(human: bool, text: bool) {
+    if human || text {
+        let default = if human { "warn" } else { "info" };
+        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default));
         tracing_subscriber::fmt()
             .compact()
+            // Старая консоль Windows (cmd) показывает цветовые коды как мусор.
+            .with_ansi(!cfg!(windows))
             .with_target(false)
             .with_env_filter(filter)
             .with_writer(std::io::stderr)
@@ -255,6 +281,19 @@ fn load_config() -> anyhow::Result<Config> {
 }
 
 async fn connect_and_migrate(cfg: &Config) -> anyhow::Result<storage::PgPool> {
+    use sqlx::migrate::MigrateDatabase as _;
+    // Своя база на ноутбуке: создать, если её ещё нет (на сервере её создаёт контейнер).
+    let url = cfg.database_url.expose_secret();
+    match sqlx::Postgres::database_exists(url).await {
+        Ok(false) => {
+            sqlx::Postgres::create_database(url)
+                .await
+                .context("cannot create the database (does the user have CREATEDB?)")?;
+            tracing::info!("database created");
+        }
+        Ok(true) => {}
+        Err(e) => tracing::debug!(error = %e, "cannot check whether the database exists"),
+    }
     let pool = storage::connect(cfg.database_url.expose_secret())
         .await
         .context("cannot connect to PostgreSQL")?;
