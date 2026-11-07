@@ -1,0 +1,8 @@
+[Unit]
+Description=exch: бэкап базы
+After=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/exch/backup.env
+ExecStart=/opt/exch/backup.sh

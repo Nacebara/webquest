@@ -125,6 +125,7 @@ pub enum TxKind {
     ExcessKept,
     InvoicePaid,
     CapitalIn,
+    CapitalOut,
     ManualClose,
 }
 
@@ -138,6 +139,7 @@ impl TxKind {
             TxKind::ExcessKept => "excess_kept",
             TxKind::InvoicePaid => "invoice_paid",
             TxKind::CapitalIn => "capital_in",
+            TxKind::CapitalOut => "capital_out",
             TxKind::ManualClose => "manual_close",
         }
     }
@@ -343,6 +345,26 @@ pub fn manual_close(asset: Asset, amount: Decimal) -> Result<Posting, PostingErr
     )
 }
 
+/// Владелец забрал деньги с кошелька: Дт equity:owner_withdrawals / Кт кошелёк.
+pub fn capital_out(
+    platform: Platform,
+    asset: Asset,
+    amount: Decimal,
+) -> Result<Posting, PostingError> {
+    let a = positive(amount)?;
+    Posting::new(
+        TxKind::CapitalOut,
+        vec![
+            line(
+                AccountCode::equity(Equity::OwnerWithdrawals, asset),
+                asset,
+                a,
+            ),
+            line(AccountCode::wallet(platform, asset), asset, -a),
+        ],
+    )
+}
+
 /// Взнос оборотного капитала: Дт кошелёк / Кт equity:capital.
 pub fn capital_in(
     platform: Platform,
@@ -488,6 +510,7 @@ mod tests {
                 excess_kept(Asset::Usdt, a),
                 manual_close(Asset::Usdt, a),
                 capital_in(p, Asset::Usdt, a),
+                capital_out(p, Asset::Usdt, a),
                 invoice_paid(p, Asset::Usdt, big, small),
                 payout(p, Asset::Usdt, big + small, big, small),
             ];

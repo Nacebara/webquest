@@ -186,6 +186,10 @@ pub enum Cb {
     ConfirmUnknown(String),
     Cancel,
     Ack(i64),
+    Reconcile,
+    Selftest,
+    /// Провести расхождение из события сверки как взнос или вывод владельца.
+    Capital(i64),
 }
 
 fn dir_code(d: Direction) -> &'static str {
@@ -278,6 +282,9 @@ impl Cb {
             Cb::ConfirmUnknown(n) => format!("ou:{n}"),
             Cb::Cancel => "no".into(),
             Cb::Ack(id) => format!("ack:{id}"),
+            Cb::Reconcile => "rc".into(),
+            Cb::Selftest => "stt".into(),
+            Cb::Capital(id) => format!("cap:{id}"),
         }
     }
 
@@ -351,6 +358,9 @@ impl Cb {
             ["ou", n] => Cb::ConfirmUnknown((*n).to_owned()),
             ["no"] => Cb::Cancel,
             ["ack", _] => Cb::Ack(id(1)?),
+            ["rc"] => Cb::Reconcile,
+            ["stt"] => Cb::Selftest,
+            ["cap", _] => Cb::Capital(id(1)?),
             _ => return None,
         })
     }
@@ -380,6 +390,9 @@ mod tests {
             Cb::StaffAdd,
             Cb::Audit,
             Cb::Cancel,
+            Cb::Reconcile,
+            Cb::Selftest,
+            Cb::Capital(big),
             Cb::Confirm("abcdefgh12".into()),
             Cb::ConfirmUnknown("abcdefgh12".into()),
             Cb::Order(big),

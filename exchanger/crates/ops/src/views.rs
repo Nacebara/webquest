@@ -240,10 +240,15 @@ impl Inner {
         let alerts = storage::alerts::open(&mut conn, 100).await?.len();
         lines.push(t.f("dash.alerts", &[("n", &alerts)]));
 
-        Ok(Screen::new(lines.join("\n")).row(vec![
-            btn(t.t("common.refresh"), &Cb::Dash),
-            btn(t.t("common.home"), &Cb::Menu),
-        ]))
+        Ok(Screen::new(lines.join("\n"))
+            .row(vec![
+                btn(t.t("dash.b_reconcile"), &Cb::Reconcile),
+                btn(t.t("dash.b_selftest"), &Cb::Selftest),
+            ])
+            .row(vec![
+                btn(t.t("common.refresh"), &Cb::Dash),
+                btn(t.t("common.home"), &Cb::Menu),
+            ]))
     }
 
     async fn lever(
@@ -1466,6 +1471,12 @@ impl Inner {
             Cb::Staff => self.staff_list(staff).await,
             Cb::Member(id) => self.member(staff, id).await,
             Cb::Audit => self.audit().await,
+            Cb::Reconcile => {
+                if let Some(denied) = self.deny(staff, Role::Admin) {
+                    return Ok(denied);
+                }
+                self.reconcile_now().await
+            }
             Cb::OrderAsk => Ok(self.prompt(staff, Input::OrderSearch, "order.ask")),
             Cb::UserAsk => Ok(self.prompt(staff, Input::UserSearch, "user.ask")),
             Cb::Take(id) => {
@@ -1535,7 +1546,11 @@ impl Inner {
         let t = &self.texts;
         let need = match &cb {
             Cb::Toggle(Flag::KillSwitch) => Role::Operator,
-            Cb::StaffAdd | Cb::MemberRole(..) | Cb::MemberDisable(_) => Role::Owner,
+            Cb::StaffAdd
+            | Cb::MemberRole(..)
+            | Cb::MemberDisable(_)
+            | Cb::Selftest
+            | Cb::Capital(_) => Role::Owner,
             _ => Role::Admin,
         };
         if let Some(denied) = self.deny(staff, need) {
@@ -1724,6 +1739,32 @@ impl Inner {
                 Action::StaffDisable {
                     id,
                     name: m.display_name,
+                }
+            }
+            Cb::Selftest => Action::Selftest {
+                amount: Decimal::ONE,
+            },
+            Cb::Capital(alert) => {
+                let Some(a) = storage::alerts::get(&mut conn, alert)
+                    .await?
+                    .filter(|a| a.acked_at.is_none() && a.title == "balance_mismatch")
+                else {
+                    return Ok(Screen::new(t.t("capital.gone"))
+                        .row(vec![btn(t.t("common.home"), &Cb::Menu)]));
+                };
+                let platform = a.payload["platform"]
+                    .as_str()
+                    .and_then(Platform::from_db_name);
+                let diff: Option<Decimal> = a.payload["diff"].as_str().and_then(|d| d.parse().ok());
+                let (Some(platform), Some(diff)) = (platform, diff) else {
+                    return Ok(Screen::new(t.t("capital.gone"))
+                        .row(vec![btn(t.t("common.home"), &Cb::Menu)]));
+                };
+                Action::Capital {
+                    platform,
+                    amount: diff.abs(),
+                    deposit: diff > Decimal::ZERO,
+                    alert,
                 }
             }
             _ => return self.menu(staff).await,

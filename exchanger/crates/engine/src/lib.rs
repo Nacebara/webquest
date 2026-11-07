@@ -18,6 +18,7 @@ mod effects;
 pub mod fees;
 mod invoice;
 pub mod operator;
+pub mod reconcile;
 mod settle;
 mod submit;
 mod worker;
@@ -60,6 +61,8 @@ pub struct EngineConfig {
     pub stale_after: Duration,
     /// Как часто повторять сверку выплат с неизвестным исходом и искать осиротевшие.
     pub housekeeping_every: Duration,
+    /// Как часто сверять балансы кошельков с леджером (SPEC П14).
+    pub reconcile_every: Duration,
     /// «Лимит без код-пароля» аккаунта CryptoBot, USD за скользящие 24 часа (DESIGN-v0.2 Р11).
     /// Должен совпадать с настройкой в самом CryptoBot («Безопасность» → «Лимит без код-пароля»).
     /// Траты кошелька CryptoBot держим ниже него с запасом — бот не спросит код никогда.
@@ -78,6 +81,7 @@ impl Default for EngineConfig {
             escalate_after: Duration::from_secs(1800),
             stale_after: Duration::from_secs(900),
             housekeeping_every: Duration::from_secs(30),
+            reconcile_every: Duration::from_secs(600),
             // Значение CryptoBot по умолчанию.
             cb_passcode_free_limit: Some(Decimal::from(500)),
         }
@@ -122,6 +126,8 @@ pub struct Engine {
     wallets: HashMap<Platform, Arc<dyn WalletBot>>,
     cfg: EngineConfig,
     updates: broadcast::Sender<OrderUpdate>,
+    /// Идёт самопроверка: сверка балансов молчит.
+    selftest_running: std::sync::atomic::AtomicBool,
 }
 
 impl std::fmt::Debug for Engine {
@@ -141,6 +147,7 @@ impl Engine {
             wallets: HashMap::new(),
             cfg,
             updates,
+            selftest_running: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -202,6 +209,8 @@ impl Engine {
                 AccountCode::revenue(Revenue::Fee, asset),
                 AccountCode::revenue(Revenue::Excess, asset),
                 AccountCode::revenue(Revenue::Retained, asset),
+                AccountCode::equity(domain::ledger::Equity::Capital, asset),
+                AccountCode::equity(domain::ledger::Equity::OwnerWithdrawals, asset),
             ] {
                 storage::ledger::ensure_account(&mut tx, &code, asset, None).await?;
             }
@@ -233,6 +242,9 @@ impl Engine {
         listener.listen("exch_operations").await?;
         let mut tick = tokio::time::interval(Duration::from_secs(1));
         let mut housekeeping = tokio::time::interval(self.cfg.housekeeping_every);
+        let mut reconcile = tokio::time::interval(self.cfg.reconcile_every);
+        // Первый замер — не сразу после старта: восстановление ещё доводит операции.
+        reconcile.tick().await;
         loop {
             while self.process_due().await? > 0 {}
             tokio::select! {
@@ -245,6 +257,11 @@ impl Engine {
                     self.expire_quotes().await?;
                     self.resolve_unknown().await?;
                     self.recover_dispatched(Some(self.cfg.stale_after)).await?;
+                }
+                _ = reconcile.tick() => {
+                    if let Err(e) = self.reconcile_balances().await {
+                        tracing::warn!(error = %e, "balance reconciliation failed");
+                    }
                 }
                 note = listener.recv() => {
                     if let Err(e) = note {

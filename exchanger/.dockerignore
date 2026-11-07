@@ -1,0 +1,6 @@
+target
+.env
+*.dump
+*.dump.age
+tools/emoji/node_modules
+docs/mockups

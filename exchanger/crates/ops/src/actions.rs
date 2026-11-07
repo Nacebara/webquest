@@ -139,6 +139,16 @@ pub(crate) enum Action {
         id: i64,
         name: String,
     },
+    /// Расхождение сверки — взнос (`deposit`) или вывод владельца.
+    Capital {
+        platform: Platform,
+        amount: Decimal,
+        deposit: bool,
+        alert: i64,
+    },
+    Selftest {
+        amount: Decimal,
+    },
 }
 
 /// Базовая ставка на примерных суммах: рост или падение больше 1 п.п. — решение владельца
@@ -189,9 +199,11 @@ impl Action {
                     Role::Owner
                 }
             }
-            Action::StaffAdd { .. } | Action::StaffRole { .. } | Action::StaffDisable { .. } => {
-                Role::Owner
-            }
+            Action::StaffAdd { .. }
+            | Action::StaffRole { .. }
+            | Action::StaffDisable { .. }
+            | Action::Capital { .. }
+            | Action::Selftest { .. } => Role::Owner,
             _ => Role::Admin,
         }
     }
@@ -1065,6 +1077,23 @@ impl Inner {
             Action::StaffDisable { name, .. } => {
                 t.f("staff.preview_disable", &[("name", &esc(name))])
             }
+            Action::Capital {
+                platform,
+                amount,
+                deposit,
+                ..
+            } => t.f(
+                if *deposit {
+                    "capital.preview_in"
+                } else {
+                    "capital.preview_out"
+                },
+                &[
+                    ("amount", &usdt(*amount)),
+                    ("name", &self.platform_name(*platform)),
+                ],
+            ),
+            Action::Selftest { amount } => t.f("selftest.preview", &[("amount", &usdt(*amount))]),
         };
         let mut s = Screen::new(text);
         if staff.role >= need {
@@ -1144,6 +1173,10 @@ impl Inner {
             let mut card = self.order(Some(staff), *order).await?;
             card.text = format!("{head}\n\n{}", card.text);
             return Ok(card);
+        }
+
+        if let Action::Selftest { amount } = &action {
+            return self.run_selftest(*amount).await;
         }
 
         let mut tx = self.pool.begin().await?;
@@ -1420,8 +1453,61 @@ impl Inner {
                     Cb::Staff,
                 )
             }
-            // Решения по заявке применены выше.
-            Action::Decide { .. } => return self.menu(staff).await,
+            Action::Capital {
+                platform,
+                amount,
+                deposit,
+                alert,
+            } => {
+                // Событие должно быть ещё открыто: иначе разницу уже провели или она ушла.
+                let open = storage::alerts::get(&mut tx, *alert)
+                    .await?
+                    .is_some_and(|a| a.acked_at.is_none());
+                if !open {
+                    return Ok(Screen::new(t.t("capital.gone"))
+                        .row(vec![btn(t.t("common.home"), &Cb::Menu)]));
+                }
+                let posting = if *deposit {
+                    domain::ledger::capital_in(*platform, Asset::Usdt, *amount)
+                } else {
+                    domain::ledger::capital_out(*platform, Asset::Usdt, *amount)
+                };
+                let Ok(posting) = posting else {
+                    return Ok(Screen::new(t.t("refusal.bad_amount"))
+                        .row(vec![btn(t.t("common.home"), &Cb::Menu)]));
+                };
+                let created_by = format!("staff:{staff_id}");
+                let memo = if *deposit {
+                    "взнос владельца по сверке"
+                } else {
+                    "вывод владельца по сверке"
+                };
+                storage::ledger::post(
+                    &mut tx,
+                    &posting,
+                    storage::ledger::PostingRefs {
+                        memo: Some(memo),
+                        created_by: Some(&created_by),
+                        ..Default::default()
+                    },
+                )
+                .await?;
+                storage::alerts::ack(&mut tx, *alert, staff_id).await?;
+                (
+                    if *deposit {
+                        "capital.in"
+                    } else {
+                        "capital.out"
+                    },
+                    "wallet",
+                    platform.db_name().to_owned(),
+                    None,
+                    Some(json!({ "amount": amount.to_string() })),
+                    Cb::Dash,
+                )
+            }
+            // Решения по заявке и самопроверка применены выше.
+            Action::Decide { .. } | Action::Selftest { .. } => return self.menu(staff).await,
         };
         storage::audit::record(
             &mut tx,
@@ -1448,10 +1534,82 @@ impl Inner {
             Cb::Emoji => self.emoji().await?,
             Cb::Bots => self.bots().await?,
             Cb::Staff => self.staff_list(staff).await?,
+            Cb::Dash => self.dash().await?,
             _ => self.menu(staff).await?,
         };
         screen.text = format!("{}\n\n{}", t.t("common.saved"), screen.text);
         Ok(screen)
+    }
+}
+
+impl Inner {
+    /// Сверка по кнопке: отчёт по кошелькам.
+    pub(crate) async fn reconcile_now(&self) -> Result<Screen, OpsError> {
+        let t = &self.texts;
+        let report = self.engine.reconcile_balances().await?;
+        let mut lines = vec![t.t("recon.title")];
+        if report.is_empty() {
+            lines.push(t.t("recon.none"));
+        }
+        for r in &report {
+            let diff = r.diff().unwrap_or_default();
+            let verdict = match r.verdict {
+                engine::reconcile::Verdict::Ok => t.t("recon.ok"),
+                engine::reconcile::Verdict::Warn => t.f("recon.warn", &[("diff", &usdt(diff))]),
+                engine::reconcile::Verdict::Pause => t.f("recon.pause", &[("diff", &usdt(-diff))]),
+                engine::reconcile::Verdict::SkippedInflight => t.t("recon.skipped"),
+                engine::reconcile::Verdict::Unavailable => t.t("recon.unavailable"),
+            };
+            lines.push(t.f(
+                "recon.line",
+                &[
+                    ("name", &self.platform_name(r.platform)),
+                    ("actual", &r.actual.map_or_else(|| t.t("common.none"), usdt)),
+                    ("expected", &usdt(r.expected)),
+                    ("verdict", &verdict),
+                ],
+            ));
+        }
+        Ok(Screen::new(lines.join("\n")).row(vec![
+            btn(t.t("menu.dash"), &Cb::Dash),
+            btn(t.t("common.home"), &Cb::Menu),
+        ]))
+    }
+
+    async fn run_selftest(&self, amount: Decimal) -> Result<Screen, OpsError> {
+        let t = &self.texts;
+        let steps = match self.engine.selftest(amount).await {
+            Ok(steps) => steps,
+            Err(engine::EngineError::Invariant(_)) => {
+                return Ok(
+                    Screen::new(t.t("selftest.busy")).row(vec![btn(t.t("common.home"), &Cb::Menu)])
+                );
+            }
+            Err(e) => return Err(e.into()),
+        };
+        let mut lines = vec![t.t("selftest.title")];
+        for s in &steps {
+            lines.push(t.f(
+                "selftest.step",
+                &[
+                    ("mark", &if s.ok { "✅" } else { "❌" }),
+                    ("name", &self.platform_name(s.platform)),
+                    ("step", &t.t(&format!("selftest.s_{}", s.step))),
+                    ("detail", &esc(&s.detail)),
+                ],
+            ));
+        }
+        lines.push(String::new());
+        let all_ok = !steps.is_empty() && steps.iter().all(|s| s.ok);
+        lines.push(t.t(if all_ok {
+            "selftest.all_ok"
+        } else {
+            "selftest.failed"
+        }));
+        Ok(Screen::new(lines.join("\n")).row(vec![
+            btn(t.t("menu.dash"), &Cb::Dash),
+            btn(t.t("common.home"), &Cb::Menu),
+        ]))
     }
 }
 

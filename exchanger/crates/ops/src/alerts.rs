@@ -199,6 +199,50 @@ impl Inner {
                 btn(t.t("menu.promo"), &Cb::Promo),
                 btn(t.t("alert.b_ack"), &Cb::Ack(a.id)),
             ]),
+            "balance_mismatch" => {
+                let platform = p["platform"]
+                    .as_str()
+                    .and_then(domain::Platform::from_db_name);
+                let name =
+                    platform.map_or_else(|| esc(&s(p, "platform")), |x| self.platform_name(x));
+                let diff = dec(p, "diff");
+                let paused = if p["paused"].as_bool() == Some(true) {
+                    t.t("alert.paused")
+                } else {
+                    String::new()
+                };
+                let mut sc = Screen::new(t.f(
+                    "alert.balance_mismatch",
+                    &[
+                        ("name", &name),
+                        ("actual", &usdt(dec(p, "actual"))),
+                        ("expected", &usdt(dec(p, "expected"))),
+                        (
+                            "diff",
+                            &format!(
+                                "{}{}",
+                                if diff > domain::Decimal::ZERO {
+                                    "+"
+                                } else {
+                                    ""
+                                },
+                                usdt(diff)
+                            ),
+                        ),
+                        ("paused", &paused),
+                    ],
+                ));
+                let capital = if diff > domain::Decimal::ZERO {
+                    t.f("alert.b_capital_in", &[("amount", &usdt(diff))])
+                } else {
+                    t.f("alert.b_capital_out", &[("amount", &usdt(-diff))])
+                };
+                sc = sc.row(vec![btn(capital, &Cb::Capital(a.id))]).row(vec![
+                    btn(t.t("alert.b_recheck"), &Cb::Reconcile),
+                    btn(t.t("alert.b_ack"), &Cb::Ack(a.id)),
+                ]);
+                sc
+            }
             _ => Screen::new(t.f(
                 "alert.generic",
                 &[

@@ -49,6 +49,13 @@ enum Command {
         #[arg(long, value_parser = parse_platform)]
         platform: domain::Platform,
     },
+    /// Самопроверка на живых кошельках: на каждом — чек через меню на `amount` USDT и его же
+    /// активация; деньги возвращаются, леджер не меняется. Запускать при остановленном
+    /// `exch run` (одна сессия Telegram — один процесс) или кнопкой «Самопроверка» в пульте.
+    Selftest {
+        #[arg(long, default_value = "1")]
+        amount: domain::Decimal,
+    },
     /// Записывать ответы ботов кошельков в файл JSON lines (для фикстур парсеров), ничего
     /// не отправляя. В файле — живые ссылки на чеки: хранить вне репозитория.
     Record {
@@ -71,8 +78,9 @@ enum Command {
         #[arg(long, default_value_t = 300)]
         history: u32,
     },
-    /// Премиум-эмодзи клиентского бота (до пульта): вариация набора, свои эмодзи по ролям,
-    /// установка наборов exch в Telegram. Клиентский бот читает настройки при старте.
+    /// Премиум-эмодзи клиентского бота: вариация набора, свои эмодзи по ролям, установка
+    /// наборов exch в Telegram. Вариация и свои эмодзи есть и в пульте; клиентский бот
+    /// подхватывает изменения в течение минуты.
     #[command(subcommand)]
     Emoji(EmojiCommand),
 }
@@ -144,6 +152,7 @@ fn main() -> ExitCode {
             Command::Run => run().await,
             Command::Migrate => migrate().await,
             Command::CheckConfig => check_config().await,
+            Command::Selftest { amount } => selftest(amount).await,
             Command::Login { label, platform } => login(label, platform).await,
             Command::Record {
                 label,
@@ -334,6 +343,37 @@ async fn record(label: String, out: PathBuf, history: u32) -> anyhow::Result<()>
     });
     let stats = app::record::record_stream(rx, &mut file, &log, &label, &cancel).await?;
     tracing::info!(account = %label, written = stats.written, lagged = stats.lagged, "recording stopped");
+    Ok(())
+}
+
+async fn selftest(amount: domain::Decimal) -> anyhow::Result<()> {
+    let cfg = load_config()?;
+    let pool = connect_and_migrate(&cfg).await?;
+    let tg = TelegramSettings::from_config(&cfg)?;
+    let log = Arc::new(app::wallet_log::WalletLog::new(
+        pool.clone(),
+        tg.bots().clone(),
+    ));
+    let userbots = app::runtime::connect_userbots(&pool, &tg, &log).await?;
+    anyhow::ensure!(
+        !userbots.is_empty(),
+        "no active wallet accounts: run `exch login` first"
+    );
+    let engine = app::runtime::engine(&pool, &userbots);
+    let steps = engine.selftest(amount).await?;
+    let mut ok = !steps.is_empty();
+    for s in &steps {
+        ok &= s.ok;
+        println!(
+            "{} {:<9} {:<13} {}",
+            if s.ok { "OK  " } else { "FAIL" },
+            s.platform.db_name(),
+            s.step,
+            s.detail
+        );
+    }
+    anyhow::ensure!(ok, "selftest failed: see the steps above");
+    println!("selftest passed");
     Ok(())
 }
 

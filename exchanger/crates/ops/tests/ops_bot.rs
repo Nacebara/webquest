@@ -647,3 +647,49 @@ async fn client_card_sets_a_personal_fee(pool: PgPool) {
     assert_eq!(terms.fee_pct, Some(dec!(1)));
     assert_eq!(terms.updated_by, Some(OWNER));
 }
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn owner_top_up_is_posted_from_the_reconciliation_alert(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/start", "Пульт exch").await;
+    o.say(ADMIN, "/start", "Пульт exch").await;
+    // Владелец пополнил CryptoBot на 250 — леджер об этом не знает.
+    o.world
+        .set_balance(o.ub, CB, Asset::Usdt, dec!(1250))
+        .unwrap();
+    let mark = o.tg.mark();
+    o.engine.reconcile_balances().await.unwrap();
+    let alert = o.tg.screen(mark, OWNER, "не сходится").await;
+    assert!(alert.text().contains("+250.00 USDT"), "{}", alert.text());
+    // Админу провести нельзя — только владельцу.
+    let admin_alert = o.tg.screen(mark, ADMIN, "не сходится").await;
+    o.press(ADMIN, &admin_alert, "Это мой взнос", "роли «Владелец»")
+        .await;
+    let preview = o
+        .press(OWNER, &alert, "Это мой взнос", "взнос владельца")
+        .await;
+    o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
+    let r = o.engine.reconcile_balances().await.unwrap();
+    assert!(
+        r.iter()
+            .all(|x| x.verdict == engine::reconcile::Verdict::Ok),
+        "{r:?}"
+    );
+    assert_eq!(o.audit("capital.in").await.len(), 1);
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn selftest_from_the_panel_reports_every_step(pool: PgPool) {
+    let o = ops(pool).await;
+    let dash = o.say(OWNER, "/dash", "Сводка").await;
+    let preview = o
+        .press(OWNER, &dash, "Самопроверка", "сам же его активирует")
+        .await;
+    let report = o
+        .press(OWNER, &preview, "Подтвердить", "Всё работает")
+        .await;
+    assert!(!report.text().contains("❌"), "{}", report.text());
+    for platform in [CB, XR] {
+        assert_eq!(o.world.balance(o.ub, platform, Asset::Usdt), dec!(1000));
+    }
+}

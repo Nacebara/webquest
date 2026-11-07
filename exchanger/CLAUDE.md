@@ -26,7 +26,7 @@ cargo fmt --all
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features      # нужен DATABASE_URL; sqlx::test создаёт БД на тест
 cargo sqlx prepare --workspace -- --all-targets   # после изменения SQL-запросов; коммитить .sqlx/
-cargo run --bin exch -- --help             # CLI: run | migrate | check-config | login | record (selftest — впереди)
+cargo run --bin exch -- --help             # CLI: run | migrate | check-config | login | record | listen | emoji | selftest
 ```
 
 `--all-features` обязателен: тесты симулятора кошельков — за feature `sim`.

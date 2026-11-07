@@ -572,6 +572,9 @@ mod tests {
             "staff",
             "audit",
             "alert",
+            "recon",
+            "selftest",
+            "capital",
         ];
         // Действия журнала (`admin_audit.action`) похожи на ключи, но это не тексты.
         let audit = [
@@ -596,6 +599,8 @@ mod tests {
             "staff.add",
             "staff.role",
             "staff.disable",
+            "capital.in",
+            "capital.out",
         ];
         let mut keys = Vec::new();
         for src in sources {
@@ -648,6 +653,9 @@ mod tests {
         }
         for e in Emoji::ALL {
             assert!(t.has(&format!("emoji_roles.{}", e.key())), "{e:?}");
+        }
+        for step in ["balance", "issue", "claim", "balance_after"] {
+            assert!(t.has(&format!("selftest.s_{step}")));
         }
     }
 

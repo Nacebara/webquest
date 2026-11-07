@@ -1,0 +1,33 @@
+# /opt/exch/docker-compose.yml (docs/DEPLOY.md). Секреты — только в /opt/exch/.env (chmod 600).
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: exch
+      POSTGRES_USER: exch
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is not set}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exch -d exch"]
+      interval: 10s
+      retries: 6
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+
+  exch:
+    # Готовый образ (EXCH_IMAGE) или сборка из исходников рядом (build).
+    image: ${EXCH_IMAGE:-exch:local}
+    build:
+      context: ${EXCH_SRC:-./src/exchanger}
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db: { condition: service_healthy }
+    # Мягкая остановка: движок доводит текущее действие (SPEC §12, шаг 14).
+    stop_grace_period: 90s
+    read_only: true
+    tmpfs: ["/tmp"]
+    logging: { driver: json-file, options: { max-size: "50m", max-file: "5" } }
+
+volumes:
+  pgdata: {}
