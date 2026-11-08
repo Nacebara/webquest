@@ -430,6 +430,10 @@ impl tgbot::UpdateHook for DemoHook {
     async fn menu_button(&self, user: i64) -> Option<String> {
         self.panel.menu_button(user).await
     }
+
+    async fn support_question(&self, from: &botapi::User, text: &str, order: Option<&str>) -> bool {
+        self.panel.support_question(from, text, order).await
+    }
 }
 
 #[cfg(test)]

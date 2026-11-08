@@ -284,6 +284,11 @@ impl Inner {
             }
             MenuAction::History => self.history(chat, user, 0).await,
             MenuAction::Support => {
+                self.memory(|m| {
+                    m.support_wait
+                        .entry(user)
+                        .or_insert((None, std::time::Instant::now()));
+                });
                 self.reply(
                     chat,
                     &self.ui().support(self.cfg.support_contact.as_deref()),
@@ -429,6 +434,31 @@ async fn message_update(
     {
         return Ok(());
     }
+    // «Поддержка» нажата: текст без ссылок — вопрос оператору (макет B1).
+    if found.is_empty() && message.forward_origin.is_none() {
+        let waiting = inner.memory(|m| {
+            m.support_wait
+                .remove(&from.id)
+                .filter(|(_, since)| since.elapsed() < crate::SUPPORT_WAIT)
+                .map(|(order, _)| order)
+        });
+        if let Some(order) = waiting
+            && !text.trim().is_empty()
+        {
+            let delivered = match inner.hook() {
+                Some(hook) => hook.support_question(from, text, order.as_deref()).await,
+                None => false,
+            };
+            let screen = if delivered {
+                inner.ui().support_sent(order.as_deref())
+            } else {
+                inner
+                    .ui()
+                    .support_unavailable(inner.cfg.support_contact.as_deref())
+            };
+            return inner.reply(chat, &screen).await;
+        }
+    }
     if found.is_empty() {
         return inner.reply(chat, &inner.ui().no_link()).await;
     }
@@ -498,7 +528,13 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
                 None => Ok(()),
             }
         }
-        Callback::Support(_) => inner.menu(chat, user, MenuAction::Support).await,
+        Callback::Support(order) => {
+            inner.memory(|m| {
+                m.support_wait
+                    .insert(user, (order.clone(), std::time::Instant::now()))
+            });
+            inner.menu(chat, user, MenuAction::Support).await
+        }
         Callback::Cancel(None) => {
             inner
                 .replace(chat, message, &inner.ui().cancelled(None))

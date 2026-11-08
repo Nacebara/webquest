@@ -795,27 +795,41 @@ impl Ui {
     /// «Поддержка». `contact` — `@username` оператора; если задан и корректен — кнопка-ссылка.
     pub fn support(&self, contact: Option<&str>) -> Screen {
         let t = &self.texts.support;
-        let contact = contact
+        let mut body = self.fill(&t.title, &[]);
+        if let Some(name) = contact
             .map(|c| c.trim_start_matches('@'))
-            .filter(|c| username_ok(c));
-        match contact {
-            Some(name) => {
-                let body = self.fill(
-                    &t.with_contact,
-                    &[("contact", &Frag::text(&format!("@{name}")))],
-                );
-                let keyboard = Keyboard::inline_rows(vec![vec![
-                    self.url_button(
-                        Some(Emoji::Support),
-                        &self.texts.buttons.write_operator,
-                        &format!("https://t.me/{name}"),
-                    )
-                    .style(ButtonStyle::Primary),
-                ]]);
-                self.plain(body, keyboard)
-            }
-            None => self.plain(self.fill(&t.without_contact, &[]), Keyboard::None),
+            .filter(|c| username_ok(c))
+        {
+            body.push(&Frag::trusted("\n"));
+            body.push(&self.fill(&t.contact, &[("contact", &Frag::text(&format!("@{name}")))]));
         }
+        self.plain(body, Keyboard::None)
+    }
+
+    /// «Передал оператору · заявка K7M2Q9XR4T» (макет B1).
+    pub fn support_sent(&self, order: Option<&str>) -> Screen {
+        let t = &self.texts.support;
+        let body = match order.filter(|o| order_id_ok(o)) {
+            Some(id) => self.fill(&t.sent, &[("order", &self.order_id(id))]),
+            None => self.fill(&t.sent_no_order, &[]),
+        };
+        self.plain(body, Keyboard::None)
+    }
+
+    /// Вопрос передать не вышло: что делать клиенту.
+    pub fn support_unavailable(&self, contact: Option<&str>) -> Screen {
+        let t = &self.texts.support;
+        let body = match contact
+            .map(|c| c.trim_start_matches('@'))
+            .filter(|c| username_ok(c))
+        {
+            Some(name) => self.fill(
+                &t.unavailable_contact,
+                &[("contact", &Frag::text(&format!("@{name}")))],
+            ),
+            None => self.fill(&t.unavailable, &[]),
+        };
+        self.plain(body, Keyboard::None)
     }
 
     /// Чек создаётся через инлайн-режим кошелька прямо в чате: ссылка придёт позже, бот

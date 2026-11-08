@@ -190,6 +190,8 @@ pub enum Cb {
     Selftest,
     /// Провести расхождение из события сверки как взнос или вывод владельца.
     Capital(i64),
+    /// Ответить клиенту на вопрос из «Поддержки» (макет: «Обращение · Ответить»).
+    SupportReply(i64),
     /// Все инвесторы и движения, ждущие решения.
     Investors,
     /// «💼 Инвестиции» клиента.
@@ -309,6 +311,7 @@ impl Cb {
             Cb::Selftest => "stt".into(),
             Cb::Capital(id) => format!("cap:{id}"),
             Cb::Investors => "iv".into(),
+            Cb::SupportReply(id) => format!("sq:{id}"),
             Cb::Invest(id) => format!("iv:{id}"),
             Cb::InvestEdit(id) => format!("ivt:{id}"),
             Cb::InvestAccess(id, on) => format!("iva:{id}:{}", bit(*on)),
@@ -393,6 +396,7 @@ impl Cb {
             ["stt"] => Cb::Selftest,
             ["cap", _] => Cb::Capital(id(1)?),
             ["iv"] => Cb::Investors,
+            ["sq", _] => Cb::SupportReply(id(1)?),
             ["iv", _] => Cb::Invest(id(1)?),
             ["ivt", _] => Cb::InvestEdit(id(1)?),
             ["iva", _, _] => Cb::InvestAccess(id(1)?, on(2)?),
@@ -449,6 +453,7 @@ mod tests {
             Cb::PromoTarget(Platform::CryptoBot),
             Cb::PromoTarget(Platform::XRocket),
             Cb::Investors,
+            Cb::SupportReply(big),
             Cb::Invest(big),
             Cb::InvestEdit(big),
             Cb::InvestAccess(big, true),

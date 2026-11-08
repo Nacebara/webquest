@@ -470,6 +470,12 @@ impl Inner {
                 self.ack(staff, id).await?;
                 return Ok(None);
             }
+            Cb::SupportReply(client) => self.prompt_with(
+                staff,
+                actions::Input::SupportReply(client),
+                self.texts
+                    .f("support.reply_prompt", &[("client", &client.to_string())]),
+            ),
             other => self.navigate(staff, other).await?,
         };
         Ok(Some(screen))
@@ -514,6 +520,99 @@ impl tgbot::UpdateHook for OpsBot {
         match self.inner.staff(user).await {
             Ok(Some(_)) => Some(self.inner.texts.t("menu.open")),
             _ => None,
+        }
+    }
+
+    async fn support_question(&self, from: &botapi::User, text: &str, order: Option<&str>) -> bool {
+        match self.inner.support_question(from, text, order).await {
+            Ok(n) => n > 0,
+            Err(e) => {
+                tracing::warn!(error = %e, "support question not delivered");
+                false
+            }
+        }
+    }
+}
+
+impl Inner {
+    /// Вопрос клиента — всем действующим сотрудникам (макет: «Обращение · клиент · @ник» и
+    /// кнопка «Ответить»). Сколько сотрудников получили.
+    async fn support_question(
+        &self,
+        from: &botapi::User,
+        text: &str,
+        order: Option<&str>,
+    ) -> Result<usize, OpsError> {
+        let staff = {
+            let mut conn = self.pool.acquire().await?;
+            storage::staff::list(&mut conn).await?
+        };
+        let who = match &from.username {
+            Some(u) => format!("{} · @{}", from.id, texts::esc(u)),
+            None => from.id.to_string(),
+        };
+        let question: String = text.chars().take(1500).collect();
+        let mut body = self.texts.f(
+            "support.question",
+            &[("who", &who), ("text", &texts::esc(&question))],
+        );
+        if let Some(order) = order {
+            body.push('\n');
+            body.push_str(
+                &self
+                    .texts
+                    .f("support.order", &[("order", &texts::esc(order))]),
+            );
+        }
+        let screen = Screen::new(body).row(vec![btn(
+            self.texts.t("support.b_reply"),
+            &Cb::SupportReply(from.id),
+        )]);
+        let mut delivered = 0;
+        for member in staff.iter().filter(|m| m.disabled_at.is_none()) {
+            match self.send(member.tg_user_id, &screen).await {
+                Ok(_) => delivered += 1,
+                Err(e) => {
+                    tracing::warn!(staff = member.tg_user_id, error = %e, "support question not sent")
+                }
+            }
+        }
+        Ok(delivered)
+    }
+
+    /// Ответ сотрудника — клиенту от имени бота («Оператор Анна: …»).
+    pub(crate) async fn support_reply(
+        &self,
+        staff: &StaffMember,
+        client: i64,
+        text: &str,
+    ) -> Result<Screen, OpsError> {
+        let home = || btn(self.texts.t("common.home"), &Cb::Menu);
+        if text.is_empty() {
+            return Ok(Screen::new(self.texts.t("support.empty")).row(vec![home()]));
+        }
+        let answer = self.texts.f(
+            "support.answer",
+            &[
+                ("name", &texts::esc(&staff.display_name)),
+                ("text", &texts::esc(text)),
+            ],
+        );
+        match self
+            .api
+            .send_message(&SendMessage::html(client, answer))
+            .await
+        {
+            Ok(_) => Ok(Screen::new(
+                self.texts
+                    .f("support.sent", &[("client", &client.to_string())]),
+            )
+            .row(vec![home()])),
+            Err(e) => Ok(Screen::new(
+                self.texts
+                    .f("support.failed", &[("error", &texts::esc(&e.to_string()))]),
+            )
+            .row(vec![home()])),
         }
     }
 }

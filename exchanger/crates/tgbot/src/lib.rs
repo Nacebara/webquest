@@ -53,6 +53,16 @@ pub trait UpdateHook: Send + Sync {
     async fn try_handle(&self, update: &botapi::Update) -> bool;
     /// Дополнительная кнопка главного меню для пользователя (персоналу — вход в пульт).
     async fn menu_button(&self, user: i64) -> Option<String>;
+    /// Вопрос клиента в поддержку (макет B1 «Поддержка»): передать персоналу в пульт.
+    /// `false` — передать некому.
+    async fn support_question(
+        &self,
+        _from: &botapi::User,
+        _text: &str,
+        _order: Option<&str>,
+    ) -> bool {
+        false
+    }
 }
 
 /// Настройки клиентского бота.
@@ -226,7 +236,12 @@ pub(crate) struct Memory {
     link_order: VecDeque<(i64, i32)>,
     /// Заявки, у которых клиент развернул «Детали» (макет B1).
     details_open: HashSet<i64>,
+    /// Клиент нажал «Поддержка»: следующий текст — вопрос оператору (заявка, с какого момента).
+    support_wait: HashMap<i64, (Option<String>, Instant)>,
 }
+
+/// Сколько ждать вопрос после «Поддержка».
+pub(crate) const SUPPORT_WAIT: std::time::Duration = std::time::Duration::from_secs(15 * 60);
 
 /// Сколько сообщений со ссылками помнить для правок.
 const LINK_MEMORY: usize = 4096;

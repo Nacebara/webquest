@@ -503,8 +503,12 @@ pub struct PrivacyTexts {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SupportTexts {
-    pub with_contact: String,
-    pub without_contact: String,
+    pub title: String,
+    pub contact: String,
+    pub sent: String,
+    pub sent_no_order: String,
+    pub unavailable: String,
+    pub unavailable_contact: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

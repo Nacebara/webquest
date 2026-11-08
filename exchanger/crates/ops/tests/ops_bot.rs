@@ -863,3 +863,45 @@ async fn dash_explains_pauses_and_reconcile_offers_the_top_up(pool: PgPool) {
     );
     assert!(alert.text().contains("Баланс"), "{}", alert.text());
 }
+
+/// Макет «Обращение»: вопрос клиента из «Поддержки» приходит персоналу с кнопкой «Ответить»,
+/// ответ сотрудника уходит клиенту от имени бота с его именем.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn support_question_reaches_staff_and_the_answer_reaches_the_client(pool: PgPool) {
+    use tgbot::UpdateHook as _;
+    let o = ops(pool).await;
+    let client = botapi::User {
+        id: 4242,
+        is_bot: false,
+        first_name: "Клиент".into(),
+        last_name: None,
+        username: Some("nick".into()),
+        language_code: None,
+        is_premium: None,
+    };
+    let mark = o.tg.mark();
+    assert!(
+        o.bot
+            .support_question(&client, "чек не пришёл <уже 10 минут>", Some("K7M2Q9XR4T"))
+            .await
+    );
+    let question = o.tg.screen(mark, ADMIN, "Обращение").await;
+    assert!(question.text().contains("@nick"), "{}", question.text());
+    assert!(
+        question.text().contains("&lt;уже 10 минут&gt;"),
+        "чужой текст экранирован"
+    );
+    assert!(question.text().contains("K7M2Q9XR4T"));
+    o.tg.screen(mark, OWNER, "Обращение").await;
+
+    o.press(ADMIN, &question, "Ответить", "Ответ клиенту 4242")
+        .await;
+    o.say(
+        ADMIN,
+        "деньги у нас, чек будет через 5 минут",
+        "Отправлено клиенту 4242",
+    )
+    .await;
+    let answer = o.tg.screen(mark, 4242, "Оператор Анна:").await;
+    assert!(answer.text().contains("деньги у нас"), "{}", answer.text());
+}
