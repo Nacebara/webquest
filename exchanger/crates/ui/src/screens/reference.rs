@@ -36,35 +36,7 @@ fn direction_icon(direction: Direction) -> Emoji {
 }
 
 impl Ui {
-    fn status_text(&self, status: DirectionStatus) -> &str {
-        let s = &self.texts.direction_status;
-        match status {
-            DirectionStatus::Open => &s.open,
-            DirectionStatus::Paused => &s.paused,
-            DirectionStatus::Off => &s.off,
-        }
-    }
-
-    /// Комиссия открытого направления или его статус.
-    fn fee_or_status(&self, t: &DirectionTerms) -> Frag {
-        match t.status {
-            DirectionStatus::Open => self.fee_frag(t),
-            _ => Frag::text(self.status_of(t)),
-        }
-    }
-
-    /// Статус для таблиц: у паузы — короткая причина («нет резерва»).
-    fn status_of(&self, t: &DirectionTerms) -> &str {
-        let s = &self.texts.direction_status;
-        match (t.status, t.pause) {
-            (DirectionStatus::Paused, Some(PauseReason::NoReserve { .. })) => &s.paused_no_reserve,
-            (DirectionStatus::Paused, Some(PauseReason::Maintenance)) => &s.paused_maintenance,
-            (DirectionStatus::Paused, Some(PauseReason::Technical)) => &s.paused_technical,
-            (status, _) => self.status_text(status),
-        }
-    }
-
-    /// Почему на паузе — фраза для «Обменять чек».
+    /// Почему на паузе — фраза для «Что меняем?» и ошибок паузы.
     fn pause_why(&self, t: &DirectionTerms) -> Frag {
         let s = &self.texts.direction_status;
         match t.pause {
@@ -139,79 +111,93 @@ impl Ui {
         let mut doc = Doc::new();
         doc.title(&self.fill(&t.title, &[]));
         doc.para(&self.fill(&t.lead, &[]));
-        doc.gap();
 
-        let rows = terms
-            .directions
+        // Строки таблицы: «Куда · Комиссия · USDT». Два обмена чеков и одна строка на оба
+        // счёта (как в макете): комиссия — самая низкая из открытых, «от …», если разная.
+        let mut lines: Vec<(Frag, Frag, Frag)> = Vec::new();
+        for direction in [Direction::CbToXrCheck, Direction::XrToCbCheck] {
+            if let Some(d) = terms.get(direction) {
+                lines.push((
+                    self.direction_name(direction),
+                    self.welcome_fee(&[d]),
+                    self.welcome_range(&[d]),
+                ));
+            }
+        }
+        let invoices: Vec<&DirectionTerms> = [Direction::PayCbInvoice, Direction::PayXrInvoice]
+            .into_iter()
+            .filter_map(|d| terms.get(d))
+            .collect();
+        if !invoices.is_empty() {
+            lines.push((
+                self.fill(&t.invoice_row, &[]),
+                self.welcome_fee(&invoices),
+                self.welcome_range(&invoices),
+            ));
+        }
+        let rows = lines
             .iter()
-            .map(|d| {
-                let offer = self.texts.offers.get(d.direction);
-                let icon = self.emoji.frag(direction_icon(d.direction));
-                let send = Frag::text(&offer.send);
-                let get = Frag::text(&offer.get);
-                let fee = self.fee_or_status(d);
-                let mut first = icon.clone();
-                first.push_text(" ").push(&send);
-                Row {
-                    cells: vec![first, get.clone(), fee.clone()],
-                    line: self.fill(
-                        &t.row,
-                        &[
-                            ("icon", &icon),
-                            ("send", &send),
-                            ("get", &get),
-                            ("fee", &fee),
-                        ],
-                    ),
-                }
+            .map(|(to, fee, range)| Row {
+                cells: vec![to.clone(), fee.clone(), range.clone()],
+                line: self.fill(&t.row, &[("direction", to), ("fee", fee), ("range", range)]),
             })
             .collect();
         doc.table(Table {
-            attrs: "bordered compact",
+            attrs: "striped compact",
             head: vec![
-                self.fill(&t.col_send, &[]),
-                self.fill(&t.col_get, &[]),
+                self.fill(&t.col_to, &[]),
                 self.fill(&t.col_fee, &[]),
+                self.fill(&t.col_usdt, &[]),
             ],
             rows,
-            right: &[2],
+            right: &[1, 2],
             plain_quote: true,
         });
-
-        self.promo_paras(terms, &mut doc);
-        let open: Vec<&DirectionTerms> = terms.open().collect();
-        let min = open.iter().map(|d| d.min).min();
-        let max = open.iter().map(|d| d.max).max();
-        let min_fee = open.iter().map(|d| d.min_fee).min();
-        match (min, max, min_fee) {
-            (Some(min), Some(max), Some(min_fee)) => doc.para(&self.fill(
-                &t.limits,
-                &[
-                    ("min", &self.usdt(min)),
-                    ("max", &self.usdt(max)),
-                    ("min_fee", &self.usdt(min_fee)),
-                ],
-            )),
-            _ => doc.para(&self.fill(&t.closed, &[])),
+        if terms.open().next().is_none() {
+            doc.para(&self.fill(&t.closed, &[]));
         }
-        doc.gap();
-
-        let cb_cmd = Frag::code(&inline_command(
-            domain::Platform::CryptoBot,
-            example_amount(terms.get(Direction::CbToXrCheck)),
-        ));
-        let xr_cmd = Frag::code(&inline_command(
-            domain::Platform::XRocket,
-            example_amount(terms.get(Direction::XrToCbCheck)),
-        ));
-        doc.details(&self.fill(&t.howto_title, &[]), false, |d| {
-            d.list(&[
-                self.fill(&t.howto_cb, &[("cmd", &cb_cmd)]),
-                self.fill(&t.howto_xr, &[("cmd", &xr_cmd)]),
-            ]);
-        });
         doc.footer(&self.fill(&t.footer, &[]));
         self.dual(doc, Keyboard::Reply(self.main_menu()))
+    }
+
+    /// Комиссия строки приветствия: самая низкая из открытых направлений строки («от …»,
+    /// если у них разная); все на паузе — «—».
+    fn welcome_fee(&self, dirs: &[&DirectionTerms]) -> Frag {
+        let open: Vec<&&DirectionTerms> = dirs
+            .iter()
+            .filter(|d| d.status == DirectionStatus::Open)
+            .collect();
+        let Some(cheapest) = open.iter().map(|d| d.fee_pct).min() else {
+            return Frag::text("—");
+        };
+        let single = open.len() == 1 && open[0].tiers.len() <= 1;
+        let same = open
+            .iter()
+            .all(|d| d.fee_pct == cheapest && d.tiers.len() <= 1);
+        if single || same {
+            self.pct(cheapest)
+        } else {
+            self.fill(&self.texts.terms.fee_from, &[("fee", &self.pct(cheapest))])
+        }
+    }
+
+    /// Пределы строки приветствия: «1–500»; все на паузе — «пауза».
+    fn welcome_range(&self, dirs: &[&DirectionTerms]) -> Frag {
+        let open: Vec<&&DirectionTerms> = dirs
+            .iter()
+            .filter(|d| d.status == DirectionStatus::Open)
+            .collect();
+        match (
+            open.iter().map(|d| d.min).min(),
+            open.iter().map(|d| d.max).max(),
+        ) {
+            (Some(min), Some(max)) => Frag::text(&format!(
+                "{}–{}",
+                fmt::bare_amount(min),
+                fmt::bare_amount(max)
+            )),
+            _ => self.fill(&self.texts.welcome.paused, &[]),
+        }
     }
 
     /// S2 «Курс и лимиты» (`/terms`): таблица направлений, какие чеки и счета принимаю, правила.
@@ -223,45 +209,68 @@ impl Ui {
             .directions
             .iter()
             .map(|d| {
-                let direction = self.direction_name(d.direction);
-                let fee = self.fee_frag(d);
-                let status = Frag::text(self.status_of(d));
-                let min = Frag::text(&fmt::amount(d.min, domain::Asset::Usdt));
-                let max = Frag::text(&fmt::amount(d.max, domain::Asset::Usdt));
+                let dot = self.emoji.frag(match d.status {
+                    DirectionStatus::Open => Emoji::DotOk,
+                    DirectionStatus::Paused => Emoji::DotWait,
+                    DirectionStatus::Off => Emoji::DotClosed,
+                });
+                let name = match d.direction.flow() {
+                    Flow::CheckExchange => self.direction_name(d.direction),
+                    Flow::InvoicePayment => Frag::text(&self.texts.offers.get(d.direction).send),
+                };
+                let (fee, range) = match d.status {
+                    DirectionStatus::Open => (
+                        self.fee_frag(d),
+                        Frag::text(&format!(
+                            "{}–{}",
+                            fmt::bare_amount(d.min),
+                            fmt::bare_amount(d.max)
+                        )),
+                    ),
+                    DirectionStatus::Paused => (Frag::text("—"), self.fill(&t.paused, &[])),
+                    DirectionStatus::Off => (Frag::text("—"), self.fill(&t.off, &[])),
+                };
                 Row {
                     line: self.fill(
                         &t.row,
                         &[
-                            ("direction", &direction),
+                            ("dot", &dot),
+                            ("direction", &name),
                             ("fee", &fee),
-                            ("min", &self.usdt(d.min)),
-                            ("max", &self.usdt(d.max)),
-                            ("status", &status),
+                            ("range", &range),
                         ],
                     ),
-                    cells: vec![direction, fee, min, max, status],
+                    cells: vec![dot, name, fee, range],
                 }
             })
             .collect();
         doc.table(Table {
-            attrs: "bordered striped compact",
+            attrs: "striped compact",
             head: vec![
-                self.fill(&t.col_direction, &[]),
+                Frag::new(),
+                self.fill(&t.col_to, &[]),
                 self.fill(&t.col_fee, &[]),
-                self.fill(&t.col_min, &[]),
-                self.fill(&t.col_max, &[]),
-                self.fill(&t.col_status, &[]),
+                self.fill(&t.col_usdt, &[]),
             ],
             rows,
-            right: &[1, 2, 3],
+            right: &[2, 3],
             plain_quote: true,
         });
+        // «Комиссия не меньше 0.10 USDT. Первые обмены — до 100 USDT.»
+        let open: Vec<&DirectionTerms> = terms.open().collect();
+        if let Some(min_fee) = open.iter().map(|d| d.min_fee).min() {
+            let mut line = self.fill(&t.min_fee, &[("min_fee", &self.usdt(min_fee))]);
+            if let Some(max) = open.iter().filter_map(|d| d.new_user_max).max() {
+                line.push(&Frag::trusted(" "));
+                line.push(&self.fill(&t.new_user, &[("max", &Frag::code(&fmt::bare_amount(max)))]));
+            }
+            doc.para(&line);
+        }
+        // Сверх макета — только когда есть: выгодный курс, личные условия, ступени.
         self.promo_paras(terms, &mut doc);
         if terms.directions.iter().any(|d| d.personal) {
             doc.para(&self.fill(&t.personal, &[]));
         }
-        doc.gap();
-
         let tiered: Vec<&DirectionTerms> = terms
             .directions
             .iter()
@@ -282,30 +291,19 @@ impl Ui {
                 .collect();
             doc.details(&self.fill(&t.tiers_title, &[]), true, |d| d.list(&lines));
         }
-
-        let mut checks: Vec<Frag> = t.checks.iter().map(|s| self.fill(s, &[])).collect();
-        if let Some(name) = terms
-            .bind_username
-            .as_deref()
-            .and_then(|n| self.bind_username(n))
-        {
-            checks.push(self.fill(&t.checks_bind, &[("username", &name)]));
+        if let Some(at) = terms.updated_at {
+            doc.footer(&self.fill(&t.updated, &[("time", &self.at(at, TimeFormat::Time))]));
         }
-        doc.details(&self.fill(&t.checks_title, &[]), false, |d| d.list(&checks));
-        doc.details(&self.fill(&t.invoices_title, &[]), false, |d| {
-            let items: Vec<Frag> = t.invoices.iter().map(|s| self.fill(s, &[])).collect();
-            d.list(&items);
-        });
-        doc.details(&self.fill(&t.rules_title, &[]), false, |d| {
-            d.para(&self.fill(&t.rules, &[]));
-        });
-        doc.footer(&self.fill(&t.footer, &[]));
-
-        let keyboard = Keyboard::inline_rows(vec![vec![self.cb_button(
-            Some(Emoji::Privacy),
-            &self.texts.buttons.privacy,
-            &Callback::Privacy,
-        )]]);
+        let b = &self.texts.buttons;
+        let keyboard = Keyboard::inline_rows(vec![vec![
+            self.cb_button(
+                Some(Emoji::Exchange),
+                &self.texts.menu.exchange,
+                &Callback::Exchange,
+            )
+            .style(ButtonStyle::Primary),
+            self.cb_button(Some(Emoji::Details), &b.plain_view, &Callback::PlainView),
+        ]]);
         self.dual(doc, keyboard)
     }
 
@@ -620,6 +618,27 @@ impl Ui {
             body.push(&Frag::trusted("\n• "));
             body.push(&self.fill(line, &[("cb", &cb), ("xr", &xr)]));
         }
+        let mut checks: Vec<Frag> = t.checks.iter().map(|s| self.fill(s, &[])).collect();
+        if let Some(name) = terms
+            .bind_username
+            .as_deref()
+            .and_then(|n| self.bind_username(n))
+        {
+            checks.push(self.fill(&t.checks_bind, &[("username", &name)]));
+        }
+        let invoices: Vec<Frag> = t.invoices.iter().map(|s| self.fill(s, &[])).collect();
+        for (title, items) in [(&t.checks_title, checks), (&t.invoices_title, invoices)] {
+            body.push(&Frag::trusted("\n\n"));
+            body.push(&self.fill(title, &[]));
+            for item in items {
+                body.push(&Frag::trusted("\n• "));
+                body.push(&item);
+            }
+        }
+        body.push(&Frag::trusted("\n\n"));
+        body.push(&self.fill(&t.rules_title, &[]));
+        body.push(&Frag::trusted("\n"));
+        body.push(&self.fill(&t.rules, &[]));
         let keyboard = Keyboard::inline_rows(vec![vec![
             self.cb_button(
                 Some(Emoji::Support),
@@ -753,6 +772,7 @@ mod tests {
             promo: None,
             personal: false,
             pause: None,
+            new_user_max: None,
         }
     }
 

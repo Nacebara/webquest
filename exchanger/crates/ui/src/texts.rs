@@ -176,6 +176,8 @@ pub struct ButtonTexts {
     pub more: String,
     pub open_wallet: String,
     pub not_rendered: String,
+    /// «Простой вид» — в «Курс и лимиты» (макет B1).
+    pub plain_view: String,
     pub again: String,
     pub privacy: String,
 }
@@ -195,15 +197,15 @@ pub struct CommandTexts {
 pub struct WelcomeTexts {
     pub title: String,
     pub lead: String,
-    pub col_send: String,
-    pub col_get: String,
+    /// Колонки таблицы: «Куда · Комиссия · USDT».
+    pub col_to: String,
     pub col_fee: String,
+    pub col_usdt: String,
+    /// Одна строка на оба счёта: «Оплата счёта».
+    pub invoice_row: String,
+    pub paused: String,
     pub row: String,
-    pub limits: String,
     pub closed: String,
-    pub howto_title: String,
-    pub howto_cb: String,
-    pub howto_xr: String,
     pub footer: String,
 }
 
@@ -211,20 +213,15 @@ pub struct WelcomeTexts {
 #[serde(deny_unknown_fields)]
 pub struct TermsTexts {
     pub title: String,
-    pub col_direction: String,
+    pub col_to: String,
     pub col_fee: String,
-    pub col_min: String,
-    pub col_max: String,
-    pub col_status: String,
+    pub col_usdt: String,
+    pub paused: String,
+    pub off: String,
     pub row: String,
-    pub checks_title: String,
-    pub checks: Vec<String>,
-    pub checks_bind: String,
-    pub invoices_title: String,
-    pub invoices: Vec<String>,
-    pub rules_title: String,
-    pub rules: String,
-    pub footer: String,
+    pub min_fee: String,
+    pub new_user: String,
+    pub updated: String,
     /// Комиссия со ступенями: «от 1,2 %».
     pub fee_from: String,
     pub tiers_title: String,
@@ -454,6 +451,13 @@ pub struct CardTexts {
 pub struct HelpTexts {
     pub title: String,
     pub lines: Vec<String>,
+    pub checks_title: String,
+    pub checks: Vec<String>,
+    pub checks_bind: String,
+    pub invoices_title: String,
+    pub invoices: Vec<String>,
+    pub rules_title: String,
+    pub rules: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

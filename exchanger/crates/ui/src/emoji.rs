@@ -57,10 +57,18 @@ pub enum Emoji {
     Hide,
     /// «Помощь» в меню.
     Help,
+    /// «Курс 1:1 · обычно 10 секунд» — молния в подвале приветствия.
+    Fast,
+    /// «Лимит на сегодня исчерпан».
+    Limit,
+    /// Точки статуса (макет «Эмодзи v2»): работает, пауза, закрыто.
+    DotOk,
+    DotWait,
+    DotClosed,
 }
 
 impl Emoji {
-    pub const ALL: [Emoji; 27] = [
+    pub const ALL: [Emoji; 32] = [
         Emoji::Wait,
         Emoji::Ok,
         Emoji::Err,
@@ -88,6 +96,11 @@ impl Emoji {
         Emoji::Details,
         Emoji::Hide,
         Emoji::Help,
+        Emoji::Fast,
+        Emoji::Limit,
+        Emoji::DotOk,
+        Emoji::DotWait,
+        Emoji::DotClosed,
     ];
 
     pub const fn key(self) -> &'static str {
@@ -119,6 +132,11 @@ impl Emoji {
             Emoji::Details => "details",
             Emoji::Hide => "hide",
             Emoji::Help => "help",
+            Emoji::Fast => "fast",
+            Emoji::Limit => "limit",
+            Emoji::DotOk => "dot_ok",
+            Emoji::DotWait => "dot_wait",
+            Emoji::DotClosed => "dot_closed",
         }
     }
 
@@ -152,6 +170,11 @@ impl Emoji {
             Emoji::Details => "👁",
             Emoji::Hide => "✖️",
             Emoji::Help => "❓",
+            Emoji::Fast => "⚡",
+            Emoji::Limit => "🚫",
+            Emoji::DotOk => "🟢",
+            Emoji::DotWait => "🟡",
+            Emoji::DotClosed => "⚪",
         }
     }
 
@@ -189,6 +212,11 @@ impl Emoji {
             Emoji::Details => "mono/eye",
             Emoji::Hide => "mono/close",
             Emoji::Help => "mono/help",
+            Emoji::Fast => "color/fast",
+            Emoji::Limit => "color/limit",
+            Emoji::DotOk => "color/dot_ok",
+            Emoji::DotWait => "color/dot_wait",
+            Emoji::DotClosed => "color/dot_closed",
         }
     }
 
@@ -222,6 +250,11 @@ impl Emoji {
             Emoji::Details => "mono/eye",
             Emoji::Hide => "mono/close",
             Emoji::Help => "mono/help",
+            Emoji::Fast => "mono/fast",
+            Emoji::Limit => "mono/limit",
+            Emoji::DotOk => "color/dot_ok",
+            Emoji::DotWait => "color/dot_wait",
+            Emoji::DotClosed => "color/dot_closed",
         }
     }
 }

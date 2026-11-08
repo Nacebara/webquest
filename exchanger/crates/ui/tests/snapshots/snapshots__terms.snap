@@ -4,90 +4,46 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-<b>Курс и лимиты</b>
-<blockquote>CryptoBot → xRocket: <b>2.5 %</b>, от <code>2.00</code> до <code>500.00</code> USDT · работает
-xRocket → CryptoBot: <b>1.5 %</b>, от <code>2.00</code> до <code>300.00</code> USDT · работает
-Оплата счёта CryptoBot: <b>3 %</b>, от <code>2.00</code> до <code>200.00</code> USDT · работает
-Оплата счёта xRocket: <b>2 %</b>, от <code>2.00</code> до <code>200.00</code> USDT · нет резерва</blockquote>
-
-<blockquote expandable><b>Какие чеки принимаю</b>
-• В USDT. Мульти-чеки — только CryptoBot: мульти-чеки xRocket открываются только в приложении xRocket.
-• Без капчи, подписок и «только для Premium».
-• Чек можно привязать к <code>@exch_cb</code>.</blockquote>
-<blockquote expandable><b>Какие счета оплачиваю</b>
-• Одноразовые, с суммой, не истекающие в ближайшие 20 минут.
-• В долларах — по точной сумме в USDT, которую показывает кошелёк.</blockquote>
-<blockquote expandable><b>Правила</b>
-Нельзя: средства от мошенничества, даркнета, миксеров, санкционных площадок. Могу отказать и вернуть деньги — туда же, откуда они пришли.</blockquote>
-<i>Комиссия меняется раз в минуту от загрузки направления. В заявке она фиксируется на 15 минут.</i>
+<b>📈 Курс и лимиты</b>
+<blockquote>🟢 CryptoBot → xRocket · 2.5 % · 2–500
+🟢 xRocket → CryptoBot · 1.5 % · 2–300
+🟢 Счёт CryptoBot · 3 % · 2–200
+🟡 Счёт xRocket · — · пауза</blockquote>
+Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.
+<i>Обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></i>
 --- rich
-<h3>Курс и лимиты</h3>
-<table bordered striped compact>
-<tr><th>Направление</th><th align="right">Комиссия</th><th align="right">Мин., USDT</th><th align="right">Макс., USDT</th><th>Статус</th></tr>
-<tr><td>CryptoBot → xRocket</td><td align="right">2.5 %</td><td align="right">2.00</td><td align="right">500.00</td><td>работает</td></tr>
-<tr><td>xRocket → CryptoBot</td><td align="right">1.5 %</td><td align="right">2.00</td><td align="right">300.00</td><td>работает</td></tr>
-<tr><td>Оплата счёта CryptoBot</td><td align="right">3 %</td><td align="right">2.00</td><td align="right">200.00</td><td>работает</td></tr>
-<tr><td>Оплата счёта xRocket</td><td align="right">2 %</td><td align="right">2.00</td><td align="right">200.00</td><td>нет резерва</td></tr>
+<h3>📈 Курс и лимиты</h3>
+<table striped compact>
+<tr><th></th><th>Куда</th><th align="right">Комиссия</th><th align="right">USDT</th></tr>
+<tr><td>🟢</td><td>CryptoBot → xRocket</td><td align="right">2.5 %</td><td align="right">2–500</td></tr>
+<tr><td>🟢</td><td>xRocket → CryptoBot</td><td align="right">1.5 %</td><td align="right">2–300</td></tr>
+<tr><td>🟢</td><td>Счёт CryptoBot</td><td align="right">3 %</td><td align="right">2–200</td></tr>
+<tr><td>🟡</td><td>Счёт xRocket</td><td align="right">—</td><td align="right">пауза</td></tr>
 </table>
-<details><summary>Какие чеки принимаю</summary>
-<ul>
-<li>В USDT. Мульти-чеки — только CryptoBot: мульти-чеки xRocket открываются только в приложении xRocket.</li>
-<li>Без капчи, подписок и «только для Premium».</li>
-<li>Чек можно привязать к <code>@exch_cb</code>.</li></ul>
-</details>
-<details><summary>Какие счета оплачиваю</summary>
-<ul>
-<li>Одноразовые, с суммой, не истекающие в ближайшие 20 минут.</li>
-<li>В долларах — по точной сумме в USDT, которую показывает кошелёк.</li></ul>
-</details>
-<details><summary>Правила</summary>
-<p>Нельзя: средства от мошенничества, даркнета, миксеров, санкционных площадок. Могу отказать и вернуть деньги — туда же, откуда они пришли.</p>
-</details>
-<footer>Комиссия меняется раз в минуту от загрузки направления. В заявке она фиксируется на 15 минут.</footer>
+<p>Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.</p>
+<footer>Обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></footer>
 --- keyboard: inline
-[{"callback_data":"privacy","text":"🔒 Конфиденциальность"}]
+[{"callback_data":"exchange","style":"primary","text":"💱 Обменять"},{"callback_data":"plain","text":"👁 Простой вид"}]
 
 ### premium
 --- html
-<b>Курс и лимиты</b>
-<blockquote>CryptoBot → xRocket: <b>2.5 %</b>, от <code>2.00</code> до <code>500.00</code> USDT · работает
-xRocket → CryptoBot: <b>1.5 %</b>, от <code>2.00</code> до <code>300.00</code> USDT · работает
-Оплата счёта CryptoBot: <b>3 %</b>, от <code>2.00</code> до <code>200.00</code> USDT · работает
-Оплата счёта xRocket: <b>2 %</b>, от <code>2.00</code> до <code>200.00</code> USDT · нет резерва</blockquote>
-
-<blockquote expandable><b>Какие чеки принимаю</b>
-• В USDT. Мульти-чеки — только CryptoBot: мульти-чеки xRocket открываются только в приложении xRocket.
-• Без капчи, подписок и «только для Premium».
-• Чек можно привязать к <code>@exch_cb</code>.</blockquote>
-<blockquote expandable><b>Какие счета оплачиваю</b>
-• Одноразовые, с суммой, не истекающие в ближайшие 20 минут.
-• В долларах — по точной сумме в USDT, которую показывает кошелёк.</blockquote>
-<blockquote expandable><b>Правила</b>
-Нельзя: средства от мошенничества, даркнета, миксеров, санкционных площадок. Могу отказать и вернуть деньги — туда же, откуда они пришли.</blockquote>
-<i>Комиссия меняется раз в минуту от загрузки направления. В заявке она фиксируется на 15 минут.</i>
+<b><tg-emoji emoji-id="5368000000000000015">📈</tg-emoji> Курс и лимиты</b>
+<blockquote><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> CryptoBot → xRocket · 2.5 % · 2–500
+<tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> xRocket → CryptoBot · 1.5 % · 2–300
+<tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> Счёт CryptoBot · 3 % · 2–200
+<tg-emoji emoji-id="5368000000000000030">🟡</tg-emoji> Счёт xRocket · — · пауза</blockquote>
+Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.
+<i>Обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></i>
 --- rich
-<h3>Курс и лимиты</h3>
-<table bordered striped compact>
-<tr><th>Направление</th><th align="right">Комиссия</th><th align="right">Мин., USDT</th><th align="right">Макс., USDT</th><th>Статус</th></tr>
-<tr><td>CryptoBot → xRocket</td><td align="right">2.5 %</td><td align="right">2.00</td><td align="right">500.00</td><td>работает</td></tr>
-<tr><td>xRocket → CryptoBot</td><td align="right">1.5 %</td><td align="right">2.00</td><td align="right">300.00</td><td>работает</td></tr>
-<tr><td>Оплата счёта CryptoBot</td><td align="right">3 %</td><td align="right">2.00</td><td align="right">200.00</td><td>работает</td></tr>
-<tr><td>Оплата счёта xRocket</td><td align="right">2 %</td><td align="right">2.00</td><td align="right">200.00</td><td>нет резерва</td></tr>
+<h3><tg-emoji emoji-id="5368000000000000015">📈</tg-emoji> Курс и лимиты</h3>
+<table striped compact>
+<tr><th></th><th>Куда</th><th align="right">Комиссия</th><th align="right">USDT</th></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji></td><td>CryptoBot → xRocket</td><td align="right">2.5 %</td><td align="right">2–500</td></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji></td><td>xRocket → CryptoBot</td><td align="right">1.5 %</td><td align="right">2–300</td></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji></td><td>Счёт CryptoBot</td><td align="right">3 %</td><td align="right">2–200</td></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000030">🟡</tg-emoji></td><td>Счёт xRocket</td><td align="right">—</td><td align="right">пауза</td></tr>
 </table>
-<details><summary>Какие чеки принимаю</summary>
-<ul>
-<li>В USDT. Мульти-чеки — только CryptoBot: мульти-чеки xRocket открываются только в приложении xRocket.</li>
-<li>Без капчи, подписок и «только для Premium».</li>
-<li>Чек можно привязать к <code>@exch_cb</code>.</li></ul>
-</details>
-<details><summary>Какие счета оплачиваю</summary>
-<ul>
-<li>Одноразовые, с суммой, не истекающие в ближайшие 20 минут.</li>
-<li>В долларах — по точной сумме в USDT, которую показывает кошелёк.</li></ul>
-</details>
-<details><summary>Правила</summary>
-<p>Нельзя: средства от мошенничества, даркнета, миксеров, санкционных площадок. Могу отказать и вернуть деньги — туда же, откуда они пришли.</p>
-</details>
-<footer>Комиссия меняется раз в минуту от загрузки направления. В заявке она фиксируется на 15 минут.</footer>
+<p>Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.</p>
+<footer>Обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></footer>
 --- keyboard: inline
-[{"callback_data":"privacy","icon_custom_emoji_id":"5368000000000000017","text":"Конфиденциальность"}]
+[{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять"},{"callback_data":"plain","icon_custom_emoji_id":"5368000000000000024","text":"Простой вид"}]

@@ -148,19 +148,11 @@ impl Ui {
             .collect()
     }
 
-    /// Клавиатура для отправки экрана rich-сообщением: к инлайн-кнопкам добавляется
-    /// «Не отображается?» (SPEC §6.1). Reply-клавиатуру не трогаем — смешивать нельзя.
+    /// Клавиатура rich-экрана — как у экрана. Прежде бот дописывал «Не отображается?» к
+    /// каждому rich-экрану; в макете B1 переход на простой вид — кнопка «Простой вид»
+    /// только в «Курс и лимиты».
     pub fn rich_keyboard(&self, screen: &Screen) -> Keyboard {
-        let button = self.cb_button(None, &self.texts.buttons.not_rendered, &Callback::PlainView);
-        match &screen.keyboard {
-            Keyboard::Inline(markup) => {
-                let mut rows = markup.inline_keyboard.clone();
-                rows.push(vec![button]);
-                Keyboard::inline_rows(rows)
-            }
-            Keyboard::None => Keyboard::inline_rows(vec![vec![button]]),
-            other => other.clone(),
-        }
+        screen.keyboard.clone()
     }
 
     // ---- общие кусочки ------------------------------------------------------------------

@@ -60,6 +60,7 @@ fn dir(
         pause: (status == DirectionStatus::Paused).then_some(ui::PauseReason::NoReserve {
             wallet: direction.target(),
         }),
+        new_user_max: Some(dec!(100)),
     }
 }
 
@@ -96,6 +97,7 @@ pub fn terms() -> Terms {
             ),
         ],
         bind_username: Some("exch_cb".to_owned()),
+        updated_at: Some(at(14, 5)),
     }
 }
 

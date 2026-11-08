@@ -162,12 +162,15 @@ pub(crate) async fn load(
             promo,
             personal: personal.is_some_and(|p| p.is_personal()),
             pause,
+            new_user_max: (row.new_user_max_amount < row.max_amount)
+                .then(|| row.new_user_max_amount.normalize()),
         });
     }
     Ok(TermsSnapshot {
         terms: Terms {
             directions,
             bind_username: bind_username.map(str::to_owned),
+            updated_at: Some(chrono::Utc::now()),
         },
         room,
     })

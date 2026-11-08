@@ -9,8 +9,7 @@ expression: out
 
 ### plain: terms sent as rich
 --- keyboard: inline
-[{"callback_data":"privacy","text":"🔒 Конфиденциальность"}]
-[{"callback_data":"plain","text":"Не отображается?"}]
+[{"callback_data":"exchange","style":"primary","text":"💱 Обменять"},{"callback_data":"plain","text":"👁 Простой вид"}]
 
 ### premium: main menu
 --- keyboard: reply {"input_field_placeholder":"Пришлите чек или счёт","is_persistent":true,"resize_keyboard":true}
@@ -19,8 +18,7 @@ expression: out
 
 ### premium: terms sent as rich
 --- keyboard: inline
-[{"callback_data":"privacy","icon_custom_emoji_id":"5368000000000000017","text":"Конфиденциальность"}]
-[{"callback_data":"plain","text":"Не отображается?"}]
+[{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять"},{"callback_data":"plain","icon_custom_emoji_id":"5368000000000000024","text":"Простой вид"}]
 
 ### setMyCommands
 [

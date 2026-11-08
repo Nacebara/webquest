@@ -33,6 +33,8 @@ pub struct DirectionTerms {
     pub personal: bool,
     /// Почему на паузе (только при [`DirectionStatus::Paused`]).
     pub pause: Option<PauseReason>,
+    /// Лимит первых обменов нового клиента, если он ниже обычного («Первые обмены — до 100»).
+    pub new_user_max: Option<Decimal>,
 }
 
 /// Почему направление на паузе — клиенту, без внутренних подробностей.
@@ -67,6 +69,8 @@ pub struct Terms {
     pub directions: Vec<DirectionTerms>,
     /// `@username` аккаунта сервиса, к которому можно привязать чек (`None` — не говорим).
     pub bind_username: Option<String>,
+    /// Когда условия посчитаны: подвал «Обновлено 14:05» в «Курс и лимиты».
+    pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl Terms {
