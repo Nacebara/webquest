@@ -14,6 +14,8 @@ pub enum Callback {
     HowTo(Direction),
     /// «Ещё обмен» — снова выбор направления.
     Exchange,
+    /// «Назад» из «Пришлите чек» — выбор направления в том же сообщении.
+    ExchangeBack,
     Terms,
     Privacy,
     /// История, страница с нуля.
@@ -71,6 +73,7 @@ impl Callback {
             Callback::Direction(d) => format!("dir:{}", d.code()),
             Callback::HowTo(d) => format!("howto:{}", d.code()),
             Callback::Exchange => "exchange".to_owned(),
+            Callback::ExchangeBack => "exchange:back".to_owned(),
             Callback::PayInvoice => "invoice".to_owned(),
             Callback::Terms => "terms".to_owned(),
             Callback::Privacy => "privacy".to_owned(),
@@ -114,6 +117,7 @@ impl Callback {
             ("howto", _) => direction(arg).map(Callback::HowTo),
             ("notify", _) => direction(arg).map(Callback::Notify),
             ("exchange", None) => Some(Callback::Exchange),
+            ("exchange", Some("back")) => Some(Callback::ExchangeBack),
             ("invoice", None) => Some(Callback::PayInvoice),
             ("terms", None) => Some(Callback::Terms),
             ("privacy", None) => Some(Callback::Privacy),
@@ -169,6 +173,7 @@ mod tests {
     fn all() -> Vec<Callback> {
         let mut v = vec![
             Callback::Exchange,
+            Callback::ExchangeBack,
             Callback::PayInvoice,
             Callback::Terms,
             Callback::Privacy,

@@ -537,10 +537,19 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
         ),
         (
             "invoice_quote",
-            ui.invoice_quote(&quote(Some("Оплата заказа #42 <VIP> & \"скидка\""), false)),
+            ui.invoice_quote(
+                &quote(Some("Оплата заказа #42 <VIP> & \"скидка\""), false),
+                at(12, 34),
+            ),
         ),
-        ("invoice_quote_fiat", ui.invoice_quote(&quote(None, true))),
-        ("invoice_awaiting", ui.invoice_awaiting(&quote(None, false))),
+        (
+            "invoice_quote_fiat",
+            ui.invoice_quote(&quote(None, true), at(12, 34)),
+        ),
+        (
+            "invoice_awaiting",
+            ui.invoice_awaiting(&quote(None, false), at(12, 34)),
+        ),
         (
             "invoice_underpaid",
             ui.invoice_underpaid(&quote(None, false), &usdt(dec!(8)), &usdt(dec!(2.3))),
@@ -570,7 +579,7 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
         ),
         (
             "invoice_check_rejected",
-            ui.invoice_check_rejected(&quote(None, false), &UiError::AlreadyActivated),
+            ui.invoice_check_rejected(&quote(None, false), &UiError::AlreadyActivated, at(12, 34)),
         ),
         (
             "invoice_paid_excess_kept",

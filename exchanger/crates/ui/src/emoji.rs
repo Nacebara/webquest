@@ -75,10 +75,12 @@ pub enum Emoji {
     RichView,
     /// «Правила» в «Помощи» — щит.
     Rules,
+    /// Стрелка вниз: «Скопируйте, чтобы создать чек» — на кнопку под сообщением.
+    Down,
 }
 
 impl Emoji {
-    pub const ALL: [Emoji; 37] = [
+    pub const ALL: [Emoji; 38] = [
         Emoji::Wait,
         Emoji::Ok,
         Emoji::Err,
@@ -116,6 +118,7 @@ impl Emoji {
         Emoji::More,
         Emoji::RichView,
         Emoji::Rules,
+        Emoji::Down,
     ];
 
     pub const fn key(self) -> &'static str {
@@ -157,6 +160,7 @@ impl Emoji {
             Emoji::More => "more",
             Emoji::RichView => "rich_view",
             Emoji::Rules => "rules",
+            Emoji::Down => "down",
         }
     }
 
@@ -200,6 +204,7 @@ impl Emoji {
             Emoji::More => "🔽",
             Emoji::RichView => "✨",
             Emoji::Rules => "🛡",
+            Emoji::Down => "⬇️",
         }
     }
 
@@ -247,6 +252,7 @@ impl Emoji {
             Emoji::More => "mono/refresh",
             Emoji::RichView => "mono/sparkle",
             Emoji::Rules => "color/shield",
+            Emoji::Down => "color/down",
         }
     }
 
@@ -290,6 +296,7 @@ impl Emoji {
             Emoji::More => "mono/refresh",
             Emoji::RichView => "mono/sparkle",
             Emoji::Rules => "mono/shield",
+            Emoji::Down => "mono/down",
         }
     }
 }
@@ -420,6 +427,7 @@ pub fn fallback_char(name: &str) -> &'static str {
         "export" => "📤",
         "sparkle" => "✨",
         "help" => "❓",
+        "down" => "⬇️",
         "order" => "🔖",
         "server" => "🖥",
         "power" => "🛑",

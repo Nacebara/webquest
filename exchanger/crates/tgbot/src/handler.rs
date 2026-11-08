@@ -77,7 +77,9 @@ impl Inner {
     }
 
     /// Заменить экран навигации (выбор направления, инструкция) в том же сообщении. Сообщение
-    /// заявки не трогаем никогда: в нём может быть ссылка на чек выплаты.
+    /// заявки не трогаем никогда: в нём может быть ссылка на чек выплаты. Экран с rich
+    /// («Квитанция» «Пришлите чек») правит сообщение rich-разметкой, если клиент не просил
+    /// простой вид (бот работает только в личке: чат = клиент).
     pub(crate) async fn replace(
         &self,
         chat: i64,
@@ -90,8 +92,11 @@ impl Inner {
                 storage::client::is_progress_message(&mut conn, chat, message.message_id).await?
             };
             if !progress {
-                match self.api.edit_html(chat, message.message_id, screen).await {
+                match self.edit_flow(chat, message.message_id, chat, screen).await {
                     Ok(crate::api::Edited::Done | crate::api::Edited::NotModified) => {
+                        if screen.rich_html.is_some() && !self.prefers_plain(chat) {
+                            self.remember_rich(chat, message.message_id, screen);
+                        }
                         return Ok(());
                     }
                     Ok(crate::api::Edited::Gone) => {}
@@ -102,7 +107,7 @@ impl Inner {
                 }
             }
         }
-        self.reply(chat, screen).await
+        self.reply_doc(chat, chat, screen).await
     }
 
     /// Условия направлений для клиента: с личными условиями — свои (без кэша), иначе общие.
@@ -565,6 +570,11 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
             inner.replace(chat, message, &screen).await
         }
         Callback::Exchange => inner.menu(chat, user, MenuAction::Exchange).await,
+        Callback::ExchangeBack => {
+            let terms = inner.terms_for(user).await?;
+            let screen = inner.ui().exchange_menu(&terms.terms);
+            inner.replace(chat, message, &screen).await
+        }
         Callback::PayInvoice => inner.menu(chat, user, MenuAction::PayInvoice).await,
         Callback::Terms => inner.menu(chat, user, MenuAction::Rates).await,
         Callback::Privacy => inner.command(chat, user, Command::Privacy).await,

@@ -5,15 +5,35 @@ expression: "both(p, q)"
 ### plain
 --- html
 ⚠️ <b>Не хватает <code>2.30</code> USDT</b>
-Пришлите ещё чек на <code>2.30</code> или верну <code>8.00</code>.
+<pre>К оплате           10.30
+Пришло              8.00
+────────────────────────
+Не хватает          2.30</pre>
+<i>Скопируйте, чтобы создать чек</i> ⬇️
+--- rich
+<p>⚠️ <b>Не хватает <code>2.30</code> USDT</b></p><pre>К оплате           10.30
+Пришло              8.00
+────────────────────────
+Не хватает          2.30</pre>
+<p><i>Скопируйте, чтобы создать чек</i> ⬇️</p>
 --- keyboard: inline
-[{"copy_text":{"text":"2.30"},"style":"primary","text":"2.30"}]
+[{"copy_text":{"text":"@xrocket 2.30"},"style":"primary","text":"@xrocket 2.30"}]
 [{"callback_data":"refund:A1B2C3D4E5","text":"↩️ Вернуть 8.00"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000003">⚠️</tg-emoji> <b>Не хватает <code>2.30</code> USDT</b>
-Пришлите ещё чек на <code>2.30</code> или верну <code>8.00</code>.
+<pre>К оплате           10.30
+Пришло              8.00
+────────────────────────
+Не хватает          2.30</pre>
+<i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji>
+--- rich
+<p><tg-emoji emoji-id="5368000000000000003">⚠️</tg-emoji> <b>Не хватает <code>2.30</code> USDT</b></p><pre>К оплате           10.30
+Пришло              8.00
+────────────────────────
+Не хватает          2.30</pre>
+<p><i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji></p>
 --- keyboard: inline
-[{"copy_text":{"text":"2.30"},"style":"primary","text":"2.30"}]
+[{"copy_text":{"text":"@xrocket 2.30"},"style":"primary","text":"@xrocket 2.30"}]
 [{"callback_data":"refund:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000005","text":"Вернуть 8.00"}]

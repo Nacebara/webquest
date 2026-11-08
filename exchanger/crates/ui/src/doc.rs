@@ -90,6 +90,14 @@ impl Doc {
         self.plain.push('\n');
     }
 
+    /// Готовый блок как есть (`<pre>` квитанции): в rich — сам блок, в обычном HTML — с
+    /// переводом строки после.
+    pub fn block(&mut self, block: &Frag) {
+        self.rich.push_str(block.rich());
+        self.plain.push_str(block.plain());
+        self.plain.push('\n');
+    }
+
     /// Пустая строка между разделами — только в обычном HTML.
     pub fn gap(&mut self) {
         self.plain.push('\n');

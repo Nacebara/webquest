@@ -227,6 +227,16 @@ impl FakeTelegram {
 
     /// Клиент нажимает инлайн-кнопку `data` под сообщением `message_id`.
     fn client_presses(&self, message_id: i64, data: &str) {
+        self.press(message_id, data, 0);
+    }
+
+    /// То же под свежим сообщением: Telegram прислал его целиком (`date` ≠ 0), его можно
+    /// править на месте.
+    fn client_taps(&self, message_id: i64, data: &str) {
+        self.press(message_id, data, 1);
+    }
+
+    fn press(&self, message_id: i64, data: &str, date: i64) {
         let mut s = self.lock();
         let id = s.next_update;
         s.next_update += 1;
@@ -237,7 +247,7 @@ impl FakeTelegram {
                 "from": { "id": CLIENT, "is_bot": false, "first_name": "Client" },
                 "message": {
                     "message_id": message_id,
-                    "date": 0,
+                    "date": date,
                     "chat": { "id": CLIENT, "type": "private" },
                 },
                 "chat_instance": "1",
@@ -767,7 +777,8 @@ async fn text_without_a_link_gets_a_hint_and_no_order(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn invoice_link_gets_a_quote_and_the_check_pays_it(pool: PgPool) {
     let e = env(pool).await;
-    let bot = e.start_bot();
+    // Rich включён: квитанция уходит rich, дальше те же правки сообщения.
+    let bot = e.start_bot_with(true);
     let shop = e.world.add_account("shop");
     let inv = e
         .world
@@ -778,13 +789,17 @@ async fn invoice_link_gets_a_quote_and_the_check_pays_it(pool: PgPool) {
     let quote = e
         .fake
         .wait_for("quote", |c| {
-            c.method == "sendMessage" && c.contains("Пришлите чек") && c.contains("10.30")
+            matches!(c.method.as_str(), "sendMessage" | "sendRichMessage")
+                && c.contains("Скопируйте, чтобы создать чек")
+                && c.contains("10.30")
         })
         .await;
     let (_, message, public_id) = e.order_message().await;
     assert_eq!(e.orders().await[0].1, OrderState::AwaitingFunds);
-    // Макет B1: сумма к оплате — на синей кнопке-копии, «Отмена» отменяет заявку.
-    assert!(quote.contains("\"copy_text\""), "{:?}", quote.body);
+    // «Квитанция» (выбор владельца 8 ноября 2026): rich, под сообщением — команда кошелька
+    // с суммой (копируется), «Отмена» отменяет заявку.
+    assert_eq!(quote.method, "sendRichMessage");
+    assert!(quote.contains("@xrocket 10.30"), "{:?}", quote.body);
     assert!(
         quote.contains(&format!("cancel:{public_id}")),
         "{:?}",
@@ -823,7 +838,7 @@ async fn invoice_link_gets_a_quote_and_the_check_pays_it(pool: PgPool) {
 
     assert_eq!(e.orders().await.len(), 1, "чек не стал отдельной заявкой");
     assert_eq!(
-        e.fake.calls_of("sendMessage").len(),
+        e.fake.calls_of("sendMessage").len() + e.fake.calls_of("sendRichMessage").len(),
         1,
         "одно сообщение на заявку"
     );
@@ -853,7 +868,9 @@ async fn invoice_in_a_forwarded_shop_button_gets_a_quote(pool: PgPool) {
     );
     e.fake
         .wait_for("quote", |c| {
-            c.method == "sendMessage" && c.contains("Пришлите чек") && c.contains("10.30")
+            matches!(c.method.as_str(), "sendMessage" | "sendRichMessage")
+                && c.contains("Скопируйте, чтобы создать чек")
+                && c.contains("10.30")
         })
         .await;
     bot.stop().await;
@@ -877,7 +894,9 @@ async fn xrocket_invoice_in_a_url_button_is_read_too(pool: PgPool) {
     );
     e.fake
         .wait_for("quote", |c| {
-            c.method == "sendMessage" && c.contains("Пришлите чек") && c.contains("20.40")
+            matches!(c.method.as_str(), "sendMessage" | "sendRichMessage")
+                && c.contains("Скопируйте, чтобы создать чек")
+                && c.contains("20.40")
         })
         .await;
     bot.stop().await;
@@ -896,7 +915,9 @@ async fn cancel_button_closes_the_quote(pool: PgPool) {
     e.fake.client_writes(&inv.url);
     e.fake
         .wait_for("quote", |c| {
-            c.method == "sendMessage" && c.contains("Пришлите чек") && c.contains("20.40")
+            matches!(c.method.as_str(), "sendMessage" | "sendRichMessage")
+                && c.contains("Скопируйте, чтобы создать чек")
+                && c.contains("20.40")
         })
         .await;
     let (_, message, public_id) = e.order_message().await;
@@ -1387,4 +1408,50 @@ async fn history_row_opens_the_order_card_by_callback(pool: PgPool) {
         })
         .await;
     bot.stop().await;
+}
+
+/// «Квитанция» «Пришлите чек» (выбор владельца 8 ноября 2026): выбор направления правит то же
+/// сообщение rich-квитанцией с командой кошелька на кнопке; «Назад» — снова «Что меняем?»
+/// в том же сообщении.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn send_check_receipt_opens_in_place_and_back_returns(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot_with(true);
+    e.fake.client_writes("Обменять");
+    e.fake
+        .wait_for("directions", |c| {
+            c.method == "sendMessage" && c.contains("Что меняем?")
+        })
+        .await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let message = e.fake.lock().next_message;
+    e.fake.client_taps(message, "dir:cb_to_xr_check");
+    let receipt = e
+        .fake
+        .wait_for("receipt", |c| {
+            c.method == "editMessageText" && c.message_id() == Some(message)
+        })
+        .await;
+    assert!(
+        receipt.body["rich_message"].is_object(),
+        "{:?}",
+        receipt.body
+    );
+    assert!(receipt.contains("Скопируйте, чтобы создать чек"));
+    assert!(receipt.contains("@send 100usdt"), "{:?}", receipt.body);
+    assert!(receipt.contains("exchange:back"));
+    e.fake.client_taps(message, "exchange:back");
+    e.fake
+        .wait_for("back", |c| {
+            c.method == "editMessageText"
+                && c.message_id() == Some(message)
+                && c.contains("Что меняем?")
+        })
+        .await;
+    bot.stop().await;
+    assert_eq!(
+        e.fake.calls_of("sendRichMessage").len() + e.fake.calls_of("sendMessage").len(),
+        1,
+        "всё в том же сообщении"
+    );
 }

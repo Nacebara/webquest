@@ -4,16 +4,40 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-🧾 <b>Жду чек xRocket</b> на <code>10.30</code> USDT
-<i>Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>.</i>
+🧾 <b>Жду чек xRocket</b> по счёту CryptoBot
+<pre>Счёт CryptoBot     10.00
+Комиссия 3 %        0.30
+────────────────────────
+Чек xRocket        10.30</pre>
+<i>Скопируйте, чтобы создать чек</i> ⬇️
+<i>⏳ Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> · <tg-time unix="1791377340" format="r">через 15 минут</tg-time></i>
+--- rich
+<p>🧾 <b>Жду чек xRocket</b> по счёту CryptoBot</p><pre>Счёт CryptoBot     10.00
+Комиссия 3 %        0.30
+────────────────────────
+Чек xRocket        10.30</pre>
+<p><i>Скопируйте, чтобы создать чек</i> ⬇️</p>
+<footer>⏳ Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> · <tg-time unix="1791377340" format="r">через 15 минут</tg-time></footer>
 --- keyboard: inline
-[{"copy_text":{"text":"10.30"},"style":"primary","text":"10.30"}]
-[{"copy_text":{"text":"@xrocket 10.3"},"text":"@xrocket 10.3"},{"callback_data":"cancel:A1B2C3D4E5","text":"✖️ Отмена"}]
+[{"copy_text":{"text":"@xrocket 10.30"},"style":"primary","text":"@xrocket 10.30"}]
+[{"callback_data":"cancel:A1B2C3D4E5","text":"✖️ Отмена"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> <b>Жду чек xRocket</b> на <code>10.30</code> USDT
-<i>Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>.</i>
+<tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> <b>Жду чек xRocket</b> по счёту CryptoBot
+<pre>Счёт CryptoBot     10.00
+Комиссия 3 %        0.30
+────────────────────────
+Чек xRocket        10.30</pre>
+<i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji>
+<i><tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> · <tg-time unix="1791377340" format="r">через 15 минут</tg-time></i>
+--- rich
+<p><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> <b>Жду чек xRocket</b> по счёту CryptoBot</p><pre>Счёт CryptoBot     10.00
+Комиссия 3 %        0.30
+────────────────────────
+Чек xRocket        10.30</pre>
+<p><i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji></p>
+<footer><tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> · <tg-time unix="1791377340" format="r">через 15 минут</tg-time></footer>
 --- keyboard: inline
-[{"copy_text":{"text":"10.30"},"style":"primary","text":"10.30"}]
-[{"copy_text":{"text":"@xrocket 10.3"},"text":"@xrocket 10.3"},{"callback_data":"cancel:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000025","text":"Отмена"}]
+[{"copy_text":{"text":"@xrocket 10.30"},"style":"primary","text":"@xrocket 10.30"}]
+[{"callback_data":"cancel:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000025","text":"Отмена"}]

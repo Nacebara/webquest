@@ -284,14 +284,77 @@ impl Ui {
         ]
     }
 
+    /// «Квитанция» (выбор владельца 8 ноября 2026): строки «подпись · сумма» столбиком
+    /// моноширинным шрифтом, итог под чертой. `<pre>` есть и в rich, и в обычном HTML.
+    fn receipt(&self, rows: &[(String, Decimal)], total: (&str, Decimal)) -> Frag {
+        let num = |v: Decimal| fmt::amount(v, Asset::Usdt);
+        let all: Vec<(String, String)> = rows
+            .iter()
+            .map(|(l, v)| (l.clone(), num(*v)))
+            .chain(std::iter::once((total.0.to_owned(), num(total.1))))
+            .collect();
+        let width = all
+            .iter()
+            .map(|(l, v)| l.chars().count() + v.chars().count() + 3)
+            .max()
+            .unwrap_or(0)
+            .max(24);
+        let line = |l: &str, v: &str| {
+            let pad = width.saturating_sub(l.chars().count() + v.chars().count());
+            format!("{l}{}{v}", " ".repeat(pad))
+        };
+        let mut out: Vec<String> = all[..all.len() - 1]
+            .iter()
+            .map(|(l, v)| line(l, v))
+            .collect();
+        out.push("─".repeat(width));
+        if let Some((l, v)) = all.last() {
+            out.push(line(l, v));
+        }
+        let html = format!("<pre>{}</pre>", crate::html::esc(&out.join("\n")));
+        Frag::dual(html.clone(), html)
+    }
+
+    /// «Скопируйте, чтобы создать чек ⬇️» — над кнопкой с командой кошелька.
+    fn copy_hint(&self) -> Frag {
+        self.fill(&self.texts.receipt.copy_hint, &[])
+    }
+
+    /// Кнопка квитанции под сообщением: команда кошелька с суммой («@send 100usdt»,
+    /// «@xrocket 51.50»), синяя, копируется нажатием (решение владельца 8 ноября 2026).
+    fn command_button(&self, command: &str) -> InlineKeyboardButton {
+        self.copy_button(command, command)
+            .style(botapi::ButtonStyle::Primary)
+    }
+
+    /// Экран-квитанция: rich (абзацы, `<pre>`, подвал) и тот же обычный HTML запасом.
+    /// Кнопок «Простой вид» нет: это шаг денежного потока, а не справка.
+    fn receipt_screen(&self, doc: crate::doc::Doc, keyboard: Keyboard) -> Screen {
+        self.dual(doc, keyboard)
+    }
+
     fn button_text(&self, template: &str, args: &[(&str, &str)]) -> String {
         fill_text(template, args)
     }
 }
 
+/// Значок кошелька: CryptoBot — синий ромб, xRocket — ракета.
+pub(crate) fn wallet_emoji(platform: Platform) -> Emoji {
+    match platform {
+        Platform::CryptoBot => Emoji::Cb,
+        Platform::XRocket => Emoji::Xr,
+    }
+}
+
 /// Инлайн-команда кошелька для создания чека (DESIGN-v0.2 Р5).
 pub fn inline_command(platform: Platform, amount: Decimal) -> String {
-    let amount = fmt::bare_amount(amount);
+    // Целая сумма — без копеек («@send 100usdt»), дробная — всегда два знака («@xrocket
+    // 51.50»), как в квитанции.
+    let amount = if amount.fract().is_zero() {
+        fmt::bare_amount(amount)
+    } else {
+        fmt::amount(amount, domain::Asset::Usdt)
+    };
     match platform {
         Platform::CryptoBot => format!("@send {amount}usdt"),
         Platform::XRocket => format!("@xrocket {amount}"),

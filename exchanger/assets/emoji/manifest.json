@@ -44,6 +44,13 @@
    "static": "static/color/warn.png"
   },
   {
+   "key": "color/down",
+   "label": "Вниз",
+   "emoji": "⬇️",
+   "animated": "color/down.tgs",
+   "static": "static/color/down.png"
+  },
+  {
    "key": "color/refund",
    "label": "Возврат",
    "emoji": "↩️",
@@ -406,6 +413,13 @@
    "emoji": "◀️",
    "animated": "mono/back.tgs",
    "static": "static/mono/back.png"
+  },
+  {
+   "key": "mono/down",
+   "label": "Вниз",
+   "emoji": "⬇️",
+   "animated": "mono/down.tgs",
+   "static": "static/mono/down.png"
   },
   {
    "key": "mono/home",

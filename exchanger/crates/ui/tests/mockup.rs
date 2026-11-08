@@ -153,6 +153,8 @@ fn lines(html: &str) -> Vec<String> {
         "</li>",
         "</summary>",
         "</details>",
+        "<pre>",
+        "</pre>",
     ] {
         s = s.replace(tag, &format!("\n{tag}"));
     }

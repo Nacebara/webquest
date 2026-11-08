@@ -404,7 +404,7 @@ impl Inner {
         })
     }
 
-    fn prefers_plain(&self, user: i64) -> bool {
+    pub(crate) fn prefers_plain(&self, user: i64) -> bool {
         !self.cfg.rich_messages || self.memory(|m| m.plain_view.contains(&user))
     }
 }

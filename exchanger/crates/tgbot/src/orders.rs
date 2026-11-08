@@ -197,13 +197,14 @@ fn render_invoice(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Extra)
         OrderState::AwaitingFunds if view.last_check_rejected => Some(ui.invoice_check_rejected(
             &q,
             &intake_failure(view.failure_code.as_deref(), cfg.bind_username),
+            cfg.now,
         )),
         OrderState::AwaitingFunds => Some(match got {
             Some(got) => {
                 let rest = Money::new(q.to_pay.amount() - got.amount(), got.asset()).ok()?;
                 ui.invoice_underpaid(&q, &got, &rest)
             }
-            None => ui.invoice_quote(&q),
+            None => ui.invoice_quote(&q, cfg.now),
         }),
         OrderState::Received | OrderState::InvoicePayPending => Some(ui.invoice_paying(&q)),
         OrderState::Completed => {
@@ -298,6 +299,7 @@ pub(crate) fn render(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Ext
 fn digest(screen: &Screen) -> u64 {
     let mut h = DefaultHasher::new();
     screen.html.hash(&mut h);
+    screen.rich_html.hash(&mut h);
     format!("{:?}", screen.keyboard).hash(&mut h);
     h.finish()
 }
@@ -369,6 +371,50 @@ impl Inner {
         });
     }
 
+    /// Сообщение денежного потока: «Квитанция» — rich (если клиент не просил простой вид),
+    /// Telegram отказал по существу — тот же экран HTML; остальные шаги — HTML.
+    pub(crate) async fn send_flow(
+        &self,
+        chat: i64,
+        user: i64,
+        screen: &Screen,
+    ) -> Result<botapi::Message, botapi::Error> {
+        match screen.rich_html.as_deref() {
+            Some(rich) if !self.prefers_plain(user) => self
+                .api
+                .send_rich(chat, rich, &screen.keyboard, screen)
+                .await
+                .map(|(message, _)| message),
+            _ => self.api.send_html(chat, screen).await,
+        }
+    }
+
+    /// Править сообщение денежного потока тем же правилом, что [`Inner::send_flow`]: шаг
+    /// после квитанции (обычный HTML) правит rich-сообщение на месте.
+    pub(crate) async fn edit_flow(
+        &self,
+        chat: i64,
+        message_id: i32,
+        user: i64,
+        screen: &Screen,
+    ) -> Result<Edited, botapi::Error> {
+        if let Some(rich) = screen.rich_html.as_deref()
+            && !self.prefers_plain(user)
+        {
+            match self
+                .api
+                .edit_rich(chat, message_id, rich, &screen.keyboard)
+                .await
+            {
+                Err(e) if e.is_rejection() => {
+                    tracing::info!(error = %e, "rich edit rejected, editing with the HTML fallback");
+                }
+                other => return other,
+            }
+        }
+        self.api.edit_html(chat, message_id, screen).await
+    }
+
     async fn send_progress(
         &self,
         view: &OrderView,
@@ -376,7 +422,7 @@ impl Inner {
         screen: &Screen,
         digest: u64,
     ) -> Result<(), TgBotError> {
-        match self.api.send_html(chat, screen).await {
+        match self.send_flow(chat, view.user_id, screen).await {
             Ok(message) => {
                 self.store_progress(
                     view.id,
@@ -435,7 +481,10 @@ pub(crate) async fn ensure_message(
             if inner.memory(|m| m.rendered.get(&order_id) == Some(&digest)) {
                 return Ok(());
             }
-            match inner.api.edit_html(p.chat_id, p.message_id, &screen).await {
+            match inner
+                .edit_flow(p.chat_id, p.message_id, view.user_id, &screen)
+                .await
+            {
                 Ok(Edited::Done | Edited::NotModified) => {
                     inner.remember_rendered(&view, digest);
                     tracing::debug!(
@@ -499,8 +548,11 @@ pub(crate) async fn show_awaiting(inner: &Arc<Inner>, view: &OrderView) -> Resul
         return Ok(());
     };
     let _guard = inner.locks.lock(view.id).await;
-    let screen = inner.ui().invoice_awaiting(&q);
-    match inner.api.edit_html(p.chat_id, p.message_id, &screen).await {
+    let screen = inner.ui().invoice_awaiting(&q, Utc::now());
+    match inner
+        .edit_flow(p.chat_id, p.message_id, view.user_id, &screen)
+        .await
+    {
         Ok(_) => {
             inner.remember_rendered(view, digest(&screen));
             Ok(())
@@ -684,10 +736,14 @@ mod tests {
             &invoice_view(OrderState::AwaitingFunds),
             &extra,
         );
-        assert!(html(&quote).contains("10.30 USDT"), "{}", quote.html);
-        // Макет B1: сумма к оплате — на синей кнопке-копии, ниже команда кошелька и «Отмена».
+        // «Квитанция» (выбор владельца 8 ноября 2026): итог столбиком, под сообщением —
+        // одна синяя кнопка с командой кошелька и суммой, ниже «Отмена»; rich и HTML запасом.
+        assert!(html(&quote).contains("10.30"), "{}", quote.html);
+        assert!(quote.rich_html.is_some(), "квитанция — rich");
         assert!(
-            buttons(&quote).contains(&botapi::InlineButtonAction::CopyText("10.30".into())),
+            buttons(&quote).contains(&botapi::InlineButtonAction::CopyText(
+                "@xrocket 10.30".into()
+            )),
             "{:?}",
             buttons(&quote)
         );

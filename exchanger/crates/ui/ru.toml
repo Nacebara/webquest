@@ -165,8 +165,19 @@ paused = "{e_pause} <i>{direction} на паузе: {why}</i>"
 
 # «Пришлите чек» — макет B1: как создать чек одной строкой, команда копируется кнопкой.
 [send_check]
-title = "<b>Пришлите чек {src}</b> · {min}–{max}\u00A0USDT"
-hint = "Наберите здесь {cmd} и выберите чек."
+# «Пришлите чек» — «Квитанция» (выбор владельца 8 ноября 2026): путь денег, суммы столбиком,
+# «Скопируйте, чтобы создать чек ⬇️» и кнопка с командой под сообщением.
+head = "{src_icon} <b>{src}</b> → {dst_icon} <b>{dst}</b> · {min}–{max}\u00A0USDT"
+
+[receipt]
+check = "Ваш чек {wallet}"
+fee = "Комиссия {pct}"
+payout = "Чек {wallet}"
+invoice = "Счёт {wallet}"
+to_pay = "К оплате"
+got = "Пришло"
+short = "Не хватает"
+copy_hint = "<i>Скопируйте, чтобы создать чек</i> {e_down}"
 
 [howto]
 title = "<b>Как создать чек {wallet}</b>"
@@ -218,15 +229,16 @@ details = """{e_ok} <b>{payout}\u00A0USDT</b> ждут вас в {dst}
 
 # Оплата счёта — макет B1: сумма к оплате на синей кнопке, срок цены одной строкой.
 [invoice]
-quote = """{e_invoice} <b>Счёт {inv_wallet}</b> · {inv_amount}{fiat}{description}
-Пришлите чек {src} на {x}
-<i>Цена держится до {expires}.</i>"""
-description = "\n<i>{text}</i>"
-fiat = " ({fiat}; курс сдвинется больше чем на {buffer} — верну деньги)"
-awaiting = """{e_invoice} <b>Жду чек {src}</b> на {x}
-<i>Цена держится до {expires}.</i>"""
-underpaid = """{e_warn} <b>Не хватает {rest}</b>
-Пришлите ещё чек на {rest_short} или верну {got_short}."""
+# «Квитанция» (выбор владельца 8 ноября 2026): путь денег, суммы столбиком, «Скопируйте,
+# чтобы создать чек ⬇️» и под сообщением — одна кнопка с командой кошелька и суммой.
+head = "{e_invoice} <b>Счёт {inv_wallet}</b> → {src_icon} <b>чек {src}</b>"
+description = "<i>{text}</i>"
+fiat = "<i>Счёт на {fiat}: курс сдвинется больше чем на {buffer} — верну деньги</i>"
+expires = "{e_wait} Цена держится до {time}{left}"
+left = "через {n} {word}"
+minute_forms = ["минуту", "минуты", "минут"]
+awaiting = "{e_invoice} <b>Жду чек {src}</b> по счёту {inv_wallet}"
+underpaid = "{e_warn} <b>Не хватает {rest}</b>"
 paying = "{e_sending} Оплачиваю счёт {inv_wallet}"
 paid = """{e_ok} <b>Счёт оплачен</b> · {inv_amount}
 <blockquote expandable>Получено {x_short} · комиссия {fee_pct} ({fee_short})

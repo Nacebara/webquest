@@ -258,10 +258,27 @@ pub struct ExchangeTexts {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SendCheckTexts {
-    /// «Пришлите чек CryptoBot · 1–500 USDT».
-    pub title: String,
-    /// «Наберите здесь @send 100usdt и выберите чек.»
-    pub hint: String,
+    /// «🔷 CryptoBot → 🚀 xRocket · 1–500 USDT» — путь денег.
+    pub head: String,
+}
+
+/// «Квитанция» — строки сумм столбиком (выбор владельца 8 ноября 2026).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReceiptTexts {
+    /// «Ваш чек CryptoBot».
+    pub check: String,
+    /// «Комиссия 2.5 %».
+    pub fee: String,
+    /// «Чек xRocket» — итог.
+    pub payout: String,
+    /// «Счёт CryptoBot».
+    pub invoice: String,
+    pub to_pay: String,
+    pub got: String,
+    pub short: String,
+    /// «Скопируйте, чтобы создать чек ⬇️» — над кнопкой с командой.
+    pub copy_hint: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -330,9 +347,17 @@ pub struct OrderTexts {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct InvoiceTexts {
-    pub quote: String,
+    /// «🧾 Счёт CryptoBot → 🚀 чек xRocket» — путь денег над квитанцией.
+    pub head: String,
+    /// «⏳ Цена держится до 21:08 · через 15 минут».
+    pub expires: String,
+    /// «через 15 минут» — запасной текст отсчёта (Telegram ведёт его сам).
+    pub left: String,
+    /// «минуту», «минуты», «минут».
+    pub minute_forms: [String; 3],
+    /// Описание счёта от продавца — курсивом под путём денег.
     pub description: String,
-    /// Счёт в фиате — в скобках после суммы.
+    /// Счёт в фиате — строка под путём денег: «Счёт на 4500 RUB: курс сдвинется …».
     pub fiat: String,
     pub awaiting: String,
     pub underpaid: String,
@@ -642,6 +667,7 @@ pub struct Texts {
     pub terms: TermsTexts,
     pub exchange: ExchangeTexts,
     pub send_check: SendCheckTexts,
+    pub receipt: ReceiptTexts,
     pub howto: HowtoTexts,
     pub invoice_prompt: InvoicePromptTexts,
     pub order: OrderTexts,

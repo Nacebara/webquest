@@ -195,7 +195,7 @@ pub fn client(ui: &Ui) -> Vec<PreviewScreen> {
         one("Детали", ui.order_done(&o, &b, CHECK_URL, 9, true)),
         one("Курс и лимиты", ui.terms(&t)),
         one("Оплатить счёт", ui.invoice_prompt(&t)),
-        one("Счёт: к оплате", ui.invoice_quote(&q)),
+        one("Счёт: к оплате", ui.invoice_quote(&q, msk(5, 14, 10))),
         one(
             "Счёт: не хватает",
             ui.invoice_underpaid(&q, &usdt(50, 0), &usdt(125, 2)),

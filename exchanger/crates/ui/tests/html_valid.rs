@@ -105,7 +105,8 @@ fn parse_attrs(tag: &str, mut s: &str, allowed: &[&str]) -> Result<(), String> {
             | ("tg-time", "unix", Some(v))
             | (_, "colspan", Some(v))
                 if !v.is_empty() && v.bytes().all(|b| b.is_ascii_digit()) => {}
-            ("tg-time", "format", Some("t" | "dt")) => {}
+            // «r» — «через 15 минут» (проверено живьём 8 ноября 2026).
+            ("tg-time", "format", Some("t" | "dt" | "r")) => {}
             ("a", "href", Some(v))
                 if v.starts_with("https://")
                     || v.starts_with("http://")
@@ -184,6 +185,20 @@ fn validate(html: &str, rich: bool) -> Result<(), String> {
     }
 }
 
+/// Текст вне блоков `<pre>`.
+fn outside_pre(html: &str) -> String {
+    let mut out = String::new();
+    let mut rest = html;
+    while let Some(start) = rest.find("<pre>") {
+        out.push_str(&rest[..start]);
+        rest = rest[start..]
+            .find("</pre>")
+            .map_or("", |end| &rest[start + end + "</pre>".len()..]);
+    }
+    out.push_str(rest);
+    out
+}
+
 fn check_text_rules(name: &str, screen: &Screen, placeholders: bool) {
     let html = &screen.html;
     validate(html, false).unwrap_or_else(|e| panic!("{name}: {e}"));
@@ -197,8 +212,9 @@ fn check_text_rules(name: &str, screen: &Screen, placeholders: bool) {
     assert!(html.chars().count() <= 4096, "{name}: длиннее 4096");
     if let Some(rich) = &screen.rich_html {
         validate(rich, true).unwrap_or_else(|e| panic!("{name} (rich): {e}"));
+        // Перевод строки в rich — только внутри `<pre>` (столбик квитанции).
         assert!(
-            !rich.contains('\n'),
+            !outside_pre(rich).contains('\n'),
             "{name}: перевод строки в rich вместо <br>"
         );
     }
@@ -285,12 +301,18 @@ fn money_flow_is_plain_html_reference_screens_have_fallback() {
         // Выбор владельца 8 ноября 2026: карточки.
         "invoice_prompt",
         "help",
+        // «Квитанция» (выбор владельца 8 ноября 2026): rich и тот же HTML запасом.
+        "send_check",
+        "invoice_quote",
+        "invoice_awaiting",
+        "invoice_underpaid",
     ];
     for (name, screen) in common::gallery(&ui) {
         let expect_rich = rich
             .iter()
             .any(|r| name == *r || name.starts_with(&format!("{r}_")))
-            && name != "history_empty";
+            && name != "history_empty"
+            && name != "send_check_paused";
         assert_eq!(screen.is_rich(), expect_rich, "{name}");
     }
 }
@@ -366,10 +388,10 @@ fn validator_rejects_bad_markup() {
 #[test]
 fn dynamic_text_cannot_inject_markup_or_placeholders() {
     let ui = common::plain_ui();
-    let screen = ui.invoice_quote(&common::quote(
-        Some("{e_ok} {order} <b>жирный</b> &amp;"),
-        false,
-    ));
+    let screen = ui.invoice_quote(
+        &common::quote(Some("{e_ok} {order} <b>жирный</b> &amp;"), false),
+        common::at(12, 34),
+    );
     assert!(
         screen
             .html
@@ -406,7 +428,7 @@ proptest! {
             terms.bind_username = Some(s.clone());
             let order = ui::OrderRef { id: s.clone(), direction: domain::Direction::CbToXrCheck };
             let screens = [
-                ui.invoice_quote(&quote),
+                ui.invoice_quote(&quote, common::at(12, 34)),
                 ui.error(&UiError::ForeignBot { bot: s.clone() }),
                 ui.error(&UiError::Banned { until: None, reason: s.clone() }),
                 ui.error(&UiError::Duplicate { order: s.clone() }),

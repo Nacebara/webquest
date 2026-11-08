@@ -25,7 +25,7 @@ const svgMono = (body) =>
 // и по нему ищет эмодзи в панели.
 const BASE = {
   color: {
-    done: '✅', swap: '🔄', process: '⏳', wait: '⏳', err: '❌', warn: '⚠️', refund: '↩️',
+    done: '✅', down: '⬇️', swap: '🔄', process: '⏳', wait: '⏳', err: '❌', warn: '⚠️', refund: '↩️',
     manual: '🛠', invoice: '🧾', sending: '📤', usdt: '💵', cb: '🔵', xr: '🚀', shield: '🛡',
     lock: '🔒', rates: '📈', history: '📜', support: '💬', fast: '⚡', pause: '⏸', ban: '⛔',
     alarm: '🚨', live: '🟢', robot: '🤖', vault: '🏦', flood: '🌊', kill: '🛑', maint: '🛠',
@@ -35,7 +35,7 @@ const BASE = {
   },
   mono: {
     swap: '🔄', ticket: '🎫', invoice: '🧾', rates: '📈', history: '📜', support: '💬', help: '❓',
-    copy: '📋', claim: '📥', cb: '🔵', xr: '🚀', usdt: '💵', done: '✅', close: '❌', back: '◀️',
+    copy: '📋', claim: '📥', cb: '🔵', xr: '🚀', usdt: '💵', done: '✅', close: '❌', back: '◀️', down: '⬇️',
     home: '🏠', refresh: '🔄', refund: '↩️', wait: '⏳', spin: '🌀', fast: '⚡', gift: '🎁',
     star: '⭐', globe: '🌐', link: '🔗', dash: '📊', queue: '📋', order: '📄', user: '👤',
     users: '👥', ban: '🚫', search: '🔍', filter: '🔽', settings: '⚙️', bell: '🔔', vault: '🏦',

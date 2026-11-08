@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use domain::fsm::OrderState;
 use domain::{Decimal, Direction, Flow};
 
-use super::{Ui, inline_command, menu_command, username_ok, wallet_bot_url};
+use super::{Ui, inline_command, menu_command, username_ok, wallet_bot_url, wallet_emoji};
 use crate::callback::{Callback, order_id_ok};
 use crate::doc::{Doc, Row, Table};
 use crate::emoji::Emoji;
@@ -31,6 +31,32 @@ fn example_amount(terms: Option<&DirectionTerms>) -> Decimal {
     }
 }
 
+/// Пример расчёта для квитанции «Пришлите чек»: та же формула, что у выплаты
+/// (`domain::pricing::quote_check_exchange`), ставка — ступени по сумме, выгодный курс —
+/// на первые `up_to`. Шаг выплаты — цент. Средний процент — как запишется в заявку.
+fn example_quote(
+    d: &DirectionTerms,
+    amount: Decimal,
+) -> Option<(Decimal, domain::pricing::ExchangeQuote)> {
+    use domain::pricing::{Discount, FeePolicy, quote_check_exchange};
+    let fee_pct = d
+        .tiers
+        .iter()
+        .filter(|t| t.from <= amount)
+        .max_by_key(|t| t.from)
+        .map_or(d.fee_pct, |t| t.fee_pct);
+    let policy = FeePolicy {
+        fee_pct,
+        min_fee: d.min_fee,
+        discount: d.promo.filter(|p| p.fee_pct <= fee_pct).map(|p| Discount {
+            fee_pct: p.fee_pct,
+            room: p.up_to,
+        }),
+    };
+    let quote = quote_check_exchange(amount, policy, domain::Step::from_dp(2)?).ok()?;
+    Some((policy.average_pct(amount).ok()?, quote))
+}
+
 /// Точка статуса строки истории: готово — зелёная, в работе — жёлтая, остальное — серая.
 fn history_dot(state: OrderState) -> Emoji {
     match state {
@@ -51,14 +77,6 @@ fn static_form(form: &str) -> &'static str {
 
 /// Раздел «Помощи»: заголовок, абзацы, кнопка действия (подпись, `callback_data`).
 type HelpSection<'a> = (&'a str, Vec<Frag>, Option<(&'a str, &'a str)>);
-
-/// Значок кошелька.
-fn wallet_icon(platform: domain::Platform) -> Emoji {
-    match platform {
-        domain::Platform::CryptoBot => Emoji::Cb,
-        domain::Platform::XRocket => Emoji::Xr,
-    }
-}
 
 impl Ui {
     /// Почему на паузе — фраза для «Что меняем?» и ошибок паузы.
@@ -377,7 +395,9 @@ impl Ui {
         self.plain(body, Keyboard::inline_rows(rows))
     }
 
-    /// После выбора направления: «пришлите чек … на сумму от X до Y» (DESIGN-v0.2 §6).
+    /// После выбора направления — «Квитанция» (выбор владельца 8 ноября 2026): путь денег
+    /// значками и лимиты, пример расчёта столбиком («Ваш чек · Комиссия · Чек xRocket»),
+    /// «Скопируйте, чтобы создать чек ⬇️» и под сообщением кнопка с командой кошелька.
     /// Направление на паузе — сразу ошибка E11 (чек ещё не прислан, деньги у клиента).
     pub fn send_check(&self, terms: &Terms, direction: Direction) -> Screen {
         let Some(d) = terms.get(direction).filter(|d| {
@@ -388,32 +408,52 @@ impl Ui {
                 until: None,
             });
         };
-        let t = &self.texts.send_check;
-        let src = direction.source();
-        let command = inline_command(src, example_amount(Some(d)));
-        let mut body = self.fill(
-            &t.title,
+        let (src, dst) = (direction.source(), direction.target());
+        let amount = example_amount(Some(d));
+        let command = inline_command(src, amount);
+        let mut doc = Doc::new();
+        doc.para(&self.fill(
+            &self.texts.send_check.head,
             &[
+                ("src_icon", &self.emoji.frag(wallet_emoji(src))),
                 ("src", &self.wallet(src)),
+                ("dst_icon", &self.emoji.frag(wallet_emoji(dst))),
+                ("dst", &self.wallet(dst)),
                 ("min", &Frag::text(&fmt::bare_amount(d.min))),
                 ("max", &Frag::text(&fmt::bare_amount(d.max))),
             ],
-        );
-        body.push(&Frag::trusted("\n"));
-        body.push(&self.fill(&t.hint, &[("cmd", &Frag::code(&command))]));
+        ));
+        if let Some((pct, q)) = example_quote(d, amount) {
+            let r = &self.texts.receipt;
+            let pct = fmt::percent(pct);
+            doc.block(&self.receipt(
+                &[
+                    (
+                        fill_text(&r.check, &[("wallet", self.wallet_name(src))]),
+                        q.amount_in,
+                    ),
+                    (fill_text(&r.fee, &[("pct", &pct)]), q.fee),
+                ],
+                (
+                    &fill_text(&r.payout, &[("wallet", self.wallet_name(dst))]),
+                    q.payout,
+                ),
+            ));
+        }
+        doc.para(&self.copy_hint());
         let b = &self.texts.buttons;
         let keyboard = Keyboard::inline_rows(vec![
-            vec![self.copy_button(&command, &command)],
+            vec![self.command_button(&command)],
             vec![
                 self.cb_button(
                     Some(Emoji::Help),
                     &b.instruction,
                     &Callback::HowTo(direction),
                 ),
-                self.cb_button(Some(Emoji::Hide), &b.cancel, &Callback::Cancel(None)),
+                self.cb_button(Some(Emoji::Back), &b.back, &Callback::ExchangeBack),
             ],
         ]);
-        self.plain(body, keyboard)
+        self.receipt_screen(doc, keyboard)
     }
 
     /// «Как создать чек»: инлайн `@send 10usdt` / `@xrocket 10` и запасной путь через меню
@@ -446,7 +486,7 @@ impl Ui {
         let open = self.button_text(&b.open_wallet, &[("wallet", self.wallet_name(src))]);
         let keyboard = Keyboard::inline_rows(vec![
             vec![self.copy_button(&command, &command)],
-            vec![self.url_button(Some(wallet_icon(src)), &open, wallet_bot_url(src))],
+            vec![self.url_button(Some(wallet_emoji(src)), &open, wallet_bot_url(src))],
             vec![self.cb_button(Some(Emoji::Back), &b.back, &Callback::Direction(direction))],
         ]);
         self.plain(body, keyboard)

@@ -294,6 +294,11 @@ const COLOR = {
   err: (t) => tile('er', C.coral, `<path d="${G.cross1}"/><path d="${G.cross2}"/>`, { transform: A.shake(t, 1.1), sw: 2.1 }),
   // Внимание: восклицательный знак коротко подпрыгивает.
   warn: (t) => tile('wn', C.amber, `<path d="${G.exclBar}"/>${G.exclDot}`, { transform: A.nudge(t, 0, -1.4, 0.06, 0.3), sw: 2.1 }),
+  // Вниз: стрелка дважды мягко «кивает» вниз — на кнопку под сообщением.
+  down: (t) => {
+    const dy = t == null ? 0 : 1.7 * bump(t, 0.06, 0.28) + 0.9 * bump(t, 0.28, 0.46);
+    return tile('dw', C.blue, '<path d="M12 6.4v10.4M7.7 12.5l4.3 4.3 4.3-4.3"/>', { transform: move(0, dy), sw: 2.1 });
+  },
   // Возврат: стрелка дважды мягко «тянется» назад.
   refund: (t) => {
     const dx = t == null ? 0 : -1.5 * bump(t, 0.06, 0.28) - 0.8 * bump(t, 0.28, 0.44);
@@ -509,6 +514,10 @@ const MONO = {
   done: (t) => `<circle cx="12" cy="12" r="8.8"/>${grp(A.pop(t, 0.14), '<path d="M8.2 12.3l2.6 2.6 5-5.2"/>')}`,
   close: (t) => grp(A.turn(t, 90), '<path d="M7.4 7.4l9.2 9.2M16.6 7.4l-9.2 9.2"/>'),
   back: (t) => grp(A.nudge(t, -1.6, 0), '<path d="M19 12H5.6M10.6 7l-5 5 5 5"/>'),
+  down: (t) => {
+    const dy = t == null ? 0 : 1.8 * bump(t, 0.06, 0.28) + 1.0 * bump(t, 0.28, 0.46);
+    return grp(move(0, dy), '<path d="M12 4.6v13.4M6.9 12.9l5.1 5.1 5.1-5.1"/>');
+  },
   home: (t) => grp(A.pop(t, 0.08, 12, 19), B.home),
   refresh: (t) => grp(A.spin(t, 360), B.refresh),
   refund: (t) => grp(A.nudge(t, -1.5, 0), `<path d="${G.uturn}"/><path d="${G.uturnHead}"/>`),
@@ -627,7 +636,7 @@ const LABELS = {
   broadcast: 'Рассылка', limit: 'Лимиты', confetti: 'Первый обмен', step_done: 'Шаг: готов', step_now: 'Шаг: сейчас',
   step_todo: 'Шаг: впереди', dot_ok: 'Хорошо', dot_work: 'В работе', dot_wait: 'Ждём', dot_act: 'Нужен человек',
   dot_closed: 'Закрыто', prog_25: 'Прогресс 25 %', prog_50: 'Прогресс 50 %', prog_75: 'Прогресс 75 %',
-  ticket: 'Чек', help: 'Помощь', copy: 'Копировать', claim: 'Забрать', close: 'Закрыть', back: 'Назад', home: 'Главная',
+  down: 'Вниз', ticket: 'Чек', help: 'Помощь', copy: 'Копировать', claim: 'Забрать', close: 'Закрыть', back: 'Назад', home: 'Главная',
   refresh: 'Обновить', spin: 'Загрузка', gift: 'Подарок', star: 'Звезда', globe: 'Язык', link: 'Ссылка', dash: 'Сводка',
   queue: 'Очередь', order: 'Заявка', user: 'Клиент', users: 'Клиенты', search: 'Поиск', filter: 'Фильтр',
   settings: 'Настройки', bell: 'Алерты', megaphone: 'Рассылка', journal: 'Журнал', chart: 'Статистика',
