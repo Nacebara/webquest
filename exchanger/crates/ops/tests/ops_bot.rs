@@ -803,3 +803,63 @@ async fn owner_grants_investor_access_and_admin_approves_a_withdrawal(pool: PgPo
     assert_eq!(o.world.checks_created_by(o.ub).len(), 1, "один чек вывода");
     assert_eq!(o.audit("invest.approve").await.len(), 1);
 }
+
+/// Сводка говорит, почему направление не принимает; «Сверить балансы» сразу предлагает
+/// провести пополнение владельца; нечитаемый баланс — событие с причиной.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn dash_explains_pauses_and_reconcile_offers_the_top_up(pool: PgPool) {
+    let o = ops(pool).await;
+    sqlx::query(
+        "UPDATE directions SET min_amount = 2000, max_amount = 5000 WHERE code = 'cb_to_xr_check'",
+    )
+    .execute(&o.pool)
+    .await
+    .unwrap();
+    let dash = o.say(OWNER, "/dash", "Сводка").await;
+    assert!(
+        dash.text().contains("нет резерва: в xRocket свободно"),
+        "{}",
+        dash.text()
+    );
+    assert!(
+        dash.text().contains("работает · заявка до"),
+        "{}",
+        dash.text()
+    );
+
+    // Владелец пополнил xRocket на 20 — «Сверить балансы» сразу предлагает провести.
+    o.world
+        .set_balance(o.ub, XR, Asset::Usdt, dec!(1020))
+        .unwrap();
+    let recon = o
+        .press(OWNER, &dash, "Сверить балансы", "Сверка балансов")
+        .await;
+    let preview = o
+        .press(OWNER, &recon, "Это мой взнос в xRocket", "взнос владельца")
+        .await;
+    o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
+    let r = o.engine.reconcile_balances().await.unwrap();
+    assert!(
+        r.iter()
+            .all(|x| x.verdict == engine::reconcile::Verdict::Ok),
+        "{r:?}"
+    );
+
+    // Кошелёк не отвечает — владелец получает событие с причиной, а не тишину.
+    o.say(OWNER, "/admin", "Админ-панель exch").await;
+    o.world.inject(
+        o.ub,
+        userbot::sim::Call::SendText,
+        userbot::sim::Fault::NoReply,
+        2,
+    );
+    let mark = o.tg.mark();
+    o.engine.reconcile_balances().await.unwrap();
+    let alert = o.tg.screen(mark, OWNER, "не читается").await;
+    assert!(
+        alert.button("Сверить снова").is_some(),
+        "{:?}",
+        alert.buttons()
+    );
+    assert!(alert.text().contains("Баланс"), "{}", alert.text());
+}

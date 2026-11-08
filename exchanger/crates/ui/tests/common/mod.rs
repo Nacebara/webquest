@@ -57,6 +57,9 @@ fn dir(
         tiers: Vec::new(),
         promo: None,
         personal: false,
+        pause: (status == DirectionStatus::Paused).then_some(ui::PauseReason::NoReserve {
+            wallet: direction.target(),
+        }),
     }
 }
 
@@ -100,6 +103,9 @@ pub fn terms() -> Terms {
 pub fn terms_partly_paused() -> Terms {
     let mut t = terms();
     t.directions[1].status = DirectionStatus::Paused;
+    t.directions[1].pause = Some(ui::PauseReason::NoReserve {
+        wallet: Platform::CryptoBot,
+    });
     t.directions[3].status = DirectionStatus::Off;
     t.bind_username = None;
     t

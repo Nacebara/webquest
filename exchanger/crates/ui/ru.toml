@@ -37,6 +37,13 @@ pay_xr_invoice = { send = "Счёт xRocket", get = "оплачу из CryptoBot
 open = "работает"
 paused = "пауза"
 off = "выключено"
+paused_no_reserve = "нет резерва"
+paused_maintenance = "обслуживание"
+paused_technical = "временный сбой"
+why_no_reserve = "в {wallet} закончился резерв для выплат — скоро пополню"
+why_maintenance = "бот на обслуживании — скоро вернусь"
+why_technical = "временный сбой кошелька — уже разбираюсь"
+why_paused = "сейчас не принимаю"
 
 [states]
 new = "создана"
@@ -144,7 +151,7 @@ personal = "Для вас действуют личные условия — о�
 title = "<b>Обменять чек</b>"
 lead = "Выберите направление:"
 line = "{icon} <b>{direction}</b> — {fee}, от {min} до {max} USDT"
-line_paused = "{icon} <b>{direction}</b> — на паузе, сейчас не принимаю"
+line_paused = "{icon} <b>{direction}</b> — на паузе: {why}"
 footer = "Курс 1:1. Выплата — чеком другого кошелька: забрать его можно одной кнопкой."
 promo = "{icon} <b>{direction}</b> сейчас выгоднее: {fee} на сумму до {up_to} USDT"
 

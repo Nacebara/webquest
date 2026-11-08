@@ -54,6 +54,18 @@ pub struct Reconciliation {
     pub expected: Decimal,
     pub actual: Option<Decimal>,
     pub verdict: Verdict,
+    /// Почему замера нет (`Unavailable`): ошибка кошелька или «не подключён».
+    pub error: Option<String>,
+}
+
+/// Ключ события «баланс кошелька не читается».
+pub fn unreadable_key(platform: Platform) -> String {
+    format!("balance_unreadable:{}", platform.db_name())
+}
+
+/// Ключ события «баланс не сходится».
+pub fn mismatch_key(platform: Platform) -> String {
+    format!("balance_mismatch:{}", platform.db_name())
 }
 
 impl Reconciliation {
@@ -105,6 +117,15 @@ impl Engine {
         for (platform, wallet_bot) in &self.wallets {
             let mut conn = self.pool.acquire().await?;
             let Some((wallet, _)) = storage::wallets::active(&mut conn, *platform).await? else {
+                let error = "кошелёк не подключён: войдите юзерботом в этот кошелёк".to_owned();
+                self.unreadable(&mut conn, *platform, &error).await?;
+                out.push(Reconciliation {
+                    platform: *platform,
+                    expected: Decimal::ZERO,
+                    actual: None,
+                    verdict: Verdict::Unavailable,
+                    error: Some(error),
+                });
                 continue;
             };
             let expected = storage::ledger::wallet_balances(&mut conn)
@@ -122,11 +143,15 @@ impl Engine {
                     Ok(b) => Some(usdt_of(&b)),
                     Err(e) => {
                         tracing::warn!(platform = platform.db_name(), error = %e, "balance read failed");
+                        let error = e.to_string();
+                        let mut conn = self.pool.acquire().await?;
+                        self.unreadable(&mut conn, *platform, &error).await?;
                         out.push(Reconciliation {
                             platform: *platform,
                             expected,
                             actual: None,
                             verdict: Verdict::Unavailable,
+                            error: Some(error),
                         });
                         continue;
                     }
@@ -161,7 +186,11 @@ impl Engine {
                 .execute(&mut *tx)
                 .await?;
             }
-            let key = format!("balance_mismatch:{}", platform.db_name());
+            let key = mismatch_key(*platform);
+            if actual.is_some() {
+                // Баланс прочитан — событие «не читается» закрыто.
+                storage::alerts::resolve(&mut tx, &unreadable_key(*platform)).await?;
+            }
             match (verdict, actual) {
                 (Verdict::Ok, _) => {
                     storage::alerts::resolve(&mut tx, &key).await?;
@@ -211,10 +240,36 @@ impl Engine {
                 expected,
                 actual,
                 verdict,
+                error: None,
             });
         }
         out.sort_by_key(|r| r.platform.db_name());
         Ok(out)
+    }
+
+    /// Баланс кошелька не читается или кошелёк не подключён: событие владельцу с причиной.
+    /// Иначе резерв тихо остаётся нулём, а направления — на паузе без объяснений.
+    async fn unreadable(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        platform: Platform,
+        error: &str,
+    ) -> Result<(), EngineError> {
+        storage::alerts::raise(
+            conn,
+            &NewAlert {
+                level: Level::Warn,
+                topic: Topic::Reserves,
+                dedup_key: &unreadable_key(platform),
+                title: "balance_unreadable",
+                payload: json!({
+                    "platform": platform.db_name(),
+                    "error": ui_safe(error),
+                }),
+            },
+        )
+        .await?;
+        Ok(())
     }
 
     /// Самопроверка на живых кошельках: чек на `amount` через меню и его же активация.
@@ -324,4 +379,10 @@ fn mask(param: &str) -> String {
         chars[..4].iter().collect::<String>(),
         chars[chars.len() - 2..].iter().collect::<String>()
     )
+}
+
+/// Текст ошибки для события: короткий, без переводов строк.
+fn ui_safe(error: &str) -> String {
+    let one_line: String = error.split_whitespace().collect::<Vec<_>>().join(" ");
+    one_line.chars().take(300).collect()
 }

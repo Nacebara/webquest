@@ -10,7 +10,7 @@ expression: "both(p, q)"
 <blockquote>🔵 Чек CryptoBot → чек xRocket · <b>от 1,2 %</b>
 🚀 Чек xRocket → чек CryptoBot · <b>1,5 %</b>
 🧾 Счёт CryptoBot → оплачу из xRocket · <b>3 %</b>
-🧾 Счёт xRocket → оплачу из CryptoBot · <b>пауза</b></blockquote>
+🧾 Счёт xRocket → оплачу из CryptoBot · <b>нет резерва</b></blockquote>
 🔥 <b>Сейчас выгодно:</b> xRocket → CryptoBot — 0,3 % на сумму до <code>450.00</code> USDT, сверх неё — обычная комиссия.
 Принимаю от <code>2.00</code> до <code>500.00</code> USDT, комиссия минимум <code>0.10</code> USDT.
 
@@ -26,7 +26,7 @@ expression: "both(p, q)"
 <tr><td>🔵 Чек CryptoBot</td><td>чек xRocket</td><td align="right">от 1,2 %</td></tr>
 <tr><td>🚀 Чек xRocket</td><td>чек CryptoBot</td><td align="right">1,5 %</td></tr>
 <tr><td>🧾 Счёт CryptoBot</td><td>оплачу из xRocket</td><td align="right">3 %</td></tr>
-<tr><td>🧾 Счёт xRocket</td><td>оплачу из CryptoBot</td><td align="right">пауза</td></tr>
+<tr><td>🧾 Счёт xRocket</td><td>оплачу из CryptoBot</td><td align="right">нет резерва</td></tr>
 </table>
 <p>🔥 <b>Сейчас выгодно:</b> xRocket → CryptoBot — 0,3 % на сумму до <code>450.00</code> USDT, сверх неё — обычная комиссия.</p>
 <p>Принимаю от <code>2.00</code> до <code>500.00</code> USDT, комиссия минимум <code>0.10</code> USDT.</p>
@@ -49,7 +49,7 @@ expression: "both(p, q)"
 <blockquote><tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> Чек CryptoBot → чек xRocket · <b>от 1,2 %</b>
 <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> Чек xRocket → чек CryptoBot · <b>1,5 %</b>
 <tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт CryptoBot → оплачу из xRocket · <b>3 %</b>
-<tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт xRocket → оплачу из CryptoBot · <b>пауза</b></blockquote>
+<tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт xRocket → оплачу из CryptoBot · <b>нет резерва</b></blockquote>
 <tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> <b>Сейчас выгодно:</b> xRocket → CryptoBot — 0,3 % на сумму до <code>450.00</code> USDT, сверх неё — обычная комиссия.
 Принимаю от <code>2.00</code> до <code>500.00</code> USDT, комиссия минимум <code>0.10</code> USDT.
 
@@ -65,7 +65,7 @@ expression: "both(p, q)"
 <tr><td><tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> Чек CryptoBot</td><td>чек xRocket</td><td align="right">от 1,2 %</td></tr>
 <tr><td><tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> Чек xRocket</td><td>чек CryptoBot</td><td align="right">1,5 %</td></tr>
 <tr><td><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт CryptoBot</td><td>оплачу из xRocket</td><td align="right">3 %</td></tr>
-<tr><td><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт xRocket</td><td>оплачу из CryptoBot</td><td align="right">пауза</td></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт xRocket</td><td>оплачу из CryptoBot</td><td align="right">нет резерва</td></tr>
 </table>
 <p><tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> <b>Сейчас выгодно:</b> xRocket → CryptoBot — 0,3 % на сумму до <code>450.00</code> USDT, сверх неё — обычная комиссия.</p>
 <p>Принимаю от <code>2.00</code> до <code>500.00</code> USDT, комиссия минимум <code>0.10</code> USDT.</p>

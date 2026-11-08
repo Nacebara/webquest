@@ -31,6 +31,19 @@ pub struct DirectionTerms {
     pub promo: Option<PromoTerms>,
     /// У клиента личные условия на этом направлении.
     pub personal: bool,
+    /// Почему на паузе (только при [`DirectionStatus::Paused`]).
+    pub pause: Option<PauseReason>,
+}
+
+/// Почему направление на паузе — клиенту, без внутренних подробностей.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PauseReason {
+    /// На кошельке выплаты кончился резерв.
+    NoReserve { wallet: Platform },
+    /// Бот на обслуживании.
+    Maintenance,
+    /// Сбой кошелька или юзербота: автопауза, кошелёк не подключён.
+    Technical,
 }
 
 /// Ступень: «от суммы `from` — `fee_pct`».

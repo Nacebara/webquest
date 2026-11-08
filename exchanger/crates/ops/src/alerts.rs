@@ -243,6 +243,20 @@ impl Inner {
                 ]);
                 sc
             }
+            "balance_unreadable" => {
+                let name = p["platform"]
+                    .as_str()
+                    .and_then(domain::Platform::from_db_name)
+                    .map_or_else(|| esc(&s(p, "platform")), |x| self.platform_name(x));
+                Screen::new(t.f(
+                    "alert.balance_unreadable",
+                    &[("name", &name), ("error", &esc(&s(p, "error")))],
+                ))
+                .row(vec![
+                    btn(t.t("alert.b_recheck"), &Cb::Reconcile),
+                    btn(t.t("alert.b_ack"), &Cb::Ack(a.id)),
+                ])
+            }
             "invest_withdrawal" | "invest_manual" | "invest_failed" => {
                 let id = p["move_id"].as_i64().unwrap_or_default();
                 let kind = t.t(if s(p, "kind") == "deposit" {

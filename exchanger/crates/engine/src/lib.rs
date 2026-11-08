@@ -14,6 +14,7 @@
 //! `domain::fsm` (в `storage::orders::apply_event`); эффекты перехода — в той же транзакции
 //! ([`effects`]); выплата — одна попытка, неясный исход — сверка или `MANUAL_REVIEW`.
 
+pub mod availability;
 mod effects;
 pub mod fees;
 pub mod invest;

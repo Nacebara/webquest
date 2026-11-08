@@ -282,3 +282,22 @@ pub async fn resolve(conn: &mut PgConnection, dedup_key: &str) -> Result<bool, S
     .rows_affected();
     Ok(n == 1)
 }
+
+/// Открытое событие по ключу (`balance_mismatch:xrocket` …).
+pub async fn open_by_key(
+    conn: &mut PgConnection,
+    dedup_key: &str,
+) -> Result<Option<AlertRow>, StorageError> {
+    let row = sqlx::query_as!(
+        Raw,
+        r#"
+        SELECT id, level, topic, dedup_key, title, payload, count, first_at, last_at,
+               sent_message_id, acked_by, acked_at
+          FROM alerts WHERE dedup_key = $1 AND acked_at IS NULL
+        "#,
+        dedup_key
+    )
+    .fetch_optional(conn)
+    .await?;
+    row.map(TryInto::try_into).transpose()
+}

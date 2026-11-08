@@ -1561,6 +1561,7 @@ impl Inner {
         if report.is_empty() {
             lines.push(t.t("recon.none"));
         }
+        let mut capital = Vec::new();
         for r in &report {
             let diff = r.diff().unwrap_or_default();
             let verdict = match r.verdict {
@@ -1568,8 +1569,28 @@ impl Inner {
                 engine::reconcile::Verdict::Warn => t.f("recon.warn", &[("diff", &usdt(diff))]),
                 engine::reconcile::Verdict::Pause => t.f("recon.pause", &[("diff", &usdt(-diff))]),
                 engine::reconcile::Verdict::SkippedInflight => t.t("recon.skipped"),
-                engine::reconcile::Verdict::Unavailable => t.t("recon.unavailable"),
+                engine::reconcile::Verdict::Unavailable => t.f(
+                    "recon.unavailable",
+                    &[("error", &esc(r.error.as_deref().unwrap_or("")))],
+                ),
             };
+            // Денег в кошельке больше, чем по леджеру (владелец пополнил) — провести сразу.
+            if diff > Decimal::ZERO {
+                let mut conn = self.pool.acquire().await?;
+                let key = engine::reconcile::mismatch_key(r.platform);
+                if let Some(a) = storage::alerts::open_by_key(&mut conn, &key).await? {
+                    capital.push(btn(
+                        t.f(
+                            "recon.b_capital_in",
+                            &[
+                                ("name", &self.platform_name(r.platform)),
+                                ("amount", &usdt(diff)),
+                            ],
+                        ),
+                        &Cb::Capital(a.id),
+                    ));
+                }
+            }
             lines.push(t.f(
                 "recon.line",
                 &[
@@ -1580,10 +1601,15 @@ impl Inner {
                 ],
             ));
         }
-        Ok(Screen::new(lines.join("\n")).row(vec![
+        let mut s = Screen::new(lines.join("\n"));
+        for b in capital {
+            s = s.row(vec![b]);
+        }
+        Ok(s.row(vec![
+            btn(t.t("dash.b_reconcile"), &Cb::Reconcile),
             btn(t.t("menu.dash"), &Cb::Dash),
-            btn(t.t("common.home"), &Cb::Menu),
-        ]))
+        ])
+        .row(vec![btn(t.t("common.home"), &Cb::Menu)]))
     }
 
     async fn run_selftest(&self, amount: Decimal) -> Result<Screen, OpsError> {

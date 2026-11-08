@@ -10,7 +10,9 @@ use crate::doc::{Doc, Row, Table};
 use crate::emoji::Emoji;
 use crate::fmt::{self, TimeFormat};
 use crate::html::{Frag, clip};
-use crate::model::{DirectionStatus, DirectionTerms, HistoryRow, OrderCard, Terms, UiError};
+use crate::model::{
+    DirectionStatus, DirectionTerms, HistoryRow, OrderCard, PauseReason, Terms, UiError,
+};
 use crate::screen::{Keyboard, Screen};
 
 /// Сколько строк истории показываем за раз (SPEC S10).
@@ -47,7 +49,31 @@ impl Ui {
     fn fee_or_status(&self, t: &DirectionTerms) -> Frag {
         match t.status {
             DirectionStatus::Open => self.fee_frag(t),
-            other => Frag::text(self.status_text(other)),
+            _ => Frag::text(self.status_of(t)),
+        }
+    }
+
+    /// Статус для таблиц: у паузы — короткая причина («нет резерва»).
+    fn status_of(&self, t: &DirectionTerms) -> &str {
+        let s = &self.texts.direction_status;
+        match (t.status, t.pause) {
+            (DirectionStatus::Paused, Some(PauseReason::NoReserve { .. })) => &s.paused_no_reserve,
+            (DirectionStatus::Paused, Some(PauseReason::Maintenance)) => &s.paused_maintenance,
+            (DirectionStatus::Paused, Some(PauseReason::Technical)) => &s.paused_technical,
+            (status, _) => self.status_text(status),
+        }
+    }
+
+    /// Почему на паузе — фраза для «Обменять чек».
+    fn pause_why(&self, t: &DirectionTerms) -> Frag {
+        let s = &self.texts.direction_status;
+        match t.pause {
+            Some(PauseReason::NoReserve { wallet }) => {
+                self.fill(&s.why_no_reserve, &[("wallet", &self.wallet(wallet))])
+            }
+            Some(PauseReason::Maintenance) => self.fill(&s.why_maintenance, &[]),
+            Some(PauseReason::Technical) => self.fill(&s.why_technical, &[]),
+            None => self.fill(&s.why_paused, &[]),
         }
     }
 
@@ -199,7 +225,7 @@ impl Ui {
             .map(|d| {
                 let direction = self.direction_name(d.direction);
                 let fee = self.fee_frag(d);
-                let status = Frag::text(self.status_text(d.status));
+                let status = Frag::text(self.status_of(d));
                 let min = Frag::text(&fmt::amount(d.min, domain::Asset::Usdt));
                 let max = Frag::text(&fmt::amount(d.max, domain::Asset::Usdt));
                 Row {
@@ -324,7 +350,14 @@ impl Ui {
                     ));
                 }
             } else {
-                body.push(&self.fill(&t.line_paused, &[("icon", &icon), ("direction", &name)]));
+                body.push(&self.fill(
+                    &t.line_paused,
+                    &[
+                        ("icon", &icon),
+                        ("direction", &name),
+                        ("why", &self.pause_why(d)),
+                    ],
+                ));
             }
             let b = &self.texts.buttons;
             let label = match direction {
@@ -730,6 +763,7 @@ mod tests {
             tiers: Vec::new(),
             promo: None,
             personal: false,
+            pause: None,
         }
     }
 

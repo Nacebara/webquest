@@ -67,6 +67,16 @@ pub struct DirectionStatusTexts {
     pub open: String,
     pub paused: String,
     pub off: String,
+    /// Пауза с причиной — короткая подпись для таблиц.
+    pub paused_no_reserve: String,
+    pub paused_maintenance: String,
+    pub paused_technical: String,
+    /// Пауза с причиной — фраза для «Обменять чек».
+    pub why_no_reserve: String,
+    pub why_maintenance: String,
+    pub why_technical: String,
+    /// Причина неизвестна.
+    pub why_paused: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

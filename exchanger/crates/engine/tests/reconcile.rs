@@ -123,3 +123,48 @@ async fn selftest_issues_and_claims_a_check_on_each_wallet_and_moves_no_money(po
     let r = e.engine.reconcile_balances().await.unwrap();
     assert!(r.iter().all(|x| x.verdict == Verdict::Ok));
 }
+
+/// Баланс кошелька не читается — не тишина: событие владельцу с причиной; прочитался —
+/// событие закрыто.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn unreadable_balance_raises_an_event_with_the_reason(pool: PgPool) {
+    let e = env(pool).await;
+    // Оба кошелька не отвечают на `/wallet` (один аккаунт на оба).
+    e.world.inject(
+        e.ub,
+        userbot::sim::Call::SendText,
+        userbot::sim::Fault::NoReply,
+        2,
+    );
+    let r = e.engine.reconcile_balances().await.unwrap();
+    assert!(r.iter().all(|x| x.verdict == Verdict::Unavailable), "{r:?}");
+    assert!(
+        r.iter()
+            .all(|x| x.error.as_deref().is_some_and(|m| !m.is_empty()))
+    );
+    let mut conn = e.pool.acquire().await.unwrap();
+    for p in [CB, XR] {
+        let a = storage::alerts::open_by_key(&mut conn, &engine::reconcile::unreadable_key(p))
+            .await
+            .unwrap()
+            .expect("событие «баланс не читается»");
+        assert_eq!(a.title, "balance_unreadable");
+        assert!(!a.payload["error"].as_str().unwrap_or("").is_empty());
+    }
+    drop(conn);
+
+    e.world.clear_faults(e.ub);
+    tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+    let r = e.engine.reconcile_balances().await.unwrap();
+    assert!(r.iter().all(|x| x.verdict == Verdict::Ok), "{r:?}");
+    let mut conn = e.pool.acquire().await.unwrap();
+    for p in [CB, XR] {
+        assert!(
+            storage::alerts::open_by_key(&mut conn, &engine::reconcile::unreadable_key(p))
+                .await
+                .unwrap()
+                .is_none(),
+            "прочитался — событие закрыто"
+        );
+    }
+}

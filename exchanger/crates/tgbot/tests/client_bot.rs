@@ -1105,3 +1105,23 @@ async fn edited_text_without_a_link_is_ignored(pool: PgPool) {
         "на правку без ссылки — тишина"
     );
 }
+
+/// Клиент видит, почему направление на паузе: «в xRocket закончился резерв», а не голое «пауза».
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn paused_direction_tells_the_client_why(pool: PgPool) {
+    let e = env(pool).await;
+    sqlx::query(
+        "UPDATE directions SET min_amount = 2000, max_amount = 5000 WHERE code = 'cb_to_xr_check'",
+    )
+    .execute(&e.pool)
+    .await
+    .unwrap();
+    let bot = e.start_bot();
+    e.fake.client_writes("Обменять чек");
+    e.fake
+        .wait_for("exchange menu with the reason", |c| {
+            c.method == "sendMessage" && c.contains("в xRocket закончился резерв")
+        })
+        .await;
+    bot.stop().await;
+}

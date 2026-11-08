@@ -7,6 +7,7 @@ use chrono::{DateTime, Utc};
 use domain::fees::{FeeMode, LeverInput};
 use domain::fsm::{Flow, OrderState};
 use domain::{Asset, Decimal, Direction, Platform};
+use engine::availability::{Availability, Blocker};
 use engine::fees::{PromoMode, SwitchedBy};
 use storage::directions::DirectionRow;
 use storage::staff::{Role, StaffMember};
@@ -176,6 +177,16 @@ impl Inner {
                     ("target", &target),
                 ],
             ));
+            let key = engine::reconcile::unreadable_key(w.platform);
+            if let Some(a) = storage::alerts::open_by_key(&mut conn, &key).await? {
+                lines.push(t.f(
+                    "dash.unreadable",
+                    &[(
+                        "error",
+                        &esc(a.payload["error"].as_str().unwrap_or_default()),
+                    )],
+                ));
+            }
         }
         if !any {
             lines.push(t.t("dash.no_wallets"));
@@ -183,15 +194,17 @@ impl Inner {
 
         lines.push(String::new());
         lines.push(t.t("dash.directions"));
+        let availability = self.engine.availability().await?;
         for d in DIRECTIONS {
             let row = storage::directions::get(&mut conn, d).await?;
             let fee = self.fee_now(&mut conn, &row).await?;
+            let a = availability.iter().find(|a| a.direction == d);
             lines.push(t.f(
                 "dash.direction",
                 &[
                     ("name", &self.dir_name(d)),
                     ("fee", &fee),
-                    ("status", &self.dir_status(&row)),
+                    ("status", &self.availability_text(a)),
                 ],
             ));
         }
@@ -317,18 +330,52 @@ impl Inner {
         })
     }
 
-    fn dir_status(&self, row: &DirectionRow) -> String {
+    /// Состояние направления с причиной: «работает · до 300.00 USDT» или
+    /// «⏸ нет резерва: в xRocket свободно 0.00, нужно от 2.00» — то же, что видит приём чека.
+    pub(crate) fn availability_text(&self, a: Option<&Availability>) -> String {
         let t = &self.texts;
-        if !row.is_open {
-            t.t("status.closed")
-        } else if row.auto_paused {
-            t.f(
-                "status.auto",
-                &[("reason", &esc(row.pause_reason.as_deref().unwrap_or("")))],
-            )
-        } else {
-            t.t("status.open")
+        let Some(a) = a else {
+            return t.t("status.unknown");
+        };
+        if a.accepting() {
+            return match a.max_now {
+                Some(max) => t.f("status.open_up_to", &[("max", &usdt(max))]),
+                None => t.t("status.open"),
+            };
         }
+        a.blockers
+            .iter()
+            .map(|b| match b {
+                Blocker::Closed => t.t("status.closed"),
+                Blocker::AutoPaused { reason } => t.f(
+                    "status.auto",
+                    &[("reason", &esc(reason.as_deref().unwrap_or("")))],
+                ),
+                Blocker::Maintenance => t.t("status.maintenance"),
+                Blocker::KillSwitch => t.t("status.kill"),
+                Blocker::WalletMissing { platform } => t.f(
+                    "status.wallet_missing",
+                    &[("name", &self.platform_name(*platform))],
+                ),
+                Blocker::UserbotPaused { platform } => t.f(
+                    "status.userbot_paused",
+                    &[("name", &self.platform_name(*platform))],
+                ),
+                Blocker::NoReserve {
+                    platform,
+                    available,
+                    needed,
+                } => t.f(
+                    "status.no_reserve",
+                    &[
+                        ("name", &self.platform_name(*platform)),
+                        ("available", &usdt(*available)),
+                        ("needed", &usdt(*needed)),
+                    ],
+                ),
+            })
+            .collect::<Vec<_>>()
+            .join("; ")
     }
 
     pub(crate) fn promo_mode_name(&self, m: PromoMode) -> String {
@@ -347,15 +394,17 @@ impl Inner {
         let mut conn = self.pool.acquire().await?;
         let mut lines = vec![t.t("dir.list_title"), String::new()];
         let mut s = Screen::default();
+        let availability = self.engine.availability().await?;
         for d in DIRECTIONS {
             let row = storage::directions::get(&mut conn, d).await?;
             let fee = self.fee_now(&mut conn, &row).await?;
+            let a = availability.iter().find(|a| a.direction == d);
             lines.push(t.f(
                 "dash.direction",
                 &[
                     ("name", &self.dir_name(d)),
                     ("fee", &fee),
-                    ("status", &self.dir_status(&row)),
+                    ("status", &self.availability_text(a)),
                 ],
             ));
             s = s.row(vec![btn(self.dir_name(d), &Cb::Dir(d))]);
@@ -396,6 +445,19 @@ impl Inner {
         } else {
             t.t("dir.state_open")
         });
+        // Открыто, но не принимает (нет резерва, кошелёк не подключён…) — почему.
+        if let Some(a) = self
+            .engine
+            .availability()
+            .await?
+            .into_iter()
+            .find(|a| a.direction == d)
+        {
+            lines.push(t.f(
+                "dir.state_now",
+                &[("status", &self.availability_text(Some(&a)))],
+            ));
+        }
         let tiered = row.fee_mode == FeeMode::Tiers && row.fee_tiers.is_some();
         if tiered {
             lines.push(t.f("dir.fee_tiers", &[("min_fee", &usdt(row.min_fee))]));

@@ -11,7 +11,7 @@ use domain::pricing::{Limits, max_order_effective};
 use domain::{Asset, Decimal, Direction};
 use rust_decimal::RoundingStrategy;
 use sqlx::PgConnection;
-use ui::{DirectionStatus, DirectionTerms, PromoTerms, Terms, TierTerms};
+use ui::{DirectionStatus, DirectionTerms, PauseReason, PromoTerms, Terms, TierTerms};
 
 use crate::TgBotError;
 
@@ -21,6 +21,17 @@ pub(crate) struct TermsSnapshot {
     pub terms: Terms,
     /// Сколько резерва целевого кошелька свободно под новую заявку (после запаса).
     pub room: HashMap<Direction, Decimal>,
+}
+
+/// Аккаунт юзербота кошелька на паузе (пульт): новые заявки не принимаются.
+async fn userbot_paused(
+    conn: &mut PgConnection,
+    wallet: Option<(i16, i16)>,
+) -> Result<bool, TgBotError> {
+    Ok(match wallet {
+        Some((w, _)) => storage::wallets::userbot_paused(conn, w).await?,
+        None => false,
+    })
 }
 
 /// Вниз до центов: показываем не больше, чем можно принять.
@@ -37,6 +48,8 @@ pub(crate) async fn load(
     user: Option<i64>,
 ) -> Result<TermsSnapshot, TgBotError> {
     let asset = Asset::Usdt;
+    let maintenance = storage::settings::flag_on(&mut *conn, "maintenance").await?
+        || storage::settings::flag_on(&mut *conn, "kill_switch_payouts").await?;
     let mut directions = Vec::new();
     let mut room = HashMap::new();
     // Основной спрос — CryptoBot → xRocket — первым (DESIGN-v0.2 Р1).
@@ -115,12 +128,27 @@ pub(crate) async fn load(
                     up_to: floor_cents(p.room).normalize(),
                 })
                 .filter(|p| p.up_to > Decimal::ZERO);
-        let status = if !row.is_open {
-            DirectionStatus::Off
-        } else if row.auto_paused || effective.is_none() {
-            DirectionStatus::Paused
+        let source_wallet = storage::wallets::active(&mut *conn, direction.source()).await?;
+        let technical = row.auto_paused
+            || wallet.is_none()
+            || source_wallet.is_none()
+            || userbot_paused(&mut *conn, wallet).await?
+            || userbot_paused(&mut *conn, source_wallet).await?;
+        let (status, pause) = if !row.is_open {
+            (DirectionStatus::Off, None)
+        } else if maintenance {
+            (DirectionStatus::Paused, Some(PauseReason::Maintenance))
+        } else if technical {
+            (DirectionStatus::Paused, Some(PauseReason::Technical))
+        } else if effective.is_none() {
+            (
+                DirectionStatus::Paused,
+                Some(PauseReason::NoReserve {
+                    wallet: direction.target(),
+                }),
+            )
         } else {
-            DirectionStatus::Open
+            (DirectionStatus::Open, None)
         };
         room.insert(direction, floor_cents(free));
         directions.push(DirectionTerms {
@@ -133,6 +161,7 @@ pub(crate) async fn load(
             tiers,
             promo,
             personal: personal.is_some_and(|p| p.is_personal()),
+            pause,
         });
     }
     Ok(TermsSnapshot {
