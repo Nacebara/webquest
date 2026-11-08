@@ -128,6 +128,12 @@ impl Engine {
                 });
                 continue;
             };
+            // Аккаунт юзербота кошелька — в событие «не сходится» (макет: «… · ub-1»).
+            let account = storage::wallets::list(&mut conn)
+                .await?
+                .into_iter()
+                .find(|w| w.wallet_id == wallet)
+                .map(|w| w.userbot_label);
             let expected = storage::ledger::wallet_balances(&mut conn)
                 .await?
                 .into_iter()
@@ -227,6 +233,7 @@ impl Engine {
                                 "actual": a.normalize().to_string(),
                                 "diff": (a - expected).normalize().to_string(),
                                 "paused": verdict == Verdict::Pause,
+                                "account": account,
                             }),
                         },
                     )

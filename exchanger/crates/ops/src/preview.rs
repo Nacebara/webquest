@@ -118,6 +118,31 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
     if let Err(e) = api.send_message(&req).await {
         tracing::warn!(error = %e, "menu preview not sent");
     }
+    // «Резервы и сверка» и «Недостача» на данных макета.
+    let _ = api
+        .send_message(
+            &SendMessage::html(chat, "<b>Пульт · Резервы и сверка</b> (данные макета)").silent(),
+        )
+        .await;
+    send_card(
+        api,
+        chat,
+        &look.screen(&crate::sample_reserves(&texts).screen(&texts)),
+    )
+    .await;
+    let _ = api
+        .send_message(&SendMessage::html(chat, "<b>Пульт · Недостача</b> (данные макета)").silent())
+        .await;
+    let payload = serde_json::json!({
+        "platform": "xrocket", "expected": "640", "actual": "628", "diff": "-12",
+        "paused": true, "account": "ub-1",
+    });
+    send_card(
+        api,
+        chat,
+        &look.screen(&crate::mismatch_screen(&texts, &payload, 0)),
+    )
+    .await;
     // Пульт: «Статистика» на данных макета — плитки и график одной картинкой.
     let _ = api
         .send_message(
@@ -138,4 +163,37 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
         },
         Err(e) => tracing::warn!(error = %e, "stats sample failed"),
     }
+}
+
+/// Экран пульта: карточкой (rich), если она есть, иначе обычным HTML; кнопки — как есть.
+async fn send_card(api: &BotApi, chat: i64, screen: &crate::Screen) {
+    let markup = (!screen.keyboard.is_empty()).then(|| {
+        botapi::ReplyMarkup::Inline(botapi::InlineKeyboardMarkup::new(screen.keyboard.clone()))
+    });
+    let sent = match &screen.rich {
+        Some(rich) => {
+            let mut req = botapi::SendRichMessage::new(chat, rich.clone());
+            req.disable_notification = Some(true);
+            req.reply_markup = markup;
+            api.send_rich_message(&req).await.map(|_| ())
+        }
+        None => {
+            let mut req = SendMessage::html(chat, screen.text.clone()).silent();
+            req.reply_markup = markup;
+            api.send_message(&req).await.map(|_| ())
+        }
+    };
+    if let Err(e) = sent {
+        tracing::warn!(error = %e, "panel preview screen not sent");
+        let _ = api
+            .send_message(&SendMessage::html(
+                chat,
+                format!(
+                    "⚠️ Telegram не принял экран: {}",
+                    ui::html::esc(&e.to_string())
+                ),
+            ))
+            .await;
+    }
+    tokio::time::sleep(Duration::from_millis(350)).await;
 }

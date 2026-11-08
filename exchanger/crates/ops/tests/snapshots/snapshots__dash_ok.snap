@@ -64,5 +64,5 @@ expression: dump(&screen)
 <i>🟢 Аккаунты 2/2 · сверка <tg-time unix="1793876400" format="t">14:00</tg-time> · выплаты идут · ▲▼ к вчера</i>
 --- keyboard
 [{"text":"📋 Разбор · 2","style":"primary","callback_data":"a:q"},{"text":"🧾 Счета · 1","style":"primary","callback_data":"a:q"}]
-[{"text":"⚠️ Ответы · 1","callback_data":"a:dirs"},{"text":"🏦 Резервы","callback_data":"a:rc"}]
+[{"text":"⚠️ Ответы · 1","callback_data":"a:dirs"},{"text":"🏦 Резервы","callback_data":"a:rs"}]
 [{"text":"🤖 Аккаунты","callback_data":"a:b"},{"text":"🎛 Меню","callback_data":"a:m"}]

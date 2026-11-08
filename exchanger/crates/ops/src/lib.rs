@@ -22,6 +22,7 @@
 
 mod actions;
 mod alerts;
+pub use alerts::mismatch_screen;
 mod cb;
 pub mod chart;
 mod dash;
@@ -29,6 +30,7 @@ mod inbox;
 mod invest;
 mod look;
 pub mod preview;
+mod reserves;
 pub mod stats;
 mod texts;
 mod views;
@@ -49,6 +51,7 @@ use tokio_util::sync::CancellationToken;
 pub use cb::Cb;
 pub use dash::{DashData, sample_dash};
 pub use look::Look;
+pub use reserves::{ReservesData, sample_reserves};
 pub use texts::Texts;
 pub use views::{MenuCounts, menu_screen};
 

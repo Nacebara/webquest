@@ -41,5 +41,5 @@ expression: dump(&screen)
 🚀 xRocket — 1 300.00 · 🟢 87 % от цели</blockquote>
 <i>🟢 Аккаунты 2/2 · сверка <tg-time unix="1793876400" format="t">14:00</tg-time> · ▲▼ к вчера</i>
 --- keyboard
-[{"text":"📊 Статистика","callback_data":"a:sx:1"},{"text":"🏦 Резервы","callback_data":"a:rc"}]
+[{"text":"📊 Статистика","callback_data":"a:sx:1"},{"text":"🏦 Резервы","callback_data":"a:rs"}]
 [{"text":"🤖 Аккаунты","callback_data":"a:b"},{"text":"🎛 Меню","callback_data":"a:m"}]

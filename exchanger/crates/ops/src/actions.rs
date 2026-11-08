@@ -1554,65 +1554,6 @@ impl Inner {
 }
 
 impl Inner {
-    /// Сверка по кнопке: отчёт по кошелькам.
-    pub(crate) async fn reconcile_now(&self) -> Result<Screen, OpsError> {
-        let t = &self.texts;
-        let report = self.engine.reconcile_balances().await?;
-        let mut lines = vec![t.t("recon.title")];
-        if report.is_empty() {
-            lines.push(t.t("recon.none"));
-        }
-        let mut capital = Vec::new();
-        for r in &report {
-            let diff = r.diff().unwrap_or_default();
-            let verdict = match r.verdict {
-                engine::reconcile::Verdict::Ok => t.t("recon.ok"),
-                engine::reconcile::Verdict::Warn => t.f("recon.warn", &[("diff", &usdt(diff))]),
-                engine::reconcile::Verdict::Pause => t.f("recon.pause", &[("diff", &usdt(-diff))]),
-                engine::reconcile::Verdict::SkippedInflight => t.t("recon.skipped"),
-                engine::reconcile::Verdict::Unavailable => t.f(
-                    "recon.unavailable",
-                    &[("error", &esc(r.error.as_deref().unwrap_or("")))],
-                ),
-            };
-            // Денег в кошельке больше, чем по леджеру (владелец пополнил) — провести сразу.
-            if diff > Decimal::ZERO {
-                let mut conn = self.pool.acquire().await?;
-                let key = engine::reconcile::mismatch_key(r.platform);
-                if let Some(a) = storage::alerts::open_by_key(&mut conn, &key).await? {
-                    capital.push(btn(
-                        t.f(
-                            "recon.b_capital_in",
-                            &[
-                                ("name", &self.platform_name(r.platform)),
-                                ("amount", &usdt(diff)),
-                            ],
-                        ),
-                        &Cb::Capital(a.id),
-                    ));
-                }
-            }
-            lines.push(t.f(
-                "recon.line",
-                &[
-                    ("name", &self.platform_name(r.platform)),
-                    ("actual", &r.actual.map_or_else(|| t.t("common.none"), usdt)),
-                    ("expected", &usdt(r.expected)),
-                    ("verdict", &verdict),
-                ],
-            ));
-        }
-        let mut s = Screen::new(lines.join("\n"));
-        for b in capital {
-            s = s.row(vec![b]);
-        }
-        Ok(s.row(vec![
-            btn(t.t("dash.b_reconcile"), &Cb::Reconcile),
-            btn(t.t("menu.dash"), &Cb::Dash),
-        ])
-        .row(vec![btn(t.t("common.home"), &Cb::Menu)]))
-    }
-
     async fn run_selftest(&self, amount: Decimal) -> Result<Screen, OpsError> {
         let t = &self.texts;
         let steps = match self.engine.selftest(amount).await {

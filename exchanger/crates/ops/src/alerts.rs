@@ -203,50 +203,7 @@ impl Inner {
                 btn(t.t("menu.promo"), &Cb::Promo),
                 btn(t.t("alert.b_ack"), &Cb::Ack(a.id)),
             ]),
-            "balance_mismatch" => {
-                let platform = p["platform"]
-                    .as_str()
-                    .and_then(domain::Platform::from_db_name);
-                let name =
-                    platform.map_or_else(|| esc(&s(p, "platform")), |x| self.platform_name(x));
-                let diff = dec(p, "diff");
-                let paused = if p["paused"].as_bool() == Some(true) {
-                    t.t("alert.paused")
-                } else {
-                    String::new()
-                };
-                let mut sc = Screen::new(t.f(
-                    "alert.balance_mismatch",
-                    &[
-                        ("name", &name),
-                        ("actual", &usdt(dec(p, "actual"))),
-                        ("expected", &usdt(dec(p, "expected"))),
-                        (
-                            "diff",
-                            &format!(
-                                "{}{}",
-                                if diff > domain::Decimal::ZERO {
-                                    "+"
-                                } else {
-                                    ""
-                                },
-                                usdt(diff)
-                            ),
-                        ),
-                        ("paused", &paused),
-                    ],
-                ));
-                let capital = if diff > domain::Decimal::ZERO {
-                    t.f("alert.b_capital_in", &[("amount", &usdt(diff))])
-                } else {
-                    t.f("alert.b_capital_out", &[("amount", &usdt(-diff))])
-                };
-                sc = sc.row(vec![btn(capital, &Cb::Capital(a.id))]).row(vec![
-                    btn(t.t("alert.b_recheck"), &Cb::Reconcile),
-                    btn(t.t("alert.b_ack"), &Cb::Ack(a.id)),
-                ]);
-                sc
-            }
+            "balance_mismatch" => mismatch_screen(t, p, a.id),
             "balance_unreadable" => {
                 let name = p["platform"]
                     .as_str()
@@ -355,4 +312,56 @@ impl Inner {
         }
         Ok(())
     }
+}
+
+/// Макет «Недостача»: «xRocket: меньше на 12.00 · Леджер … · реально … · ub-1 · Выплаты в
+/// xRocket на паузе. Это вы выводили?» — «Да, это я» (провести вывод владельца) и красная
+/// «Нет, разбираться». Излишек — то же с «Это вы пополняли?».
+pub fn mismatch_screen(t: &crate::Texts, p: &serde_json::Value, id: i64) -> Screen {
+    let name = p["platform"]
+        .as_str()
+        .and_then(domain::Platform::from_db_name)
+        .map_or_else(
+            || esc(p["platform"].as_str().unwrap_or_default()),
+            |x| t.t(&format!("names.{}", x.db_name())),
+        );
+    let num = |k: &str| -> domain::Decimal {
+        p[k].as_str()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or_default()
+    };
+    let diff = num("diff");
+    let account = p["account"]
+        .as_str()
+        .map(|l| t.f("alert.account", &[("label", &esc(l))]))
+        .unwrap_or_default();
+    let paused = if p["paused"].as_bool() == Some(true) {
+        t.f("alert.paused", &[("name", &name)])
+    } else {
+        String::new()
+    };
+    let short = diff < domain::Decimal::ZERO;
+    let text = t.f(
+        if short {
+            "alert.balance_short"
+        } else {
+            "alert.balance_extra"
+        },
+        &[
+            ("name", &name),
+            ("amount", &crate::dash::amount(diff.abs())),
+            ("expected", &crate::dash::amount(num("expected"))),
+            ("actual", &crate::dash::amount(num("actual"))),
+            ("account", &account),
+            ("paused", &paused),
+        ],
+    );
+    let no = btn(t.t("alert.b_no"), &Cb::Investigate(id));
+    Screen::new(text)
+        .row(vec![btn(t.t("alert.b_yes"), &Cb::Capital(id))])
+        .row(vec![if short {
+            no.style(botapi::ButtonStyle::Danger)
+        } else {
+            no
+        }])
 }

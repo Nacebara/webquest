@@ -1,0 +1,13 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&extra)
+---
+--- rich
+
+--- html
+💲 <b>CryptoBot: больше на <code>250.00</code></b>
+Леджер 1 000.00 · реально 1 250.00 · ub-1
+Это вы пополняли?
+--- keyboard
+[{"text":"👍 Да, это я","callback_data":"a:cap:2"}]
+[{"text":"🔎 Нет, разбираться","callback_data":"a:iq:2"}]

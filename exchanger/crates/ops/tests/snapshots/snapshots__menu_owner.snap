@@ -8,7 +8,7 @@ expression: dump(&owner)
 <b>Пульт</b> · вы владелец
 --- keyboard
 [{"text":"📋 Разбор · 2","style":"primary","callback_data":"a:q"},{"text":"🔖 Заявки","callback_data":"a:oa"}]
-[{"text":"🏦 Резервы","callback_data":"a:rc"},{"text":"🤖 Аккаунты","callback_data":"a:b"}]
+[{"text":"🏦 Резервы","callback_data":"a:rs"},{"text":"🤖 Аккаунты","callback_data":"a:b"}]
 [{"text":"🔁 Направления","callback_data":"a:dirs"},{"text":"👥 Клиенты","callback_data":"a:ua"}]
 [{"text":"📥 Обращения · 1","style":"primary","callback_data":"a:ib"},{"text":"📣 Рассылка","callback_data":"a:bc"}]
 [{"text":"📊 Статистика","callback_data":"a:sx:7"},{"text":"📓 Журнал","callback_data":"a:au"}]

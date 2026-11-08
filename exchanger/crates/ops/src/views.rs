@@ -95,7 +95,7 @@ pub fn menu_screen(t: &crate::Texts, role: Role, c: &MenuCounts) -> Screen {
     let mut items = vec![
         counted("menu.b_queue", c.review, Cb::Queue),
         btn(t.t("menu.b_orders"), &Cb::OrderAsk),
-        btn(t.t("menu.b_reserves"), &Cb::Reconcile),
+        btn(t.t("menu.b_reserves"), &Cb::Reserves),
         btn(t.t("menu.b_bots"), &Cb::Bots),
         btn(t.t("menu.b_dirs"), &Cb::Dirs),
         btn(t.t("menu.b_users"), &Cb::UserAsk),
@@ -188,7 +188,7 @@ impl Inner {
     }
 
     /// Комиссия направления сейчас (с рычагом): «2,5 %» или «ступени 2,5 % … 1,2 %».
-    async fn fee_now(
+    pub(crate) async fn fee_now(
         &self,
         conn: &mut sqlx::PgConnection,
         row: &DirectionRow,
@@ -1458,6 +1458,11 @@ impl Inner {
                 }
                 self.reconcile_now().await
             }
+            Cb::Reserves => self.reserves().await,
+            Cb::AlertShow(id) => self.alert_screen(id).await,
+            Cb::Investigate(id) => self.investigate(staff, id).await,
+            Cb::Thresholds => self.thresholds_screen().await,
+            Cb::Profit => Ok(self.profit()),
             Cb::OrderAsk => Ok(self.prompt(staff, Input::OrderSearch, "order.ask")),
             Cb::UserAsk => {
                 // «Клиенты»: поиск клиента; инвесторы — тоже клиенты (в меню макета их нет).

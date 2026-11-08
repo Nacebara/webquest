@@ -717,15 +717,19 @@ async fn owner_top_up_is_posted_from_the_reconciliation_alert(pool: PgPool) {
         .unwrap();
     let mark = o.tg.mark();
     o.engine.reconcile_balances().await.unwrap();
-    let alert = o.tg.screen(mark, OWNER, "не сходится").await;
-    assert!(alert.text().contains("+250.00 USDT"), "{}", alert.text());
+    // Макет «Недостача» (здесь — излишек): «больше на 250.00 … Это вы пополняли?».
+    let alert = o.tg.screen(mark, OWNER, "больше на").await;
+    assert!(alert.text().contains("250.00"), "{}", alert.text());
+    assert!(
+        alert.text().contains("ub-1"),
+        "аккаунт кошелька: {}",
+        alert.text()
+    );
     // Админу провести нельзя — только владельцу.
-    let admin_alert = o.tg.screen(mark, ADMIN, "не сходится").await;
-    o.press(ADMIN, &admin_alert, "Это мой взнос", "роли «Владелец»")
+    let admin_alert = o.tg.screen(mark, ADMIN, "больше на").await;
+    o.press(ADMIN, &admin_alert, "Да, это я", "роли «Владелец»")
         .await;
-    let preview = o
-        .press(OWNER, &alert, "Это мой взнос", "взнос владельца")
-        .await;
+    let preview = o.press(OWNER, &alert, "Да, это я", "взнос владельца").await;
     o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
     let r = o.engine.reconcile_balances().await.unwrap();
     assert!(
@@ -833,16 +837,35 @@ async fn dash_explains_pauses_and_reconcile_offers_the_top_up(pool: PgPool) {
         dirs.text()
     );
 
-    // Владелец пополнил xRocket на 20 — «Резервы» на главном экране сверяют и сразу
-    // предлагают провести.
+    // Владелец пополнил xRocket на 20 — «Резервы» → «Сверить сейчас» показывают излишек,
+    // а по кнопке — событие «Это вы пополняли?».
     o.world
         .set_balance(o.ub, XR, Asset::Usdt, dec!(1020))
         .unwrap();
     let dash = o.say(OWNER, "/dash", "Всё спокойно").await;
-    let recon = o.press(OWNER, &dash, "Резервы", "Сверка балансов").await;
-    let preview = o
-        .press(OWNER, &recon, "Это мой взнос в xRocket", "взнос владельца")
+    let reserves = o.press(OWNER, &dash, "Резервы", "Цель · порог").await;
+    assert_eq!(
+        reserves.method, "editMessageText",
+        "карточка в том же сообщении"
+    );
+    let fresh = o
+        .press(
+            OWNER,
+            &reserves,
+            "Сверить сейчас",
+            "расхождение xRocket +20.00",
+        )
         .await;
+    assert!(fresh.text().contains("Сверено"), "{}", fresh.text());
+    assert!(
+        fresh.text().contains("1\u{a0}020.00"),
+        "реально: {}",
+        fresh.text()
+    );
+    let alert = o
+        .press(OWNER, &fresh, "Излишек xRocket", "Это вы пополняли?")
+        .await;
+    let preview = o.press(OWNER, &alert, "Да, это я", "взнос владельца").await;
     o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
     let r = o.engine.reconcile_balances().await.unwrap();
     assert!(
@@ -983,4 +1006,50 @@ async fn dash_turns_to_fire_on_a_shortfall_and_refreshes_itself(pool: PgPool) {
         .find(|b| b["text"].as_str().is_some_and(|t| t.contains("Недостача")))
         .unwrap();
     assert_eq!(shortfall["style"], "danger", "{shortfall}");
+}
+
+/// Макет «Недостача»: в кошельке меньше, чем по леджеру, — «Это вы выводили?»; «Нет,
+/// разбираться» оставляет выплаты на паузе и закрывает повтор события.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn shortfall_asks_the_owner_and_investigation_keeps_payouts_paused(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    o.world
+        .set_balance(o.ub, XR, Asset::Usdt, dec!(988))
+        .unwrap();
+    let mark = o.tg.mark();
+    o.engine.reconcile_balances().await.unwrap();
+    o.bot.deliver_alerts().await.unwrap();
+    let alert = o.tg.screen(mark, OWNER, "меньше на").await;
+    let body = alert.text();
+    assert!(
+        body.contains("xRocket: меньше на <code>12.00</code>"),
+        "{body}"
+    );
+    assert!(body.contains("Выплаты в xRocket на паузе"), "{body}");
+    assert!(body.contains("Это вы выводили?"), "{body}");
+    let no = alert.body["reply_markup"]["inline_keyboard"][1][0].clone();
+    assert_eq!(no["style"], "danger", "{no}");
+    let after = o
+        .press(OWNER, &alert, "Нет, разбираться", "Разбираемся")
+        .await;
+    assert!(
+        after.text().contains("остаются на паузе"),
+        "{}",
+        after.text()
+    );
+    assert!(after.text().contains("ub-1"), "{}", after.text());
+    // Событие закрыто — больше не повторяется; выплаты в xRocket всё ещё на паузе.
+    let mut conn = o.pool.acquire().await.unwrap();
+    let key = engine::reconcile::mismatch_key(XR);
+    assert!(
+        storage::alerts::open_by_key(&mut conn, &key)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let row = storage::directions::get(&mut conn, Direction::CbToXrCheck)
+        .await
+        .unwrap();
+    assert!(row.auto_paused, "выплаты в xRocket на паузе");
 }

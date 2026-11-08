@@ -25,7 +25,12 @@ const DASH_MESSAGES: &str = "ops_dash_messages";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Need {
     /// Сверка: в кошельке меньше, чем по леджеру, выплаты с него на паузе.
-    Shortfall { platform: Platform, amount: Decimal },
+    Shortfall {
+        platform: Platform,
+        amount: Decimal,
+        /// Событие «не сходится» — его открывает кнопка «Недостача».
+        alert: i64,
+    },
     /// Заявки на ручном разборе; возраст старейшей, минуты.
     Review { n: i64, oldest_mins: i64 },
     /// Аккаунт юзербота потерял вход (`logged_out`) или заблокирован (`banned`).
@@ -145,7 +150,7 @@ fn platform_icon(p: Platform) -> &'static str {
 }
 
 /// «2 140.00»: разряды через неразрывный пробел, два знака.
-fn amount(v: Decimal) -> String {
+pub(crate) fn amount(v: Decimal) -> String {
     let s = ui::fmt::amount(v, Asset::Usdt);
     let (sign, s) = match s.strip_prefix('-') {
         Some(rest) => ("−", rest.to_owned()),
@@ -210,6 +215,7 @@ impl DashData {
             Need::Shortfall {
                 platform,
                 amount: a,
+                ..
             } => (
                 t.f("dash.n_shortfall", &[("name", &platform_name(*platform))]),
                 t.f("dash.v_shortfall", &[("amount", &amount(*a))]),
@@ -324,9 +330,9 @@ impl DashData {
         let mut shortfall = false;
         for n in &needs {
             match n {
-                Need::Shortfall { .. } if !shortfall => {
+                Need::Shortfall { alert, .. } if !shortfall => {
                     shortfall = true;
-                    out.push(btn(t.t("dash.b_shortfall"), &Cb::Reconcile).style(Danger));
+                    out.push(btn(t.t("dash.b_shortfall"), &Cb::AlertShow(*alert)).style(Danger));
                 }
                 Need::Review { n, .. } => {
                     out.push(btn(t.f("dash.b_review", &[("n", n)]), &Cb::Queue).style(Primary));
@@ -349,7 +355,7 @@ impl DashData {
                 Need::Shortfall { .. } | Need::Unreadable { .. } => {}
             }
         }
-        out.push(btn(t.t("dash.b_reserves"), &Cb::Reconcile));
+        out.push(btn(t.t("dash.b_reserves"), &Cb::Reserves));
         if state != DashState::Fire {
             out.push(btn(t.t("dash.b_accounts"), &Cb::Bots));
         }
@@ -587,6 +593,7 @@ pub fn sample_dash() -> [(&'static str, DashData); 3] {
             Need::Shortfall {
                 platform: Platform::XRocket,
                 amount: Decimal::from(12),
+                alert: 1,
             },
             Need::Review {
                 n: 4,
@@ -644,6 +651,7 @@ impl Inner {
                 needs.push(Need::Shortfall {
                     platform: p,
                     amount: -diff,
+                    alert: a.id,
                 });
                 paused.push((p, Some(a.first_at)));
             }

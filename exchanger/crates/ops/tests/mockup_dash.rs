@@ -108,7 +108,8 @@ fn mock_emoji(html: &str) -> Vec<String> {
 
 /// Строки текста без тегов, значков и пробелов.
 fn lines(html: &str) -> Vec<String> {
-    let mut s = html.to_owned();
+    // В исходнике макета перевод строки в обычном сообщении записан как `\n`.
+    let mut s = html.replace("\\n", "\n");
     // Значки: токены макета и <tg-emoji>…</tg-emoji> бота.
     while let Some(i) = s.find("<tg-emoji") {
         let j = s[i..].find("</tg-emoji>").unwrap() + i + "</tg-emoji>".len();
@@ -314,4 +315,91 @@ fn menu_is_the_mockup() {
         vec![2, 2, 2, 2, 2, 2, 2, 1],
         "по два в ряд, «Стоп-кран» один внизу"
     );
+}
+
+/// Кнопки экрана как в макете: подпись, ключ иконки, цвет.
+fn our_buttons(screen: &ops::Screen, back: &BTreeMap<String, String>) -> Vec<Button> {
+    screen
+        .keyboard
+        .iter()
+        .flatten()
+        .map(|b| {
+            (
+                b.text.clone(),
+                b.icon_custom_emoji_id
+                    .as_ref()
+                    .and_then(|id| back.get(id).cloned()),
+                b.style.map(|s| {
+                    match s {
+                        botapi::ButtonStyle::Primary => "primary",
+                        botapi::ButtonStyle::Success => "success",
+                        botapi::ButtonStyle::Danger => "danger",
+                    }
+                    .to_owned()
+                }),
+            )
+        })
+        .collect()
+}
+
+/// Экран против сообщения макета: строки, значки в тексте, кнопки.
+fn check(
+    title: &str,
+    html: &str,
+    buttons: &[Button],
+    screen: &ops::Screen,
+    back: &BTreeMap<String, String>,
+) {
+    let body = screen.rich.clone().unwrap_or_else(|| screen.text.clone());
+    let ours = lines(&body).join("|");
+    for line in lines(html) {
+        assert!(
+            ours.contains(&line),
+            "«{title}»: в макете «{line}», у бота: {ours}"
+        );
+    }
+    let mut found = Vec::new();
+    let mut rest = body.as_str();
+    while let Some(i) = rest.find("emoji-id=\"") {
+        rest = &rest[i + 10..];
+        let end = rest.find('"').unwrap();
+        found.push(back.get(&rest[..end]).cloned().unwrap_or_default());
+    }
+    for e in mock_emoji(html) {
+        assert!(
+            found.contains(&e),
+            "«{title}»: нет значка {e} (у бота {found:?})"
+        );
+    }
+    assert_eq!(our_buttons(screen, back), buttons, "«{title}»: кнопки");
+}
+
+fn keys_of(html: &str, buttons: &[Button]) -> Vec<String> {
+    let mut keys = mock_emoji(html);
+    keys.extend(buttons.iter().filter_map(|b| b.1.clone()));
+    keys.sort();
+    keys.dedup();
+    keys
+}
+
+#[test]
+fn reserves_and_shortfall_are_the_mockup() {
+    let texts = Texts::builtin().unwrap();
+    let (html, buttons) = mock_after("t: 'Резервы и сверка'");
+    let (look, back) = numbered(&keys_of(&html, &buttons));
+    let screen = look.screen(&ops::sample_reserves(&texts).screen(&texts));
+    check("Резервы и сверка", &html, &buttons, &screen, &back);
+
+    let (html, buttons) = mock_after("t: 'Недостача'");
+    let (look, back) = numbered(&keys_of(&html, &buttons));
+    let payload = serde_json::json!({
+        "platform": "xrocket",
+        "expected": "640",
+        "actual": "628",
+        "diff": "-12",
+        "paused": true,
+        "account": "ub-1",
+    });
+    let screen = look.screen(&ops::mismatch_screen(&texts, &payload, 1));
+    check("Недостача", &html, &buttons, &screen, &back);
 }

@@ -204,6 +204,16 @@ pub enum Cb {
     Preview,
     /// «Рассылка».
     Broadcast,
+    /// «Резервы и сверка».
+    Reserves,
+    /// Событие пульта по id («Недостача»).
+    AlertShow(i64),
+    /// «Нет, разбираться» по событию «не сходится».
+    Investigate(i64),
+    /// «Пороги» резерва.
+    Thresholds,
+    /// «Прибыль».
+    Profit,
     /// Все инвесторы и движения, ждущие решения.
     Investors,
     /// «💼 Инвестиции» клиента.
@@ -330,6 +340,11 @@ impl Cb {
             Cb::System => "sy".into(),
             Cb::Preview => "pv".into(),
             Cb::Broadcast => "bc".into(),
+            Cb::Reserves => "rs".into(),
+            Cb::AlertShow(id) => format!("al:{id}"),
+            Cb::Investigate(id) => format!("iq:{id}"),
+            Cb::Thresholds => "th".into(),
+            Cb::Profit => "pf".into(),
             Cb::Invest(id) => format!("iv:{id}"),
             Cb::InvestEdit(id) => format!("ivt:{id}"),
             Cb::InvestAccess(id, on) => format!("iva:{id}:{}", bit(*on)),
@@ -421,6 +436,11 @@ impl Cb {
             ["sy"] => Cb::System,
             ["pv"] => Cb::Preview,
             ["bc"] => Cb::Broadcast,
+            ["rs"] => Cb::Reserves,
+            ["al", _] => Cb::AlertShow(id(1)?),
+            ["iq", _] => Cb::Investigate(id(1)?),
+            ["th"] => Cb::Thresholds,
+            ["pf"] => Cb::Profit,
             ["iv", _] => Cb::Invest(id(1)?),
             ["ivt", _] => Cb::InvestEdit(id(1)?),
             ["iva", _, _] => Cb::InvestAccess(id(1)?, on(2)?),

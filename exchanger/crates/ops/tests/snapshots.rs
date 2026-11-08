@@ -48,3 +48,22 @@ fn menu_owner_and_operator() {
     ));
     insta::assert_snapshot!("menu_operator_kill_switch", dump(&operator));
 }
+
+#[test]
+fn reserves_and_shortfall() {
+    let t = Texts::builtin().unwrap();
+    let reserves = Look::plain().screen(&ops::sample_reserves(&t).screen(&t));
+    insta::assert_snapshot!("reserves", dump(&reserves));
+    let payload = serde_json::json!({
+        "platform": "xrocket", "expected": "640", "actual": "628", "diff": "-12",
+        "paused": true, "account": "ub-1",
+    });
+    let short = Look::plain().screen(&ops::mismatch_screen(&t, &payload, 1));
+    insta::assert_snapshot!("shortfall", dump(&short));
+    let payload = serde_json::json!({
+        "platform": "cryptobot", "expected": "1000", "actual": "1250", "diff": "250",
+        "paused": false, "account": "ub-1",
+    });
+    let extra = Look::plain().screen(&ops::mismatch_screen(&t, &payload, 2));
+    insta::assert_snapshot!("surplus", dump(&extra));
+}

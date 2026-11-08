@@ -1,0 +1,13 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&short)
+---
+--- rich
+
+--- html
+🚨 <b>xRocket: меньше на <code>12.00</code></b>
+Леджер 640.00 · реально 628.00 · ub-1
+Выплаты в xRocket на паузе. Это вы выводили?
+--- keyboard
+[{"text":"👍 Да, это я","callback_data":"a:cap:1"}]
+[{"text":"🔎 Нет, разбираться","style":"danger","callback_data":"a:iq:1"}]
