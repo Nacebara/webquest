@@ -376,6 +376,13 @@ impl Inner {
             let Some(cb) = query.data.as_deref().and_then(Cb::parse) else {
                 return Ok(false);
             };
+            if cb == Cb::Sample {
+                // Пример из «Предпросмотра»: ничего не делаем, но говорим об этом.
+                let mut answer = AnswerCallbackQuery::ack(query.id.clone());
+                answer.text = Some(self.texts.t("common.sample"));
+                let _ = self.api.answer_callback_query(&answer).await;
+                return Ok(true);
+            }
             let _ = self
                 .api
                 .answer_callback_query(&AnswerCallbackQuery::ack(query.id.clone()))

@@ -93,7 +93,7 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
         let _ = api
             .send_message(&SendMessage::html(chat, caption).silent())
             .await;
-        let screen = look.screen(&data.screen(&texts));
+        let screen = sample(look.screen(&data.screen(&texts)));
         let mut req = botapi::SendRichMessage::new(chat, screen.rich.clone().unwrap_or_default());
         req.disable_notification = Some(true);
         req.reply_markup = (!screen.keyboard.is_empty()).then(|| {
@@ -117,7 +117,7 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
     let _ = api
         .send_message(&SendMessage::html(chat, "<b>Пульт · Меню</b> (данные макета)").silent())
         .await;
-    let menu = look.screen(&crate::menu_screen(
+    let menu = sample(look.screen(&crate::menu_screen(
         &texts,
         storage::staff::Role::Owner,
         &crate::MenuCounts {
@@ -125,7 +125,7 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
             inbox: 1,
             ..Default::default()
         },
-    ));
+    )));
     let mut req = SendMessage::html(chat, menu.text.clone()).silent();
     req.reply_markup = Some(botapi::ReplyMarkup::Inline(
         botapi::InlineKeyboardMarkup::new(menu.keyboard.clone()),
@@ -188,7 +188,12 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
             &SendMessage::html(chat, "<b>Пульт · Статистика</b> (данные макета)").silent(),
         )
         .await;
-    match crate::stats::sample_card().map(|c| look.stats(c)) {
+    match crate::stats::sample_card()
+        .map(|c| look.stats(c))
+        .map(|mut c| {
+            sample_keyboard(&mut c.keyboard.inline_keyboard, &crate::Cb::Sample.encode());
+            c
+        }) {
         Ok(card) => match card.chart.png() {
             Ok(png) => {
                 if let Err(e) = api
@@ -205,7 +210,47 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
 }
 
 /// Экран пульта: карточкой (rich), если она есть, иначе обычным HTML; кнопки — как есть.
+/// Пример экрана для «Предпросмотра»: у всех кнопок — и под сообщением, и в тексте карточки —
+/// вместо настоящего действия [`crate::Cb::Sample`] (ссылки и «копировать» остаются). На
+/// данных макета id настоящие: «Закрыть без выплаты» на примере сработала бы по живой заявке
+/// №15 (аудит v2, П13).
+pub(crate) fn sample(mut screen: crate::Screen) -> crate::Screen {
+    let data = crate::Cb::Sample.encode();
+    sample_keyboard(&mut screen.keyboard, &data);
+    screen.rich = screen.rich.map(|r| sample_text(&r, &data));
+    screen.text = sample_text(&screen.text, &data);
+    screen
+}
+
+fn sample_keyboard(rows: &mut [Vec<botapi::InlineKeyboardButton>], data: &str) {
+    for button in rows.iter_mut().flatten() {
+        if let botapi::InlineButtonAction::CallbackData(d) = &mut button.action {
+            *d = data.to_owned();
+        }
+    }
+}
+
+/// `data="…"` у кнопок в тексте (`<tg-button type="callback_data" … data="…">`).
+fn sample_text(html: &str, data: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(i) = rest.find(" data=\"") {
+        let (head, tail) = rest.split_at(i + " data=\"".len());
+        out.push_str(head);
+        out.push_str(data);
+        match tail.find('"') {
+            Some(end) => rest = &tail[end..],
+            None => {
+                rest = "";
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 async fn send_card(api: &BotApi, chat: i64, screen: &crate::Screen) {
+    let screen = &sample(screen.clone());
     let markup = (!screen.keyboard.is_empty()).then(|| {
         botapi::ReplyMarkup::Inline(botapi::InlineKeyboardMarkup::new(screen.keyboard.clone()))
     });
@@ -235,4 +280,53 @@ async fn send_card(api: &BotApi, chat: i64, screen: &crate::Screen) {
             .await;
     }
     tokio::time::sleep(Duration::from_millis(350)).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// П13: на примерах из «Предпросмотра» ни одна кнопка не ведёт к настоящему действию.
+    #[test]
+    fn samples_carry_no_live_buttons() {
+        let texts = crate::Texts::builtin().unwrap();
+        let card = crate::sample_order().screen(
+            &texts,
+            storage::staff::Role::Owner,
+            crate::sample_now(),
+            &crate::Links::default(),
+        );
+        let queue = crate::sample_queue().screen(&texts, &crate::Links::default(), 0);
+        let mut url = crate::Screen::new("x");
+        url.keyboard = vec![vec![
+            botapi::InlineKeyboardButton::url("t.me", "https://t.me/x"),
+            botapi::InlineKeyboardButton::callback("go", crate::Cb::Order(15).encode()),
+        ]];
+        for screen in [card, queue, url] {
+            let s = sample(screen);
+            let data = crate::Cb::Sample.encode();
+            for b in s.keyboard.iter().flatten() {
+                if let botapi::InlineButtonAction::CallbackData(d) = &b.action {
+                    assert_eq!(d, &data, "{}", b.text);
+                }
+            }
+            for html in std::iter::once(&s.text).chain(s.rich.as_ref()) {
+                for part in html.split(" data=\"").skip(1) {
+                    assert!(part.starts_with(&data), "{part}");
+                }
+            }
+        }
+        let s = sample({
+            let mut u = crate::Screen::new("x");
+            u.keyboard = vec![vec![botapi::InlineKeyboardButton::url(
+                "t.me",
+                "https://t.me/x",
+            )]];
+            u
+        });
+        assert_eq!(
+            s.keyboard[0][0].action,
+            botapi::InlineButtonAction::Url("https://t.me/x".into())
+        );
+    }
 }

@@ -138,6 +138,9 @@ impl Flag {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Cb {
+    /// Кнопка на примере экрана из «Предпросмотра»: ничего не делает, только всплывашка «Это
+    /// пример» (аудит v2, П13 — раньше примеры несли кнопки на настоящие заявки и события).
+    Sample,
     Menu,
     Dash,
     Dirs,
@@ -290,6 +293,7 @@ impl Cb {
         match self {
             Cb::Menu => "m".into(),
             Cb::Dash => "dash".into(),
+            Cb::Sample => "x".into(),
             Cb::Dirs => "dirs".into(),
             Cb::Dir(d) => format!("d:{}", dir_code(*d)),
             Cb::DirEdit(d, f) => format!("de:{}:{}", dir_code(*d), f.code()),
@@ -376,6 +380,7 @@ impl Cb {
         Some(match parts.as_slice() {
             ["m"] => Cb::Menu,
             ["dash"] => Cb::Dash,
+            ["x"] => Cb::Sample,
             ["dirs"] => Cb::Dirs,
             ["d", _] => Cb::Dir(dir(1)?),
             ["de", _, f] => {
