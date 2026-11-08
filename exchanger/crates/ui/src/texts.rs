@@ -402,6 +402,7 @@ pub struct ErrorTexts {
     pub invoice_pending: String,
     pub invoice_check_busy: String,
     pub invoice_refused: String,
+    pub invoice_paused: String,
     pub quote_expired: String,
     pub internal: String,
 }

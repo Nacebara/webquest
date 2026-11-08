@@ -19,6 +19,7 @@ pub mod emoji;
 pub mod fmt;
 pub mod html;
 pub mod model;
+pub mod preview;
 pub mod screen;
 mod screens;
 pub mod texts;

@@ -151,16 +151,16 @@ expression: errors.trim_end()
 ### plain
 --- html
 ❌ <b>Мульти-чек не подойдёт</b>
-Деньги в чеке, я его не открывал. Пришлите обычный: <code>@xrocket 10</code>
+Деньги в чеке, я его не открывал. Пришлите обычный: <code>@xrocket 100</code>
 --- keyboard: inline
-[{"copy_text":{"text":"@xrocket 10"},"text":"📋 @xrocket 10"}]
+[{"copy_text":{"text":"@xrocket 100"},"text":"📋 @xrocket 100"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Мульти-чек не подойдёт</b>
-Деньги в чеке, я его не открывал. Пришлите обычный: <code>@xrocket 10</code>
+Деньги в чеке, я его не открывал. Пришлите обычный: <code>@xrocket 100</code>
 --- keyboard: inline
-[{"copy_text":{"text":"@xrocket 10"},"icon_custom_emoji_id":"5368000000000000013","text":"@xrocket 10"}]
+[{"copy_text":{"text":"@xrocket 100"},"icon_custom_emoji_id":"5368000000000000013","text":"@xrocket 100"}]
 
 ## below_minimum
 ### plain
@@ -554,15 +554,17 @@ expression: errors.trim_end()
 ## invoice_refused_paused
 ### plain
 --- html
-⏸ <b>Этот счёт сейчас не возьму</b>
-Причина: оплата таких счетов временно на паузе — попробуйте позже. Деньги не списаны.
---- keyboard: none
+⏸ <b>Оплата счетов на паузе</b>
+Счёт не открывал, деньги не списаны. Пока можно обменять чек.
+--- keyboard: inline
+[{"callback_data":"exchange","text":"💱 Обменять"},{"callback_data":"terms","text":"📈 Курс"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> <b>Этот счёт сейчас не возьму</b>
-Причина: оплата таких счетов временно на паузе — попробуйте позже. Деньги не списаны.
---- keyboard: none
+<tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> <b>Оплата счетов на паузе</b>
+Счёт не открывал, деньги не списаны. Пока можно обменять чек.
+--- keyboard: inline
+[{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","text":"Обменять"},{"callback_data":"terms","icon_custom_emoji_id":"5368000000000000015","text":"Курс"}]
 
 ## invoice_refused_maintenance
 ### plain

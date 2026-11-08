@@ -7,7 +7,7 @@ expression: "both(p, q)"
 <b>Как создать чек xRocket</b>
 
 <b>Быстро — прямо в этом чате:</b>
-1. Наберите <code>@xrocket 10</code> — вместо <code>10</code> ваша сумма.
+1. Наберите <code>@xrocket 100</code> — вместо <code>100</code> ваша сумма.
 2. Выберите чек в USDT и отправьте.
 3. Чек появится здесь — я сразу его заберу.
 
@@ -16,7 +16,7 @@ expression: "both(p, q)"
 
 Чек — в USDT, для одного человека, без капчи и подписок.
 --- keyboard: inline
-[{"copy_text":{"text":"@xrocket 10"},"text":"📋 @xrocket 10"}]
+[{"copy_text":{"text":"@xrocket 100"},"text":"📋 @xrocket 100"}]
 [{"text":"Открыть xRocket","url":"https://t.me/xrocket"}]
 [{"callback_data":"dir:xr_to_cb_check","text":"Назад"}]
 
@@ -25,7 +25,7 @@ expression: "both(p, q)"
 <b>Как создать чек xRocket</b>
 
 <b>Быстро — прямо в этом чате:</b>
-1. Наберите <code>@xrocket 10</code> — вместо <code>10</code> ваша сумма.
+1. Наберите <code>@xrocket 100</code> — вместо <code>100</code> ваша сумма.
 2. Выберите чек в USDT и отправьте.
 3. Чек появится здесь — я сразу его заберу.
 
@@ -34,6 +34,6 @@ expression: "both(p, q)"
 
 Чек — в USDT, для одного человека, без капчи и подписок.
 --- keyboard: inline
-[{"copy_text":{"text":"@xrocket 10"},"icon_custom_emoji_id":"5368000000000000013","text":"@xrocket 10"}]
+[{"copy_text":{"text":"@xrocket 100"},"icon_custom_emoji_id":"5368000000000000013","text":"@xrocket 100"}]
 [{"text":"Открыть xRocket","url":"https://t.me/xrocket"}]
 [{"callback_data":"dir:xr_to_cb_check","text":"Назад"}]

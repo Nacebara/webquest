@@ -22,11 +22,12 @@ use crate::screen::{Keyboard, Screen};
 pub const HISTORY_PAGE: usize = 10;
 
 /// Пример суммы для инлайн-команды: 10 USDT, но в пределах лимитов направления.
+/// Сумма в примере команды кошелька — как в макете («@send 100usdt»), в пределах направления.
 fn example_amount(terms: Option<&DirectionTerms>) -> Decimal {
-    let ten = Decimal::TEN;
+    let base = Decimal::ONE_HUNDRED;
     match terms {
-        Some(t) if t.max >= t.min => ten.max(t.min.ceil()).min(t.max.floor().max(t.min.ceil())),
-        _ => ten,
+        Some(t) if t.max >= t.min => base.max(t.min.ceil()).min(t.max.floor().max(t.min.ceil())),
+        _ => base,
     }
 }
 
@@ -919,12 +920,12 @@ mod tests {
 
     #[test]
     fn example_amount_stays_within_limits() {
-        assert_eq!(example_amount(None), dec!(10));
-        assert_eq!(example_amount(Some(&terms(dec!(2), dec!(500)))), dec!(10));
+        assert_eq!(example_amount(None), dec!(100));
+        assert_eq!(example_amount(Some(&terms(dec!(2), dec!(500)))), dec!(100));
         assert_eq!(
-            example_amount(Some(&terms(dec!(15.5), dec!(500)))),
-            dec!(16)
+            example_amount(Some(&terms(dec!(150.5), dec!(500)))),
+            dec!(151)
         );
-        assert_eq!(example_amount(Some(&terms(dec!(2), dec!(5.5)))), dec!(5));
+        assert_eq!(example_amount(Some(&terms(dec!(2), dec!(55.5)))), dec!(55));
     }
 }

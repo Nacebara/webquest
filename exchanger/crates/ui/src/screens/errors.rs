@@ -100,7 +100,7 @@ impl Ui {
             UiError::PasswordProtected => (self.fill(&e.password, &[]), Keyboard::None),
             UiError::MultiCheck => {
                 // Макет: «Пришлите обычный: @xrocket 100» и та же команда на кнопке-копии.
-                let cmd = super::inline_command(domain::Platform::XRocket, Decimal::TEN);
+                let cmd = super::inline_command(domain::Platform::XRocket, Decimal::ONE_HUNDRED);
                 (
                     self.fill(&e.multi_check, &[("cmd", &Frag::code(&cmd))]),
                     Keyboard::inline_rows(vec![vec![self.copy_button(&cmd, &cmd)]]),
@@ -273,6 +273,17 @@ impl Ui {
                 Keyboard::None,
             ),
             UiError::InvoiceCheckBusy => (self.fill(&e.invoice_check_busy, &[]), Keyboard::None),
+            UiError::InvoiceRefused(InvoiceRefusal::Paused) => (
+                self.fill(&e.invoice_paused, &[]),
+                Keyboard::inline_rows(vec![vec![
+                    self.cb_button(
+                        Some(Emoji::Exchange),
+                        &self.texts.menu.exchange,
+                        &Callback::Exchange,
+                    ),
+                    self.cb_button(Some(Emoji::Rates), &self.texts.menu.rates, &Callback::Terms),
+                ]]),
+            ),
             UiError::InvoiceRefused(refusal) => (
                 self.fill(
                     &e.invoice_refused,

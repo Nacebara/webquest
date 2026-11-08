@@ -248,6 +248,13 @@ fn cb(text: &str, data: &str) -> InlineKeyboardButton {
 fn menu_keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(vec![
         vec![
+            InlineKeyboardButton::new(
+                "Предпросмотр экранов клиента",
+                InlineButtonAction::CallbackData("demo:preview".to_owned()),
+            )
+            .style(botapi::ButtonStyle::Primary),
+        ],
+        vec![
             cb("Чек CryptoBot 10", "demo:cb:10"),
             cb("Чек CryptoBot 100", "demo:cb:100"),
         ],
@@ -276,12 +283,61 @@ fn menu_keyboard() -> InlineKeyboardMarkup {
 
 const MENU: &str = "<b>🧪 Демо exch</b>\nКошельки здесь — симулятор: денег нет, остальное как в настоящем боте.\n\nВыберите, что прислать боту: я дам ссылку — скопируйте её и пришлите сюда, как клиент.\nПульт владельца — кнопка «Админ-панель» в меню.";
 
+/// «Предпросмотр экранов» (CLAUDE.md п. 21): все экраны клиента по порядку макета, каждый —
+/// с подписью «N/25 · название», чтобы сверить с макетом и принять.
+pub async fn send_preview(api: &BotApi, ui: &ui::Ui, chat: i64) {
+    let screens = ui::preview::client(ui);
+    let total = screens.len();
+    for (i, screen) in screens.iter().enumerate() {
+        let caption = format!("<b>{}/{total} · {}</b>", i + 1, ui::html::esc(screen.title));
+        let _ = api
+            .send_message(&SendMessage::html(chat, caption).silent())
+            .await;
+        for message in &screen.messages {
+            let sent = match &message.rich_html {
+                Some(rich) => {
+                    let mut req = botapi::SendRichMessage::new(chat, rich.clone());
+                    req.disable_notification = Some(true);
+                    req.reply_markup = message.keyboard.reply_markup();
+                    api.send_rich_message(&req).await.map(|_| ())
+                }
+                None => {
+                    let mut req = SendMessage::html(chat, message.html.clone()).silent();
+                    req.reply_markup = message.keyboard.reply_markup();
+                    api.send_message(&req).await.map(|_| ())
+                }
+            };
+            if let Err(e) = sent {
+                tracing::warn!(screen = screen.title, error = %e, "preview screen not sent");
+                let _ = api
+                    .send_message(&SendMessage::html(
+                        chat,
+                        format!(
+                            "⚠️ Telegram не принял экран: {}",
+                            ui::html::esc(&e.to_string())
+                        ),
+                    ))
+                    .await;
+            }
+            tokio::time::sleep(Duration::from_millis(350)).await;
+        }
+    }
+    let _ = api
+        .send_message(&SendMessage::html(
+            chat,
+            format!("<b>Готово: {total} экранов.</b> Пишите номер и что не так — например «7: кнопка не того цвета»."),
+        ))
+        .await;
+}
+
 /// Перехватчик демо: `/demo` и кнопки проб; остальное — пульту и клиентскому боту.
 pub struct DemoHook {
     api: BotApi,
     world: SimWorld,
     stranger: AccountId,
     panel: Arc<dyn tgbot::UpdateHook>,
+    /// Интерфейс клиента с эмодзи демо — для «Предпросмотра экранов».
+    ui: ui::Ui,
 }
 
 impl DemoHook {
@@ -289,13 +345,20 @@ impl DemoHook {
         token: SecretString,
         demo: &DemoWorld,
         panel: Arc<dyn tgbot::UpdateHook>,
+        emoji: ui::EmojiSet,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             api: crate::telegram::bot_api(token)?,
             world: demo.world.clone(),
             stranger: demo.stranger,
             panel,
+            ui: ui::Ui::builtin(emoji, ui::UiConfig::default())
+                .context("built-in client texts are invalid")?,
         })
+    }
+
+    async fn preview(&self, chat: i64) {
+        send_preview(&self.api, &self.ui, chat).await;
     }
 
     async fn send_menu(&self, chat: i64) {
@@ -398,6 +461,10 @@ impl tgbot::UpdateHook for DemoHook {
                 self.send_menu(m.chat.id).await;
                 return true;
             }
+            if text == "/preview" {
+                self.preview(m.chat.id).await;
+                return true;
+            }
             if text == "/start" {
                 // Приветствие покажет клиентский бот, меню проб — следом за ним.
                 let api = self.api.clone();
@@ -418,6 +485,10 @@ impl tgbot::UpdateHook for DemoHook {
                 .answer_callback_query(&AnswerCallbackQuery::ack(q.id.clone()))
                 .await;
             let chat = q.message.as_ref().map_or(q.from.id, |m| m.chat.id);
+            if data == "demo:preview" {
+                self.preview(chat).await;
+                return true;
+            }
             match Item::parse(data) {
                 Some(item) => self.give(chat, item).await,
                 None => self.send_menu(chat).await,
@@ -469,7 +540,7 @@ mod tests {
             for b in row {
                 if let InlineButtonAction::CallbackData(d) = b.action {
                     assert!(d.len() <= 64);
-                    assert!(Item::parse(&d).is_some(), "{d}");
+                    assert!(d == "demo:preview" || Item::parse(&d).is_some(), "{d}");
                 }
             }
         }

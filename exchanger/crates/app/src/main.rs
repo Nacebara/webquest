@@ -47,7 +47,11 @@ enum Command {
     Check,
     /// Демо: настоящий бот и пульт на симуляторе кошельков — без денег и юзербота, на
     /// отдельной базе `<база>_demo` (пересоздаётся при запуске). Пробы — команда /demo в боте.
-    Demo,
+    Demo {
+        /// Сразу прислать владельцу «Предпросмотр экранов» (все экраны клиента по макету).
+        #[arg(long)]
+        preview: bool,
+    },
     /// Применить миграции и выйти.
     Migrate,
     /// Войти аккаунтом юзербота и привязать его к кошельку платформы. Телефон, код и пароль
@@ -226,7 +230,7 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
     let result = runtime.block_on(async {
         match command {
             Command::Run => run().await,
-            Command::Demo => demo().await,
+            Command::Demo { preview } => demo(preview).await,
             Command::Setup => setup(paths, bare).await,
             Command::Check => check(paths).await,
             Command::Migrate => migrate().await,
@@ -561,15 +565,16 @@ async fn spawn_bot(
             },
         ));
     }
+    let emoji = app::runtime::emoji_set(pool).await;
     let hook: Arc<dyn tgbot::UpdateHook> = match demo {
         Some(world) => Arc::new(app::demo::DemoHook::new(
             token.clone(),
             world,
             Arc::new(panel),
+            emoji.clone(),
         )?),
         None => Arc::new(panel),
     };
-    let emoji = app::runtime::emoji_set(pool).await;
     let bot = app::runtime::client_bot(pool, token, engine, cfg.support_contact.clone(), emoji)?
         .with_hook(hook);
     tasks.spawn(supervise(
@@ -585,7 +590,7 @@ async fn spawn_bot(
 }
 
 /// `exch demo`: тот же бот и пульт, кошельки — симулятор, база — `<база>_demo`.
-async fn demo() -> anyhow::Result<()> {
+async fn demo(preview: bool) -> anyhow::Result<()> {
     let cfg = load_config()?;
     let token = cfg
         .client_bot_token
@@ -632,10 +637,19 @@ async fn demo() -> anyhow::Result<()> {
         &pool,
         engine,
         &cfg,
-        token,
+        token.clone(),
         Some(&world),
     )
     .await?;
+    if preview {
+        let api = app::telegram::bot_api(token)?;
+        let ui = ui::Ui::builtin(
+            app::runtime::emoji_set(&pool).await,
+            ui::UiConfig::default(),
+        )
+        .context("built-in client texts are invalid")?;
+        app::demo::send_preview(&api, &ui, cfg.owner_tg_id).await;
+    }
     wait(tasks, cancel).await
 }
 
