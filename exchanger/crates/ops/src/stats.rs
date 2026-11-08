@@ -355,6 +355,17 @@ mod tests {
         assert_eq!(card.chart.kpis[0].delta_pct, Some(14));
         assert_eq!(card.chart.kpis[1].delta_pct, Some(9));
         assert_eq!(card.chart.kpis[2].delta_pct, Some(6));
-        assert!(card.chart.png().is_ok());
+        let png = card.chart.png().unwrap();
+        // Отправить вручную: EXCH_STATS_OUT=/tmp/dir cargo test -p ops stats.
+        if let Ok(dir) = std::env::var("EXCH_STATS_OUT") {
+            let dir = std::path::Path::new(&dir);
+            std::fs::write(dir.join("stats.html"), &card.html).unwrap();
+            std::fs::write(dir.join("stats.png"), &png).unwrap();
+            std::fs::write(
+                dir.join("stats_kb.json"),
+                serde_json::to_string(&card.keyboard).unwrap(),
+            )
+            .unwrap();
+        }
     }
 }
