@@ -143,6 +143,26 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
         &look.screen(&crate::mismatch_screen(&texts, &payload, 0)),
     )
     .await;
+    // «Очередь разбора» и «Карточка заявки» на данных макета.
+    let _ = api
+        .send_message(
+            &SendMessage::html(chat, "<b>Пульт · Очередь разбора</b> (данные макета)").silent(),
+        )
+        .await;
+    send_card(
+        api,
+        chat,
+        &look.screen(&crate::sample_queue().screen(&texts)),
+    )
+    .await;
+    let _ = api
+        .send_message(
+            &SendMessage::html(chat, "<b>Пульт · Карточка заявки</b> (данные макета)").silent(),
+        )
+        .await;
+    let card =
+        crate::sample_order().screen(&texts, storage::staff::Role::Owner, crate::sample_now());
+    send_card(api, chat, &look.screen(&card)).await;
     // Пульт: «Статистика» на данных макета — плитки и график одной картинкой.
     let _ = api
         .send_message(

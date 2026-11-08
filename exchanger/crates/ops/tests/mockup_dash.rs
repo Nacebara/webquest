@@ -109,7 +109,7 @@ fn mock_emoji(html: &str) -> Vec<String> {
 /// Строки текста без тегов, значков и пробелов.
 fn lines(html: &str) -> Vec<String> {
     // В исходнике макета перевод строки в обычном сообщении записан как `\n`.
-    let mut s = html.replace("\\n", "\n");
+    let mut s = html.replace("\\n", "\n").replace("${ORD}", "K7M2Q9XR4T");
     // Значки: токены макета и <tg-emoji>…</tg-emoji> бота.
     while let Some(i) = s.find("<tg-emoji") {
         let j = s[i..].find("</tg-emoji>").unwrap() + i + "</tg-emoji>".len();
@@ -402,4 +402,57 @@ fn reserves_and_shortfall_are_the_mockup() {
     });
     let screen = look.screen(&ops::mismatch_screen(&texts, &payload, 1));
     check("Недостача", &html, &buttons, &screen, &back);
+}
+
+#[test]
+fn queue_and_order_card_are_the_mockup() {
+    let texts = Texts::builtin().unwrap();
+    let (html, buttons) = mock_after("t: 'Очередь разбора'");
+    let (look, back) = numbered(&keys_of(&html, &buttons));
+    let screen = look.screen(&ops::sample_queue().screen(&texts));
+    check("Очередь разбора", &html, &buttons, &screen, &back);
+
+    let (html, buttons) = mock_after("n: 'Ход заявки");
+    let (look, back) = numbered(&keys_of(&html, &buttons));
+    let screen = look.screen(&ops::sample_order().screen(
+        &texts,
+        storage::staff::Role::Owner,
+        ops::sample_now(),
+    ));
+    // Отступление: у операции один статус — историю статусов («unknown → failed») база не
+    // хранит; в карточке — «failed».
+    let known = "ord-…-payoutunknown→failed";
+    let body = screen.rich.clone().unwrap();
+    let ours = lines(&body).join("|");
+    for line in lines(&html) {
+        if line.starts_with(known) {
+            assert!(
+                !ours.contains(&line),
+                "отступление «{known}» больше не нужно"
+            );
+            continue;
+        }
+        assert!(
+            ours.contains(&line),
+            "«Карточка заявки»: в макете «{line}», у бота: {ours}"
+        );
+    }
+    let mut found = Vec::new();
+    let mut rest = body.as_str();
+    while let Some(i) = rest.find("emoji-id=\"") {
+        rest = &rest[i + 10..];
+        let end = rest.find('"').unwrap();
+        found.push(back.get(&rest[..end]).cloned().unwrap_or_default());
+    }
+    for e in mock_emoji(&html) {
+        assert!(
+            found.contains(&e),
+            "«Карточка заявки»: нет значка {e} (у бота {found:?})"
+        );
+    }
+    assert_eq!(
+        our_buttons(&screen, &back),
+        buttons,
+        "«Карточка заявки»: кнопки"
+    );
 }

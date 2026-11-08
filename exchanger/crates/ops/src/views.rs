@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use domain::fees::{FeeMode, LeverInput};
-use domain::fsm::{Flow, OrderState};
+use domain::fsm::Flow;
 use domain::{Asset, Decimal, Direction, Platform};
 use engine::availability::{Availability, Blocker};
 use engine::fees::{PromoMode, SwitchedBy};
@@ -49,7 +49,7 @@ pub(crate) fn mask(param: &str) -> String {
 }
 
 /// Чеки и счета в тексте ответа кошелька — маской.
-fn mask_links(text: &str) -> String {
+pub(crate) fn mask_links(text: &str) -> String {
     text.split_inclusive(|c: char| c.is_whitespace())
         .map(|word| {
             let trimmed = word.trim_end();
@@ -651,59 +651,6 @@ impl Inner {
     // -----------------------------------------------------------------------------------------
     // Разбор
 
-    pub(crate) async fn queue(&self) -> Result<Screen, OpsError> {
-        let t = &self.texts;
-        let mut conn = self.pool.acquire().await?;
-        let items = storage::admin::review_queue(&mut conn).await?;
-        let mut lines = vec![t.f("queue.title", &[("n", &items.len())])];
-        let mut s = Screen::default();
-        if items.is_empty() {
-            lines.push(t.t("queue.empty"));
-        }
-        for item in &items {
-            let amount = item
-                .intake_amount
-                .or(item.payout_amount)
-                .map_or_else(|| t.t("common.none"), usdt);
-            let minutes = (Utc::now() - item.since).num_minutes().max(0);
-            let age = if minutes < 120 {
-                t.f("queue.age_min", &[("n", &minutes)])
-            } else {
-                t.f("queue.age_hours", &[("n", &(minutes / 60))])
-            };
-            let taken = match item.taken_by {
-                Some(id) => {
-                    let name = storage::staff::get(&mut conn, id)
-                        .await?
-                        .map_or_else(|| id.to_string(), |m| m.display_name);
-                    t.f("queue.taken", &[("name", &esc(&name))])
-                }
-                None => String::new(),
-            };
-            lines.push(String::new());
-            lines.push(t.f(
-                "queue.item",
-                &[
-                    ("id", &item.id),
-                    ("direction", &self.dir_name(item.direction)),
-                    ("amount", &amount),
-                    ("age", &age),
-                    ("reason", &esc(item.manual_reason.as_deref().unwrap_or(""))),
-                    ("taken", &taken),
-                ],
-            ));
-            s = s.row(vec![btn(
-                t.f("queue.b_item", &[("id", &item.id), ("amount", &amount)]),
-                &Cb::Order(item.id),
-            )]);
-        }
-        s.text = lines.join("\n");
-        Ok(s.row(vec![
-            btn(t.t("common.refresh"), &Cb::Queue),
-            btn(t.t("common.home"), &Cb::Menu),
-        ]))
-    }
-
     pub(crate) async fn find_order(&self, query: &str) -> Result<Screen, OpsError> {
         let id = {
             let mut conn = self.pool.acquire().await?;
@@ -714,201 +661,6 @@ impl Inner {
             None => Ok(Screen::new(self.texts.t("order.not_found"))
                 .row(vec![btn(self.texts.t("common.home"), &Cb::Menu)])),
         }
-    }
-
-    /// Карточка заявки; `staff` — кнопки решений по его роли.
-    pub(crate) async fn order(
-        &self,
-        staff: Option<&StaffMember>,
-        id: i64,
-    ) -> Result<Screen, OpsError> {
-        let t = &self.texts;
-        let mut conn = self.pool.acquire().await?;
-        let card = match storage::admin::order_card(&mut conn, id).await {
-            Ok(c) => c,
-            Err(storage::StorageError::NotFound(_)) => {
-                return Ok(Screen::new(t.t("order.not_found"))
-                    .row(vec![btn(t.t("common.home"), &Cb::Menu)]));
-            }
-            Err(e) => return Err(e.into()),
-        };
-        let mut lines = vec![
-            t.f(
-                "order.title",
-                &[("id", &card.id), ("public", &esc(&card.public_id))],
-            ),
-            t.f(
-                "order.line_dir",
-                &[
-                    ("direction", &self.dir_name(card.direction)),
-                    ("user", &card.user_id),
-                ],
-            ),
-            t.f(
-                "order.line_state",
-                &[("state", &self.state_name(card.state.as_db_str()))],
-            ),
-        ];
-        if let Some(r) = &card.manual_reason {
-            lines.push(t.f("order.line_reason", &[("reason", &esc(r))]));
-        }
-        if let Some(a) = card.intake_amount {
-            let posted = if card.intake_posted() {
-                t.t("order.posted_yes")
-            } else {
-                t.t("order.posted_no")
-            };
-            lines.push(t.f(
-                "order.line_intake",
-                &[("amount", &usdt(a)), ("posted", &posted)],
-            ));
-        }
-        if card.direction.flow() == Flow::InvoicePayment {
-            if let Some(x) = card.quote_amount_in {
-                lines.push(t.f("order.line_quote", &[("amount", &usdt(x))]));
-            }
-            if let Some(a) = card.invoice_amount {
-                let fiat = match (&card.invoice_fiat, card.invoice_fiat_amount) {
-                    (Some(cur), Some(v)) => format!(" (${} {})", v.normalize(), esc(cur)),
-                    _ => String::new(),
-                };
-                lines.push(t.f(
-                    "order.line_invoice",
-                    &[
-                        ("amount", &usdt(a)),
-                        ("fiat", &fiat),
-                        (
-                            "param",
-                            &esc(&mask(card.invoice_start_param.as_deref().unwrap_or(""))),
-                        ),
-                    ],
-                ));
-            }
-        }
-        if let (Some(p), Some(f)) = (card.payout_amount, card.fee_amount)
-            && card.direction.flow() == Flow::CheckExchange
-        {
-            lines.push(t.f(
-                "order.line_payout",
-                &[
-                    ("payout", &usdt(p)),
-                    ("fee", &usdt(f)),
-                    ("pct", &card.fee_pct_applied.map_or_else(String::new, pct)),
-                ],
-            ));
-        }
-        if let Some(r) = card.refund_amount {
-            lines.push(t.f("order.line_refund", &[("amount", &usdt(r))]));
-        }
-        if let Some(url) = &card.payout_check_url {
-            lines.push(t.f("order.line_check", &[("check", &esc(&mask_links(url)))]));
-        }
-        if !card.operations.is_empty() {
-            lines.push(String::new());
-            lines.push(t.t("order.ops"));
-            for op in &card.operations {
-                let amount = op
-                    .amount
-                    .map(|a| format!(" · {}", usdt(a)))
-                    .unwrap_or_default();
-                let extra = op
-                    .last_error
-                    .as_deref()
-                    .map(|e| format!(" · <i>{}</i>", esc(&ui::html::clip(e, 120))))
-                    .unwrap_or_default();
-                lines.push(t.f(
-                    "order.op",
-                    &[
-                        ("key", &esc(&op.key)),
-                        ("status", &t.t(&format!("op_status.{}", op.status))),
-                        ("amount", &amount),
-                        ("extra", &extra),
-                    ],
-                ));
-            }
-        }
-        if !card.transitions.is_empty() {
-            lines.push(String::new());
-            lines.push(t.t("order.history"));
-            for step in card.transitions.iter().rev().take(8).rev() {
-                let actor = if step.actor == "system" {
-                    String::new()
-                } else {
-                    format!(" · {}", esc(&step.actor))
-                };
-                lines.push(
-                    t.f(
-                        "order.step",
-                        &[
-                            ("at", &when(step.at)),
-                            (
-                                "from",
-                                &step
-                                    .from
-                                    .as_deref()
-                                    .map_or_else(|| "·".to_owned(), |s| self.state_name(s)),
-                            ),
-                            ("to", &self.state_name(&step.to)),
-                            ("actor", &actor),
-                        ],
-                    ),
-                );
-            }
-        }
-        if !card.messages.is_empty() {
-            lines.push(String::new());
-            lines.push(t.t("order.messages"));
-            for m in card.messages.iter().rev().take(4).rev() {
-                let text = mask_links(&m.text);
-                lines.push(t.f(
-                    "order.message",
-                    &[
-                        ("dir", &if m.outgoing { "→" } else { "←" }),
-                        (
-                            "text",
-                            &format!("<i>{}</i>", esc(&ui::html::clip(&text, 200))),
-                        ),
-                    ],
-                ));
-            }
-        }
-        let mut s = Screen::new(lines.join("\n"));
-        if card.state == OrderState::ManualReview {
-            let role = staff.map_or(Role::Operator, |m| m.role);
-            let posted = card.intake_posted();
-            let check = card.direction.flow() == Flow::CheckExchange;
-            let mut decisions = Vec::new();
-            if !posted && role >= Role::Admin {
-                decisions.push((DecisionKind::Intake, "order.b_intake"));
-            }
-            if posted {
-                decisions.push(if check {
-                    (DecisionKind::RetryPayout, "order.b_retry")
-                } else {
-                    (DecisionKind::RetryInvoice, "order.b_retry_invoice")
-                });
-                decisions.push((DecisionKind::Refund, "order.b_refund"));
-                if role >= Role::Admin {
-                    decisions.push((DecisionKind::ClosePaid, "order.b_paid"));
-                }
-            }
-            if role >= Role::Owner {
-                decisions.push((DecisionKind::Close, "order.b_close"));
-            }
-            for pair in decisions.chunks(2) {
-                s = s.row(
-                    pair.iter()
-                        .map(|(k, key)| btn(t.t(key), &Cb::Decide(card.id, *k)))
-                        .collect(),
-                );
-            }
-            s = s.row(vec![btn(t.t("order.b_take"), &Cb::Take(card.id))]);
-        }
-        Ok(s.row(vec![
-            btn(t.t("common.refresh"), &Cb::Order(card.id)),
-            btn(t.t("menu.queue"), &Cb::Queue),
-            btn(t.t("common.home"), &Cb::Menu),
-        ]))
     }
 
     // -----------------------------------------------------------------------------------------
@@ -1426,7 +1178,7 @@ impl Inner {
             Cb::Dirs => self.dirs().await,
             Cb::Dir(d) => self.dir_card(staff, d).await,
             Cb::Promo => self.promo().await,
-            Cb::Queue => self.queue().await,
+            Cb::Queue => self.queue_for(Some(staff.tg_user_id)).await,
             Cb::Order(id) => self.order(Some(staff), id).await,
             Cb::User(id) => self.user(Some(staff), id).await,
             Cb::UserTerms(id) => self.user_terms(id).await,
@@ -1491,7 +1243,11 @@ impl Inner {
                 )
                 .await?;
                 tx.commit().await?;
-                self.order(Some(staff), id).await
+                Ok(self.order(Some(staff), id).await?.notice(
+                    &self
+                        .texts
+                        .f("order.taken", &[("name", &esc(&staff.display_name))]),
+                ))
             }
             Cb::Decide(id, kind) => {
                 let need = match kind {

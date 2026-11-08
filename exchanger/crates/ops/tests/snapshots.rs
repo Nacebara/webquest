@@ -67,3 +67,19 @@ fn reserves_and_shortfall() {
     let extra = Look::plain().screen(&ops::mismatch_screen(&t, &payload, 2));
     insta::assert_snapshot!("surplus", dump(&extra));
 }
+
+#[test]
+fn queue_and_order_card() {
+    let t = Texts::builtin().unwrap();
+    let queue = Look::plain().screen(&ops::sample_queue().screen(&t));
+    insta::assert_snapshot!("queue", dump(&queue));
+    let empty = Look::plain().screen(&ops::QueueData::default().screen(&t));
+    insta::assert_snapshot!("queue_empty", dump(&empty));
+    for (role, name) in [
+        (storage::staff::Role::Owner, "order_card_owner"),
+        (storage::staff::Role::Operator, "order_card_operator"),
+    ] {
+        let card = Look::plain().screen(&ops::sample_order().screen(&t, role, ops::sample_now()));
+        insta::assert_snapshot!(name, dump(&card));
+    }
+}

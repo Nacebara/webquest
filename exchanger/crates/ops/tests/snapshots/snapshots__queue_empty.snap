@@ -1,0 +1,12 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&empty)
+---
+--- rich
+<h3>📋 Разбор</h3>
+<p>Очередь пуста — решать нечего.</p>
+--- html
+<b>📋 Разбор</b>
+Очередь пуста — решать нечего.
+--- keyboard
+[{"text":"🔄 Обновить","callback_data":"a:q"}]

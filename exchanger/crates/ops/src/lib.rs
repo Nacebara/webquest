@@ -31,6 +31,7 @@ mod invest;
 mod look;
 pub mod preview;
 mod reserves;
+mod review;
 pub mod stats;
 mod texts;
 mod views;
@@ -52,6 +53,7 @@ pub use cb::Cb;
 pub use dash::{DashData, sample_dash};
 pub use look::Look;
 pub use reserves::{ReservesData, sample_reserves};
+pub use review::{OrderView, QueueData, QueueRow, sample_now, sample_order, sample_queue};
 pub use texts::Texts;
 pub use views::{MenuCounts, menu_screen};
 
@@ -559,7 +561,7 @@ impl Inner {
                 "dash" | "admin" | "panel" => self.dash().await,
                 "menu" => self.menu(staff).await,
                 "system" => self.system().await,
-                "queue" => self.queue().await,
+                "queue" => self.queue_for(Some(staff.tg_user_id)).await,
                 "dir" => self.dirs().await,
                 "promo" => self.promo().await,
                 "settings" => self.settings().await,

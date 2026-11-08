@@ -1,0 +1,47 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&queue)
+---
+--- rich
+<h3>📋 Разбор · 2</h3>
+<table striped compact>
+<tr>
+<th>Заявка</th>
+<th>Что</th>
+<th align="right">Ждёт</th>
+</tr>
+<tr>
+<td>
+<code>K7M2Q9XR4T</code>
+</td>
+<td>выплата: нет ответа</td>
+<td align="right">6 мин</td>
+</tr>
+<tr>
+<td>
+<code>7F3A1C9D2B</code>
+</td>
+<td>незнакомый ответ</td>
+<td align="right">2 мин</td>
+</tr>
+</table>
+<h4>Оплатить вручную · 1</h4>
+<table striped compact>
+<tr>
+<td>
+<code>Q1W2E3R4T5</code>
+</td>
+<td>счёт CryptoBot 12.00</td>
+<td align="right">4 мин</td>
+</tr>
+</table>
+--- html
+<b>📋 Разбор · 2</b>
+<blockquote><code>K7M2Q9XR4T</code> — выплата: нет ответа · 6 мин
+<code>7F3A1C9D2B</code> — незнакомый ответ · 2 мин</blockquote>
+<b>Оплатить вручную · 1</b>
+<blockquote><code>Q1W2E3R4T5</code> — счёт CryptoBot 12.00 · 4 мин</blockquote>
+--- keyboard
+[{"text":"✋ K7M2…","style":"primary","callback_data":"a:ot:15"},{"text":"✋ 7F3A…","callback_data":"a:ot:16"}]
+[{"text":"🧾 Q1W2… оплатить","callback_data":"a:o:17"}]
+[{"text":"🔄 Обновить","callback_data":"a:q"}]

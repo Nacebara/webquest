@@ -647,9 +647,12 @@ async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
         .set_balance(o.ub, XR, Asset::Usdt, dec!(1000))
         .unwrap();
     let card = o
-        .press(OWNER, &alert, "Открыть заявку", "ручной разбор")
+        .press(OWNER, &alert, "Открыть заявку", "Ручной разбор")
         .await;
-    assert!(card.text().contains("(проведено)"));
+    // Карточка по макету: деньги клиента проведены — «Принято» без «не проведено».
+    assert!(card.text().contains("Принято"), "{}", card.text());
+    assert!(!card.text().contains("не проведено"), "{}", card.text());
+    assert!(card.text().contains("Ход · "), "{}", card.text());
     o.press(OWNER, &card, "Вернуть", "Коротко причина").await;
     o.say(OWNER, "ок", "короче 3 символов").await;
     let preview = o
