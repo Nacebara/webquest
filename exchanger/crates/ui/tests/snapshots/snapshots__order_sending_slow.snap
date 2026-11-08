@@ -4,12 +4,12 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-📤 Отправляю <code>97.50</code> USDT в xRocket
+⏳ Отправляю <code>97.50</code> USDT в xRocket
 <i>Дольше обычного. Деньги у меня — ничего делать не нужно.</i>
 --- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000022">📤</tg-emoji> Отправляю <code>97.50</code> USDT в xRocket
+<tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> Отправляю <code>97.50</code> USDT в xRocket
 <i>Дольше обычного. Деньги у меня — ничего делать не нужно.</i>
 --- keyboard: none

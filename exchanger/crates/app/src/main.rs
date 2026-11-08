@@ -573,6 +573,15 @@ async fn demo() -> anyhow::Result<()> {
     let pool = app::demo::fresh_database(&url).await?;
     let base = engine::Engine::new(pool.clone(), engine::EngineConfig::default());
     let world = app::demo::seed(&pool, &base).await?;
+    match app::demo::copy_emoji(cfg.database_url.expose_secret(), &pool).await {
+        Ok(n) => tracing::info!(
+            settings = n,
+            "demo: emoji settings copied from the main database"
+        ),
+        Err(e) => {
+            tracing::warn!(error = %e, "demo: emoji settings not copied, plain emoji are used")
+        }
+    }
     let engine = app::demo::wallets(&pool, &world)
         .await?
         .into_iter()

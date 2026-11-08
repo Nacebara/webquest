@@ -4,16 +4,14 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-Пришлите чек или ссылку на счёт, например:
-<code>https://t.me/send?start=CQ…</code>
-<code>https://t.me/xrocket?start=t_…</code>
-Можно переслать сообщение с чеком или создать чек прямо здесь: <code>@send 10usdt</code>.
---- keyboard: none
+Пришлите чек CryptoBot или xRocket — обменяю.
+Или ссылку на счёт — оплачу.
+--- keyboard: inline
+[{"callback_data":"howto:cb_to_xr_check","text":"❓ Как создать чек"}]
 
 ### premium
 --- html
-Пришлите чек или ссылку на счёт, например:
-<code>https://t.me/send?start=CQ…</code>
-<code>https://t.me/xrocket?start=t_…</code>
-Можно переслать сообщение с чеком или создать чек прямо здесь: <code>@send 10usdt</code>.
---- keyboard: none
+Пришлите чек CryptoBot или xRocket — обменяю.
+Или ссылку на счёт — оплачу.
+--- keyboard: inline
+[{"callback_data":"howto:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000026","text":"Как создать чек"}]

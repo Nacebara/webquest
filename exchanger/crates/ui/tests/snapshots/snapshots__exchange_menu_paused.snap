@@ -4,7 +4,7 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-Что меняем?
+<b>Что меняем?</b>
 ⏸ <i>xRocket → CryptoBot на паузе: в CryptoBot закончился резерв для выплат — скоро пополню</i>
 --- keyboard: inline
 [{"callback_data":"dir:cb_to_xr_check","style":"primary","text":"🚀 CryptoBot → xRocket · 2.5 %"}]
@@ -12,7 +12,7 @@ expression: "both(p, q)"
 
 ### premium
 --- html
-Что меняем?
+<b>Что меняем?</b>
 <tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> <i>xRocket → CryptoBot на паузе: в CryptoBot закончился резерв для выплат — скоро пополню</i>
 --- keyboard: inline
 [{"callback_data":"dir:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000012","style":"primary","text":"CryptoBot → xRocket · 2.5 %"}]

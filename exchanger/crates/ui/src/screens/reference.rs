@@ -367,28 +367,28 @@ impl Ui {
         };
         let t = &self.texts.send_check;
         let src = direction.source();
-        let cmd = Frag::code(&inline_command(src, example_amount(Some(d))));
-        let mut body = self.fill(&t.title, &[("direction", &self.direction_name(direction))]);
-        body.push(&Frag::trusted("\n"));
-        body.push(&self.fill(
-            &t.body,
+        let command = inline_command(src, example_amount(Some(d)));
+        let mut body = self.fill(
+            &t.title,
             &[
                 ("src", &self.wallet(src)),
-                ("dst", &self.wallet(direction.target())),
-                ("min", &self.usdt(d.min)),
-                ("max", &self.usdt(d.max)),
-                ("fee", &self.pct(d.fee_pct)),
-                ("min_fee", &self.usdt(d.min_fee)),
+                ("min", &Frag::text(&fmt::bare_amount(d.min))),
+                ("max", &Frag::text(&fmt::bare_amount(d.max))),
             ],
-        ));
-        body.push(&Frag::trusted("\n\n<blockquote>"));
-        body.push(&self.fill(&t.quick, &[("cmd", &cmd)]));
-        body.push(&Frag::trusted("</blockquote>\n"));
-        body.push(&self.fill(&t.rules, &[]));
+        );
+        body.push(&Frag::trusted("\n"));
+        body.push(&self.fill(&t.hint, &[("cmd", &Frag::code(&command))]));
         let b = &self.texts.buttons;
         let keyboard = Keyboard::inline_rows(vec![
-            vec![self.cb_button(None, &b.howto, &Callback::HowTo(direction))],
-            vec![self.cb_button(None, &b.cancel, &Callback::Cancel(None))],
+            vec![self.copy_button(&command, &command)],
+            vec![
+                self.cb_button(
+                    Some(Emoji::Help),
+                    &b.instruction,
+                    &Callback::HowTo(direction),
+                ),
+                self.cb_button(Some(Emoji::Hide), &b.cancel, &Callback::Cancel(None)),
+            ],
         ]);
         self.plain(body, keyboard)
     }
@@ -705,18 +705,13 @@ impl Ui {
 
     /// S13: сообщение без ссылки.
     pub fn no_link(&self) -> Screen {
-        let body = self.fill(
-            &self.texts.misc.no_link,
-            &[
-                ("cb_check", &Frag::code("https://t.me/send?start=CQ…")),
-                ("xr_check", &Frag::code("https://t.me/xrocket?start=t_…")),
-                (
-                    "cb_cmd",
-                    &Frag::code(&inline_command(domain::Platform::CryptoBot, Decimal::TEN)),
-                ),
-            ],
-        );
-        self.plain(body, Keyboard::None)
+        let body = self.fill(&self.texts.misc.no_link, &[]);
+        let keyboard = Keyboard::inline_rows(vec![vec![self.cb_button(
+            Some(Emoji::Help),
+            &self.texts.buttons.howto,
+            &Callback::HowTo(Direction::CbToXrCheck),
+        )]]);
+        self.plain(body, keyboard)
     }
 
     /// Прислали ссылку на счёт, а оплата счетов ещё не подключена: счёт не тронут, что

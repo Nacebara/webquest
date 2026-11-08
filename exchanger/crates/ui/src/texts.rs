@@ -158,6 +158,8 @@ pub struct ButtonTexts {
     pub back: String,
     pub copy_order: String,
     pub claim_check: String,
+    /// «Инструкция» под «Пришлите чек» (макет B1).
+    pub instruction: String,
     /// B1: «Забрать» (зелёная, ссылка на чек), «Детали» / «Скрыть» — то же сообщение.
     pub claim: String,
     pub details: String,
@@ -251,10 +253,10 @@ pub struct ExchangeTexts {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SendCheckTexts {
+    /// «Пришлите чек CryptoBot · 1–500 USDT».
     pub title: String,
-    pub body: String,
-    pub quick: String,
-    pub rules: String,
+    /// «Наберите здесь @send 100usdt и выберите чек.»
+    pub hint: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -687,7 +689,7 @@ mod tests {
 
     #[test]
     fn typo_in_key_is_rejected() {
-        let broken = BUILTIN_RU.replace("[misc]\nno_link", "[misc]\nno_lnk");
+        let broken = BUILTIN_RU.replace("\nno_link = ", "\nno_lnk = ");
         assert!(matches!(
             Texts::from_toml(&broken),
             Err(TextsError::Parse(_))
@@ -697,8 +699,8 @@ mod tests {
     #[test]
     fn broken_placeholder_is_rejected() {
         let broken = BUILTIN_RU.replace(
-            "checking = \"{e_process} Проверяю чек\"",
-            "checking = \"{e_process Проверяю чек\"",
+            "checking = \"{icon} Проверяю чек\"",
+            "checking = \"{icon Проверяю чек\"",
         );
         assert!(matches!(
             Texts::from_toml(&broken),

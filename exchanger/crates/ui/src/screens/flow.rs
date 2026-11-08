@@ -24,6 +24,11 @@ impl Ui {
         Keyboard::inline_rows(vec![vec![self.copy_order_button(&order.id)]])
     }
 
+    /// Значок шага: свой, а если шаг затянулся — часы (макет B1, состояние «Долго»).
+    fn step_icon(&self, role: Emoji, slow: bool) -> Frag {
+        self.emoji.frag(if slow { Emoji::Wait } else { role })
+    }
+
     /// Строка-успокоение под шагом, если он затянулся (макет B1: «Дольше обычного»).
     fn with_slow(&self, mut body: Frag, slow: bool) -> Frag {
         if slow {
@@ -37,9 +42,13 @@ impl Ui {
     /// кошелёк не открыл чек, — тогда просто «Проверяю чек». Без кнопок: одно окно.
     pub fn order_checking(&self, _order: &OrderRef, amount: Option<&Money>, slow: bool) -> Screen {
         let t = &self.texts.order;
+        let icon = self.step_icon(Emoji::Process, slow);
         let body = match amount {
-            Some(a) => self.fill(&t.checking_amount, &[("amount", &self.usdt(a.amount()))]),
-            None => self.fill(&t.checking, &[]),
+            Some(a) => self.fill(
+                &t.checking_amount,
+                &[("icon", &icon), ("amount", &self.usdt(a.amount()))],
+            ),
+            None => self.fill(&t.checking, &[("icon", &icon)]),
         };
         self.plain(self.with_slow(body, slow), Keyboard::None)
     }
@@ -49,6 +58,7 @@ impl Ui {
         let body = self.fill(
             &self.texts.order.sending,
             &[
+                ("icon", &self.step_icon(Emoji::Sending, slow)),
                 ("payout", &self.usdt(payout.amount())),
                 ("dst", &self.wallet(order.direction.target())),
             ],

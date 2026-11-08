@@ -152,6 +152,33 @@ pub async fn seed(pool: &PgPool, engine: &engine::Engine) -> anyhow::Result<Demo
     })
 }
 
+/// Эмодзи демо — как у рабочего бота: вариация, наборы и свои эмодзи владельца из основной
+/// базы (её только читаем). Нет основной базы или настроек — обычные символы.
+pub async fn copy_emoji(main_url: &str, demo: &PgPool) -> anyhow::Result<usize> {
+    if !sqlx::Postgres::database_exists(main_url)
+        .await
+        .unwrap_or(false)
+    {
+        return Ok(0);
+    }
+    let main = storage::connect(main_url).await?;
+    let mut from = main.acquire().await?;
+    let mut to = demo.acquire().await?;
+    let mut copied = 0;
+    for key in [
+        crate::emoji::STYLE_KEY,
+        crate::emoji::PACKS_KEY,
+        crate::emoji::CUSTOM_KEY,
+    ] {
+        if let Some(value) = storage::settings::get(&mut from, key).await? {
+            storage::settings::set(&mut to, key, &value, None).await?;
+            copied += 1;
+        }
+    }
+    main.close().await;
+    Ok(copied)
+}
+
 /// Кошельки юзербота на симуляторе для движка (журнал ответов — как в бою).
 pub async fn wallets(pool: &PgPool, demo: &DemoWorld) -> anyhow::Result<Vec<Arc<dyn WalletBot>>> {
     let userbot_id = {
