@@ -599,15 +599,20 @@ impl Ui {
             .zip(&labels)
             .map(|(r, when)| {
                 let dot = self.emoji.frag(history_dot(r.state));
-                // «Когда» — ссылка на карточку заявки (как в гаранте: строка таблицы нажимается).
-                let when = match nav.bot.as_deref().filter(|_| order_id_ok(&r.order)) {
-                    Some(bot) => Frag::trusted(&format!(
-                        "<a href=\"https://t.me/{}?start=ord_{}\">{}</a>",
-                        crate::html::esc(bot),
-                        r.order,
-                        crate::html::esc(when)
-                    )),
-                    None => Frag::text(when),
+                // «Когда» — кнопка прямо в тексте (как в гаранте: строка таблицы нажимается, а
+                // нажатие приходит боту кнопкой — карточка заявки, без «/start»). В обычном HTML
+                // кнопок в тексте нет — там просто время.
+                let when = if nav.links && order_id_ok(&r.order) {
+                    Frag::dual(
+                        format!(
+                            "<tg-button type=\"callback_data\" style=\"link\" data=\"{}\">{}</tg-button>",
+                            crate::html::esc(&Callback::Order(r.order.clone()).encode()),
+                            crate::html::esc(when)
+                        ),
+                        crate::html::esc(when).into_owned(),
+                    )
+                } else {
+                    Frag::text(when)
                 };
                 let what = Frag::text(match r.direction {
                     Direction::CbToXrCheck => &t.dir_cb_to_xr,
@@ -669,7 +674,7 @@ impl Ui {
         let buttons: Vec<_> = rows
             .iter()
             .zip(&labels)
-            .filter(|(r, _)| order_id_ok(&r.order) && nav.bot.is_none())
+            .filter(|(r, _)| order_id_ok(&r.order) && !nav.links)
             .map(|(r, when)| {
                 let repeated = labels.iter().filter(|l| *l == when).count() > 1;
                 let label = if repeated {

@@ -416,7 +416,7 @@ proptest! {
                     &ui::HistoryPage {
                         page: 0,
                         pages: 1,
-                        bot: Some("exch_bot".into()),
+                        links: true,
                     },
                     None,
                     common::at(18, 0),

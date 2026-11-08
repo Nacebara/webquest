@@ -10,7 +10,7 @@ expression: dump(&card)
 <tr>
 <td>Клиент</td>
 <td align="right">
-<a href="https://t.me/exch_bot?start=a__u__51234567">51234567</a> · 23 обмена</td>
+<tg-button type="callback_data" style="link" data="a:u:51234567">51234567</tg-button> · 23 обмена</td>
 </tr>
 <tr>
 <td>Принято</td>
@@ -52,7 +52,7 @@ ord-…-payout     failed</pre>
 --- html
 <b>Заявка <code>K7M2Q9XR4T</code></b>
 🔎 <b>Ручной разбор</b> · 6 мин · CB → xR · ub-1
-Клиент: <a href="https://t.me/exch_bot?start=a__u__51234567">51234567</a> · 23 обмена
+Клиент: 51234567 · 23 обмена
 Принято: 100.00 CryptoBot
 К выплате: 97.50 xRocket
 Комиссия: 2.50 · 2.5 %

@@ -12,14 +12,14 @@ expression: dump(&queue)
 </tr>
 <tr>
 <td>
-<a href="https://t.me/exch_bot?start=a__o__15">K7M2Q9XR4T</a>
+<tg-button type="callback_data" style="link" data="a:o:15">K7M2Q9XR4T</tg-button>
 </td>
 <td>выплата: нет ответа</td>
 <td align="right">6 мин</td>
 </tr>
 <tr>
 <td>
-<a href="https://t.me/exch_bot?start=a__o__16">7F3A1C9D2B</a>
+<tg-button type="callback_data" style="link" data="a:o:16">7F3A1C9D2B</tg-button>
 </td>
 <td>незнакомый ответ</td>
 <td align="right">2 мин</td>
@@ -29,7 +29,7 @@ expression: dump(&queue)
 <table striped compact>
 <tr>
 <td>
-<a href="https://t.me/exch_bot?start=a__o__17">Q1W2E3R4T5</a>
+<tg-button type="callback_data" style="link" data="a:o:17">Q1W2E3R4T5</tg-button>
 </td>
 <td>счёт CryptoBot 12.00</td>
 <td align="right">4 мин</td>
@@ -38,10 +38,10 @@ expression: dump(&queue)
 <footer>Нажмите номер — откроется карточка: взять, решить, написать клиенту.</footer>
 --- html
 <b>📋 Разбор · 2</b>
-<blockquote><a href="https://t.me/exch_bot?start=a__o__15">K7M2Q9XR4T</a> — выплата: нет ответа · 6 мин
-<a href="https://t.me/exch_bot?start=a__o__16">7F3A1C9D2B</a> — незнакомый ответ · 2 мин</blockquote>
+<blockquote>K7M2Q9XR4T — выплата: нет ответа · 6 мин
+7F3A1C9D2B — незнакомый ответ · 2 мин</blockquote>
 <b>Оплатить вручную · 1</b>
-<blockquote><a href="https://t.me/exch_bot?start=a__o__17">Q1W2E3R4T5</a> — счёт CryptoBot 12.00 · 4 мин</blockquote>
+<blockquote>Q1W2E3R4T5 — счёт CryptoBot 12.00 · 4 мин</blockquote>
 <i>Нажмите номер — откроется карточка: взять, решить, написать клиенту.</i>
 --- keyboard
 [{"text":"🔄 Обновить","callback_data":"a:pg:q:0"}]

@@ -19,9 +19,7 @@ pub async fn send_preview(api: &BotApi, look: &Look, chat: i64) {
         }
     };
     let ui = &ui;
-    // Ссылки в «Истории» — на этого же бота (нажатие откроет карточку, если заявка есть).
-    let bot = api.get_me().await.ok().and_then(|m| m.username);
-    let screens = ui::preview::client(ui, bot.as_deref());
+    let screens = ui::preview::client(ui);
     let total = screens.len();
     for (i, screen) in screens.iter().enumerate() {
         let caption = format!("<b>{}/{total} · {}</b>", i + 1, ui::html::esc(screen.title));

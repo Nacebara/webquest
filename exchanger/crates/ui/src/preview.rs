@@ -168,8 +168,8 @@ fn card() -> OrderCard {
     }
 }
 
-/// Все экраны клиента в порядке макета. `bot` — имя бота для ссылок в «Истории».
-pub fn client(ui: &Ui, bot: Option<&str>) -> Vec<PreviewScreen> {
+/// Все экраны клиента в порядке макета.
+pub fn client(ui: &Ui) -> Vec<PreviewScreen> {
     let t = terms();
     let o = order();
     let b = breakdown();
@@ -267,7 +267,7 @@ pub fn client(ui: &Ui, bot: Option<&str>) -> Vec<PreviewScreen> {
                 &crate::model::HistoryPage {
                     page: 0,
                     pages: 3,
-                    bot: bot.map(str::to_owned),
+                    links: true,
                 },
                 Some(&HistorySummary {
                     completed: 23,

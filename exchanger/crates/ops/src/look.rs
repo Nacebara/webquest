@@ -31,6 +31,41 @@ fn token(s: &str) -> Option<(&'static str, &str, usize)> {
     ok.then_some((kind, name, 1 + 2 + end + 1))
 }
 
+/// Обычный HTML экрана → rich: абзацы через пустую строку, переводы строк — `<br/>`.
+pub(crate) fn auto_rich(html: &str) -> String {
+    html.split("\n\n")
+        .filter(|p| !p.trim().is_empty())
+        .map(|p| format!("<p>{}</p>", p.trim().replace('\n', "<br/>")))
+        .collect()
+}
+
+/// `<tg-button …>текст</tg-button>` → `текст` (для обычного HTML).
+pub(crate) fn strip_text_buttons(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(i) = rest.find("<tg-button") {
+        out.push_str(&rest[..i]);
+        let tail = &rest[i..];
+        let Some(open_end) = tail.find('>') else {
+            out.push_str(tail);
+            return out;
+        };
+        let inner = &tail[open_end + 1..];
+        match inner.find("</tg-button>") {
+            Some(close) => {
+                out.push_str(&inner[..close]);
+                rest = &inner[close + "</tg-button>".len()..];
+            }
+            None => {
+                out.push_str(inner);
+                return out;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Вид пульта: действующий набор эмодзи.
 #[derive(Debug, Clone, Default)]
 pub struct Look {
@@ -119,9 +154,17 @@ impl Look {
 
     /// Экран со значками: текст, карточка и кнопки.
     pub fn screen(&self, s: &Screen) -> Screen {
+        // Экран без карточки, но с нажимаемыми строками — карточкой: кнопки в тексте живут
+        // только в rich-сообщении.
+        let rich = match s.rich.as_deref() {
+            Some(r) => Some(r.to_owned()),
+            None if s.text.contains("<tg-button") => Some(auto_rich(&s.text)),
+            None => None,
+        };
         Screen {
-            text: self.text(&s.text),
-            rich: s.rich.as_deref().map(|r| self.text(r)),
+            // В обычном HTML кнопок в тексте (`<tg-button>`) не бывает — остаётся их текст.
+            text: self.text(&strip_text_buttons(&s.text)),
+            rich: rich.as_deref().map(|r| self.text(r)),
             keyboard: s
                 .keyboard
                 .iter()
@@ -161,6 +204,16 @@ mod tests {
         );
         assert_eq!(p.text("{e:vault} {x} {"), "🏦 {x} {");
         assert_eq!(Look::plain().text("{e:alarm}"), "🚨");
+    }
+
+    #[test]
+    fn text_buttons_become_plain_text_in_html() {
+        assert_eq!(
+            strip_text_buttons(
+                "a <tg-button type=\"callback_data\" style=\"link\" data=\"a:o:1\">K7M2</tg-button> b"
+            ),
+            "a K7M2 b"
+        );
     }
 
     #[test]

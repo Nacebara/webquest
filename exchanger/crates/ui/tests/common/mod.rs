@@ -612,7 +612,7 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
                 &ui::HistoryPage {
                     page: 0,
                     pages: 2,
-                    bot: None,
+                    links: false,
                 },
                 Some(&history_summary()),
                 at(18, 0),
@@ -625,7 +625,7 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
                 &ui::HistoryPage {
                     page: 1,
                     pages: 3,
-                    bot: Some("exch_bot".into()),
+                    links: true,
                 },
                 Some(&history_summary()),
                 at(18, 0),

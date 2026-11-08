@@ -262,10 +262,11 @@ impl Inner {
             completed: summary.completed,
             volume: summary.volume,
         };
+        // Карточкой — строки нажимаются; простой вид — кнопки под сообщением.
         let nav = ui::HistoryPage {
             page,
             pages,
-            bot: self.bot_username().map(str::to_owned),
+            links: self.cfg.rich_messages && !self.prefers_plain(user),
         };
         let screen = self
             .ui()

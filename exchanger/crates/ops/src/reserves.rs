@@ -361,9 +361,13 @@ impl Inner {
         })
     }
 
-    /// «Резервы и сверка».
+    /// «Резервы и сверка»; внизу — возврат в меню.
     pub(crate) async fn reserves(&self) -> Result<Screen, OpsError> {
-        Ok(self.reserves_data().await?.screen(&self.texts))
+        Ok(self
+            .reserves_data()
+            .await?
+            .screen(&self.texts)
+            .row(crate::nav::back(&self.texts, &Cb::Menu)))
     }
 
     /// «Сверить сейчас»: сверка и та же карточка со свежими цифрами; что не прочиталось —
@@ -405,7 +409,9 @@ impl Inner {
             storage::alerts::get(&mut conn, id).await?
         };
         Ok(match a {
-            Some(a) => self.render_alert(&a),
+            Some(a) => self
+                .render_alert(&a)
+                .row(crate::nav::back(&self.texts, &Cb::Reserves)),
             None => self.reserves().await?,
         })
     }
@@ -472,7 +478,7 @@ impl Inner {
         plain.push_str(&t.t("reserves.th_note"));
         s.text = plain;
         s.rich = Some(rich);
-        Ok(s.row(vec![btn(t.t("reserves.b_back"), &Cb::Reserves)]))
+        Ok(s.row(crate::nav::back(t, &Cb::Reserves)))
     }
 
     /// «Прибыль» — вывода прибыли ещё нет: говорим прямо.
@@ -488,6 +494,6 @@ impl Inner {
             t.t("reserves.profit_title"),
             t.t("reserves.profit_soon")
         );
-        Screen::card(rich, plain).row(vec![btn(t.t("reserves.b_back"), &Cb::Reserves)])
+        Screen::card(rich, plain).row(crate::nav::back(t, &Cb::Reserves))
     }
 }

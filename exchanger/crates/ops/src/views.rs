@@ -281,10 +281,6 @@ impl Inner {
                     ("status", &self.availability_text(a)),
                 ],
             ));
-            // Нет имени бота — ссылок не будет: тогда кнопки.
-            if self.bot_username().is_none() {
-                s = s.row(vec![btn(self.dir_name(d), &Cb::Dir(d))]);
-            }
         }
         lines.push(String::new());
         lines.push(t.t("dir.hint"));
@@ -1109,9 +1105,6 @@ impl Inner {
                     ("off", &off),
                 ],
             ));
-            if m.role != Role::Owner && m.active() && self.bot_username().is_none() {
-                s = s.row(vec![btn(esc(&m.display_name), &Cb::Member(m.tg_user_id))]);
-            }
         }
         s.text = lines.join("\n");
         Ok(s.row(vec![btn(t.t("staff.b_add"), &Cb::StaffAdd)])

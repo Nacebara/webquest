@@ -1353,10 +1353,10 @@ async fn plain_view_switches_back_to_the_rich_card_in_the_same_message(pool: PgP
     );
 }
 
-/// «История» по решению владельца 8 ноября: время в строке — ссылка на карточку заявки;
-/// нажали — бот убирает служебное «/start» и присылает карточку.
+/// «История» по решению владельца 8 ноября: время в строке — кнопка в тексте (callback, как в
+/// гаранте); нажали — карточка заявки, без «/start» в чате.
 #[sqlx::test(migrator = "storage::MIGRATOR")]
-async fn history_row_link_opens_the_order_card(pool: PgPool) {
+async fn history_row_opens_the_order_card_by_callback(pool: PgPool) {
     let e = env(pool).await;
     let bot = e.start_bot_with(true);
     let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
@@ -1369,10 +1369,16 @@ async fn history_row_link_opens_the_order_card(pool: PgPool) {
             c.method == "sendRichMessage" && c.contains("История")
         })
         .await;
-    let link = format!("https://t.me/exch_test_bot?start=ord_{public_id}");
-    assert!(history.contains(&link), "время — ссылка: {}", history.body);
-    let mark = e.fake.calls().len();
-    e.fake.client_writes(&format!("/start ord_{public_id}"));
+    let data = format!("order:{public_id}");
+    assert!(
+        history.contains(&format!(
+            "tg-button type=\\\"callback_data\\\" style=\\\"link\\\" data=\\\"{data}\\\""
+        )),
+        "время — кнопка в тексте: {}",
+        history.body
+    );
+    assert!(!history.contains("start=ord_"), "без ссылок со «/start»");
+    e.fake.client_presses(1000, &data);
     e.fake
         .wait_for("card", |c| {
             matches!(c.method.as_str(), "sendRichMessage" | "sendMessage")
@@ -1381,12 +1387,4 @@ async fn history_row_link_opens_the_order_card(pool: PgPool) {
         })
         .await;
     bot.stop().await;
-    assert!(
-        e.fake
-            .calls()
-            .iter()
-            .skip(mark)
-            .any(|c| c.method == "deleteMessage"),
-        "служебное «/start» удалено"
-    );
 }

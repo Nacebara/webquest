@@ -390,19 +390,22 @@ impl Ops {
         self.tg.screen(mark, user, needle).await
     }
 
-    /// Нажать ссылку-строку таблицы с текстом `label`: Telegram пришлёт «/start <метка>».
+    /// Нажать строку таблицы с текстом `label`: кнопка в тексте (`<tg-button
+    /// type="callback_data">`) приходит боту обычной кнопкой под тем же сообщением.
     async fn follow(&self, user: i64, screen: &Call, label: &str, needle: &str) -> Call {
         let body = screen.text().replace("\\\"", "\"");
-        let payload = body
-            .split("?start=")
+        let data = body
+            .split("<tg-button type=\"callback_data\" style=\"link\" data=\"")
             .skip(1)
             .find_map(|rest| {
-                let (p, tail) = rest.split_once('"')?;
-                let text = tail.strip_prefix('>')?.split('<').next()?;
-                text.contains(label).then(|| p.to_owned())
+                let (data, tail) = rest.split_once('"')?;
+                let text = tail.strip_prefix('>')?.split("</tg-button>").next()?;
+                text.contains(label).then(|| data.to_owned())
             })
-            .unwrap_or_else(|| panic!("no link {label:?} in {body}"));
-        self.say(user, &format!("/start {payload}"), needle).await
+            .unwrap_or_else(|| panic!("no row {label:?} in {body}"));
+        let mark = self.tg.mark();
+        self.tg.presses(user, screen.message_id.unwrap(), &data);
+        self.tg.screen(mark, user, needle).await
     }
 
     async fn say(&self, user: i64, text: &str, needle: &str) -> Call {
@@ -1072,8 +1075,8 @@ async fn shortfall_asks_the_owner_and_investigation_keeps_payouts_paused(pool: P
     assert!(row.auto_paused, "выплаты в xRocket на паузе");
 }
 
-/// Решение владельца 8 ноября: номер в таблице нажимается — карточка открывается в том же
-/// окне пульта, служебное «/start» удаляется; длинный список — страницами «1 / 2»; внизу
+/// Решение владельца 8 ноября: номер в таблице — кнопка в тексте (callback, как в гаранте),
+/// карточка открывается в том же сообщении; длинный список — страницами «1 / 2»; внизу
 /// карточки — «‹ Заявки» обратно на ту же страницу.
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn table_rows_open_cards_in_the_same_window_and_lists_have_pages(pool: PgPool) {
@@ -1105,14 +1108,14 @@ async fn table_rows_open_cards_in_the_same_window_and_lists_have_pages(pool: PgP
     assert_eq!(card.method, "editMessageText");
     assert_eq!(
         card.message_id, page2.message_id,
-        "карточка — в том же окне"
+        "карточка — в том же сообщении"
     );
     assert!(
         o.tg.calls()
             .iter()
             .skip(mark)
-            .any(|c| c.method == "deleteMessage"),
-        "служебное «/start» удалено"
+            .all(|c| c.method != "sendMessage" && c.method != "sendRichMessage"),
+        "никаких новых сообщений и «/start» — нажатие приходит кнопкой"
     );
     let back = o.press(OWNER, &card, "Заявки", "2 / 2").await;
     assert!(back.text().contains(&oldest), "назад — на ту же страницу");

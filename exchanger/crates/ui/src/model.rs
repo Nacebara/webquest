@@ -434,11 +434,12 @@ pub enum InvestProblem {
     Internal,
 }
 
-/// Страница «Истории»: номер (с нуля), сколько всего и имя бота для ссылок «Когда» → карточка.
+/// Страница «Истории»: номер (с нуля), сколько всего и нажимаемые ли строки.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HistoryPage {
     pub page: u32,
     pub pages: u32,
-    /// Имя бота: «Когда» в строке — ссылка `t.me/<бот>?start=ord_<номер>`. Нет — кнопки.
-    pub bot: Option<String>,
+    /// «Когда» в строке — кнопка в тексте (rich `<tg-button type="callback_data">`, нажатие —
+    /// карточка заявки). `false` (простой вид) — кнопки под сообщением.
+    pub links: bool,
 }
