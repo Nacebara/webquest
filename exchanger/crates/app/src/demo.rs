@@ -175,6 +175,8 @@ pub async fn copy_emoji(main_url: &str, demo: &PgPool) -> anyhow::Result<usize> 
             copied += 1;
         }
     }
+    // Соединение вернуть в пул до закрытия: `close` ждёт все соединения.
+    drop(from);
     main.close().await;
     Ok(copied)
 }
