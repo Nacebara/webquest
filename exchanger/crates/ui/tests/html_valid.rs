@@ -17,7 +17,7 @@ const PLAIN_TAGS: &[(&str, &[&str])] = &[
     ("i", &[]),
     ("u", &[]),
     ("s", &[]),
-    ("code", &[]),
+    ("code", &["class"]),
     ("pre", &[]),
     ("tg-spoiler", &[]),
     ("a", &["href"]),
@@ -112,6 +112,9 @@ fn parse_attrs(tag: &str, mut s: &str, allowed: &[&str]) -> Result<(), String> {
                     || v.starts_with("http://")
                     || v.starts_with("tg://") => {}
             (_, "align", Some("left" | "right" | "center")) => {}
+            // Шапка блока `<pre>`: «Пример расчёта», одним словом (пробелы — неразрывные).
+            ("code", "class", Some(v))
+                if v.starts_with("language-") && !v.contains(' ') && v.len() > 9 => {}
             ("tg-button", "type", Some("callback_data")) => {}
             ("tg-button", "style", Some("primary" | "success" | "danger" | "link")) => {}
             ("tg-button", "data", Some(v)) if Callback::parse(v).is_some() => {}

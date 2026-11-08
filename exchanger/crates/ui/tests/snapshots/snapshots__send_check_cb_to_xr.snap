@@ -5,16 +5,16 @@ expression: "both(p, q)"
 ### plain
 --- html
 🔵 <b>CryptoBot</b> → 🚀 <b>xRocket</b> · 2–500 USDT
-<pre>Ваш чек CryptoBot   100.00
+<pre><code class="language-Пример расчёта">Ваш чек CryptoBot   100.00
 Комиссия 2.5 %        2.50
-──────────────────────────
-Чек xRocket          97.50</pre>
+——————————————————————————
+Чек xRocket          97.50</code></pre>
 <i>Скопируйте, чтобы создать чек</i> ⬇️
 --- rich
-<p>🔵 <b>CryptoBot</b> → 🚀 <b>xRocket</b> · 2–500 USDT</p><pre>Ваш чек CryptoBot   100.00
+<p>🔵 <b>CryptoBot</b> → 🚀 <b>xRocket</b> · 2–500 USDT</p><pre><code class="language-Пример расчёта">Ваш чек CryptoBot   100.00
 Комиссия 2.5 %        2.50
-──────────────────────────
-Чек xRocket          97.50</pre>
+——————————————————————————
+Чек xRocket          97.50</code></pre>
 <p><i>Скопируйте, чтобы создать чек</i> ⬇️</p>
 --- keyboard: inline
 [{"copy_text":{"text":"@send 100usdt"},"style":"primary","text":"@send 100usdt"}]
@@ -23,16 +23,16 @@ expression: "both(p, q)"
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> → <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> · 2–500 USDT
-<pre>Ваш чек CryptoBot   100.00
+<pre><code class="language-Пример расчёта">Ваш чек CryptoBot   100.00
 Комиссия 2.5 %        2.50
-──────────────────────────
-Чек xRocket          97.50</pre>
+——————————————————————————
+Чек xRocket          97.50</code></pre>
 <i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji>
 --- rich
-<p><tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> → <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> · 2–500 USDT</p><pre>Ваш чек CryptoBot   100.00
+<p><tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> → <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> · 2–500 USDT</p><pre><code class="language-Пример расчёта">Ваш чек CryptoBot   100.00
 Комиссия 2.5 %        2.50
-──────────────────────────
-Чек xRocket          97.50</pre>
+——————————————————————————
+Чек xRocket          97.50</code></pre>
 <p><i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji></p>
 --- keyboard: inline
 [{"copy_text":{"text":"@send 100usdt"},"style":"primary","text":"@send 100usdt"}]

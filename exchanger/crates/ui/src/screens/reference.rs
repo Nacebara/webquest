@@ -427,6 +427,7 @@ impl Ui {
             let r = &self.texts.receipt;
             let pct = fmt::percent(pct);
             doc.block(&self.receipt(
+                Some(&r.example),
                 &[
                     (
                         fill_text(&r.check, &[("wallet", self.wallet_name(src))]),

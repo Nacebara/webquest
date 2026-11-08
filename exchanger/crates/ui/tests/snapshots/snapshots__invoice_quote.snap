@@ -8,7 +8,7 @@ expression: "both(p, q)"
 <i>Оплата заказа #42 &lt;VIP&gt; &amp; &quot;скидка&quot;</i>
 <pre>Счёт CryptoBot     10.00
 Комиссия 3 %        0.30
-────────────────────────
+————————————————————————
 Чек xRocket        10.30</pre>
 <i>Скопируйте, чтобы создать чек</i> ⬇️
 <i>⏳ Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> · <tg-time unix="1791377340" format="r">через 15 минут</tg-time></i>
@@ -16,7 +16,7 @@ expression: "both(p, q)"
 <p>🧾 <b>Счёт CryptoBot</b> → 🚀 <b>чек xRocket</b></p>
 <p><i>Оплата заказа #42 &lt;VIP&gt; &amp; &quot;скидка&quot;</i></p><pre>Счёт CryptoBot     10.00
 Комиссия 3 %        0.30
-────────────────────────
+————————————————————————
 Чек xRocket        10.30</pre>
 <p><i>Скопируйте, чтобы создать чек</i> ⬇️</p>
 <footer>⏳ Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> · <tg-time unix="1791377340" format="r">через 15 минут</tg-time></footer>
@@ -30,7 +30,7 @@ expression: "both(p, q)"
 <i>Оплата заказа #42 &lt;VIP&gt; &amp; &quot;скидка&quot;</i>
 <pre>Счёт CryptoBot     10.00
 Комиссия 3 %        0.30
-────────────────────────
+————————————————————————
 Чек xRocket        10.30</pre>
 <i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji>
 <i><tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> · <tg-time unix="1791377340" format="r">через 15 минут</tg-time></i>
@@ -38,7 +38,7 @@ expression: "both(p, q)"
 <p><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> <b>Счёт CryptoBot</b> → <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>чек xRocket</b></p>
 <p><i>Оплата заказа #42 &lt;VIP&gt; &amp; &quot;скидка&quot;</i></p><pre>Счёт CryptoBot     10.00
 Комиссия 3 %        0.30
-────────────────────────
+————————————————————————
 Чек xRocket        10.30</pre>
 <p><i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji></p>
 <footer><tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> · <tg-time unix="1791377340" format="r">через 15 минут</tg-time></footer>

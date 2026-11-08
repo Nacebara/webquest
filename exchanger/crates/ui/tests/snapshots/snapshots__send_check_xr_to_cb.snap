@@ -5,16 +5,16 @@ expression: "both(p, q)"
 ### plain
 --- html
 🚀 <b>xRocket</b> → 🔵 <b>CryptoBot</b> · 2–300 USDT
-<pre>Ваш чек xRocket   100.00
+<pre><code class="language-Пример расчёта">Ваш чек xRocket   100.00
 Комиссия 1.5 %      1.50
-────────────────────────
-Чек CryptoBot      98.50</pre>
+————————————————————————
+Чек CryptoBot      98.50</code></pre>
 <i>Скопируйте, чтобы создать чек</i> ⬇️
 --- rich
-<p>🚀 <b>xRocket</b> → 🔵 <b>CryptoBot</b> · 2–300 USDT</p><pre>Ваш чек xRocket   100.00
+<p>🚀 <b>xRocket</b> → 🔵 <b>CryptoBot</b> · 2–300 USDT</p><pre><code class="language-Пример расчёта">Ваш чек xRocket   100.00
 Комиссия 1.5 %      1.50
-────────────────────────
-Чек CryptoBot      98.50</pre>
+————————————————————————
+Чек CryptoBot      98.50</code></pre>
 <p><i>Скопируйте, чтобы создать чек</i> ⬇️</p>
 --- keyboard: inline
 [{"copy_text":{"text":"@xrocket 100"},"style":"primary","text":"@xrocket 100"}]
@@ -23,16 +23,16 @@ expression: "both(p, q)"
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> → <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> · 2–300 USDT
-<pre>Ваш чек xRocket   100.00
+<pre><code class="language-Пример расчёта">Ваш чек xRocket   100.00
 Комиссия 1.5 %      1.50
-────────────────────────
-Чек CryptoBot      98.50</pre>
+————————————————————————
+Чек CryptoBot      98.50</code></pre>
 <i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji>
 --- rich
-<p><tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> → <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> · 2–300 USDT</p><pre>Ваш чек xRocket   100.00
+<p><tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> → <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> · 2–300 USDT</p><pre><code class="language-Пример расчёта">Ваш чек xRocket   100.00
 Комиссия 1.5 %      1.50
-────────────────────────
-Чек CryptoBot      98.50</pre>
+————————————————————————
+Чек CryptoBot      98.50</code></pre>
 <p><i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji></p>
 --- keyboard: inline
 [{"copy_text":{"text":"@xrocket 100"},"style":"primary","text":"@xrocket 100"}]

@@ -10,7 +10,7 @@ expression: "both(p, q)"
 🧾 <b>Жду чек xRocket</b> по счёту CryptoBot
 <pre>Счёт CryptoBot     10.00
 Комиссия 3 %        0.30
-────────────────────────
+————————————————————————
 Чек xRocket        10.30</pre>
 <i>Скопируйте, чтобы создать чек</i> ⬇️
 <i>⏳ Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> · <tg-time unix="1791377340" format="r">через 15 минут</tg-time></i>
@@ -26,7 +26,7 @@ expression: "both(p, q)"
 <tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> <b>Жду чек xRocket</b> по счёту CryptoBot
 <pre>Счёт CryptoBot     10.00
 Комиссия 3 %        0.30
-────────────────────────
+————————————————————————
 Чек xRocket        10.30</pre>
 <i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji>
 <i><tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time> · <tg-time unix="1791377340" format="r">через 15 минут</tg-time></i>

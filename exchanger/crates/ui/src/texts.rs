@@ -266,6 +266,8 @@ pub struct SendCheckTexts {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReceiptTexts {
+    /// «Пример расчёта» — шапка квитанции в «Пришлите чек»: суммы там — пример.
+    pub example: String,
     /// «Ваш чек CryptoBot».
     pub check: String,
     /// «Комиссия 2.5 %».

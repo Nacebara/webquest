@@ -286,7 +286,15 @@ impl Ui {
 
     /// «Квитанция» (выбор владельца 8 ноября 2026): строки «подпись · сумма» столбиком
     /// моноширинным шрифтом, итог под чертой. `<pre>` есть и в rich, и в обычном HTML.
-    fn receipt(&self, rows: &[(String, Decimal)], total: (&str, Decimal)) -> Frag {
+    /// `label` — подпись в шапке блока («Пример расчёта»): Telegram показывает её там, где у
+    /// кода пишется язык. Одно слово на класс — пробелы заменяются неразрывными (проверено
+    /// живьём 8 ноября 2026: так подпись приходит целиком).
+    fn receipt(
+        &self,
+        label: Option<&str>,
+        rows: &[(String, Decimal)],
+        total: (&str, Decimal),
+    ) -> Frag {
         let num = |v: Decimal| fmt::amount(v, Asset::Usdt);
         let all: Vec<(String, String)> = rows
             .iter()
@@ -307,11 +315,22 @@ impl Ui {
             .iter()
             .map(|(l, v)| line(l, v))
             .collect();
-        out.push("─".repeat(width));
+        // Черта — тире «—»: ровно в клетку в любом моноширинном шрифте и посередине строки.
+        // «─» шрифт кода Telegram на Android (Roboto Mono) не знает: его рисует другой шрифт,
+        // на 18 % шире, и черта вылезала за суммы (скриншот владельца 8 ноября 2026).
+        out.push("—".repeat(width));
         if let Some((l, v)) = all.last() {
             out.push(line(l, v));
         }
-        let html = format!("<pre>{}</pre>", crate::html::esc(&out.join("\n")));
+        let text = out.join("\n");
+        let body = crate::html::esc(&text);
+        let html = match label {
+            Some(label) => format!(
+                "<pre><code class=\"language-{}\">{body}</code></pre>",
+                crate::html::esc(&label.replace([' ', '"'], "\u{a0}"))
+            ),
+            None => format!("<pre>{body}</pre>"),
+        };
         Frag::dual(html.clone(), html)
     }
 

@@ -170,6 +170,7 @@ paused = "{e_pause} <i>{direction} на паузе: {why}</i>"
 head = "{src_icon} <b>{src}</b> → {dst_icon} <b>{dst}</b> · {min}–{max}\u00A0USDT"
 
 [receipt]
+example = "Пример расчёта"
 check = "Ваш чек {wallet}"
 fee = "Комиссия {pct}"
 payout = "Чек {wallet}"

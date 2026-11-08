@@ -28,6 +28,8 @@ const C = {
   coin: '#0E9E7B',
   coinRim: '#0A7A60',
   grey: '#8A98A8',
+  // Стрелка «Вниз» владельца — его цвет.
+  arrow: '#3F82F0',
 };
 const W = '#FFFFFF';
 
@@ -130,6 +132,11 @@ const glyph = (body, opts = {}) => {
 };
 
 const tile = (id, color, body, opts = {}) => `${tileBg(id, color)}${opts.under || ''}${glyph(body, opts)}${opts.over || ''}`;
+
+// Стрелка «Вниз» по картинке владельца (8 ноября 2026): там линия 77 px, ствол 636 px от
+// верхнего конца до острия, «крылья» по 268 px под 45°, концы и угол круглые. Здесь — тот же
+// рисунок высотой 15,6 из 24 (как наши моно-значки), по центру.
+const DOWN = { w: 1.69, d: 'M12 5.04V18.96M6.14 13.09L12 18.96L17.86 13.09' };
 
 // Четырёхлучевая искра.
 const SPARK = (cx, cy, r) => {
@@ -294,10 +301,12 @@ const COLOR = {
   err: (t) => tile('er', C.coral, `<path d="${G.cross1}"/><path d="${G.cross2}"/>`, { transform: A.shake(t, 1.1), sw: 2.1 }),
   // Внимание: восклицательный знак коротко подпрыгивает.
   warn: (t) => tile('wn', C.amber, `<path d="${G.exclBar}"/>${G.exclDot}`, { transform: A.nudge(t, 0, -1.4, 0.06, 0.3), sw: 2.1 }),
-  // Вниз: стрелка дважды мягко «кивает» вниз — на кнопку под сообщением.
+  // Вниз — стрелка владельца (8 ноября 2026), точь-в-точь по его картинке: без плитки, голубая
+  // линия со скруглёнными концами, «крылья» под 45°. Дважды мягко «кивает» вниз — на кнопку
+  // под сообщением.
   down: (t) => {
     const dy = t == null ? 0 : 1.7 * bump(t, 0.06, 0.28) + 0.9 * bump(t, 0.28, 0.46);
-    return tile('dw', C.blue, '<path d="M12 6.4v10.4M7.7 12.5l4.3 4.3 4.3-4.3"/>', { transform: move(0, dy), sw: 2.1 });
+    return `<g fill="none" stroke="${C.arrow}" stroke-width="${DOWN.w}" stroke-linecap="round" stroke-linejoin="round">${grp(move(0, dy), `<path d="${DOWN.d}"/>`)}</g>`;
   },
   // Возврат: стрелка дважды мягко «тянется» назад.
   refund: (t) => {
@@ -515,8 +524,8 @@ const MONO = {
   close: (t) => grp(A.turn(t, 90), '<path d="M7.4 7.4l9.2 9.2M16.6 7.4l-9.2 9.2"/>'),
   back: (t) => grp(A.nudge(t, -1.6, 0), '<path d="M19 12H5.6M10.6 7l-5 5 5 5"/>'),
   down: (t) => {
-    const dy = t == null ? 0 : 1.8 * bump(t, 0.06, 0.28) + 1.0 * bump(t, 0.28, 0.46);
-    return grp(move(0, dy), '<path d="M12 4.6v13.4M6.9 12.9l5.1 5.1 5.1-5.1"/>');
+    const dy = t == null ? 0 : 1.7 * bump(t, 0.06, 0.28) + 0.9 * bump(t, 0.28, 0.46);
+    return grp(move(0, dy), `<path d="${DOWN.d}"/>`);
   },
   home: (t) => grp(A.pop(t, 0.08, 12, 19), B.home),
   refresh: (t) => grp(A.spin(t, 360), B.refresh),

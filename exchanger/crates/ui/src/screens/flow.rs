@@ -134,6 +134,7 @@ impl Ui {
         let invoice = q.invoice_amount.amount();
         let to_pay = q.to_pay.amount();
         self.receipt(
+            None,
             &[
                 (
                     super::fill_text(&r.invoice, &[("wallet", self.wallet_name(d.target()))]),
@@ -271,6 +272,7 @@ impl Ui {
             &[("rest", &self.money(rest))],
         ));
         doc.block(&self.receipt(
+            None,
             &[
                 (r.to_pay.clone(), q.to_pay.amount()),
                 (r.got.clone(), got.amount()),
