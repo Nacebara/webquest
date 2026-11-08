@@ -16,7 +16,7 @@ expression: "both(p, q)"
 <tr><td>Комиссия</td><td align="right">2.50 · 2.5 %</td></tr>
 </table>
 --- keyboard: inline
-[{"callback_data":"support:A1B2C3D4E5","text":"💬 Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 A1B2C3D4E5"}]
+[{"callback_data":"support:A1B2C3D4E5","text":"💬 Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"A1B2C3D4E5"}]
 
 ### premium
 --- html
@@ -32,4 +32,4 @@ expression: "both(p, q)"
 <tr><td>Комиссия</td><td align="right">2.50 · 2.5 %</td></tr>
 </table>
 --- keyboard: inline
-[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"A1B2C3D4E5"}]
+[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"A1B2C3D4E5"}]

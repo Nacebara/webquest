@@ -7,7 +7,7 @@ expression: "both(p, q)"
 ⚠️ <b>Не хватает <code>2.30</code> USDT</b>
 Пришлите ещё чек на <code>2.30</code> или верну <code>8.00</code>.
 --- keyboard: inline
-[{"copy_text":{"text":"2.30"},"style":"primary","text":"📋 2.30"}]
+[{"copy_text":{"text":"2.30"},"style":"primary","text":"2.30"}]
 [{"callback_data":"refund:A1B2C3D4E5","text":"↩️ Вернуть 8.00"}]
 
 ### premium
@@ -15,5 +15,5 @@ expression: "both(p, q)"
 <tg-emoji emoji-id="5368000000000000003">⚠️</tg-emoji> <b>Не хватает <code>2.30</code> USDT</b>
 Пришлите ещё чек на <code>2.30</code> или верну <code>8.00</code>.
 --- keyboard: inline
-[{"copy_text":{"text":"2.30"},"icon_custom_emoji_id":"5368000000000000013","style":"primary","text":"2.30"}]
+[{"copy_text":{"text":"2.30"},"style":"primary","text":"2.30"}]
 [{"callback_data":"refund:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000005","text":"Вернуть 8.00"}]

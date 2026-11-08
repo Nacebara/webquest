@@ -282,7 +282,7 @@ impl Inner {
             }
             MenuAction::PayInvoice => {
                 let terms = self.terms_for(user).await?;
-                self.reply(chat, &self.ui().invoice_prompt(&terms.terms))
+                self.reply_doc(chat, user, &self.ui().invoice_prompt(&terms.terms))
                     .await
             }
             MenuAction::Rates => {
@@ -305,7 +305,8 @@ impl Inner {
             }
             MenuAction::Help => {
                 let terms = self.terms_for(user).await?;
-                self.reply(chat, &self.ui().help(&terms.terms)).await
+                self.reply_doc(chat, user, &self.ui().help(&terms.terms))
+                    .await
             }
         }
     }
@@ -326,7 +327,8 @@ impl Inner {
             Command::History => self.history(chat, user, 0).await,
             Command::Help => {
                 let terms = self.terms_for(user).await?;
-                self.reply(chat, &self.ui().help(&terms.terms)).await
+                self.reply_doc(chat, user, &self.ui().help(&terms.terms))
+                    .await
             }
             Command::Privacy => self.reply_doc(chat, user, &self.ui().privacy()).await,
         }

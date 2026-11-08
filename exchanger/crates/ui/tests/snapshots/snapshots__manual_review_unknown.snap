@@ -8,7 +8,7 @@ expression: "both(p, q)"
 Кошелёк не ответил вовремя — сверяю, дошёл ли чек. Если деньги у меня, они в безопасности; если нет — остались в чеке. Обычно до 15 минут.
 <i>Ничего делать не нужно — напишу сюда.</i>
 --- keyboard: inline
-[{"callback_data":"support:A1B2C3D4E5","text":"💬 Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 A1B2C3D4E5"}]
+[{"callback_data":"support:A1B2C3D4E5","text":"💬 Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"A1B2C3D4E5"}]
 
 ### premium
 --- html
@@ -16,4 +16,4 @@ expression: "both(p, q)"
 Кошелёк не ответил вовремя — сверяю, дошёл ли чек. Если деньги у меня, они в безопасности; если нет — остались в чеке. Обычно до 15 минут.
 <i>Ничего делать не нужно — напишу сюда.</i>
 --- keyboard: inline
-[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"A1B2C3D4E5"}]
+[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"A1B2C3D4E5"}]

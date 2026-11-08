@@ -153,14 +153,14 @@ expression: errors.trim_end()
 ❌ <b>Мульти-чек не подойдёт</b>
 Деньги в чеке, я его не открывал. Пришлите обычный: <code>@xrocket 100</code>
 --- keyboard: inline
-[{"copy_text":{"text":"@xrocket 100"},"text":"📋 @xrocket 100"}]
+[{"copy_text":{"text":"@xrocket 100"},"text":"@xrocket 100"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Мульти-чек не подойдёт</b>
 Деньги в чеке, я его не открывал. Пришлите обычный: <code>@xrocket 100</code>
 --- keyboard: inline
-[{"copy_text":{"text":"@xrocket 100"},"icon_custom_emoji_id":"5368000000000000013","text":"@xrocket 100"}]
+[{"copy_text":{"text":"@xrocket 100"},"text":"@xrocket 100"}]
 
 ## below_minimum
 ### plain
@@ -425,14 +425,14 @@ expression: errors.trim_end()
 ⏳ <b>Кошелёк xRocket отвечает с задержкой</b>
 Ваши <code>97.50</code> USDT зарезервированы — чек придёт сюда сам.
 --- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+[{"copy_text":{"text":"A1B2C3D4E5"},"text":"Номер заявки"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> <b>Кошелёк xRocket отвечает с задержкой</b>
 Ваши <code>97.50</code> USDT зарезервированы — чек придёт сюда сам.
 --- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+[{"copy_text":{"text":"A1B2C3D4E5"},"text":"Номер заявки"}]
 
 ## unsupported_asset
 ### plain

@@ -16,7 +16,7 @@ expression: "both(p, q)"
 
 Чек — в USDT, для одного человека, без капчи и подписок.
 --- keyboard: inline
-[{"copy_text":{"text":"@xrocket 100"},"text":"📋 @xrocket 100"}]
+[{"copy_text":{"text":"@xrocket 100"},"text":"@xrocket 100"}]
 [{"text":"🚀 Открыть xRocket","url":"https://t.me/xrocket"}]
 [{"callback_data":"dir:xr_to_cb_check","text":"◀️ Назад"}]
 
@@ -34,6 +34,6 @@ expression: "both(p, q)"
 
 Чек — в USDT, для одного человека, без капчи и подписок.
 --- keyboard: inline
-[{"copy_text":{"text":"@xrocket 100"},"icon_custom_emoji_id":"5368000000000000013","text":"@xrocket 100"}]
+[{"copy_text":{"text":"@xrocket 100"},"text":"@xrocket 100"}]
 [{"icon_custom_emoji_id":"5368000000000000012","text":"Открыть xRocket","url":"https://t.me/xrocket"}]
 [{"callback_data":"dir:xr_to_cb_check","icon_custom_emoji_id":"5368000000000000032","text":"Назад"}]

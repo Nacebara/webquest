@@ -6,12 +6,12 @@ expression: "both(p, q)"
 --- html
 ✅ Ваш чек xRocket на <code>50.00 USDT</code> готов. Нажмите «Забрать чек».
 --- keyboard: inline
-[{"style":"success","text":"📥 Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"text":"📋 Скопировать ссылку"}]
+[{"style":"success","text":"📥 Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"text":"Скопировать ссылку"}]
 [{"callback_data":"inv","text":"💼 Инвестиции"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000001">✅</tg-emoji> Ваш чек xRocket на <code>50.00 USDT</code> готов. Нажмите «Забрать чек».
 --- keyboard: inline
-[{"icon_custom_emoji_id":"5368000000000000023","style":"success","text":"Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"icon_custom_emoji_id":"5368000000000000013","text":"Скопировать ссылку"}]
+[{"icon_custom_emoji_id":"5368000000000000023","style":"success","text":"Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"text":"Скопировать ссылку"}]
 [{"callback_data":"inv","icon_custom_emoji_id":"5368000000000000020","text":"Инвестиции"}]

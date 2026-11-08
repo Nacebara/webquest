@@ -7,7 +7,7 @@ expression: "both(p, q)"
 <b>Пришлите чек xRocket</b> · 2–300 USDT
 Наберите здесь <code>@xrocket 100</code> и выберите чек.
 --- keyboard: inline
-[{"copy_text":{"text":"@xrocket 100"},"text":"📋 @xrocket 100"}]
+[{"copy_text":{"text":"@xrocket 100"},"text":"@xrocket 100"}]
 [{"callback_data":"howto:xr_to_cb_check","text":"❓ Инструкция"},{"callback_data":"cancel","text":"✖️ Отмена"}]
 
 ### premium
@@ -15,5 +15,5 @@ expression: "both(p, q)"
 <b>Пришлите чек xRocket</b> · 2–300 USDT
 Наберите здесь <code>@xrocket 100</code> и выберите чек.
 --- keyboard: inline
-[{"copy_text":{"text":"@xrocket 100"},"icon_custom_emoji_id":"5368000000000000013","text":"@xrocket 100"}]
+[{"copy_text":{"text":"@xrocket 100"},"text":"@xrocket 100"}]
 [{"callback_data":"howto:xr_to_cb_check","icon_custom_emoji_id":"5368000000000000026","text":"Инструкция"},{"callback_data":"cancel","icon_custom_emoji_id":"5368000000000000025","text":"Отмена"}]

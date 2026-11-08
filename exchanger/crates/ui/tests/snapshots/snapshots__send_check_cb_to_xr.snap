@@ -7,7 +7,7 @@ expression: "both(p, q)"
 <b>Пришлите чек CryptoBot</b> · 2–500 USDT
 Наберите здесь <code>@send 100usdt</code> и выберите чек.
 --- keyboard: inline
-[{"copy_text":{"text":"@send 100usdt"},"text":"📋 @send 100usdt"}]
+[{"copy_text":{"text":"@send 100usdt"},"text":"@send 100usdt"}]
 [{"callback_data":"howto:cb_to_xr_check","text":"❓ Инструкция"},{"callback_data":"cancel","text":"✖️ Отмена"}]
 
 ### premium
@@ -15,5 +15,5 @@ expression: "both(p, q)"
 <b>Пришлите чек CryptoBot</b> · 2–500 USDT
 Наберите здесь <code>@send 100usdt</code> и выберите чек.
 --- keyboard: inline
-[{"copy_text":{"text":"@send 100usdt"},"icon_custom_emoji_id":"5368000000000000013","text":"@send 100usdt"}]
+[{"copy_text":{"text":"@send 100usdt"},"text":"@send 100usdt"}]
 [{"callback_data":"howto:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000026","text":"Инструкция"},{"callback_data":"cancel","icon_custom_emoji_id":"5368000000000000025","text":"Отмена"}]

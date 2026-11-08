@@ -7,13 +7,13 @@ expression: "both(p, q)"
 🧾 <b>Жду чек xRocket</b> на <code>10.30</code> USDT
 <i>Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>.</i>
 --- keyboard: inline
-[{"copy_text":{"text":"10.30"},"style":"primary","text":"📋 10.30"}]
-[{"copy_text":{"text":"@xrocket 10.3"},"text":"📋 @xrocket 10.3"},{"callback_data":"cancel:A1B2C3D4E5","text":"✖️ Отмена"}]
+[{"copy_text":{"text":"10.30"},"style":"primary","text":"10.30"}]
+[{"copy_text":{"text":"@xrocket 10.3"},"text":"@xrocket 10.3"},{"callback_data":"cancel:A1B2C3D4E5","text":"✖️ Отмена"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> <b>Жду чек xRocket</b> на <code>10.30</code> USDT
 <i>Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>.</i>
 --- keyboard: inline
-[{"copy_text":{"text":"10.30"},"icon_custom_emoji_id":"5368000000000000013","style":"primary","text":"10.30"}]
-[{"copy_text":{"text":"@xrocket 10.3"},"icon_custom_emoji_id":"5368000000000000013","text":"@xrocket 10.3"},{"callback_data":"cancel:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000025","text":"Отмена"}]
+[{"copy_text":{"text":"10.30"},"style":"primary","text":"10.30"}]
+[{"copy_text":{"text":"@xrocket 10.3"},"text":"@xrocket 10.3"},{"callback_data":"cancel:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000025","text":"Отмена"}]

@@ -11,6 +11,7 @@
 //! | `<table>`                     | готовая фраза на строку, при желании в цитате |
 //! | `<details><summary>`          | `<blockquote expandable>` с жирной подписью   |
 //! | `<footer>`                    | курсив                                        |
+//! | `<tg-button-row>`             | нет: то же действие есть в меню бота          |
 //!
 //! Вложенных цитат Telegram не допускает: внутри `details` цитата становится курсивом
 //! (флаг `quoted`, как у lovec). Перед `</blockquote>` не остаётся пустой строки.
@@ -174,6 +175,17 @@ impl Doc {
                 self.plain.push('\n');
             }
         }
+    }
+
+    /// Синяя кнопка внутри текста (Bot API 10.3 `<tg-button>`) с `callback_data`. Только в
+    /// rich: в обычном HTML кнопок в тексте нет — то же действие есть в меню бота.
+    pub fn button(&mut self, label: &str, data: &str) {
+        self.rich
+            .push_str("<tg-button-row><tg-button type=\"callback_data\" style=\"primary\" data=\"");
+        self.rich.push_str(&crate::html::esc(data));
+        self.rich.push_str("\">");
+        self.rich.push_str(&crate::html::esc(label));
+        self.rich.push_str("</tg-button></tg-button-row>");
     }
 
     pub fn footer(&mut self, text: &Frag) {

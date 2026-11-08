@@ -43,6 +43,8 @@ const RICH_EXTRA_TAGS: &[(&str, &[&str])] = &[
     ("td", &["align", "colspan"]),
     ("br", &[]),
     ("hr", &[]),
+    ("tg-button-row", &[]),
+    ("tg-button", &["type", "style", "data"]),
 ];
 
 const VOID_TAGS: &[&str] = &["br", "hr"];
@@ -109,6 +111,9 @@ fn parse_attrs(tag: &str, mut s: &str, allowed: &[&str]) -> Result<(), String> {
                     || v.starts_with("http://")
                     || v.starts_with("tg://") => {}
             (_, "align", Some("left" | "right" | "center")) => {}
+            ("tg-button", "type", Some("callback_data")) => {}
+            ("tg-button", "style", Some("primary" | "success" | "danger" | "link")) => {}
+            ("tg-button", "data", Some(v)) if Callback::parse(v).is_some() => {}
             (_, "expandable" | "open" | "bordered" | "striped" | "compact", None) => {}
             _ => {
                 return Err(format!(
@@ -277,6 +282,9 @@ fn money_flow_is_plain_html_reference_screens_have_fallback() {
         "terms_with_offers",
         "welcome_with_offers",
         "invest_howto",
+        // Выбор владельца 8 ноября 2026: карточки.
+        "invoice_prompt",
+        "help",
     ];
     for (name, screen) in common::gallery(&ui) {
         let expect_rich = rich

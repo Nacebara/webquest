@@ -73,10 +73,12 @@ pub enum Emoji {
     More,
     /// Кнопка «Красивый вид» — вернуть карточку после «Простого вида».
     RichView,
+    /// «Правила» в «Помощи» — щит.
+    Rules,
 }
 
 impl Emoji {
-    pub const ALL: [Emoji; 36] = [
+    pub const ALL: [Emoji; 37] = [
         Emoji::Wait,
         Emoji::Ok,
         Emoji::Err,
@@ -113,6 +115,7 @@ impl Emoji {
         Emoji::Order,
         Emoji::More,
         Emoji::RichView,
+        Emoji::Rules,
     ];
 
     pub const fn key(self) -> &'static str {
@@ -153,6 +156,7 @@ impl Emoji {
             Emoji::Order => "order",
             Emoji::More => "more",
             Emoji::RichView => "rich_view",
+            Emoji::Rules => "rules",
         }
     }
 
@@ -195,6 +199,7 @@ impl Emoji {
             Emoji::Order => "🔖",
             Emoji::More => "🔽",
             Emoji::RichView => "✨",
+            Emoji::Rules => "🛡",
         }
     }
 
@@ -241,6 +246,7 @@ impl Emoji {
             Emoji::Order => "mono/order",
             Emoji::More => "mono/refresh",
             Emoji::RichView => "mono/sparkle",
+            Emoji::Rules => "color/shield",
         }
     }
 
@@ -283,6 +289,7 @@ impl Emoji {
             Emoji::Order => "mono/order",
             Emoji::More => "mono/refresh",
             Emoji::RichView => "mono/sparkle",
+            Emoji::Rules => "mono/shield",
         }
     }
 }

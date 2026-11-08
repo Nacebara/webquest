@@ -292,11 +292,19 @@ impl HowtoTexts {
 #[serde(deny_unknown_fields)]
 pub struct InvoicePromptTexts {
     pub title: String,
+    pub col_invoice: String,
+    pub col_pay: String,
+    pub col_fee: String,
+    pub col_usdt: String,
+    /// Строка таблицы в простом виде.
+    pub row: String,
+    /// То же, когда пределы сумм у счетов разные (колонка «USDT»).
+    pub row_range: String,
     pub body: String,
-    pub line: String,
-    pub line_paused: String,
-    pub examples: String,
-    pub rules: String,
+    /// Подвал с пределами сумм — когда они одинаковые у всех открытых счетов.
+    pub footer: String,
+    /// Подвал без пределов: они в таблице или счета не принимаются.
+    pub footer_bare: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -481,14 +489,18 @@ pub struct CardTexts {
 #[serde(deny_unknown_fields)]
 pub struct HelpTexts {
     pub title: String,
-    pub lines: Vec<String>,
-    pub checks_title: String,
-    pub checks: Vec<String>,
-    pub checks_bind: String,
-    pub invoices_title: String,
-    pub invoices: Vec<String>,
+    pub intro: String,
+    pub footer: String,
+    /// Разделы: заголовок (раскрывается тапом), абзацы, кнопка действия.
+    pub exchange_title: String,
+    pub exchange: Vec<String>,
+    pub exchange_bind: String,
+    pub invoice_title: String,
+    pub invoice: Vec<String>,
+    pub money_title: String,
+    pub money: Vec<String>,
     pub rules_title: String,
-    pub rules: String,
+    pub rules: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

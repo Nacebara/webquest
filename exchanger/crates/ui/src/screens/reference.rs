@@ -49,19 +49,14 @@ fn static_form(form: &str) -> &'static str {
     }
 }
 
+/// Раздел «Помощи»: заголовок, абзацы, кнопка действия (подпись, `callback_data`).
+type HelpSection<'a> = (&'a str, Vec<Frag>, Option<(&'a str, &'a str)>);
+
 /// Значок кошелька.
 fn wallet_icon(platform: domain::Platform) -> Emoji {
     match platform {
         domain::Platform::CryptoBot => Emoji::Cb,
         domain::Platform::XRocket => Emoji::Xr,
-    }
-}
-
-fn direction_icon(direction: Direction) -> Emoji {
-    match direction {
-        Direction::CbToXrCheck => Emoji::Cb,
-        Direction::XrToCbCheck => Emoji::Xr,
-        Direction::PayCbInvoice | Direction::PayXrInvoice => Emoji::Invoice,
     }
 }
 
@@ -457,51 +452,101 @@ impl Ui {
         self.plain(body, keyboard)
     }
 
-    /// «Оплатить счёт»: что прислать и сколько стоит.
+    /// «Оплатить счёт» — карточка (выбор владельца 8 ноября 2026, вариант В): счета какого
+    /// кошелька оплачиваю, чеком какого платить, комиссия; точка — статус, как в «Курс и
+    /// лимиты». Пределы сумм — в подвале, если у открытых счетов они одинаковые, иначе колонкой.
     pub fn invoice_prompt(&self, terms: &Terms) -> Screen {
         let t = &self.texts.invoice_prompt;
-        let mut body = self.fill(&t.title, &[]);
-        body.push(&Frag::trusted("\n"));
-        body.push(&self.fill(&t.body, &[]));
-        let lines: Vec<Frag> = [Direction::PayCbInvoice, Direction::PayXrInvoice]
+        let directions: Vec<&DirectionTerms> = [Direction::PayCbInvoice, Direction::PayXrInvoice]
             .into_iter()
             .filter_map(|direction| terms.get(direction))
+            .collect();
+        let open: Vec<&&DirectionTerms> = directions
+            .iter()
+            .filter(|d| d.status == DirectionStatus::Open)
+            .collect();
+        let same_range = open.first().filter(|first| {
+            open.iter()
+                .all(|d| d.min == first.min && d.max == first.max)
+        });
+        let range_column = same_range.is_none() && !open.is_empty();
+        let range = |d: &DirectionTerms| {
+            Frag::text(&format!(
+                "{}–{}",
+                fmt::bare_amount(d.min),
+                fmt::bare_amount(d.max)
+            ))
+        };
+        let rows = directions
+            .iter()
             .map(|d| {
-                let offer = self.texts.offers.get(d.direction);
-                let icon = self.emoji.frag(direction_icon(d.direction));
-                let send = Frag::text(&offer.send);
-                let get = Frag::text(&offer.get);
-                if d.status == DirectionStatus::Open {
-                    self.fill(
-                        &t.line,
-                        &[
-                            ("icon", &icon),
-                            ("send", &send),
-                            ("get", &get),
-                            ("fee", &self.pct(d.fee_pct)),
-                        ],
-                    )
-                } else {
-                    self.fill(&t.line_paused, &[("icon", &icon), ("send", &send)])
+                let (dot, fee, usdt) = match d.status {
+                    DirectionStatus::Open => (Emoji::DotOk, self.fee_frag(d), range(d)),
+                    DirectionStatus::Paused => (
+                        Emoji::DotWait,
+                        self.fill(&self.texts.terms.paused, &[]),
+                        Frag::text("—"),
+                    ),
+                    DirectionStatus::Off => (
+                        Emoji::DotClosed,
+                        self.fill(&self.texts.terms.off, &[]),
+                        Frag::text("—"),
+                    ),
+                };
+                let dot = self.emoji.frag(dot);
+                let invoice = self.wallet(d.direction.target());
+                let pay = self.wallet(d.direction.source());
+                let args = [
+                    ("dot", &dot),
+                    ("invoice", &invoice),
+                    ("pay", &pay),
+                    ("fee", &fee),
+                    ("range", &usdt),
+                ];
+                let line = self.fill(if range_column { &t.row_range } else { &t.row }, &args);
+                let mut cells = vec![dot.clone(), invoice.clone(), pay.clone(), fee.clone()];
+                if range_column {
+                    cells.push(usdt.clone());
                 }
+                Row { line, cells }
             })
             .collect();
-        if !lines.is_empty() {
-            body.push(&Frag::trusted("\n\n<blockquote>"));
-            body.push(&Frag::join(&lines, "\n"));
-            body.push(&Frag::trusted("</blockquote>"));
+        let mut head = vec![
+            Frag::new(),
+            self.fill(&t.col_invoice, &[]),
+            self.fill(&t.col_pay, &[]),
+            self.fill(&t.col_fee, &[]),
+        ];
+        if range_column {
+            head.push(self.fill(&t.col_usdt, &[]));
         }
-        body.push(&Frag::trusted("\n"));
-        body.push(&self.fill(
-            &t.examples,
-            &[
-                ("cb", &Frag::code("https://t.me/send?start=IV…")),
-                ("xr", &Frag::code("https://t.me/xrocket?start=inv_…")),
-            ],
-        ));
-        body.push(&Frag::trusted("\n"));
-        body.push(&self.fill(&t.rules, &[]));
-        self.plain(body, Keyboard::None)
+        let mut doc = Doc::new();
+        doc.title(&self.fill(&t.title, &[]));
+        doc.table(Table {
+            attrs: "striped compact",
+            head,
+            rows,
+            right: &[3, 4],
+            plain_quote: true,
+        });
+        doc.para(&self.fill(&t.body, &[]));
+        let footer = match same_range {
+            Some(d) => self.fill(
+                &t.footer,
+                &[
+                    ("min", &Frag::text(&fmt::bare_amount(d.min))),
+                    ("max", &Frag::text(&fmt::bare_amount(d.max))),
+                ],
+            ),
+            None => self.fill(&t.footer_bare, &[]),
+        };
+        doc.footer(&footer);
+        let keyboard = Keyboard::inline_rows(vec![vec![self.cb_button(
+            Some(Emoji::Hide),
+            &self.texts.buttons.cancel,
+            &Callback::Cancel(None),
+        )]]);
+        self.dual(doc, keyboard)
     }
 
     /// S10 `/history`: до 10 заявок, кнопки с номерами по две в ряд, «Ещё».
@@ -743,9 +788,12 @@ impl Ui {
         self.dual(doc, Keyboard::inline_rows(keyboard))
     }
 
-    /// S12 `/help`.
+    /// «Помощь» — карточка (выбор владельца 8 ноября 2026, вариант В): заголовок и одна строка,
+    /// разделы раскрываются тапом прямо в сообщении, в каждом — кнопка сделать это сразу.
+    /// В простом виде разделы — свёрнутые цитаты, кнопок в тексте нет (они есть в меню).
     pub fn help(&self, terms: &Terms) -> Screen {
         let t = &self.texts.help;
+        let m = &self.texts.menu;
         let cb = Frag::code(&inline_command(
             domain::Platform::CryptoBot,
             example_amount(terms.get(Direction::CbToXrCheck)),
@@ -754,32 +802,55 @@ impl Ui {
             domain::Platform::XRocket,
             example_amount(terms.get(Direction::XrToCbCheck)),
         ));
-        let mut body = self.fill(&t.title, &[]);
-        for line in &t.lines {
-            body.push(&Frag::trusted("\n• "));
-            body.push(&self.fill(line, &[("cb", &cb), ("xr", &xr)]));
-        }
-        let mut checks: Vec<Frag> = t.checks.iter().map(|s| self.fill(s, &[])).collect();
+        let mut exchange: Vec<Frag> = t
+            .exchange
+            .iter()
+            .map(|p| self.fill(p, &[("cb", &cb), ("xr", &xr)]))
+            .collect();
         if let Some(name) = terms
             .bind_username
             .as_deref()
             .and_then(|n| self.bind_username(n))
         {
-            checks.push(self.fill(&t.checks_bind, &[("username", &name)]));
+            exchange.push(self.fill(&t.exchange_bind, &[("username", &name)]));
         }
-        let invoices: Vec<Frag> = t.invoices.iter().map(|s| self.fill(s, &[])).collect();
-        for (title, items) in [(&t.checks_title, checks), (&t.invoices_title, invoices)] {
-            body.push(&Frag::trusted("\n\n"));
-            body.push(&self.fill(title, &[]));
-            for item in items {
-                body.push(&Frag::trusted("\n• "));
-                body.push(&item);
-            }
+        let plain =
+            |items: &[String]| -> Vec<Frag> { items.iter().map(|p| self.fill(p, &[])).collect() };
+        let exchange_cb = Callback::Exchange.encode();
+        let invoice_cb = Callback::PayInvoice.encode();
+        let history_cb = Callback::History { page: 0 }.encode();
+        let sections: [HelpSection<'_>; 4] = [
+            (
+                &t.exchange_title,
+                exchange,
+                Some((&m.exchange, &exchange_cb)),
+            ),
+            (
+                &t.invoice_title,
+                plain(&t.invoice),
+                Some((&m.pay_invoice, &invoice_cb)),
+            ),
+            (
+                &t.money_title,
+                plain(&t.money),
+                Some((&m.history, &history_cb)),
+            ),
+            (&t.rules_title, plain(&t.rules), None),
+        ];
+        let mut doc = Doc::new();
+        doc.title(&self.fill(&t.title, &[]));
+        doc.para(&self.fill(&t.intro, &[]));
+        for (title, paras, action) in &sections {
+            doc.details(&self.fill(title, &[]), false, |d| {
+                for p in paras {
+                    d.para(p);
+                }
+                if let Some((label, data)) = action {
+                    d.button(label, data);
+                }
+            });
         }
-        body.push(&Frag::trusted("\n\n"));
-        body.push(&self.fill(&t.rules_title, &[]));
-        body.push(&Frag::trusted("\n"));
-        body.push(&self.fill(&t.rules, &[]));
+        doc.footer(&self.fill(&t.footer, &[]));
         let keyboard = Keyboard::inline_rows(vec![vec![
             self.cb_button(
                 Some(Emoji::Support),
@@ -788,7 +859,7 @@ impl Ui {
             )
             .style(ButtonStyle::Primary),
         ]]);
-        self.plain(body, keyboard)
+        self.dual(doc, keyboard)
     }
 
     /// `/privacy` — короткая политика (SPEC §1.8, Bot Developer Terms).

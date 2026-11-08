@@ -4,22 +4,38 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-<b>Оплатить счёт</b>
-Пришлите ссылку на счёт CryptoBot или xRocket или перешлите сообщение магазина с кнопкой «Оплатить». Я посчитаю, сколько прислать, — до вашего чека деньги не тронуты.
-
-<blockquote>🧾 Счёт CryptoBot — оплачу из xRocket · <b>3 %</b>
-🧾 Счёт xRocket — на паузе</blockquote>
-Ссылка выглядит так: <code>https://t.me/send?start=IV…</code> или <code>https://t.me/xrocket?start=inv_…</code>
-Оплачиваю одноразовые счета с суммой.
---- keyboard: none
+<b>🧾 Оплачу ваш счёт</b>
+<blockquote>🟢 Счёт CryptoBot — чеком xRocket · 3 %
+🟡 Счёт xRocket — чеком CryptoBot · пауза</blockquote>
+Пришлите ссылку на счёт — назову сумму чека.
+<i>⚡ Одноразовые счета с суммой · 2–200 USDT</i>
+--- rich
+<h3>🧾 Оплачу ваш счёт</h3>
+<table striped compact>
+<tr><th></th><th>Счёт</th><th>Платите чеком</th><th align="right">Комиссия</th></tr>
+<tr><td>🟢</td><td>CryptoBot</td><td>xRocket</td><td align="right">3 %</td></tr>
+<tr><td>🟡</td><td>xRocket</td><td>CryptoBot</td><td align="right">пауза</td></tr>
+</table>
+<p>Пришлите ссылку на счёт — назову сумму чека.</p>
+<footer>⚡ Одноразовые счета с суммой · 2–200 USDT</footer>
+--- keyboard: inline
+[{"callback_data":"cancel","text":"✖️ Отмена"}]
 
 ### premium
 --- html
-<b>Оплатить счёт</b>
-Пришлите ссылку на счёт CryptoBot или xRocket или перешлите сообщение магазина с кнопкой «Оплатить». Я посчитаю, сколько прислать, — до вашего чека деньги не тронуты.
-
-<blockquote><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт CryptoBot — оплачу из xRocket · <b>3 %</b>
-<tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Счёт xRocket — на паузе</blockquote>
-Ссылка выглядит так: <code>https://t.me/send?start=IV…</code> или <code>https://t.me/xrocket?start=inv_…</code>
-Оплачиваю одноразовые счета с суммой.
---- keyboard: none
+<b><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Оплачу ваш счёт</b>
+<blockquote><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> Счёт CryptoBot — чеком xRocket · 3 %
+<tg-emoji emoji-id="5368000000000000030">🟡</tg-emoji> Счёт xRocket — чеком CryptoBot · пауза</blockquote>
+Пришлите ссылку на счёт — назову сумму чека.
+<i><tg-emoji emoji-id="5368000000000000027">⚡</tg-emoji> Одноразовые счета с суммой · 2–200 USDT</i>
+--- rich
+<h3><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Оплачу ваш счёт</h3>
+<table striped compact>
+<tr><th></th><th>Счёт</th><th>Платите чеком</th><th align="right">Комиссия</th></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji></td><td>CryptoBot</td><td>xRocket</td><td align="right">3 %</td></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000030">🟡</tg-emoji></td><td>xRocket</td><td>CryptoBot</td><td align="right">пауза</td></tr>
+</table>
+<p>Пришлите ссылку на счёт — назову сумму чека.</p>
+<footer><tg-emoji emoji-id="5368000000000000027">⚡</tg-emoji> Одноразовые счета с суммой · 2–200 USDT</footer>
+--- keyboard: inline
+[{"callback_data":"cancel","icon_custom_emoji_id":"5368000000000000025","text":"Отмена"}]

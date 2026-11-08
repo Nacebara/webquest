@@ -264,10 +264,10 @@ impl Ui {
         InlineKeyboardButton::url(text, url).maybe_icon(icon)
     }
 
-    /// Кнопка `copy_text` с иконкой «копировать» (SPEC §6.4 `icon_copy`).
+    /// Кнопка `copy_text` без своей иконки: значок «копировать» Telegram рисует на ней сам —
+    /// со второй иконкой их было два (решение владельца 8 ноября 2026).
     fn copy_button(&self, label: &str, copy: &str) -> InlineKeyboardButton {
-        let (text, icon) = self.emoji.button(Some(Emoji::Copy), label);
-        InlineKeyboardButton::copy_text(text, copy).maybe_icon(icon)
+        InlineKeyboardButton::copy_text(label, copy)
     }
 
     fn copy_order_button(&self, order: &str) -> InlineKeyboardButton {

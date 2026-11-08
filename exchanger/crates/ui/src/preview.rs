@@ -194,6 +194,7 @@ pub fn client(ui: &Ui) -> Vec<PreviewScreen> {
         one("Готово", ui.order_done(&o, &b, CHECK_URL, 9, false)),
         one("Детали", ui.order_done(&o, &b, CHECK_URL, 9, true)),
         one("Курс и лимиты", ui.terms(&t)),
+        one("Оплатить счёт", ui.invoice_prompt(&t)),
         one("Счёт: к оплате", ui.invoice_quote(&q)),
         one(
             "Счёт: не хватает",
@@ -271,6 +272,7 @@ pub fn client(ui: &Ui) -> Vec<PreviewScreen> {
             ),
         ),
         one("Карточка заявки", ui.order_card(&card(), now())),
+        one("Помощь", ui.help(&t)),
         PreviewScreen {
             title: "Поддержка",
             messages: vec![ui.support(None), ui.support_sent(Some(ORDER))],

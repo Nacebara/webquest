@@ -21,7 +21,7 @@ expression: "both(p, q)"
 </table>
 --- keyboard: inline
 [{"style":"success","text":"📥 Забрать 97.50 USDT","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"}]
-[{"callback_data":"support:A1B2C3D4E5","text":"💬 Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 A1B2C3D4E5"}]
+[{"callback_data":"support:A1B2C3D4E5","text":"💬 Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"A1B2C3D4E5"}]
 
 ### premium
 --- html
@@ -42,4 +42,4 @@ expression: "both(p, q)"
 </table>
 --- keyboard: inline
 [{"icon_custom_emoji_id":"5368000000000000023","style":"success","text":"Забрать 97.50 USDT","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"}]
-[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"A1B2C3D4E5"}]
+[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"A1B2C3D4E5"}]
