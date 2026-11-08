@@ -34,6 +34,7 @@ tgbot = { path = "../tgbot" }
 resvg = { version = "0.45", default-features = false, features = ["text"] }
 
 [dev-dependencies]
+insta = { version = "1.49.0", default-features = false }
 rust_decimal_macros.workspace = true
 secrecy.workspace = true
 tokio = { workspace = true, features = ["net", "io-util"] }

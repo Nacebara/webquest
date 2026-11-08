@@ -146,148 +146,6 @@ impl Inner {
     // -----------------------------------------------------------------------------------------
     // Сводка
 
-    pub(crate) async fn dash(&self) -> Result<Screen, OpsError> {
-        let t = &self.texts;
-        let mut conn = self.pool.acquire().await?;
-        let mut lines = vec![t.f("dash.title", &[("time", &when(Utc::now()))])];
-
-        lines.push(String::new());
-        lines.push(t.t("dash.wallets"));
-        let wallets = storage::wallets::list(&mut conn).await?;
-        let balances = storage::ledger::wallet_balances(&mut conn).await?;
-        let mut any = false;
-        for w in wallets.iter().filter(|w| w.is_active) {
-            let Some(b) = balances
-                .iter()
-                .find(|b| b.wallet_account_id == w.wallet_id && b.asset == "USDT")
-            else {
-                continue;
-            };
-            any = true;
-            let target = storage::admin::thresholds(&mut conn, w.wallet_id, Asset::Usdt)
-                .await?
-                .map(|th| t.f("dash.target", &[("target", &usdt(th.target))]))
-                .unwrap_or_default();
-            lines.push(t.f(
-                "dash.wallet",
-                &[
-                    ("name", &self.platform_name(w.platform)),
-                    ("available", &usdt(b.available)),
-                    ("balance", &usdt(b.ledger_balance)),
-                    ("held", &usdt(b.held)),
-                    ("target", &target),
-                ],
-            ));
-            let key = engine::reconcile::unreadable_key(w.platform);
-            if let Some(a) = storage::alerts::open_by_key(&mut conn, &key).await? {
-                lines.push(t.f(
-                    "dash.unreadable",
-                    &[(
-                        "error",
-                        &esc(a.payload["error"].as_str().unwrap_or_default()),
-                    )],
-                ));
-            }
-        }
-        if !any {
-            lines.push(t.t("dash.no_wallets"));
-        }
-
-        lines.push(String::new());
-        lines.push(t.t("dash.directions"));
-        let availability = self.engine.availability().await?;
-        for d in DIRECTIONS {
-            let row = storage::directions::get(&mut conn, d).await?;
-            let fee = self.fee_now(&mut conn, &row).await?;
-            let a = availability.iter().find(|a| a.direction == d);
-            lines.push(t.f(
-                "dash.direction",
-                &[
-                    ("name", &self.dir_name(d)),
-                    ("fee", &fee),
-                    ("status", &self.availability_text(a)),
-                ],
-            ));
-        }
-
-        lines.push(String::new());
-        let live = storage::admin::live_by_state(&mut conn).await?;
-        if live.is_empty() {
-            lines.push(t.t("dash.live_none"));
-        } else {
-            let list = live
-                .iter()
-                .map(|s| format!("{} {}", self.state_name(&s.state), s.count))
-                .collect::<Vec<_>>()
-                .join(", ");
-            lines.push(t.f("dash.live", &[("list", &list)]));
-        }
-        let review = storage::admin::review_queue(&mut conn).await?.len();
-        lines.push(t.f("dash.review", &[("n", &review)]));
-        let day = storage::admin::stats_since(&mut conn, Utc::now() - chrono::Duration::hours(24))
-            .await?;
-        lines.push(t.f(
-            "dash.day",
-            &[
-                ("completed", &day.completed),
-                ("refunded", &day.refunded),
-                ("turnover", &usdt(day.turnover)),
-                ("fees", &usdt(day.fees)),
-            ],
-        ));
-        let settings = engine::fees::promo_settings(&mut conn).await?;
-        let states = engine::fees::promo_states(&mut conn).await?;
-        let on: Vec<String> = DIRECTIONS
-            .iter()
-            .filter(|d| states.get(d.code()).is_some_and(|s| s.on))
-            .map(|d| self.dir_name(*d))
-            .collect();
-        let list = if on.is_empty() || settings.mode == PromoMode::Off {
-            t.t("dash.promo_none")
-        } else {
-            on.join(", ")
-        };
-        lines.push(t.f(
-            "dash.promo",
-            &[
-                ("mode", &self.promo_mode_name(settings.mode)),
-                ("list", &list),
-            ],
-        ));
-        let alerts = storage::alerts::open(&mut conn, 100).await?.len();
-        lines.push(t.f("dash.alerts", &[("n", &alerts)]));
-        let invest = storage::invest::totals(&mut conn).await?;
-        if invest.investors > 0 || invest.requested + invest.manual > 0 {
-            let waiting = invest.requested + invest.manual;
-            lines.push(t.f(
-                "dash.invest",
-                &[
-                    ("n", &invest.investors),
-                    ("balance", &usdt(invest.balance)),
-                    ("accrued", &usdt(invest.accrued_24h)),
-                    (
-                        "waiting",
-                        &if waiting > 0 {
-                            t.f("dash.invest_waiting", &[("n", &waiting)])
-                        } else {
-                            String::new()
-                        },
-                    ),
-                ],
-            ));
-        }
-
-        Ok(Screen::new(lines.join("\n"))
-            .row(vec![
-                btn(t.t("dash.b_reconcile"), &Cb::Reconcile),
-                btn(t.t("dash.b_selftest"), &Cb::Selftest),
-            ])
-            .row(vec![
-                btn(t.t("common.refresh"), &Cb::Dash),
-                btn(t.t("common.home"), &Cb::Menu),
-            ]))
-    }
-
     async fn lever(
         &self,
         conn: &mut sqlx::PgConnection,
@@ -401,7 +259,7 @@ impl Inner {
             let fee = self.fee_now(&mut conn, &row).await?;
             let a = availability.iter().find(|a| a.direction == d);
             lines.push(t.f(
-                "dash.direction",
+                "dir.line",
                 &[
                     ("name", &self.dir_name(d)),
                     ("fee", &fee),
@@ -1419,10 +1277,12 @@ impl Inner {
             )]);
         }
         s.text = lines.join("\n");
-        Ok(s.row(vec![
-            btn(t.t("common.refresh"), &Cb::Bots),
-            btn(t.t("common.home"), &Cb::Menu),
-        ]))
+        // Самопроверка аккаунтов — здесь: с главного экрана её убрал макет.
+        Ok(s.row(vec![btn(t.t("dash.b_selftest"), &Cb::Selftest)])
+            .row(vec![
+                btn(t.t("common.refresh"), &Cb::Bots),
+                btn(t.t("common.home"), &Cb::Menu),
+            ]))
     }
 
     pub(crate) async fn staff_list(&self, staff: &StaffMember) -> Result<Screen, OpsError> {

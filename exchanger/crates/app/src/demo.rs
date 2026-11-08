@@ -286,8 +286,8 @@ fn menu_keyboard() -> InlineKeyboardMarkup {
 const MENU: &str = "<b>🧪 Демо exch</b>\nКошельки здесь — симулятор: денег нет, остальное как в настоящем боте.\n\nВыберите, что прислать боту: я дам ссылку — скопируйте её и пришлите сюда, как клиент.\nПульт владельца — кнопка «Админ-панель» в меню.";
 
 /// «Предпросмотр экранов» (CLAUDE.md п. 21): все экраны клиента по порядку макета, каждый —
-/// с подписью «N/всего · название», чтобы сверить с макетом и принять.
-pub async fn send_preview(api: &BotApi, ui: &ui::Ui, chat: i64) {
+/// с подписью «N/всего · название», чтобы сверить с макетом и принять; затем экраны пульта.
+pub async fn send_preview(api: &BotApi, ui: &ui::Ui, look: &ops::Look, chat: i64) {
     let screens = ui::preview::client(ui);
     let total = screens.len();
     for (i, screen) in screens.iter().enumerate() {
@@ -324,6 +324,49 @@ pub async fn send_preview(api: &BotApi, ui: &ui::Ui, chat: i64) {
             tokio::time::sleep(Duration::from_millis(350)).await;
         }
     }
+    send_panel_preview(api, look, chat).await;
+    let _ = api
+        .send_message(&SendMessage::html(
+            chat,
+            format!("<b>Готово: {total} экранов клиента и экраны пульта.</b> Пишите номер и что не так — например «7: кнопка не того цвета»."),
+        ))
+        .await;
+}
+
+/// Экраны пульта на данных макета: главный экран в трёх состояниях, «Статистика».
+pub async fn send_panel_preview(api: &BotApi, look: &ops::Look, chat: i64) {
+    let texts = match ops::Texts::builtin() {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!(error = %e, "ops texts are invalid");
+            return;
+        }
+    };
+    for (title, data) in ops::sample_dash() {
+        let caption = format!("<b>Пульт · Главный экран · {title}</b> (данные макета)");
+        let _ = api
+            .send_message(&SendMessage::html(chat, caption).silent())
+            .await;
+        let screen = look.screen(&data.screen(&texts));
+        let mut req = botapi::SendRichMessage::new(chat, screen.rich.clone().unwrap_or_default());
+        req.disable_notification = Some(true);
+        req.reply_markup = (!screen.keyboard.is_empty()).then(|| {
+            botapi::ReplyMarkup::Inline(botapi::InlineKeyboardMarkup::new(screen.keyboard.clone()))
+        });
+        if let Err(e) = api.send_rich_message(&req).await {
+            tracing::warn!(title, error = %e, "dash preview not sent");
+            let _ = api
+                .send_message(&SendMessage::html(
+                    chat,
+                    format!(
+                        "⚠️ Telegram не принял экран: {}",
+                        ui::html::esc(&e.to_string())
+                    ),
+                ))
+                .await;
+        }
+        tokio::time::sleep(Duration::from_millis(350)).await;
+    }
     // Пульт: «Статистика» на данных макета — плитки и график одной картинкой.
     let _ = api
         .send_message(
@@ -344,12 +387,6 @@ pub async fn send_preview(api: &BotApi, ui: &ui::Ui, chat: i64) {
         },
         Err(e) => tracing::warn!(error = %e, "stats sample failed"),
     }
-    let _ = api
-        .send_message(&SendMessage::html(
-            chat,
-            format!("<b>Готово: {total} экранов.</b> Пишите номер и что не так — например «7: кнопка не того цвета»."),
-        ))
-        .await;
 }
 
 /// Перехватчик демо: `/demo` и кнопки проб; остальное — пульту и клиентскому боту.
@@ -360,6 +397,8 @@ pub struct DemoHook {
     panel: Arc<dyn tgbot::UpdateHook>,
     /// Интерфейс клиента с эмодзи демо — для «Предпросмотра экранов».
     ui: ui::Ui,
+    /// Вид пульта с теми же эмодзи.
+    look: ops::Look,
 }
 
 impl DemoHook {
@@ -374,13 +413,14 @@ impl DemoHook {
             world: demo.world.clone(),
             stranger: demo.stranger,
             panel,
+            look: ops::Look::new(emoji.clone()),
             ui: ui::Ui::builtin(emoji, ui::UiConfig::default())
                 .context("built-in client texts are invalid")?,
         })
     }
 
     async fn preview(&self, chat: i64) {
-        send_preview(&self.api, &self.ui, chat).await;
+        send_preview(&self.api, &self.ui, &self.look, chat).await;
     }
 
     async fn send_menu(&self, chat: i64) {
@@ -481,6 +521,10 @@ impl tgbot::UpdateHook for DemoHook {
             let text = m.text.as_deref().unwrap_or_default().trim();
             if text == "/demo" {
                 self.send_menu(m.chat.id).await;
+                return true;
+            }
+            if text == "/preview_panel" {
+                send_panel_preview(&self.api, &self.look, m.chat.id).await;
                 return true;
             }
             if text == "/preview" {

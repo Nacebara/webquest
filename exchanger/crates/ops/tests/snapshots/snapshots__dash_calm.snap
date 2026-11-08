@@ -1,0 +1,45 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&screen)
+---
+--- rich
+<h3>🟢 Всё спокойно</h3>
+<p>Решать нечего. Выплаты идут, аккаунты на связи.</p>
+<table bordered>
+<tr>
+<td>Обменов<br/>
+<b>148</b> ▲ 9 %</td>
+<td>Оборот<br/>
+<b>12 480</b> ▲ 5 %</td>
+<td>Прибыль<br/>
+<b>291.40</b> ▲ 6 %</td>
+</tr>
+</table>
+<table striped compact>
+<tr>
+<th>Резерв</th>
+<th align="right">Доступно</th>
+<th align="right">От цели</th>
+</tr>
+<tr>
+<td>🔷 CryptoBot</td>
+<td align="right">1 480.00</td>
+<td align="right">🟢 99 %</td>
+</tr>
+<tr>
+<td>🚀 xRocket</td>
+<td align="right">1 300.00</td>
+<td align="right">🟢 87 %</td>
+</tr>
+</table>
+<footer>🟢 Аккаунты 2/2 · сверка <tg-time unix="1793876400" format="t">14:00</tg-time> · ▲▼ к вчера</footer>
+--- html
+<b>🟢 Всё спокойно</b>
+Решать нечего. Выплаты идут, аккаунты на связи.
+Обменов <b>148</b> ▲ 9 % · Оборот <b>12 480</b> ▲ 5 % · Прибыль <b>291.40</b> ▲ 6 %
+<blockquote>🔷 CryptoBot — 1 480.00 · 🟢 99 % от цели
+🚀 xRocket — 1 300.00 · 🟢 87 % от цели</blockquote>
+<i>🟢 Аккаунты 2/2 · сверка <tg-time unix="1793876400" format="t">14:00</tg-time> · ▲▼ к вчера</i>
+--- keyboard
+[{"text":"📊 Статистика","callback_data":"a:sx:1"},{"text":"🏦 Резервы","callback_data":"a:rc"}]
+[{"text":"🤖 Аккаунты","callback_data":"a:b"},{"text":"🎛 Меню","callback_data":"a:m"}]

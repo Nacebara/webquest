@@ -1,0 +1,62 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&screen)
+---
+--- rich
+<h3>🚨 Нужно решить · 6</h3>
+<p>⛔ <b>Выплаты в xRocket на паузе</b> · с <tg-time unix="1793877300" format="t">14:15</tg-time>
+</p>
+<table compact>
+<tr>
+<td>🔴</td>
+<td>Недостача xRocket</td>
+<td align="right">
+<b>12.00</b>
+</td>
+</tr>
+<tr>
+<td>🔴</td>
+<td>Разбор</td>
+<td align="right">
+<b>4</b> · старейший 18 мин</td>
+</tr>
+<tr>
+<td>🔴</td>
+<td>ub-2: вход сброшен</td>
+<td align="right">
+<b>пауза</b>
+</td>
+</tr>
+</table>
+<hr/>
+<table striped compact>
+<tr>
+<th>Резерв</th>
+<th align="right">Леджер</th>
+<th align="right">Реально</th>
+</tr>
+<tr>
+<td>🔷 CryptoBot</td>
+<td align="right">2 140.00</td>
+<td align="right">2 140.00</td>
+</tr>
+<tr>
+<td>🚀 xRocket</td>
+<td align="right">640.00</td>
+<td align="right">🔴 628.00</td>
+</tr>
+</table>
+<footer>🔴 Аккаунты 1/2 · сверка <tg-time unix="1793877300" format="t">14:15</tg-time> — расхождение</footer>
+--- html
+<b>🚨 Нужно решить · 6</b>
+⛔ <b>Выплаты в xRocket на паузе</b> · с <tg-time unix="1793877300" format="t">14:15</tg-time>
+<blockquote>🔴 Недостача xRocket — <b>12.00</b>
+🔴 Разбор — <b>4</b> · старейший 18 мин
+🔴 ub-2: вход сброшен — <b>пауза</b></blockquote>
+<blockquote>🔷 CryptoBot — леджер 2 140.00 · реально 2 140.00
+🚀 xRocket — леджер 640.00 · реально 🔴 628.00</blockquote>
+<i>🔴 Аккаунты 1/2 · сверка <tg-time unix="1793877300" format="t">14:15</tg-time> — расхождение</i>
+--- keyboard
+[{"text":"⚠️ Недостача","style":"danger","callback_data":"a:rc"},{"text":"📋 Разбор · 4","style":"primary","callback_data":"a:q"}]
+[{"text":"🔌 ub-2: войти","style":"primary","callback_data":"a:b"},{"text":"🏦 Резервы","callback_data":"a:rc"}]
+[{"text":"🎛 Меню","callback_data":"a:m"}]

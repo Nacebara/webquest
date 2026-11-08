@@ -74,7 +74,7 @@ impl Inner {
         let recipients: Vec<&StaffMember> = staff.iter().filter(|m| m.active()).collect();
         drop(conn);
         for alert in pending {
-            let screen = self.render_alert(&alert);
+            let screen = self.look().screen(&self.render_alert(&alert));
             let known = self.state(|st| st.delivered.get(&alert.id).cloned().unwrap_or_default());
             let mut sent = Vec::new();
             for m in &recipients {
@@ -115,6 +115,10 @@ impl Inner {
             });
             let mut conn = self.pool.acquire().await?;
             storage::alerts::mark_delivered(&mut conn, alert.id, first).await?;
+        }
+        // Новое событие — главный экран правится сразу (макет: «и сразу при событии»).
+        if let Err(e) = self.refresh_dashes().await {
+            tracing::warn!(error = %e, "ops dash refresh failed");
         }
         Ok(())
     }

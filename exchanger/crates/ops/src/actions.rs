@@ -1178,9 +1178,8 @@ impl Inner {
                     t.f("common.error", &[("error", &esc(&e.to_string()))])
                 }
             };
-            let mut card = self.order(Some(staff), *order).await?;
-            card.text = format!("{head}\n\n{}", card.text);
-            return Ok(card);
+            let card = self.order(Some(staff), *order).await?;
+            return Ok(card.notice(&head));
         }
 
         if let Action::Selftest { amount } = &action {
@@ -1538,7 +1537,7 @@ impl Inner {
         .await?;
         tx.commit().await?;
         tracing::info!(staff = staff_id, action = audit_action, target = %target_id, "ops change applied");
-        let mut screen = match back {
+        let screen = match back {
             Cb::Dir(d) => self.dir_card(staff, d).await?,
             Cb::Promo => self.promo().await?,
             Cb::UserDir(id, d) => self.user_dir(id, d).await?,
@@ -1550,8 +1549,7 @@ impl Inner {
             Cb::Dash => self.dash().await?,
             _ => self.menu(staff).await?,
         };
-        screen.text = format!("{}\n\n{}", t.t("common.saved"), screen.text);
-        Ok(screen)
+        Ok(screen.notice(&t.t("common.saved")))
     }
 }
 

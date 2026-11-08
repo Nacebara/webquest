@@ -24,7 +24,9 @@ mod actions;
 mod alerts;
 mod cb;
 pub mod chart;
+mod dash;
 mod invest;
+mod look;
 pub mod stats;
 mod texts;
 mod views;
@@ -43,9 +45,14 @@ use storage::staff::{Role, StaffMember};
 use tokio_util::sync::CancellationToken;
 
 pub use cb::Cb;
+pub use dash::{DashData, sample_dash};
+pub use look::Look;
 pub use texts::Texts;
 
 use crate::actions::{Action, Input};
+
+/// Как часто главный экран правится сам (макет: «раз в минуту и сразу при событии»).
+const DASH_EVERY: Duration = Duration::from_secs(60);
 
 /// Настройки пульта.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,7 +98,10 @@ pub enum OpsError {
 /// Экран пульта: HTML и инлайн-клавиатура.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Screen {
+    /// Обычный HTML; у карточки — запасной вид.
     pub text: String,
+    /// Карточка (rich-HTML, `sendRichMessage`); `None` — экран обычным HTML.
+    pub rich: Option<String>,
     pub keyboard: Vec<Vec<InlineKeyboardButton>>,
 }
 
@@ -99,6 +109,17 @@ impl Screen {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
+            rich: None,
+            keyboard: Vec::new(),
+        }
+    }
+
+    /// Карточка: rich-HTML и запасной обычный HTML (CLAUDE.md п. 18: все экраны пульта —
+    /// карточки).
+    pub fn card(rich: impl Into<String>, plain: impl Into<String>) -> Self {
+        Self {
+            text: plain.into(),
+            rich: Some(rich.into()),
             keyboard: Vec::new(),
         }
     }
@@ -106,6 +127,16 @@ impl Screen {
     pub fn row(mut self, row: Vec<InlineKeyboardButton>) -> Self {
         if !row.is_empty() {
             self.keyboard.push(row);
+        }
+        self
+    }
+
+    /// Строка-уведомление над экраном («Сохранено», итог решения) — и в карточке, и в
+    /// запасном тексте.
+    pub fn notice(mut self, html: &str) -> Self {
+        self.text = format!("{html}\n\n{}", self.text);
+        if let Some(rich) = &mut self.rich {
+            *rich = format!("<p>{html}</p>{rich}");
         }
         self
     }
@@ -163,6 +194,8 @@ pub(crate) struct Inner {
     texts: Texts,
     cfg: OpsConfig,
     state: Mutex<State>,
+    /// Вид (эмодзи) и отпечаток настроек, по которому он собран.
+    look: std::sync::RwLock<(Arc<Look>, String)>,
 }
 
 impl OpsBot {
@@ -181,6 +214,7 @@ impl OpsBot {
                 texts,
                 cfg,
                 state: Mutex::new(State::default()),
+                look: std::sync::RwLock::new((Arc::new(Look::plain()), String::new())),
             }),
         })
     }
@@ -190,6 +224,7 @@ impl OpsBot {
     pub async fn run(&self, cancel: CancellationToken) -> Result<(), OpsError> {
         let inner = self.inner.clone();
         inner.startup().await?;
+        inner.refresh_look().await;
         inner.alert_loop(cancel).await;
         Ok(())
     }
@@ -215,6 +250,42 @@ impl Inner {
         f(&mut guard)
     }
 
+    /// Действующий вид пульта.
+    pub(crate) fn look(&self) -> Arc<Look> {
+        match self.look.read() {
+            Ok(g) => g.0.clone(),
+            Err(p) => p.into_inner().0.clone(),
+        }
+    }
+
+    /// Перечитать эмодзи из базы (те же настройки, что у клиентского бота), если изменились.
+    async fn refresh_look(&self) {
+        let loaded = match self.pool.acquire().await {
+            Ok(mut conn) => tgbot::emoji::load(&mut conn).await.ok(),
+            Err(_) => None,
+        };
+        let Some((settings, fingerprint)) = loaded else {
+            return;
+        };
+        let same = match self.look.read() {
+            Ok(g) => g.1 == fingerprint,
+            Err(p) => p.into_inner().1 == fingerprint,
+        };
+        if same {
+            return;
+        }
+        match tgbot::emoji::set_from(&settings) {
+            Ok(set) => {
+                let mut g = match self.look.write() {
+                    Ok(g) => g,
+                    Err(p) => p.into_inner(),
+                };
+                *g = (Arc::new(Look::new(set)), fingerprint);
+            }
+            Err(e) => tracing::warn!(error = %e, "ops: emoji settings are invalid"),
+        }
+    }
+
     async fn startup(&self) -> Result<(), OpsError> {
         if let Some(owner) = self.cfg.owner_id {
             let mut conn = self.pool.acquire().await?;
@@ -230,6 +301,7 @@ impl Inner {
 
     async fn alert_loop(&self, cancel: CancellationToken) {
         let mut tick = tokio::time::interval(self.cfg.alert_every);
+        let mut last_minute = Instant::now();
         loop {
             tokio::select! {
                 () = cancel.cancelled() => return,
@@ -237,6 +309,13 @@ impl Inner {
             }
             if let Err(e) = self.alerts_once().await {
                 tracing::warn!(error = %e, "ops alerts failed");
+            }
+            if last_minute.elapsed() >= DASH_EVERY {
+                last_minute = Instant::now();
+                self.refresh_look().await;
+                if let Err(e) = self.refresh_dashes().await {
+                    tracing::warn!(error = %e, "ops dash refresh failed");
+                }
             }
         }
     }
@@ -283,8 +362,12 @@ impl Inner {
                 return Ok(true);
             };
             let chat = message.chat.id;
+            let dash = cb == Cb::Dash;
             if let Some(screen) = self.on_callback(&staff, chat, message, cb).await? {
                 self.edit(chat, message.message_id, &screen).await?;
+                if dash {
+                    self.remember_dash(chat, message.message_id).await?;
+                }
             }
             return Ok(true);
         }
@@ -312,20 +395,61 @@ impl Inner {
             return Ok(false);
         }
         let screen = self.on_message(&staff, message).await?;
-        self.send(message.chat.id, &screen).await?;
+        let sent = self.send(message.chat.id, &screen).await?;
+        if command == Some("dash") {
+            self.remember_dash(sent.chat.id, sent.message_id).await?;
+        }
         Ok(true)
     }
 
-    async fn send(&self, chat: i64, screen: &Screen) -> Result<Message, OpsError> {
+    /// Отправить экран: карточку — `sendRichMessage` (Telegram отказал — обычным HTML).
+    pub(crate) async fn send(&self, chat: i64, screen: &Screen) -> Result<Message, OpsError> {
+        let screen = self.look().screen(screen);
+        if let Some(rich) = &screen.rich {
+            let mut request = botapi::SendRichMessage::new(chat, rich.clone());
+            request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
+            match self.api.send_rich_message(&request).await {
+                Ok(m) => return Ok(m),
+                Err(e) if e.is_rejection() => {
+                    tracing::info!(error = %e, "ops card rejected, sending plain HTML");
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
         let mut request = SendMessage::html(chat, screen.text.clone());
         request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
         Ok(self.api.send_message(&request).await?)
     }
 
-    /// Править экран на месте; не вышло (старое сообщение) — новым сообщением.
-    async fn edit(&self, chat: i64, message_id: i32, screen: &Screen) -> Result<(), OpsError> {
-        let mut request = EditMessageText::html(chat, message_id, screen.text.clone());
-        request.reply_markup = screen.markup();
+    /// Править экран на месте (карточка ⇄ обычный HTML — тоже правкой); не вышло (старое
+    /// сообщение) — новым сообщением.
+    pub(crate) async fn edit(
+        &self,
+        chat: i64,
+        message_id: i32,
+        screen: &Screen,
+    ) -> Result<(), OpsError> {
+        let look = self.look().screen(screen);
+        if let Some(rich) = &look.rich {
+            match self
+                .api
+                .edit_message_rich(chat, message_id, rich.clone(), look.markup())
+                .await
+            {
+                Ok(_) => return Ok(()),
+                Err(e) if e.is_not_modified() => return Ok(()),
+                Err(e) if e.is_message_gone() => {
+                    self.send(chat, screen).await?;
+                    return Ok(());
+                }
+                Err(e) if e.is_rejection() => {
+                    tracing::info!(error = %e, "ops card edit rejected, trying plain HTML");
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+        let mut request = EditMessageText::html(chat, message_id, look.text.clone());
+        request.reply_markup = look.markup();
         match self.api.edit_message_text(&request).await {
             Ok(_) => Ok(()),
             Err(e) if e.is_not_modified() => Ok(()),

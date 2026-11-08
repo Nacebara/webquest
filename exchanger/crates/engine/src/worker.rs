@@ -497,7 +497,7 @@ impl Engine {
                         &mut tx,
                         op.platform,
                         Side::Source,
-                        "незнакомый ответ кошелька на активацию чека",
+                        crate::UNKNOWN_REPLY_PAUSE,
                     )
                     .await?;
                     tracing::error!(

@@ -737,6 +737,36 @@ pub async fn set_thresholds(
 // ---------------------------------------------------------------------------------------------
 // Юзерботы
 
+/// Последняя сверка кошелька (без «пропущено: операции в полёте»).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LastReconciliation {
+    pub wallet_account_id: i16,
+    pub expected: Decimal,
+    pub actual: Decimal,
+    /// `ok`, `warn`, `pause`.
+    pub verdict: String,
+    pub at: DateTime<Utc>,
+}
+
+/// Последняя сверка каждого кошелька по USDT (главный экран пульта: «сверка 14:00»,
+/// «Леджер · Реально»).
+pub async fn last_reconciliations(
+    conn: &mut PgConnection,
+) -> Result<Vec<LastReconciliation>, StorageError> {
+    Ok(sqlx::query_as!(
+        LastReconciliation,
+        r#"
+        SELECT DISTINCT ON (wallet_account_id)
+               wallet_account_id, expected, actual, verdict, at
+          FROM reconciliations
+         WHERE asset = 'USDT' AND verdict <> 'skipped_inflight'
+         ORDER BY wallet_account_id, at DESC
+        "#
+    )
+    .fetch_all(conn)
+    .await?)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserbotRow {
     pub id: i16,

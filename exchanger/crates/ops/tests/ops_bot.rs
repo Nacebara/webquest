@@ -737,9 +737,11 @@ async fn owner_top_up_is_posted_from_the_reconciliation_alert(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn selftest_from_the_panel_reports_every_step(pool: PgPool) {
     let o = ops(pool).await;
-    let dash = o.say(OWNER, "/dash", "Сводка").await;
+    // Макет убрал самопроверку с главного экрана: она — в «Аккаунтах».
+    let dash = o.say(OWNER, "/dash", "Всё спокойно").await;
+    let bots = o.press(OWNER, &dash, "Аккаунты", "Юзерботы").await;
     let preview = o
-        .press(OWNER, &dash, "Самопроверка", "сам же его активирует")
+        .press(OWNER, &bots, "Самопроверка", "сам же его активирует")
         .await;
     let report = o
         .press(OWNER, &preview, "Подтвердить", "Всё работает")
@@ -815,25 +817,27 @@ async fn dash_explains_pauses_and_reconcile_offers_the_top_up(pool: PgPool) {
     .execute(&o.pool)
     .await
     .unwrap();
-    let dash = o.say(OWNER, "/dash", "Сводка").await;
+    // Почему направление не принимает — в «Направлениях» (главный экран по макету
+    // показывает только то, что ждёт человека).
+    let dirs = o.say(OWNER, "/dir", "Направления").await;
     assert!(
-        dash.text().contains("нет резерва: в xRocket свободно"),
+        dirs.text().contains("нет резерва: в xRocket свободно"),
         "{}",
-        dash.text()
+        dirs.text()
     );
     assert!(
-        dash.text().contains("работает · заявка до"),
+        dirs.text().contains("работает · заявка до"),
         "{}",
-        dash.text()
+        dirs.text()
     );
 
-    // Владелец пополнил xRocket на 20 — «Сверить балансы» сразу предлагает провести.
+    // Владелец пополнил xRocket на 20 — «Резервы» на главном экране сверяют и сразу
+    // предлагают провести.
     o.world
         .set_balance(o.ub, XR, Asset::Usdt, dec!(1020))
         .unwrap();
-    let recon = o
-        .press(OWNER, &dash, "Сверить балансы", "Сверка балансов")
-        .await;
+    let dash = o.say(OWNER, "/dash", "Всё спокойно").await;
+    let recon = o.press(OWNER, &dash, "Резервы", "Сверка балансов").await;
     let preview = o
         .press(OWNER, &recon, "Это мой взнос в xRocket", "взнос владельца")
         .await;
@@ -904,4 +908,40 @@ async fn support_question_reaches_staff_and_the_answer_reaches_the_client(pool: 
     .await;
     let answer = o.tg.screen(mark, 4242, "Оператор Анна:").await;
     assert!(answer.text().contains("деньги у нас"), "{}", answer.text());
+}
+
+/// Главный экран по макету («вариант А»): тишина → пожар после недостачи; карточка правится
+/// сама в том же сообщении, красная кнопка — только сейчас.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn dash_turns_to_fire_on_a_shortfall_and_refreshes_itself(pool: PgPool) {
+    let o = ops(pool).await;
+    let calm = o.say(OWNER, "/dash", "Всё спокойно").await;
+    assert_eq!(calm.method, "sendRichMessage", "главный экран — карточка");
+    assert!(calm.button("Статистика").is_some(), "{:?}", calm.buttons());
+    // В xRocket на 100 меньше, чем по леджеру: сверка ставит выплаты на паузу.
+    o.world
+        .set_balance(o.ub, XR, Asset::Usdt, dec!(900))
+        .unwrap();
+    o.engine.reconcile_balances().await.unwrap();
+    let mark = o.tg.mark();
+    o.bot.deliver_alerts().await.unwrap();
+    let fire = o.tg.screen(mark, OWNER, "Недостача xRocket").await;
+    assert_eq!(fire.method, "editMessageText", "правится, а не множится");
+    assert_eq!(fire.message_id, calm.message_id);
+    let body = fire.text();
+    assert!(body.contains("Выплаты в xRocket на паузе"), "{body}");
+    assert!(body.contains("Нужно решить · 1"), "{body}");
+    assert!(body.contains("100.00"), "{body}");
+    assert!(
+        body.contains("Реально"),
+        "в пожар — «Леджер · Реально»: {body}"
+    );
+    let shortfall = fire.body["reply_markup"]["inline_keyboard"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|r| r.as_array().cloned().unwrap_or_default())
+        .find(|b| b["text"].as_str().is_some_and(|t| t.contains("Недостача")))
+        .unwrap();
+    assert_eq!(shortfall["style"], "danger", "{shortfall}");
 }

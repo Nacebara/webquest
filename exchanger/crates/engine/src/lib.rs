@@ -40,6 +40,10 @@ pub use invoice::{
     InvoiceIssue, InvoiceReject, InvoiceSubmitted, direction_for_invoice, payable_amount,
 };
 pub use operator::{OperatorDecision, OperatorError, OperatorRequest, Refusal};
+
+/// Причина автопаузы приёма после незнакомого ответа кошелька на активацию (CLAUDE.md п. 13):
+/// по ней пульт показывает строку «Незнакомый ответ» на главном экране.
+pub const UNKNOWN_REPLY_PAUSE: &str = "незнакомый ответ кошелька на активацию чека";
 pub use submit::{SubmitReject, Submitted};
 
 /// Настройки движка.

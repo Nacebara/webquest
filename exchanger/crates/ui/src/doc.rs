@@ -18,7 +18,7 @@
 
 use crate::html::Frag;
 
-pub(crate) struct Doc {
+pub struct Doc {
     rich: String,
     plain: String,
     /// Обычный HTML сейчас внутри цитаты.
@@ -26,12 +26,12 @@ pub(crate) struct Doc {
 }
 
 /// Строка таблицы: ячейки для rich и готовая фраза для обычного HTML.
-pub(crate) struct Row {
+pub struct Row {
     pub cells: Vec<Frag>,
     pub line: Frag,
 }
 
-pub(crate) struct Table<'a> {
+pub struct Table<'a> {
     /// Атрибуты `<table>`: `bordered`, `striped`, `compact`.
     pub attrs: &'a str,
     pub head: Vec<Frag>,
@@ -40,6 +40,12 @@ pub(crate) struct Table<'a> {
     pub right: &'a [usize],
     /// В обычном HTML обернуть строки в цитату.
     pub plain_quote: bool,
+}
+
+impl Default for Doc {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Doc {

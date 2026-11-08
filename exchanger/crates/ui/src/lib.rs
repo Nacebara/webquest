@@ -14,7 +14,7 @@
 
 pub mod callback;
 pub mod command;
-mod doc;
+pub mod doc;
 pub mod emoji;
 pub mod fmt;
 pub mod html;
@@ -27,7 +27,8 @@ pub mod texts;
 pub use callback::{Callback, InvestAction};
 pub use command::Command;
 pub use emoji::{
-    Emoji, EmojiError, EmojiPacks, EmojiSet, EmojiSettings, EmojiStyle, is_custom_emoji_id,
+    Emoji, EmojiError, EmojiPacks, EmojiSet, EmojiSettings, EmojiStyle, fallback_char,
+    is_custom_emoji_id,
 };
 pub use fmt::{Clock, TimeFormat};
 pub use model::{

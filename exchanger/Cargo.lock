@@ -1865,6 +1865,7 @@ dependencies = [
  "chrono",
  "domain",
  "engine",
+ "insta",
  "parsers",
  "resvg",
  "rust_decimal",

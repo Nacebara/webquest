@@ -359,6 +359,72 @@ pub struct EmojiSettings {
     pub custom: BTreeMap<String, String>,
 }
 
+/// Обычный символ вместо значка набора (без Premium и в запасном тексте), по имени значка
+/// без вида: `alarm`, `queue`. Как `FB` в макете.
+pub fn fallback_char(name: &str) -> &'static str {
+    match name {
+        "alarm" => "🚨",
+        "alert" => "⚠️",
+        "warn" => "⚠️",
+        "live" => "🟢",
+        "dot_ok" => "🟢",
+        "dot_wait" => "🟠",
+        "dot_act" => "🔴",
+        "dot_work" => "🔵",
+        "dot_closed" => "⚪",
+        "step_done" => "✅",
+        "step_now" => "🔵",
+        "step_todo" => "⚪",
+        "prog_25" => "◔",
+        "prog_50" => "◑",
+        "prog_75" => "◕",
+        "done" => "✅",
+        "err" | "close" => "❌",
+        "kill" => "⛔",
+        "pause" => "⏸",
+        "play" => "▶️",
+        "queue" => "📋",
+        "invoice" => "🧾",
+        "vault" => "🏦",
+        "robot" => "🤖",
+        "dash" => "🎛",
+        "chart" => "📊",
+        "plug" => "🔌",
+        "cb" => "🔷",
+        "xr" => "🚀",
+        "swap" => "🔁",
+        "rates" => "📈",
+        "history" => "🕘",
+        "support" => "💬",
+        "shield" => "🛡",
+        "lock" => "🔒",
+        "key" => "🔑",
+        "refresh" => "🔄",
+        "settings" => "⚙️",
+        "users" | "staff" => "👥",
+        "user" => "👤",
+        "journal" => "📓",
+        "search" => "🔎",
+        "fire" => "🔥",
+        "flood" => "⌛",
+        "maint" => "🛠",
+        "ban" => "🚫",
+        "limit" => "📏",
+        "usdt" => "💲",
+        "wallet" => "👛",
+        "inbox" => "📥",
+        "back" => "◀️",
+        "home" => "🏠",
+        "eye" => "👁",
+        "emoji" => "😊",
+        "megaphone" | "broadcast" => "📣",
+        "export" => "📤",
+        "sparkle" => "✨",
+        "help" => "❓",
+        _ => "•",
+    }
+}
+
 /// `custom_emoji_id` — число до 32 цифр (ничего другого в атрибут HTML не попадёт).
 pub fn is_custom_emoji_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 32 && id.bytes().all(|b| b.is_ascii_digit())
@@ -380,6 +446,9 @@ pub struct EmojiSet {
     ids: BTreeMap<Emoji, String>,
     /// id для иконок кнопок; нет — как в тексте.
     buttons: BTreeMap<Emoji, String>,
+    /// Весь действующий набор по ключу значка (`color/alarm`, `mono/queue`): пульт берёт
+    /// значки не по ролям клиента, а прямо по ключу макета. Без Premium — пусто.
+    pack: BTreeMap<String, String>,
 }
 
 impl EmojiSet {
@@ -402,6 +471,7 @@ impl EmojiSet {
             premium: true,
             ids: map,
             buttons: BTreeMap::new(),
+            pack: BTreeMap::new(),
         })
     }
 
@@ -437,15 +507,26 @@ impl EmojiSet {
                 buttons.insert(role, id);
             }
         }
+        let pack = pack
+            .iter()
+            .filter(|(_, id)| is_custom_emoji_id(id))
+            .map(|(k, id)| (k.clone(), id.clone()))
+            .collect();
         Ok(Self {
             premium: true,
             ids,
             buttons,
+            pack,
         })
     }
 
     pub fn is_premium(&self) -> bool {
         self.premium
+    }
+
+    /// `custom_emoji_id` значка набора по ключу (`color/alarm`, `mono/queue`).
+    pub fn pack_id(&self, key: &str) -> Option<&str> {
+        self.pack.get(key).map(String::as_str)
     }
 
     /// `custom_emoji_id` роли в тексте, если Premium включён и id задан.

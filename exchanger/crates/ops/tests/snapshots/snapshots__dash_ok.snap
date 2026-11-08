@@ -1,0 +1,68 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&screen)
+---
+--- rich
+<h3>🚨 Нужно решить · 4</h3>
+<table compact>
+<tr>
+<td>🔴</td>
+<td>Разбор</td>
+<td align="right">
+<b>2</b> · старейший 6 мин</td>
+</tr>
+<tr>
+<td>🟠</td>
+<td>Оплатить счёт вручную</td>
+<td align="right">
+<b>1</b> · 12.00</td>
+</tr>
+<tr>
+<td>🟠</td>
+<td>Незнакомый ответ</td>
+<td align="right">
+<b>1</b> · xRocket</td>
+</tr>
+</table>
+<hr/>
+<table bordered>
+<tr>
+<td>Обменов<br/>
+<b>148</b> ▲ 9 %</td>
+<td>Оборот<br/>
+<b>12 480</b> ▲ 5 %</td>
+<td>Прибыль<br/>
+<b>291.40</b> ▲ 6 %</td>
+</tr>
+</table>
+<table striped compact>
+<tr>
+<th>Резерв</th>
+<th align="right">Доступно</th>
+<th align="right">От цели</th>
+</tr>
+<tr>
+<td>🔷 CryptoBot</td>
+<td align="right">2 140.00</td>
+<td align="right">🟢 143 %</td>
+</tr>
+<tr>
+<td>🚀 xRocket</td>
+<td align="right">640.00</td>
+<td align="right">🟠 43 %</td>
+</tr>
+</table>
+<footer>🟢 Аккаунты 2/2 · сверка <tg-time unix="1793876400" format="t">14:00</tg-time> · выплаты идут · ▲▼ к вчера</footer>
+--- html
+<b>🚨 Нужно решить · 4</b>
+<blockquote>🔴 Разбор — <b>2</b> · старейший 6 мин
+🟠 Оплатить счёт вручную — <b>1</b> · 12.00
+🟠 Незнакомый ответ — <b>1</b> · xRocket</blockquote>
+Обменов <b>148</b> ▲ 9 % · Оборот <b>12 480</b> ▲ 5 % · Прибыль <b>291.40</b> ▲ 6 %
+<blockquote>🔷 CryptoBot — 2 140.00 · 🟢 143 % от цели
+🚀 xRocket — 640.00 · 🟠 43 % от цели</blockquote>
+<i>🟢 Аккаунты 2/2 · сверка <tg-time unix="1793876400" format="t">14:00</tg-time> · выплаты идут · ▲▼ к вчера</i>
+--- keyboard
+[{"text":"📋 Разбор · 2","style":"primary","callback_data":"a:q"},{"text":"🧾 Счета · 1","style":"primary","callback_data":"a:q"}]
+[{"text":"⚠️ Ответы · 1","callback_data":"a:dirs"},{"text":"🏦 Резервы","callback_data":"a:rc"}]
+[{"text":"🤖 Аккаунты","callback_data":"a:b"},{"text":"🎛 Меню","callback_data":"a:m"}]

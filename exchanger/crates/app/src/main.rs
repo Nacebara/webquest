@@ -48,9 +48,12 @@ enum Command {
     /// Демо: настоящий бот и пульт на симуляторе кошельков — без денег и юзербота, на
     /// отдельной базе `<база>_demo` (пересоздаётся при запуске). Пробы — команда /demo в боте.
     Demo {
-        /// Сразу прислать владельцу «Предпросмотр экранов» (все экраны клиента по макету).
+        /// Сразу прислать владельцу «Предпросмотр экранов» (все экраны клиента и пульта).
         #[arg(long)]
         preview: bool,
+        /// Сразу прислать владельцу только экраны пульта (в боте — команда /preview_panel).
+        #[arg(long)]
+        preview_panel: bool,
     },
     /// Применить миграции и выйти.
     Migrate,
@@ -230,7 +233,10 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
     let result = runtime.block_on(async {
         match command {
             Command::Run => run().await,
-            Command::Demo { preview } => demo(preview).await,
+            Command::Demo {
+                preview,
+                preview_panel,
+            } => demo(preview, preview_panel).await,
             Command::Setup => setup(paths, bare).await,
             Command::Check => check(paths).await,
             Command::Migrate => migrate().await,
@@ -590,7 +596,7 @@ async fn spawn_bot(
 }
 
 /// `exch demo`: тот же бот и пульт, кошельки — симулятор, база — `<база>_demo`.
-async fn demo(preview: bool) -> anyhow::Result<()> {
+async fn demo(preview: bool, preview_panel: bool) -> anyhow::Result<()> {
     let cfg = load_config()?;
     let token = cfg
         .client_bot_token
@@ -641,14 +647,17 @@ async fn demo(preview: bool) -> anyhow::Result<()> {
         Some(&world),
     )
     .await?;
-    if preview {
+    if preview || preview_panel {
         let api = app::telegram::bot_api(token)?;
-        let ui = ui::Ui::builtin(
-            app::runtime::emoji_set(&pool).await,
-            ui::UiConfig::default(),
-        )
-        .context("built-in client texts are invalid")?;
-        app::demo::send_preview(&api, &ui, cfg.owner_tg_id).await;
+        let emoji = app::runtime::emoji_set(&pool).await;
+        let look = ops::Look::new(emoji.clone());
+        let ui = ui::Ui::builtin(emoji, ui::UiConfig::default())
+            .context("built-in client texts are invalid")?;
+        if preview {
+            app::demo::send_preview(&api, &ui, &look, cfg.owner_tg_id).await;
+        } else {
+            app::demo::send_panel_preview(&api, &look, cfg.owner_tg_id).await;
+        }
     }
     wait(tasks, cancel).await
 }

@@ -1,0 +1,74 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT DISTINCT ON (wallet_account_id)\n               wallet_account_id, expected, actual, verdict, at\n          FROM reconciliations\n         WHERE asset = 'USDT' AND verdict <> 'skipped_inflight'\n         ORDER BY wallet_account_id, at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "wallet_account_id",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "reconciliations",
+            "name": "wallet_account_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "expected",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "reconciliations",
+            "name": "expected"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "actual",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "reconciliations",
+            "name": "actual"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "verdict",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reconciliations",
+            "name": "verdict"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "reconciliations",
+            "name": "at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "07e435473d0c8690eaa98353d778e1bffaa96eb7f9e59bd9d27598127d39e162"
+}

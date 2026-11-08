@@ -694,11 +694,10 @@ impl Inner {
             InvestOp::Terms { after, .. } => {
                 let user = after.user_id;
                 return Ok(match self.engine.invest_save_terms(staff, after).await {
-                    Ok(()) => {
-                        let mut card = self.invest_card(staff, user).await?;
-                        card.text = format!("{}\n\n{}", t.t("common.saved"), card.text);
-                        card
-                    }
+                    Ok(()) => self
+                        .invest_card(staff, user)
+                        .await?
+                        .notice(&t.t("common.saved")),
                     Err(e) => Screen::new(self.invest_refusal(e))
                         .row(vec![btn(t.t("common.back"), &Cb::Invest(user))]),
                 });
@@ -713,11 +712,10 @@ impl Inner {
                 };
                 terms.is_active = *active;
                 return Ok(match self.engine.invest_save_terms(staff, &terms).await {
-                    Ok(()) => {
-                        let mut card = self.invest_card(staff, *user).await?;
-                        card.text = format!("{}\n\n{}", t.t("common.saved"), card.text);
-                        card
-                    }
+                    Ok(()) => self
+                        .invest_card(staff, *user)
+                        .await?
+                        .notice(&t.t("common.saved")),
                     Err(e) => Screen::new(self.invest_refusal(e))
                         .row(vec![btn(t.t("common.back"), &Cb::Invest(*user))]),
                 });
@@ -756,9 +754,7 @@ impl Inner {
             Ok(m) => t.f("invest.done", &[("status", &self.move_status(m.status))]),
             Err(e) => self.invest_refusal(e),
         };
-        let mut card = self.invest_move(staff, move_id).await?;
-        card.text = format!("{head}\n\n{}", card.text);
-        Ok(card)
+        Ok(self.invest_move(staff, move_id).await?.notice(&head))
     }
 }
 
