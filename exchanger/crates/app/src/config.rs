@@ -62,8 +62,8 @@ impl Config {
         let get = |k: &str| {
             lookup(k)
                 .map(|v| {
-                    // Частая ошибка: строку `KEY=…` из `0-key.bat` вставили после `KEY=`
-                    // шаблона — получилось `KEY=KEY=…`. Имя переменной в значении не бывает.
+                    // Частая ошибка: готовую строку `KEY=…` вставили после `KEY=` шаблона —
+                    // получилось `KEY=KEY=…`. Имя переменной в значении не бывает.
                     let prefix = format!("{k}=");
                     let mut v = v.trim();
                     while let Some(rest) = v.strip_prefix(prefix.as_str()) {
@@ -98,6 +98,11 @@ impl Config {
             tz_owner: get("TZ_OWNER").unwrap_or_else(|| "UTC".to_owned()),
             support_contact: get("SUPPORT_CONTACT"),
         })
+    }
+
+    /// Разобрать `SESSION_KEY` (base64 32 байт) — для мастера и проверки.
+    pub fn parse_session_key(value: String) -> Result<SessionKey, ConfigError> {
+        parse_session_key(value)
     }
 
     /// Чего не хватает для следующих вех (без значений — только имена переменных).

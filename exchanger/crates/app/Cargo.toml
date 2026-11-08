@@ -41,6 +41,8 @@ thiserror.workspace = true
 # fs, io-util — запись файла `exch record` без блокировки рантайма.
 tokio = { workspace = true, features = ["fs", "io-util"] }
 tokio-util.workspace = true
+# config.toml — настройки без секретов, как у гаранта (тот же крейт, что у ui и ops).
+toml = { version = "1.1.6", default-features = false, features = ["std", "serde", "parse"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
 ui = { path = "../ui" }

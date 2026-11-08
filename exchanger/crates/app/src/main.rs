@@ -22,23 +22,31 @@ use app::telegram::TelegramSettings;
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(60);
 
 #[derive(Parser)]
-#[command(name = "exch", version, about = "Бот-обменник xRocket ⇄ CryptoBot")]
+#[command(
+    name = "exch",
+    version,
+    about = "Бот-обменник xRocket ⇄ CryptoBot",
+    long_about = "Бот-обменник xRocket ⇄ CryptoBot.\n\nБез команды — запустить бота (первый раз — мастер настройки). Секреты — в .env, остальные настройки — в config.toml в папке проекта."
+)]
 struct Cli {
-    /// Файл с переменными окружения для локальной разработки (по умолчанию .env, если есть).
+    /// Файл секретов (по умолчанию .env в папке проекта: рядом, в target/release или выше).
     #[arg(long, global = true)]
     env_file: Option<PathBuf>,
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand)]
 enum Command {
-    /// Применить миграции и работать до SIGTERM / Ctrl-C.
+    /// Применить миграции и работать до Ctrl-C (то же, что запуск без команды).
     Run,
+    /// Мастер настройки: база, бот, владелец, ключи, вход юзерботом. Можно запускать повторно.
+    Setup,
+    /// Проверить всё по-русски: ✅ готово, ⚠️ стоит поправить, ❌ не заработает.
+    #[command(alias = "check-config")]
+    Check,
     /// Применить миграции и выйти.
     Migrate,
-    /// Проверить переменные окружения; значения секретов не печатаются.
-    CheckConfig,
     /// Войти аккаунтом юзербота и привязать его к кошельку платформы. Телефон, код и пароль
     /// 2FA спрашиваются в терминале и никуда не сохраняются, сессия — только зашифрованной.
     Login {
@@ -130,24 +138,68 @@ fn load_env_file(path: &std::path::Path) -> Result<(), String> {
     dotenvy::from_read(std::io::Cursor::new(text.as_bytes())).map_err(|e| e.to_string())
 }
 
+/// Переменные из `config.toml`: только те, что не заданы окружением или `.env` (пустое
+/// значение = не задано). Вызывается до запуска рантайма — потоков ещё нет.
+fn load_settings_file(path: &std::path::Path) -> Result<(), String> {
+    let mut values = app::settings_file::load(path)?;
+    values.retain(|k, _| std::env::var(k).map_or(true, |v| v.trim().is_empty()));
+    let text = app::project::dotenv_text(&values);
+    dotenvy::from_read_override(std::io::Cursor::new(text.into_bytes())).map_err(|e| e.to_string())
+}
+
 fn main() -> ExitCode {
+    // Двойной щелчок по exch.exe: аргументов нет, окно закроется сразу после выхода.
+    let bare = std::env::args_os().len() <= 1;
     let cli = Cli::parse();
-    // .env необязателен: на сервере переменные приходят из docker compose. Но если файл
-    // есть и в нём ошибка — сказать об этом, а не молча работать без него.
-    let env_file = cli.env_file.clone().or_else(|| {
-        let default = PathBuf::from(".env");
-        default.is_file().then_some(default)
-    });
-    if let Some(path) = &env_file
-        && let Err(e) = load_env_file(path)
-    {
-        eprintln!("cannot read {}: {e}", path.display());
-        return ExitCode::FAILURE;
+    let paths = match cli.env_file.clone() {
+        Some(env) => app::project::Paths::for_env_file(env),
+        None => app::project::locate(),
+    };
+    let has_env = paths.env.is_file();
+    // Первый запуск без команды и без .env — сразу мастер настройки.
+    let command = cli
+        .command
+        .unwrap_or(if has_env || std::env::var_os("DATABASE_URL").is_some() {
+            Command::Run
+        } else {
+            Command::Setup
+        });
+    let code = start(command, &paths, has_env, bare);
+    if bare && code != ExitCode::SUCCESS {
+        app::prompt::pause();
     }
-    // У слушателя на ноутбуке вывод для человека: короткие строки, только предупреждения.
-    let human = matches!(cli.command, Command::Listen { .. } | Command::Emoji(_));
-    // LOG_FORMAT=text — обычный текст вместо JSON (запуск на ноутбуке, docs/LAPTOP.md).
-    let text = std::env::var("LOG_FORMAT").is_ok_and(|v| v.eq_ignore_ascii_case("text"));
+    code
+}
+
+fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: bool) -> ExitCode {
+    // Мастер читает и пишет файлы сам: переменные из старого .env ему не нужны.
+    let wizard = matches!(command, Command::Setup);
+    if !wizard {
+        // .env необязателен (на сервере переменные приходят из окружения), но если он есть
+        // и в нём ошибка — сказать об этом, а не молча работать без него.
+        if has_env && let Err(e) = load_env_file(&paths.env) {
+            eprintln!("Ошибка в {}: {e}", paths.env.display());
+            return ExitCode::FAILURE;
+        }
+        // Ошибку в config.toml покажет `exch check` строкой отчёта.
+        if let Err(e) = load_settings_file(&paths.config)
+            && !matches!(command, Command::Check)
+        {
+            eprintln!("Ошибка в {}: {e}", paths.config.display());
+            return ExitCode::FAILURE;
+        }
+    }
+    // Вывод для человека: короткие строки, только предупреждения.
+    let human = matches!(
+        command,
+        Command::Listen { .. } | Command::Emoji(_) | Command::Setup | Command::Check
+    );
+    // LOG_FORMAT=text — обычный текст, json — для сервера; не задан — текст в окне программы,
+    // JSON, когда вывод идёт в файл или журнал сервера.
+    let text = match std::env::var("LOG_FORMAT") {
+        Ok(v) if !v.trim().is_empty() => v.trim().eq_ignore_ascii_case("text"),
+        _ => std::io::IsTerminal::is_terminal(&std::io::stderr()),
+    };
     init_tracing(human, text);
 
     let runtime = match tokio::runtime::Builder::new_multi_thread()
@@ -161,10 +213,11 @@ fn main() -> ExitCode {
         }
     };
     let result = runtime.block_on(async {
-        match cli.command {
+        match command {
             Command::Run => run().await,
+            Command::Setup => setup(paths, bare).await,
+            Command::Check => check(paths).await,
             Command::Migrate => migrate().await,
-            Command::CheckConfig => check_config().await,
             Command::Selftest { amount } => selftest(amount).await,
             Command::GenSessionKey => {
                 use base64::Engine as _;
@@ -281,25 +334,7 @@ fn load_config() -> anyhow::Result<Config> {
 }
 
 async fn connect_and_migrate(cfg: &Config) -> anyhow::Result<storage::PgPool> {
-    use sqlx::migrate::MigrateDatabase as _;
-    // Своя база на ноутбуке: создать, если её ещё нет (на сервере её создаёт контейнер).
-    let url = cfg.database_url.expose_secret();
-    match sqlx::Postgres::database_exists(url).await {
-        Ok(false) => {
-            sqlx::Postgres::create_database(url)
-                .await
-                .context("cannot create the database (does the user have CREATEDB?)")?;
-            tracing::info!("database created");
-        }
-        Ok(true) => {}
-        Err(e) => tracing::debug!(error = %e, "cannot check whether the database exists"),
-    }
-    let pool = storage::connect(cfg.database_url.expose_secret())
-        .await
-        .context("cannot connect to PostgreSQL")?;
-    storage::migrate(&pool).await.context("migrations failed")?;
-    tracing::info!("migrations applied");
-    Ok(pool)
+    app::db::connect_and_migrate(cfg.database_url.expose_secret()).await
 }
 
 async fn migrate() -> anyhow::Result<()> {
@@ -307,43 +342,39 @@ async fn migrate() -> anyhow::Result<()> {
     connect_and_migrate(&cfg).await.map(|_| ())
 }
 
-async fn check_config() -> anyhow::Result<()> {
-    let cfg = load_config()?;
-    tracing::info!(owner_tg_id = cfg.owner_tg_id, tz_owner = %cfg.tz_owner, "configuration is valid");
-    for p in cfg.pending() {
-        tracing::warn!(
-            var = p.var,
-            milestone = p.milestone,
-            "not set yet, required from this milestone"
-        );
+/// Мастер; если владелец хочет запустить бота сразу — новый процесс `exch run` в этом же
+/// окне: он прочитает только что записанные .env и config.toml как при обычном запуске.
+async fn setup(paths: &app::project::Paths, bare: bool) -> anyhow::Result<()> {
+    if !app::setup::run(paths, bare).await? {
+        if bare {
+            app::prompt::pause();
+        }
+        return Ok(());
     }
-    if let Err(e) = TelegramSettings::from_config(&cfg) {
-        tracing::warn!(error = %e, "userbots cannot connect yet");
-    }
-    // Аккаунты и кошельки — только метки, маски телефонов и статусы, без секретов.
-    let pool = storage::connect(cfg.database_url.expose_secret())
-        .await
-        .context("cannot connect to PostgreSQL")?;
-    let mut conn = pool.acquire().await?;
-    for acc in storage::sessions::list(&mut conn).await? {
-        tracing::info!(
-            account = %acc.label,
-            phone = %acc.phone_masked,
-            status = acc.status.db_name(),
-            has_session = acc.has_session,
-            tg_user_id = acc.tg_user_id,
-            "userbot account"
-        );
-    }
-    for w in storage::wallets::list(&mut conn).await? {
-        tracing::info!(
-            wallet = %w.label,
-            platform = w.platform.db_name(),
-            active = w.is_active,
-            account = %w.userbot_label,
-            "wallet"
-        );
-    }
+    let exe = std::env::current_exe().context("cannot find exch.exe")?;
+    let env = paths.env.clone();
+    let status = tokio::task::spawn_blocking(move || {
+        std::process::Command::new(exe)
+            .arg("--env-file")
+            .arg(env)
+            .arg("run")
+            .status()
+    })
+    .await
+    .context("cannot start exch run")?
+    .context("cannot start exch run")?;
+    anyhow::ensure!(status.success(), "exch run stopped with {status}");
+    Ok(())
+}
+
+async fn check(paths: &app::project::Paths) -> anyhow::Result<()> {
+    println!("Проверка exch — {}\n", paths.dir.display());
+    let report = app::check::run(paths).await;
+    print!("{report}");
+    anyhow::ensure!(
+        report.count(app::check::Mark::Fail) == 0,
+        "исправьте строки с ❌ и запустите exch check ещё раз"
+    );
     Ok(())
 }
 

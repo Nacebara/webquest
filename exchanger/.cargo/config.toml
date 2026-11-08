@@ -1,0 +1,6 @@
+# Сборка без базы данных: данные запросов sqlx лежат в .sqlx/ (их обновляет
+# `cargo sqlx prepare --workspace -- --all-targets`). Так `cargo build --release` работает на
+# любом компьютере, даже если PostgreSQL ещё не настроен. Переменная окружения SQLX_OFFLINE,
+# если задана, сильнее этой строки.
+[env]
+SQLX_OFFLINE = "true"

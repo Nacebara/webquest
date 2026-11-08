@@ -19,21 +19,23 @@ Telegram-бот на Rust. Клиент присылает чек CryptoBot ил
 ## Команды
 
 ```bash
-# локальная БД (Linux/macOS/Windows — Docker)
-docker run -d --name exch-pg -e POSTGRES_PASSWORD=dev -p 5432:5432 postgres:16
-export DATABASE_URL=postgres://postgres:dev@localhost:5432/exch   # PowerShell: $env:DATABASE_URL="…"
+# свой PostgreSQL 16 (у владельца — служба Windows; Docker не предлагать)
+export DATABASE_URL=postgres://postgres:<пароль>@localhost:5432/exch   # PowerShell: $env:DATABASE_URL="…"
 cargo install sqlx-cli --version 0.9.0 --locked --no-default-features --features postgres,rustls   # один раз
 
-cargo sqlx database create && cargo sqlx migrate run --source migrations
+cargo build --release                      # без базы: .cargo/config.toml включает SQLX_OFFLINE
+target/release/exch                        # без команды — запуск; первый раз — мастер `exch setup`
 cargo fmt --all
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features      # нужен DATABASE_URL; sqlx::test создаёт БД на тест
 cargo sqlx prepare --workspace -- --all-targets   # после изменения SQL-запросов; коммитить .sqlx/
-cargo run --bin exch -- --help             # CLI: run | migrate | check-config | login | record | listen | emoji | selftest
+cargo run --bin exch -- --help             # CLI: run | setup | check | migrate | login | selftest | emoji | record | listen
 ```
 
+Настройки: секреты — `.env` (`.env.example`), остальное — `config.toml` (`config.example.toml`), переменные окружения сильнее обоих. Файлы ищутся в текущей папке, затем у бинарника и на два уровня выше (`app::project`). Запуск у владельца — `docs/LAPTOP.md`.
+
 `--all-features` обязателен: тесты симулятора кошельков — за feature `sim`.
-Сборка без БД: `SQLX_OFFLINE=true cargo build` (данные запросов — в `.sqlx/`). CI — `../.github/workflows/exchanger-ci.yml`.
+Сборка без БД — по умолчанию (`.cargo/config.toml`, данные запросов — в `.sqlx/`); `SQLX_OFFLINE=false` — проверять запросы по живой базе. CI — `../.github/workflows/exchanger-ci.yml`.
 
 Перед **каждым** коммитом все четыре: fmt, clippy без предупреждений, test, `cargo sqlx prepare --workspace --check -- --all-targets`.
 
@@ -76,7 +78,7 @@ app (бинарник exch) ← всё
 ### Секреты и логи
 15. Токены ботов, `TG_API_HASH`, сессии, `SESSION_KEY` — только из переменных окружения. Тип `secrecy::SecretString`. Не попадают в логи, ошибки, БД (кроме зашифрованной сессии), коммиты, тестовые снимки и промты. Код-пароль CryptoBot в системе не хранится и не вводится никогда (DESIGN-v0.2 Р4).
 16. `start_param` чеков, ссылки на чеки и телефоны в логах — маскировать.
-17. `.env` никогда не коммитится; новые переменные — в `.env.example` без значений и в `app::config`.
+17. `.env` никогда не коммитится; новые секреты — в `.env.example` без значений и в `app::config`; несекретные настройки — в `config.example.toml` и `app::settings_file`.
 
 ### Интерфейс
 18. Тексты — в `crates/ui/ru.toml` (клиент) и `crates/ops/ru.toml` (пульт), не в коде. Telegram HTML: только разрешённые теги, все подстановки экранированы (тест `ui/tests/html_valid.rs`). Денежный поток клиента — обычные HTML-сообщения (так в макете); справка клиента и **все экраны пульта** — карточки (rich + запасной HTML).

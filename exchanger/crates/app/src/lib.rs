@@ -7,15 +7,23 @@
 //! - [`telegram`] — настройки подключения юзерботов из окружения;
 //! - [`login`] — `exch login`; [`record`] — `exch record`;
 //! - [`runtime`] — подключение юзерботов и сборка движка для `exch run`;
-//! - [`emoji`] — премиум-эмодзи: вариация набора, свои эмодзи по ролям, установка (`exch emoji`).
+//! - [`emoji`] — премиум-эмодзи: вариация набора, свои эмодзи по ролям, установка (`exch emoji`);
+//! - [`project`] — папка проекта: `.env` и `config.toml` ([`settings_file`]);
+//! - [`setup`] — мастер `exch setup`; [`check`] — проверка `exch check`; [`db`] — база.
 
+pub mod check;
 pub mod config;
+pub mod db;
 pub mod emoji;
 pub mod listen;
 pub mod login;
+pub mod project;
+pub mod prompt;
 pub mod record;
 pub mod runtime;
 pub mod session_store;
+pub mod settings_file;
+pub mod setup;
 pub mod supervisor;
 pub mod telegram;
 pub mod wallet_log;
