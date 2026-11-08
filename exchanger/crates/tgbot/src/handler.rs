@@ -313,14 +313,39 @@ pub(crate) async fn handle(inner: &Arc<Inner>, update: Update) -> Result<(), TgB
     if let Some(query) = update.callback_query {
         return callback(inner, query).await;
     }
-    // Правки сообщений не обрабатываем: исправленная ссылка — это новое сообщение.
-    match update.message {
-        Some(message) => message_update(inner, &message).await,
-        None => Ok(()),
+    // Правка — тоже приход ссылки: чек, созданный через `@send` / `@xrocket` прямо в этом
+    // чате, сначала приходит заглушкой «Создание чека…», а ссылка появляется кнопкой в
+    // правке того же сообщения (docs/LOVEC-PORTING.md §8.1, шаг 5).
+    match (update.message, update.edited_message) {
+        (Some(message), _) => message_update(inner, &message, Arrival::New).await,
+        (None, Some(message)) => message_update(inner, &message, Arrival::Edited).await,
+        (None, None) => Ok(()),
     }
 }
 
-async fn message_update(inner: &Arc<Inner>, message: &Message) -> Result<(), TgBotError> {
+/// Как пришло сообщение.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Arrival {
+    New,
+    /// Правка ранее присланного сообщения: берём из неё только новые ссылки на чек или счёт,
+    /// без команд, кнопок меню и подсказок.
+    Edited,
+}
+
+/// Кошелёк, через инлайн-режим которого отправлено сообщение (`via_bot`).
+fn wallet_via_bot(message: &Message) -> Option<domain::Platform> {
+    message
+        .via_bot
+        .as_ref()
+        .and_then(|b| b.username.as_deref())
+        .and_then(parsers::links::official_platform)
+}
+
+async fn message_update(
+    inner: &Arc<Inner>,
+    message: &Message,
+    arrival: Arrival,
+) -> Result<(), TgBotError> {
     if message.chat.kind != ChatType::Private {
         return Ok(());
     }
@@ -332,6 +357,23 @@ async fn message_update(inner: &Arc<Inner>, message: &Message) -> Result<(), TgB
         return inner.banned(chat, from.id, &ban).await;
     }
     let text = message.text_and_entities().map_or("", |(text, _)| text);
+
+    if arrival == Arrival::Edited {
+        let found = extract_from_message(text, &message.entity_urls(), &message.button_urls());
+        // Только то, чего в этом сообщении ещё не было: правка без новой ссылки — молча.
+        if !inner.first_seen_links(chat, message.message_id, &found) {
+            return Ok(());
+        }
+        tracing::info!(
+            user = from.id,
+            via = ?wallet_via_bot(message),
+            "check link arrived in an edited message"
+        );
+        if inner.invest_message(chat, from.id, text, &found).await? {
+            return Ok(());
+        }
+        return intake::process(inner, chat, from.id, &found).await;
+    }
 
     if let Some(command) = Command::parse(text, inner.bot_username()) {
         // Диплинк `t.me/<бот>?start=CQ…` — это чек.
@@ -353,6 +395,16 @@ async fn message_update(inner: &Arc<Inner>, message: &Message) -> Result<(), TgB
         && let Some(bare) = parse_bare_code(text)
     {
         found.push(bare);
+    }
+    // Запомнить ссылки этого сообщения: правка без новых ссылок не станет второй заявкой.
+    inner.first_seen_links(chat, message.message_id, &found);
+    // Чек через инлайн-режим кошелька ещё создаётся: ссылка придёт правкой — подождать.
+    if found.is_empty()
+        && let Some(platform) = wallet_via_bot(message)
+    {
+        return inner
+            .reply(chat, &inner.ui().check_link_pending(platform))
+            .await;
     }
     // Инвестор нажал «Пополнить» или выбрал кошелёк вывода: чек или сумма — туда.
     if (message.forward_origin.is_none() || !found.is_empty())

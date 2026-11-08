@@ -444,6 +444,8 @@ pub struct MiscTexts {
     pub cancelled_flow: String,
     /// Ссылка на счёт, пока оплата счетов не подключена к движку.
     pub invoice_soon: String,
+    /// Чек через инлайн-режим кошелька ещё создаётся — ссылка придёт правкой.
+    pub check_pending: String,
 }
 
 /// Раздел «💼 Инвестиции» (DESIGN-v0.2 Р18).

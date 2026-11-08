@@ -112,7 +112,7 @@ struct CopyTextButton {
     text: String,
 }
 
-/// `{"url": "…"}` внутри `web_app`.
+/// `{"url": "…"}` внутри `web_app` и `login_url`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct WebAppInfo {
     url: String,
@@ -136,11 +136,14 @@ struct WireInlineButton {
     disabled: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     web_app: Option<WebAppInfo>,
+    /// Во входящих сообщениях: кнопка входа по ссылке — для нас это обычная ссылка.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    login_url: Option<WebAppInfo>,
 }
 
 impl From<WireInlineButton> for InlineKeyboardButton {
     fn from(w: WireInlineButton) -> Self {
-        let action = if let Some(url) = w.url {
+        let action = if let Some(url) = w.url.or(w.login_url.map(|l| l.url)) {
             InlineButtonAction::Url(url)
         } else if let Some(data) = w.callback_data {
             InlineButtonAction::CallbackData(data)

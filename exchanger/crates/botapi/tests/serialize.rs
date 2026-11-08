@@ -370,3 +370,33 @@ fn unknown_and_broken_updates_still_advance_offset() {
     assert_eq!(ids, vec![1000, 1001, 1002]);
     assert!(updates[1].message.is_none() && updates[2].message.is_none());
 }
+
+/// Ссылка на чек может быть в любой кнопке: URL, мини-приложение, вход по ссылке или
+/// «Скопировать» (кошельки кладут туда ссылку на чек).
+#[test]
+fn links_are_read_from_every_kind_of_button() {
+    let message: Message = serde_json::from_value(json!({
+        "message_id": 8,
+        "chat": {"id": 10, "type": "private"},
+        "date": 1,
+        "via_bot": {"id": 1_559_501_630_i64, "is_bot": true, "first_name": "Crypto Bot", "username": "send"},
+        "text": "🦋 Чек на 1 USDT",
+        "reply_markup": {"inline_keyboard": [
+            [{"text": "Получить", "url": "https://t.me/send?start=CQaaaaaaaaaa"}],
+            [{"text": "Открыть", "web_app": {"url": "https://t.me/send?start=CQbbbbbbbbbb"}}],
+            [{"text": "Войти", "login_url": {"url": "https://t.me/xrocket?start=t_abcdefghijklmno"}}],
+            [{"text": "Скопировать", "copy_text": {"text": "https://t.me/send?start=CQcccccccccc"}}],
+            [{"text": "Ещё", "callback_data": "x"}]
+        ]}
+    }))
+    .unwrap();
+    assert_eq!(
+        message.button_urls(),
+        vec![
+            "https://t.me/send?start=CQaaaaaaaaaa".to_owned(),
+            "https://t.me/send?start=CQbbbbbbbbbb".to_owned(),
+            "https://t.me/xrocket?start=t_abcdefghijklmno".to_owned(),
+            "https://t.me/send?start=CQcccccccccc".to_owned(),
+        ]
+    );
+}

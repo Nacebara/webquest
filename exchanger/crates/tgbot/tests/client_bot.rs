@@ -163,6 +163,27 @@ impl FakeTelegram {
         }));
     }
 
+    /// Сообщение клиента в чате с ботом (`kind`: `message` или `edited_message`) с
+    /// дополнительными полями (`via_bot`, `reply_markup`, `edit_date`).
+    fn client_message(&self, kind: &str, message_id: i64, text: &str, extra: Value) {
+        let mut s = self.lock();
+        let id = s.next_update;
+        s.next_update += 1;
+        let mut message = json!({
+            "message_id": message_id,
+            "date": 1,
+            "chat": { "id": CLIENT, "type": "private", "first_name": "Client" },
+            "from": { "id": CLIENT, "is_bot": false, "first_name": "Client", "language_code": "ru" },
+            "text": text,
+        });
+        if let (Some(m), Some(e)) = (message.as_object_mut(), extra.as_object()) {
+            for (k, v) in e {
+                m.insert(k.clone(), v.clone());
+            }
+        }
+        s.updates.push(json!({ "update_id": id, kind: message }));
+    }
+
     /// Клиент нажимает инлайн-кнопку `data` под сообщением `message_id`.
     fn client_presses(&self, message_id: i64, data: &str) {
         let mut s = self.lock();
@@ -972,4 +993,115 @@ async fn investor_deposits_by_check_and_withdraws_a_check(pool: PgPool) {
         dec!(-150)
     );
     e.assert_books_match().await;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Чек со ссылкой в кнопке
+
+fn via_send() -> Value {
+    json!({ "id": 1_559_501_630_i64, "is_bot": true, "first_name": "Crypto Bot", "username": "send" })
+}
+
+/// Главный путь из макета: клиент набирает `@send 100usdt` прямо в чате с ботом. CryptoBot
+/// присылает заглушку «Создание чека…» без ссылки, а ссылку добавляет кнопкой правкой того же
+/// сообщения. Бот ждёт, берёт чек из правки, и повторная правка не создаёт вторую заявку.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn inline_check_created_in_the_chat_is_taken_from_the_edited_button(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+
+    e.fake.client_message(
+        "message",
+        50,
+        "Создание чека…",
+        json!({ "via_bot": via_send() }),
+    );
+    e.fake
+        .wait_for("pending notice", |c| {
+            c.method == "sendMessage" && c.contains("дописывает ссылку")
+        })
+        .await;
+    assert!(e.orders().await.is_empty(), "без ссылки заявки нет");
+    assert!(
+        !e.calls_contain("Пришлите чек"),
+        "не подсказка «пришлите чек»"
+    );
+
+    let button = json!({ "inline_keyboard": [[{ "text": "Получить 100 USDT", "url": url }]] });
+    e.fake.client_message(
+        "edited_message",
+        50,
+        "🦋 Чек на 100 USDT",
+        json!({ "via_bot": via_send(), "edit_date": 2, "reply_markup": button }),
+    );
+    let (order_id, _, _) = e.order_message().await;
+    e.drain().await;
+    let (_, state, _, _, payout_url) = e.orders().await[0].clone();
+    assert_eq!(state, OrderState::Completed, "заявка {order_id} выплачена");
+    let payout_url = payout_url.unwrap();
+
+    // Кошелёк правит сообщение ещё раз (например, «чек активирован») — второй заявки нет.
+    e.fake.client_message(
+        "edited_message",
+        50,
+        "🦋 Чек на 100 USDT активирован",
+        json!({ "via_bot": via_send(), "edit_date": 3, "reply_markup": button }),
+    );
+    e.fake
+        .wait_for("edit with the payout check", |c| {
+            c.method == "editMessageText" && c.contains(&payout_url)
+        })
+        .await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    bot.stop().await;
+    assert_eq!(e.orders().await.len(), 1, "одна заявка на чек");
+    assert!(!e.calls_contain("уже в работе"), "повторная правка — молча");
+    e.world.claim_check(e.client, &payout_url).unwrap();
+    e.assert_books_match().await;
+}
+
+/// Ссылка на чек только в кнопке «Скопировать» (`copy_text`) пересланного сообщения.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn check_link_in_a_copy_button_is_taken(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let url = e.world.client_check(XR, usdt(dec!(30))).unwrap();
+    e.fake.client_message(
+        "message",
+        60,
+        "Чек на 30 USDT",
+        json!({
+            "forward_origin": { "type": "user", "date": 0,
+                "sender_user": { "id": 777, "is_bot": false, "first_name": "Friend" } },
+            "reply_markup": { "inline_keyboard": [[{ "text": "Скопировать ссылку", "copy_text": { "text": url } }]] },
+        }),
+    );
+    e.order_message().await;
+    e.drain().await;
+    let (_, state, _, _, _) = e.orders().await[0].clone();
+    assert_eq!(state, OrderState::Completed);
+    bot.stop().await;
+}
+
+/// Клиент поправил своё сообщение без ссылки — бот молчит (не «пришлите чек» второй раз).
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn edited_text_without_a_link_is_ignored(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    e.fake.client_message("message", 70, "привет", json!({}));
+    e.fake
+        .wait_for("hint", |c| {
+            c.method == "sendMessage" && c.contains("Пришлите чек")
+        })
+        .await;
+    e.fake
+        .client_message("edited_message", 70, "привет!", json!({ "edit_date": 2 }));
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    bot.stop().await;
+    assert_eq!(
+        e.fake.calls_of("sendMessage").len(),
+        1,
+        "на правку без ссылки — тишина"
+    );
 }

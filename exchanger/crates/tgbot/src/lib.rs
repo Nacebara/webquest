@@ -206,7 +206,14 @@ pub(crate) struct Memory {
     notices: HashMap<(i64, Notice), Instant>,
     /// Инвестор нажал «Пополнить» или выбрал кошелёк вывода: чего ждём и с какого момента.
     invest_wait: HashMap<i64, (invest::Wait, Instant)>,
+    /// Ссылки, уже взятые из сообщения (чат, сообщение) — чтобы правка того же сообщения
+    /// не обработала их второй раз.
+    link_messages: HashMap<(i64, i32), HashSet<String>>,
+    link_order: VecDeque<(i64, i32)>,
 }
+
+/// Сколько сообщений со ссылками помнить для правок.
+const LINK_MEMORY: usize = 4096;
 
 /// Сколько rich-сообщений помнить для «Не отображается?».
 const RICH_MEMORY: usize = 1024;
@@ -320,6 +327,41 @@ impl Inner {
                 }
             }
         });
+    }
+
+    /// Отметить ссылки сообщения как взятые. `true` — среди них есть новая (ещё не взятая
+    /// из этого же сообщения), её надо обработать.
+    pub(crate) fn first_seen_links(
+        &self,
+        chat: i64,
+        message_id: i32,
+        found: &[Result<parsers::WalletLink, parsers::LinkError>],
+    ) -> bool {
+        let params: Vec<String> = found
+            .iter()
+            .filter_map(|f| f.as_ref().ok())
+            .map(|l| format!("{}:{}", l.platform.db_name(), l.param))
+            .collect();
+        if params.is_empty() {
+            return false;
+        }
+        self.memory(|m| {
+            let key = (chat, message_id);
+            if !m.link_messages.contains_key(&key) {
+                m.link_order.push_back(key);
+                while m.link_order.len() > LINK_MEMORY {
+                    if let Some(old) = m.link_order.pop_front() {
+                        m.link_messages.remove(&old);
+                    }
+                }
+            }
+            let seen = m.link_messages.entry(key).or_default();
+            let mut fresh = false;
+            for p in params {
+                fresh |= seen.insert(p);
+            }
+            fresh
+        })
     }
 
     fn prefers_plain(&self, user: i64) -> bool {

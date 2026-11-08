@@ -666,6 +666,16 @@ impl Ui {
         }
     }
 
+    /// Чек создаётся через инлайн-режим кошелька прямо в чате: ссылка придёт правкой
+    /// сообщения, бот её подхватит сам.
+    pub fn check_link_pending(&self, platform: domain::Platform) -> Screen {
+        let body = self.fill(
+            &self.texts.misc.check_pending,
+            &[("wallet", &self.wallet(platform))],
+        );
+        self.plain(body, Keyboard::None)
+    }
+
     /// S13: сообщение без ссылки.
     pub fn no_link(&self) -> Screen {
         let body = self.fill(

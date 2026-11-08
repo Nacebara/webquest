@@ -577,6 +577,10 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
         ("cancelled_order", ui.cancelled(Some(ORDER))),
         ("cancelled_flow", ui.cancelled(None)),
         ("invoice_soon", ui.invoice_soon()),
+        (
+            "check_link_pending",
+            ui.check_link_pending(Platform::CryptoBot),
+        ),
     ];
     let mut out: Vec<(String, Screen)> = screens
         .drain(..)

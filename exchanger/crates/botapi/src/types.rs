@@ -178,13 +178,17 @@ impl Message {
             .collect()
     }
 
-    /// URL инлайн-кнопок сообщения по рядам слева направо.
+    /// Ссылки из инлайн-кнопок сообщения по рядам слева направо: URL, мини-приложение,
+    /// вход по ссылке и текст кнопки «Скопировать» (кошельки кладут ссылку на чек и туда).
+    /// Что из этого — чек или счёт, решает разбор ссылок; чужое он отбросит.
     pub fn button_urls(&self) -> Vec<String> {
         self.reply_markup
             .iter()
             .flat_map(|m| m.inline_keyboard.iter().flatten())
             .filter_map(|b| match &b.action {
-                InlineButtonAction::Url(url) | InlineButtonAction::WebApp(url) => Some(url.clone()),
+                InlineButtonAction::Url(url)
+                | InlineButtonAction::WebApp(url)
+                | InlineButtonAction::CopyText(url) => Some(url.clone()),
                 _ => None,
             })
             .collect()
