@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT direction AS \"direction!\",\n               count(*) AS \"completed!\",\n               COALESCE(percentile_cont(0.95) WITHIN GROUP (\n                   ORDER BY extract(epoch FROM finished_at - created_at)), 0)::bigint AS \"p95_secs!\"\n          FROM orders\n         WHERE state = 'COMPLETED' AND finished_at >= $1 AND finished_at < $2\n         GROUP BY direction ORDER BY 2 DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "direction!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "direction"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "completed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "p95_secs!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "f5b2fce03f575024a63af0684aa46ce25e00536bdd6620bc26fd99dfb097dd69"
+}

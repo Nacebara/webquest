@@ -23,7 +23,9 @@
 mod actions;
 mod alerts;
 mod cb;
+pub mod chart;
 mod invest;
+pub mod stats;
 mod texts;
 mod views;
 
@@ -56,6 +58,8 @@ pub struct OpsConfig {
     pub input_ttl: Duration,
     /// Владелец из окружения (`OWNER_TG_ID`): создаётся при старте, если владельца ещё нет.
     pub owner_id: Option<i64>,
+    /// Часовой пояс владельца (IANA, `TZ_OWNER`): дни и часы «Статистики».
+    pub tz: String,
 }
 
 impl Default for OpsConfig {
@@ -65,6 +69,7 @@ impl Default for OpsConfig {
             confirm_ttl: Duration::from_secs(60),
             input_ttl: Duration::from_secs(600),
             owner_id: None,
+            tz: "Europe/Moscow".to_owned(),
         }
     }
 }
@@ -453,11 +458,15 @@ impl Inner {
     async fn on_callback(
         self: &Arc<Self>,
         staff: &StaffMember,
-        _chat: i64,
+        chat: i64,
         _message: &Message,
         cb: Cb,
     ) -> Result<Option<Screen>, OpsError> {
         let screen = match cb {
+            Cb::Stats(days) => {
+                self.send_stats(chat, days).await?;
+                return Ok(None);
+            }
             Cb::Menu => self.menu(staff).await?,
             Cb::Cancel => {
                 self.clear_awaiting(staff.tg_user_id);

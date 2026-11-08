@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT count(*) AS \"orders!\",\n               COALESCE(percentile_cont(0.5) WITHIN GROUP (\n                   ORDER BY extract(epoch FROM o.finished_at - o.created_at)), 0)::bigint AS \"median_secs!\",\n               COALESCE(max(extract(epoch FROM o.finished_at - o.created_at)), 0)::bigint AS \"max_secs!\"\n          FROM orders o\n         WHERE o.finished_at >= $1 AND o.finished_at < $2\n           AND EXISTS (SELECT 1 FROM order_transitions t\n                        WHERE t.order_id = o.id AND t.to_state = 'MANUAL_REVIEW')\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "orders!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "median_secs!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "max_secs!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "a7ad04f64afa9032478520695ae711fc35450c0582ed7b5e91f19767a486cda7"
+}

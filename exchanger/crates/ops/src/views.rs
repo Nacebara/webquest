@@ -119,6 +119,7 @@ impl Inner {
                 btn(t.t("menu.dash"), &Cb::Dash),
                 btn(queue, &Cb::Queue),
             ])
+            .row(vec![btn(t.t("menu.stats"), &Cb::Stats(7))])
             .row(vec![
                 btn(t.t("menu.dirs"), &Cb::Dirs),
                 btn(t.t("menu.promo"), &Cb::Promo),

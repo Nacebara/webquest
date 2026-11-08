@@ -545,6 +545,128 @@ pub async fn stats_since(
     })
 }
 
+/// День статистики (по часовому поясу владельца): завершённые обмены, оборот (пришло от
+/// клиентов), валовая прибыль (комиссии).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DayPoint {
+    /// Начало дня или часа по местному времени.
+    pub bucket: chrono::NaiveDateTime,
+    pub completed: i64,
+    pub turnover: Decimal,
+    pub fees: Decimal,
+}
+
+/// Направление за период: сколько обменов и p95 времени заявки в секундах.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirectionPoint {
+    pub direction: String,
+    pub completed: i64,
+    pub p95_secs: i64,
+}
+
+/// Ручной разбор за период: заявок, медиана и максимум их полного времени, секунды.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ManualPoint {
+    pub orders: i64,
+    pub median_secs: i64,
+    pub max_secs: i64,
+}
+
+/// Статистика по дням или часам (`unit`: `day` / `hour`) за `[from, to)` в поясе `tz`
+/// (IANA, например `Europe/Moscow`).
+pub async fn daily_stats(
+    conn: &mut PgConnection,
+    from: DateTime<Utc>,
+    to: DateTime<Utc>,
+    tz: &str,
+    unit: &str,
+) -> Result<Vec<DayPoint>, StorageError> {
+    Ok(sqlx::query_as!(
+        DayPoint,
+        r#"
+        SELECT date_trunc($4, finished_at AT TIME ZONE $3) AS "bucket!",
+               count(*) AS "completed!",
+               COALESCE(sum(intake_amount), 0) AS "turnover!",
+               COALESCE(sum(fee_amount), 0) AS "fees!"
+          FROM orders
+         WHERE state = 'COMPLETED' AND finished_at >= $1 AND finished_at < $2
+         GROUP BY 1 ORDER BY 1
+        "#,
+        from,
+        to,
+        tz,
+        unit
+    )
+    .fetch_all(conn)
+    .await?)
+}
+
+/// Местные «сейчас» и полночь сегодня в поясе `tz` (UTC): границы периодов статистики.
+pub async fn local_midnight(
+    conn: &mut PgConnection,
+    tz: &str,
+) -> Result<(chrono::NaiveDateTime, DateTime<Utc>), StorageError> {
+    let r = sqlx::query!(
+        r#"
+        SELECT (now() AT TIME ZONE $1) AS "local_now!",
+               (date_trunc('day', now() AT TIME ZONE $1) AT TIME ZONE $1) AS "midnight!"
+        "#,
+        tz
+    )
+    .fetch_one(conn)
+    .await?;
+    Ok((r.local_now, r.midnight))
+}
+
+/// По направлениям за `[from, to)`: обменов и p95 времени заявки.
+pub async fn direction_stats(
+    conn: &mut PgConnection,
+    from: DateTime<Utc>,
+    to: DateTime<Utc>,
+) -> Result<Vec<DirectionPoint>, StorageError> {
+    Ok(sqlx::query_as!(
+        DirectionPoint,
+        r#"
+        SELECT direction AS "direction!",
+               count(*) AS "completed!",
+               COALESCE(percentile_cont(0.95) WITHIN GROUP (
+                   ORDER BY extract(epoch FROM finished_at - created_at)), 0)::bigint AS "p95_secs!"
+          FROM orders
+         WHERE state = 'COMPLETED' AND finished_at >= $1 AND finished_at < $2
+         GROUP BY direction ORDER BY 2 DESC
+        "#,
+        from,
+        to
+    )
+    .fetch_all(conn)
+    .await?)
+}
+
+/// Заявки, побывавшие на ручном разборе и закрытые за `[from, to)`.
+pub async fn manual_stats(
+    conn: &mut PgConnection,
+    from: DateTime<Utc>,
+    to: DateTime<Utc>,
+) -> Result<ManualPoint, StorageError> {
+    Ok(sqlx::query_as!(
+        ManualPoint,
+        r#"
+        SELECT count(*) AS "orders!",
+               COALESCE(percentile_cont(0.5) WITHIN GROUP (
+                   ORDER BY extract(epoch FROM o.finished_at - o.created_at)), 0)::bigint AS "median_secs!",
+               COALESCE(max(extract(epoch FROM o.finished_at - o.created_at)), 0)::bigint AS "max_secs!"
+          FROM orders o
+         WHERE o.finished_at >= $1 AND o.finished_at < $2
+           AND EXISTS (SELECT 1 FROM order_transitions t
+                        WHERE t.order_id = o.id AND t.to_state = 'MANUAL_REVIEW')
+        "#,
+        from,
+        to
+    )
+    .fetch_one(conn)
+    .await?)
+}
+
 // ---------------------------------------------------------------------------------------------
 // Пороги резерва
 

@@ -192,6 +192,8 @@ pub enum Cb {
     Capital(i64),
     /// Ответить клиенту на вопрос из «Поддержки» (макет: «Обращение · Ответить»).
     SupportReply(i64),
+    /// «Статистика» за 1, 7 или 30 дней (макет: карточка с графиком).
+    Stats(u8),
     /// Все инвесторы и движения, ждущие решения.
     Investors,
     /// «💼 Инвестиции» клиента.
@@ -312,6 +314,7 @@ impl Cb {
             Cb::Capital(id) => format!("cap:{id}"),
             Cb::Investors => "iv".into(),
             Cb::SupportReply(id) => format!("sq:{id}"),
+            Cb::Stats(days) => format!("sx:{days}"),
             Cb::Invest(id) => format!("iv:{id}"),
             Cb::InvestEdit(id) => format!("ivt:{id}"),
             Cb::InvestAccess(id, on) => format!("iva:{id}:{}", bit(*on)),
@@ -397,6 +400,7 @@ impl Cb {
             ["cap", _] => Cb::Capital(id(1)?),
             ["iv"] => Cb::Investors,
             ["sq", _] => Cb::SupportReply(id(1)?),
+            ["sx", d] => Cb::Stats(d.parse().ok().filter(|d| matches!(d, 1 | 7 | 30))?),
             ["iv", _] => Cb::Invest(id(1)?),
             ["ivt", _] => Cb::InvestEdit(id(1)?),
             ["iva", _, _] => Cb::InvestAccess(id(1)?, on(2)?),
@@ -454,6 +458,7 @@ mod tests {
             Cb::PromoTarget(Platform::XRocket),
             Cb::Investors,
             Cb::SupportReply(big),
+            Cb::Stats(7),
             Cb::Invest(big),
             Cb::InvestEdit(big),
             Cb::InvestAccess(big, true),

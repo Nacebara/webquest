@@ -30,6 +30,8 @@ tracing.workspace = true
 ui = { path = "../ui" }
 # Пульт живёт в клиентском боте: крючок `UpdateHook`.
 tgbot = { path = "../tgbot" }
+# График «Статистики» (макет): SVG в PNG на чистом Rust; шрифт — assets/fonts (DejaVu).
+resvg = { version = "0.45", default-features = false, features = ["text"] }
 
 [dev-dependencies]
 rust_decimal_macros.workspace = true

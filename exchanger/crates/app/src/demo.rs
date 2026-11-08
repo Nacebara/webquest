@@ -324,6 +324,26 @@ pub async fn send_preview(api: &BotApi, ui: &ui::Ui, chat: i64) {
             tokio::time::sleep(Duration::from_millis(350)).await;
         }
     }
+    // Пульт: «Статистика» на данных макета — плитки и график одной картинкой.
+    let _ = api
+        .send_message(
+            &SendMessage::html(chat, "<b>Пульт · Статистика</b> (данные макета)").silent(),
+        )
+        .await;
+    match ops::stats::sample_card() {
+        Ok(card) => match card.chart.png() {
+            Ok(png) => {
+                if let Err(e) = api
+                    .send_rich_with_photo(chat, &card.html, "chart", png, Some(&card.keyboard))
+                    .await
+                {
+                    tracing::warn!(error = %e, "stats preview not sent");
+                }
+            }
+            Err(e) => tracing::warn!(error = %e, "stats chart not rendered"),
+        },
+        Err(e) => tracing::warn!(error = %e, "stats sample failed"),
+    }
     let _ = api
         .send_message(&SendMessage::html(
             chat,

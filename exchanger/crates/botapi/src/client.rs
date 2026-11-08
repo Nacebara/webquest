@@ -332,6 +332,56 @@ impl BotApi {
 
     /// `uploadStickerFile`: файл стикера для будущего набора (multipart). `file_name` — с
     /// расширением (`done.tgs`, `done.png`): по нему Telegram узнаёт тип.
+    /// rich-сообщение с картинкой внутри: в `html` — `<img src="tg://photo?id={media_id}"/>`,
+    /// файл уходит частью формы (`InputRichMessage.media`, Bot API 10.2). Так графики стоят прямо
+    /// в карточке, а не отдельным фото.
+    pub async fn send_rich_with_photo(
+        &self,
+        chat_id: i64,
+        html: &str,
+        media_id: &str,
+        png: Vec<u8>,
+        reply_markup: Option<&crate::keyboard::InlineKeyboardMarkup>,
+    ) -> Result<Message, Error> {
+        const METHOD: &str = "sendRichMessage";
+        let token = self.token.expose_secret();
+        let url = format!("{}/bot{token}/{METHOD}", self.base_url);
+        let rich = serde_json::json!({
+            "html": html,
+            "media": [{ "id": media_id, "media": { "type": "photo", "media": "attach://photo" } }],
+            "skip_entity_detection": true,
+        });
+        let mut form = reqwest::multipart::Form::new()
+            .text("chat_id", chat_id.to_string())
+            .text("rich_message", rich.to_string())
+            .part(
+                "photo",
+                reqwest::multipart::Part::bytes(png).file_name(format!("{media_id}.png")),
+            );
+        if let Some(markup) = reply_markup {
+            let markup = serde_json::to_string(markup).map_err(|e| Error::Encode {
+                method: METHOD.to_owned(),
+                detail: e.to_string(),
+            })?;
+            form = form.text("reply_markup", markup);
+        }
+        tracing::debug!(method = METHOD, "Bot API: rich-сообщение с картинкой");
+        let response = self
+            .http
+            .post(url)
+            .multipart(form)
+            .timeout(self.timeout)
+            .send()
+            .await
+            .map_err(|e| transport_error(METHOD, e, token))?;
+        let status = response.status().as_u16();
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| transport_error(METHOD, e, token))?;
+        decode_response(METHOD, status, &bytes).map_err(|e| e.scrub(token))
+    }
+
     pub async fn upload_sticker_file(
         &self,
         user_id: i64,

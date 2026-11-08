@@ -135,6 +135,10 @@ pub fn ops_bot(
     let api = crate::telegram::bot_api(token)?;
     let cfg = ops::OpsConfig {
         owner_id: Some(owner_tg_id),
+        tz: std::env::var("TZ_OWNER")
+            .ok()
+            .filter(|t| !t.trim().is_empty())
+            .unwrap_or_else(|| "Europe/Moscow".to_owned()),
         ..ops::OpsConfig::default()
     };
     ops::OpsBot::new(api, engine, pool.clone(), cfg).context("built-in ops texts are invalid")

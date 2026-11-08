@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT date_trunc($4, finished_at AT TIME ZONE $3) AS \"bucket!\",\n               count(*) AS \"completed!\",\n               COALESCE(sum(intake_amount), 0) AS \"turnover!\",\n               COALESCE(sum(fee_amount), 0) AS \"fees!\"\n          FROM orders\n         WHERE state = 'COMPLETED' AND finished_at >= $1 AND finished_at < $2\n         GROUP BY 1 ORDER BY 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "bucket!",
+        "type_info": "Timestamp",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "completed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "turnover!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "fees!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "c3a001b23aacef60139ab3f6336255091cc018be6613dfd02d7137b836e585aa"
+}

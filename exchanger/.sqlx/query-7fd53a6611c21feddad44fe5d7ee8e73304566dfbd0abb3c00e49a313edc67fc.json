@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT (now() AT TIME ZONE $1) AS \"local_now!\",\n               (date_trunc('day', now() AT TIME ZONE $1) AT TIME ZONE $1) AS \"midnight!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "local_now!",
+        "type_info": "Timestamp",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "midnight!",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "7fd53a6611c21feddad44fe5d7ee8e73304566dfbd0abb3c00e49a313edc67fc"
+}
