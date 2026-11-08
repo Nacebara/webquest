@@ -4,42 +4,42 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-<b>Заявка <code>A1B2C3D4E5</code> · готово</b>
-<blockquote>Создана: <tg-time unix="1791376200" format="dt">07.10.2026 15:30 МСК</tg-time>
-Направление: CryptoBot → xRocket
-Получено: <code>100.00</code> USDT
-Комиссия: <code>2.50</code> USDT
-Выплачено: <code>97.50</code> USDT</blockquote>
+<b>Заявка <code>A1B2C3D4E5</code></b>
+🟢 <b>Готово</b> · 7 окт, 15:30 · 9 секунд
+<blockquote>Прислали: 100.00 CryptoBot
+Комиссия: 2.50 · 2.5 %
+Получили: 97.50 xRocket
+Чек: в кнопке ниже</blockquote>
 --- rich
-<h3>Заявка <code>A1B2C3D4E5</code> · готово</h3>
+<h3>Заявка <code>A1B2C3D4E5</code></h3>
+<p>🟢 <b>Готово</b> · 7 окт, 15:30 · 9 секунд</p>
 <table compact>
-<tr><td>Создана</td><td><tg-time unix="1791376200" format="dt">07.10.2026 15:30 МСК</tg-time></td></tr>
-<tr><td>Направление</td><td>CryptoBot → xRocket</td></tr>
-<tr><td>Получено</td><td><code>100.00</code> USDT</td></tr>
-<tr><td>Комиссия</td><td><code>2.50</code> USDT</td></tr>
-<tr><td>Выплачено</td><td><code>97.50</code> USDT</td></tr>
+<tr><td>Прислали</td><td align="right">100.00 CryptoBot</td></tr>
+<tr><td>Комиссия</td><td align="right">2.50 · 2.5 %</td></tr>
+<tr><td>Получили</td><td align="right">97.50 xRocket</td></tr>
+<tr><td>Чек</td><td align="right">в кнопке ниже</td></tr>
 </table>
 --- keyboard: inline
-[{"style":"success","text":"Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"text":"📋 Скопировать ссылку"}]
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"},{"callback_data":"support:A1B2C3D4E5","text":"💬 Вопрос по заявке"}]
+[{"style":"success","text":"📥 Забрать 97.50 USDT","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"}]
+[{"callback_data":"support:A1B2C3D4E5","text":"💬 Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 A1B2C3D4E5"}]
 
 ### premium
 --- html
-<b>Заявка <code>A1B2C3D4E5</code> · готово</b>
-<blockquote>Создана: <tg-time unix="1791376200" format="dt">07.10.2026 15:30 МСК</tg-time>
-Направление: CryptoBot → xRocket
-Получено: <code>100.00</code> USDT
-Комиссия: <code>2.50</code> USDT
-Выплачено: <code>97.50</code> USDT</blockquote>
+<b>Заявка <code>A1B2C3D4E5</code></b>
+<tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> <b>Готово</b> · 7 окт, 15:30 · 9 секунд
+<blockquote>Прислали: 100.00 CryptoBot
+Комиссия: 2.50 · 2.5 %
+Получили: 97.50 xRocket
+Чек: в кнопке ниже</blockquote>
 --- rich
-<h3>Заявка <code>A1B2C3D4E5</code> · готово</h3>
+<h3>Заявка <code>A1B2C3D4E5</code></h3>
+<p><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> <b>Готово</b> · 7 окт, 15:30 · 9 секунд</p>
 <table compact>
-<tr><td>Создана</td><td><tg-time unix="1791376200" format="dt">07.10.2026 15:30 МСК</tg-time></td></tr>
-<tr><td>Направление</td><td>CryptoBot → xRocket</td></tr>
-<tr><td>Получено</td><td><code>100.00</code> USDT</td></tr>
-<tr><td>Комиссия</td><td><code>2.50</code> USDT</td></tr>
-<tr><td>Выплачено</td><td><code>97.50</code> USDT</td></tr>
+<tr><td>Прислали</td><td align="right">100.00 CryptoBot</td></tr>
+<tr><td>Комиссия</td><td align="right">2.50 · 2.5 %</td></tr>
+<tr><td>Получили</td><td align="right">97.50 xRocket</td></tr>
+<tr><td>Чек</td><td align="right">в кнопке ниже</td></tr>
 </table>
 --- keyboard: inline
-[{"style":"success","text":"Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"icon_custom_emoji_id":"5368000000000000013","text":"Скопировать ссылку"}]
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"},{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Вопрос по заявке"}]
+[{"icon_custom_emoji_id":"5368000000000000023","style":"success","text":"Забрать 97.50 USDT","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"}]
+[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"A1B2C3D4E5"}]

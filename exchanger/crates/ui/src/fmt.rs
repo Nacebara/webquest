@@ -48,6 +48,22 @@ pub fn took(seconds: i64) -> String {
     format!("{} ч {} мин", m / 60, m % 60)
 }
 
+/// Целое число с разрядами через неразрывный пробел: «2 310», «74 830».
+pub fn grouped(value: Decimal) -> String {
+    let digits = value.trunc().abs().to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push('\u{a0}');
+        }
+        out.push(c);
+    }
+    if value.is_sign_negative() && value.trunc() != Decimal::ZERO {
+        out.insert(0, '−');
+    }
+    out
+}
+
 /// «до 30 минут», «до 1 минуты», «до 21 минуты» — родительный падеж после «до».
 pub fn minutes_gen(n: i64) -> String {
     let n = n.max(1);
@@ -149,6 +165,57 @@ impl Clock {
         } else {
             format!("{local} {}", self.label)
         }
+    }
+
+    /// «Когда» в истории (макет B1): «14:04» — сегодня, «вчера», иначе «2 ноя»
+    /// (с годом, если не этот). Даты — в поясе часов.
+    pub fn day_label(
+        &self,
+        at: DateTime<Utc>,
+        now: DateTime<Utc>,
+        yesterday: &str,
+        months: &[String; 12],
+    ) -> String {
+        use chrono::Datelike as _;
+        let day = at.with_timezone(&self.offset).date_naive();
+        let today = now.with_timezone(&self.offset).date_naive();
+        if day == today {
+            return at.with_timezone(&self.offset).format("%H:%M").to_string();
+        }
+        if today.pred_opt() == Some(day) {
+            return yesterday.to_owned();
+        }
+        let month = usize::try_from(day.month0())
+            .ok()
+            .and_then(|m| months.get(m));
+        let month = month.map_or("", String::as_str);
+        if day.year() == today.year() {
+            format!("{} {month}", day.day())
+        } else {
+            format!("{} {month} {}", day.day(), day.year())
+        }
+    }
+
+    /// «5 ноя, 14:04» (с годом, если не этот) — дата и время в поясе часов.
+    pub fn date_time_label(
+        &self,
+        at: DateTime<Utc>,
+        now: DateTime<Utc>,
+        months: &[String; 12],
+    ) -> String {
+        use chrono::Datelike as _;
+        let local = at.with_timezone(&self.offset);
+        let day = local.date_naive();
+        let month = usize::try_from(day.month0())
+            .ok()
+            .and_then(|m| months.get(m));
+        let month = month.map_or("", String::as_str);
+        let year = if day.year() == now.with_timezone(&self.offset).year() {
+            String::new()
+        } else {
+            format!(" {}", day.year())
+        };
+        format!("{} {month}{year}, {}", day.day(), local.format("%H:%M"))
     }
 
     /// `<tg-time>` с запасным текстом. В обычном HTML — тег, если `tag_in_html`, иначе текст:

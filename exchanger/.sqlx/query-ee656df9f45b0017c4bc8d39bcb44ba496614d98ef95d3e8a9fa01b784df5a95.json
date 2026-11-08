@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT public_id, created_at, direction, asset, intake_amount, state\n          FROM orders\n         WHERE user_id = $1\n         ORDER BY created_at DESC, id DESC\n         LIMIT $2 OFFSET $3\n        ",
+  "query": "\n        SELECT public_id, created_at, direction, asset, intake_amount, payout_amount,\n               invoice_amount, state\n          FROM orders\n         WHERE user_id = $1\n         ORDER BY created_at DESC, id DESC\n         LIMIT $2 OFFSET $3\n        ",
   "describe": {
     "columns": [
       {
@@ -60,6 +60,28 @@
       },
       {
         "ordinal": 5,
+        "name": "payout_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "payout_amount"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "invoice_amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "invoice_amount"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
         "name": "state",
         "type_info": "Text",
         "origin": {
@@ -83,8 +105,10 @@
       false,
       false,
       true,
+      true,
+      true,
       false
     ]
   },
-  "hash": "2ff733d9d02537de89ea07b3ee98f7ea60ca917b5a66d41b0c6ee42b37e0538e"
+  "hash": "ee656df9f45b0017c4bc8d39bcb44ba496614d98ef95d3e8a9fa01b784df5a95"
 }

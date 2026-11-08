@@ -2,6 +2,8 @@
 //! карточка заявки, помощь, конфиденциальность, поддержка.
 
 use botapi::ButtonStyle;
+use chrono::{DateTime, Utc};
+use domain::fsm::OrderState;
 use domain::{Decimal, Direction, Flow};
 
 use super::{Ui, inline_command, menu_command, username_ok, wallet_bot_url};
@@ -11,7 +13,8 @@ use crate::emoji::Emoji;
 use crate::fmt::{self, TimeFormat};
 use crate::html::{Frag, clip};
 use crate::model::{
-    DirectionStatus, DirectionTerms, HistoryRow, OrderCard, PauseReason, Terms, UiError,
+    DirectionStatus, DirectionTerms, HistoryRow, HistorySummary, OrderCard, PauseReason, Terms,
+    UiError,
 };
 use crate::screen::{Keyboard, Screen};
 
@@ -24,6 +27,24 @@ fn example_amount(terms: Option<&DirectionTerms>) -> Decimal {
     match terms {
         Some(t) if t.max >= t.min => ten.max(t.min.ceil()).min(t.max.floor().max(t.min.ceil())),
         _ => ten,
+    }
+}
+
+/// Точка статуса строки истории: готово — зелёная, в работе — жёлтая, остальное — серая.
+fn history_dot(state: OrderState) -> Emoji {
+    match state {
+        OrderState::Completed => Emoji::DotOk,
+        s if !s.is_terminal() => Emoji::DotWait,
+        _ => Emoji::DotClosed,
+    }
+}
+
+/// Форма слова из текстов для [`fmt::plural`]: тексты живут всё время работы бота.
+fn static_form(form: &str) -> &'static str {
+    match form {
+        "обмен" => "обмен",
+        "обмена" => "обмена",
+        _ => "обменов",
     }
 }
 
@@ -476,7 +497,13 @@ impl Ui {
 
     /// S10 `/history`: до 10 заявок, кнопки с номерами по две в ряд, «Ещё».
     /// `next_page` — номер следующей страницы, если она есть.
-    pub fn history(&self, rows: &[HistoryRow], next_page: Option<u32>) -> Screen {
+    pub fn history(
+        &self,
+        rows: &[HistoryRow],
+        next_page: Option<u32>,
+        summary: Option<&HistorySummary>,
+        now: DateTime<Utc>,
+    ) -> Screen {
         let t = &self.texts.history;
         let b = &self.texts.buttons;
         let more =
@@ -487,91 +514,188 @@ impl Ui {
         }
         let rows = &rows[..rows.len().min(HISTORY_PAGE)];
         let mut doc = Doc::new();
-        doc.subtitle(&self.fill(&t.title, &[]));
-        let table_rows = rows
+        doc.title(&self.fill(&t.title, &[]));
+        let labels: Vec<String> = rows
             .iter()
             .map(|r| {
-                let order = self.order_id(&r.order);
-                let when = self.at(r.created_at, TimeFormat::DayTime);
-                let what = self.direction_name(r.direction);
-                let amount = r
-                    .amount
-                    .as_ref()
-                    .map_or_else(|| Frag::text("—"), |m| self.money(m));
-                let result = Frag::text(self.texts.states.get(r.state));
+                self.config
+                    .clock
+                    .day_label(r.created_at, now, &t.yesterday, &t.months)
+            })
+            .collect();
+        let table_rows = rows
+            .iter()
+            .zip(&labels)
+            .map(|(r, when)| {
+                let dot = self.emoji.frag(history_dot(r.state));
+                let when = Frag::text(when);
+                let what = Frag::text(match r.direction {
+                    Direction::CbToXrCheck => &t.dir_cb_to_xr,
+                    Direction::XrToCbCheck => &t.dir_xr_to_cb,
+                    Direction::PayCbInvoice => &t.dir_pay_cb,
+                    Direction::PayXrInvoice => &t.dir_pay_xr,
+                });
+                let result = Frag::text(&self.history_result(r));
                 Row {
                     line: self.fill(
                         &t.row,
                         &[
-                            ("order", &order),
+                            ("dot", &dot),
                             ("when", &when),
                             ("what", &what),
-                            ("amount", &amount),
                             ("result", &result),
                         ],
                     ),
-                    cells: vec![order, when, what, amount, result],
+                    cells: vec![dot, when, what, result],
                 }
             })
             .collect();
         doc.table(Table {
-            attrs: "compact striped",
+            attrs: "striped compact",
             head: vec![
-                self.fill(&t.col_order, &[]),
+                Frag::new(),
                 self.fill(&t.col_when, &[]),
                 self.fill(&t.col_what, &[]),
-                self.fill(&t.col_amount, &[]),
                 self.fill(&t.col_result, &[]),
             ],
             rows: table_rows,
             right: &[3],
-            plain_quote: false,
+            plain_quote: true,
         });
-        doc.footer(&self.fill(&t.footer, &[]));
+        if let Some(s) = summary.filter(|s| s.completed > 0) {
+            let count = format!(
+                "{} {}",
+                s.completed,
+                fmt::plural(
+                    s.completed,
+                    [
+                        static_form(&t.exchange_forms[0]),
+                        static_form(&t.exchange_forms[1]),
+                        static_form(&t.exchange_forms[2]),
+                    ]
+                )
+            );
+            doc.footer(&self.fill(
+                &t.total,
+                &[
+                    ("count", &Frag::text(&count)),
+                    ("volume", &Frag::text(&fmt::grouped(s.volume))),
+                ],
+            ));
+        }
 
-        // Кнопка — только для корректного номера: длинные данные кнопки Telegram отвергнет
-        // вместе со всем сообщением.
+        // Тап — карточка заявки (макет: кнопки с «Когда»). Одинаковые подписи («вчера» дважды)
+        // различаем итогом. Номер — только корректный: длинные данные Telegram отвергнет.
         let buttons: Vec<_> = rows
             .iter()
-            .filter(|r| order_id_ok(&r.order))
-            .map(|r| self.cb_button(None, &r.order, &Callback::Order(r.order.clone())))
+            .zip(&labels)
+            .filter(|(r, _)| order_id_ok(&r.order))
+            .map(|(r, when)| {
+                let repeated = labels.iter().filter(|l| *l == when).count() > 1;
+                let label = if repeated {
+                    format!("{when} · {}", self.history_result(r))
+                } else {
+                    when.clone()
+                };
+                self.cb_button(None, &label, &Callback::Order(r.order.clone()))
+            })
             .collect();
         let mut keyboard: Vec<Vec<_>> = buttons.chunks(2).map(<[_]>::to_vec).collect();
         keyboard.extend(more);
         self.dual(doc, Keyboard::inline_rows(keyboard))
     }
 
+    /// «Итог» строки истории: выплата или сумма счёта, «возврат», «в работе», «—».
+    fn history_result(&self, r: &HistoryRow) -> String {
+        let t = &self.texts.history;
+        match r.state {
+            OrderState::Completed => r
+                .payout
+                .as_ref()
+                .map_or_else(|| t.failed.clone(), |m| fmt::amount(m.amount(), m.asset())),
+            OrderState::Refunded => t.refund.clone(),
+            s if !s.is_terminal() => t.working.clone(),
+            _ => t.failed.clone(),
+        }
+    }
+
     /// S11 карточка заявки.
-    pub fn order_card(&self, card: &OrderCard) -> Screen {
+    pub fn order_card(&self, card: &OrderCard, now: DateTime<Utc>) -> Screen {
         let t = &self.texts.card;
         let mut doc = Doc::new();
-        doc.title(&self.fill(
-            &t.title,
+        doc.title(&self.fill(&t.title, &[("order", &self.order_id(&card.order.id))]));
+        let state = self.texts.states.get(card.state);
+        let state = {
+            let mut c = state.chars();
+            c.next()
+                .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                .unwrap_or_default()
+        };
+        let when =
+            self.config
+                .clock
+                .date_time_label(card.created_at, now, &self.texts.history.months);
+        let took = match card.finished_at {
+            Some(f) => self.fill(
+                &t.took,
+                &[(
+                    "took",
+                    &Frag::text(&fmt::took((f - card.created_at).num_seconds())),
+                )],
+            ),
+            None => Frag::new(),
+        };
+        doc.para(&self.fill(
+            &t.status,
             &[
-                ("order", &self.order_id(&card.order.id)),
-                ("state", &Frag::text(self.texts.states.get(card.state))),
+                ("dot", &self.emoji.frag(history_dot(card.state))),
+                ("state", &Frag::text(&state)),
+                ("when", &Frag::text(&when)),
+                ("took", &took),
             ],
         ));
-        let mut kv: Vec<(&str, Frag)> = vec![
-            (&t.created, self.at(card.created_at, TimeFormat::Full)),
-            (&t.direction, self.direction_name(card.order.direction)),
-        ];
-        let money_rows = [
-            (&t.received, &card.amount_in),
-            (&t.invoice, &card.invoice_amount),
-            (&t.fee, &card.fee),
-            (&t.paid_out, &card.payout),
-            (&t.refunded, &card.refunded),
-        ];
-        for (label, value) in money_rows {
-            if let Some(m) = value {
-                kv.push((label, self.money(m)));
-            }
+
+        let src = card.order.direction.source();
+        let dst = card.order.direction.target();
+        let with_wallet = |m: &domain::Money, platform: domain::Platform| {
+            self.fill(
+                &t.amount_wallet,
+                &[
+                    ("amount", &Frag::text(&fmt::amount(m.amount(), m.asset()))),
+                    ("wallet", &self.wallet(platform)),
+                ],
+            )
+        };
+        let mut kv: Vec<(Frag, Frag)> = Vec::new();
+        if let Some(m) = &card.amount_in {
+            kv.push((self.fill(&t.sent, &[]), with_wallet(m, src)));
+        }
+        if let (Some(fee), Some(pct)) = (&card.fee, card.fee_pct) {
+            kv.push((
+                self.fill(&t.fee, &[]),
+                self.fill(
+                    &t.fee_value,
+                    &[
+                        ("fee", &Frag::text(&fmt::amount(fee.amount(), fee.asset()))),
+                        ("pct", &self.pct(pct)),
+                    ],
+                ),
+            ));
+        }
+        if let Some(m) = &card.invoice_amount {
+            kv.push((self.fill(&t.invoice, &[]), with_wallet(m, dst)));
+        } else if let Some(m) = &card.payout {
+            kv.push((self.fill(&t.got, &[]), with_wallet(m, dst)));
+        }
+        if let Some(m) = &card.refunded {
+            kv.push((self.fill(&t.refunded, &[]), with_wallet(m, src)));
+        }
+        if card.check_url.is_some() {
+            kv.push((self.fill(&t.check, &[]), self.fill(&t.check_ready, &[])));
         }
         let rows = kv
             .into_iter()
             .map(|(label, value)| {
-                let label = self.fill(label, &[]);
                 let mut line = label.clone();
                 line.push_text(": ").push(&value);
                 Row {
@@ -584,20 +708,23 @@ impl Ui {
             attrs: "compact",
             head: Vec::new(),
             rows,
-            right: &[],
+            right: &[1],
             plain_quote: true,
         });
 
-        let b = &self.texts.buttons;
         let id = &card.order.id;
         let mut keyboard = Vec::new();
         if let Some(url) = &card.check_url {
-            keyboard.push(self.claim_row(url));
+            let amount = card.refunded.as_ref().or(card.payout.as_ref());
+            match amount {
+                Some(m) => keyboard.push(vec![self.claim_button(m, url)]),
+                None => keyboard.push(self.claim_row(url)),
+            }
         }
         let support = Callback::Support(order_id_ok(id).then(|| id.clone()));
         keyboard.push(vec![
-            self.copy_order_button(id),
-            self.cb_button(Some(Emoji::Support), &b.order_question, &support),
+            self.cb_button(Some(Emoji::Support), &self.texts.buttons.support, &support),
+            self.copy_button(id, id),
         ]);
         self.dual(doc, Keyboard::inline_rows(keyboard))
     }

@@ -226,12 +226,26 @@ impl Inner {
                 created_at: e.created_at,
                 direction: e.direction,
                 amount: e.intake_amount.and_then(|a| Money::new(a, e.asset).ok()),
+                payout: e
+                    .invoice_amount
+                    .or(e.payout_amount)
+                    .and_then(|a| Money::new(a, e.asset).ok()),
                 state: e.state,
             })
             .collect();
         let next = more.then(|| page.saturating_add(1));
-        self.reply_doc(chat, user, &self.ui().history(&rows, next))
-            .await
+        let summary = {
+            let mut conn = self.pool.acquire().await?;
+            storage::client::history_totals(&mut conn, user).await?
+        };
+        let summary = ui::HistorySummary {
+            completed: summary.completed,
+            volume: summary.volume,
+        };
+        let screen = self
+            .ui()
+            .history(&rows, next, Some(&summary), chrono::Utc::now());
+        self.reply_doc(chat, user, &screen).await
     }
 
     async fn order_card(&self, chat: i64, user: i64, public_id: &str) -> Result<(), TgBotError> {
@@ -244,7 +258,7 @@ impl Inner {
             return Ok(());
         };
         let card = crate::orders::card(&view);
-        self.reply_doc(chat, user, &self.ui().order_card(&card))
+        self.reply_doc(chat, user, &self.ui().order_card(&card, chrono::Utc::now()))
             .await
     }
 

@@ -318,26 +318,41 @@ no_reserve = "сейчас могу оплатить счёт не больше 
 below_minimum = "к оплате выходит меньше минимума {min}"
 above_maximum = "к оплате выходит больше вашего лимита {max}"
 
+# «История» (/history) — макет B1: последние заявки одной таблицей, тап — карточка заявки.
 [history]
-title = "Последние заявки"
-col_order = "№"
+title = "{e_history} История"
 col_when = "Когда"
-col_what = "Что"
-col_amount = "Сумма"
+col_what = "Обмен"
 col_result = "Итог"
-row = "{order} · {when} · {what} · {amount} · {result}"
-footer = "Подробно — нажмите номер заявки ниже."
+# Строка в простом виде (без rich).
+row = "{dot} {when} · {what} · {result}"
+dir_cb_to_xr = "CB → xR"
+dir_xr_to_cb = "xR → CB"
+dir_pay_cb = "счёт CB"
+dir_pay_xr = "счёт xR"
+refund = "возврат"
+working = "в работе"
+failed = "—"
+total = "Всего {count} · {volume}\u00A0USDT"
+exchange_forms = ["обмен", "обмена", "обменов"]
+yesterday = "вчера"
+months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
 empty = "{e_history} Заявок пока нет. Пришлите чек — первая заявка появится здесь."
 
+# Карточка заявки — макет B1: всё по одной заявке; чек не забран — кнопка «Забрать».
 [card]
-title = "Заявка {order} · {state}"
-created = "Создана"
-direction = "Направление"
-received = "Получено"
+title = "Заявка {order}"
+status = "{dot} <b>{state}</b> · {when}{took}"
+took = " · {took}"
+sent = "Прислали"
 fee = "Комиссия"
-paid_out = "Выплачено"
+fee_value = "{fee} · {pct}"
+got = "Получили"
 invoice = "Счёт"
-refunded = "Возвращено"
+refunded = "Вернули"
+check = "Чек"
+check_ready = "в кнопке ниже"
+amount_wallet = "{amount} {wallet}"
 
 # «Помощь» (кнопка меню B1). Экрана в макете нет — здесь всё справочное, что не вошло в
 # «Курс и лимиты» по макету: какие чеки и счета подходят, правила.

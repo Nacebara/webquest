@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT count(*) AS \"completed!\", COALESCE(sum(intake_amount), 0) AS \"volume!\"\n          FROM orders\n         WHERE user_id = $1 AND state = 'COMPLETED'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "completed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "volume!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "91dcc6eeeb0ea0230e43ee23caf2221a25f499d203fb6c3032258f8ea7493fdb"
+}

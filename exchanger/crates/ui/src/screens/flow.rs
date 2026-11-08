@@ -327,7 +327,7 @@ impl Ui {
     }
 
     /// «Забрать 51.25 USDT» — зелёная, ссылка на чек.
-    fn claim_button(&self, amount: &Money, url: &str) -> botapi::InlineKeyboardButton {
+    pub(super) fn claim_button(&self, amount: &Money, url: &str) -> botapi::InlineKeyboardButton {
         let label = self.button_text(
             &self.texts.refund.claim,
             &[("amount", &fmt::amount(amount.amount(), amount.asset()))],

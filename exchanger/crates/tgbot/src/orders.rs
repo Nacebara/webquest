@@ -150,12 +150,14 @@ pub(crate) fn card(view: &OrderView) -> OrderCard {
         invoice_amount: money(view, view.invoice_amount),
         refunded: money(view, view.refund_amount).filter(|_| view.state == OrderState::Refunded),
         check_url,
+        fee_pct: view.fee_pct_applied.map(|p| p.normalize()),
+        finished_at: view.finished_at,
     }
 }
 
 /// Карточка заявки обычным HTML (её фолбэк) — для состояний без своего экрана в потоке.
 fn card_plain(ui: &Ui, view: &OrderView) -> Screen {
-    let screen = ui.order_card(&card(view));
+    let screen = ui.order_card(&card(view), Utc::now());
     Screen {
         html: screen.html,
         rich_html: None,

@@ -293,7 +293,16 @@ pub struct HistoryRow {
     pub created_at: DateTime<Utc>,
     pub direction: Direction,
     pub amount: Option<Money>,
+    /// «Итог»: выплата обмена или сумма оплаченного счёта.
+    pub payout: Option<Money>,
     pub state: OrderState,
+}
+
+/// «Всего 23 обмена · 2 310 USDT».
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HistorySummary {
+    pub completed: i64,
+    pub volume: Decimal,
 }
 
 /// Карточка заявки (S11).
@@ -309,6 +318,10 @@ pub struct OrderCard {
     pub refunded: Option<Money>,
     /// Ссылка на чек выплаты или возврата, пока клиент его не забрал.
     pub check_url: Option<String>,
+    /// Комиссия заявки, % — «2.50 · 2.5 %».
+    pub fee_pct: Option<Decimal>,
+    /// Когда закончилась — «· 9 секунд» в строке статуса.
+    pub finished_at: Option<DateTime<Utc>>,
 }
 
 /// Вид движения инвестора.

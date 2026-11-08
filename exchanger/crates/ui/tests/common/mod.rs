@@ -212,9 +212,21 @@ pub fn history_rows() -> Vec<HistoryRow> {
             created_at: at(9 + u32::try_from(i).unwrap(), 15),
             direction,
             amount: amount.map(usdt),
+            // Итог: выплата = пришло − 2.5 % (для истории важна только сама сумма).
+            payout: (state == OrderState::Completed)
+                .then(|| amount.map(|a| usdt((a * dec!(0.975)).round_dp(2))))
+                .flatten(),
             state,
         })
         .collect()
+}
+
+/// «Всего 23 обмена · 2 310 USDT».
+pub fn history_summary() -> ui::HistorySummary {
+    ui::HistorySummary {
+        completed: 23,
+        volume: dec!(2310.40),
+    }
 }
 
 pub fn card(with_check: bool) -> OrderCard {
@@ -232,6 +244,8 @@ pub fn card(with_check: bool) -> OrderCard {
         invoice_amount: None,
         refunded: None,
         check_url: with_check.then(|| CHECK_URL.to_owned()),
+        fee_pct: Some(dec!(2.5)),
+        finished_at: with_check.then(|| at(12, 30) + chrono::Duration::seconds(9)),
     }
 }
 
@@ -591,10 +605,21 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
                 Some(&RefundReason::BelowMinimum { min: usdt(dec!(1)) }),
             ),
         ),
-        ("history", ui.history(&history_rows(), Some(1))),
-        ("history_empty", ui.history(&[], None)),
-        ("order_card", ui.order_card(&card(false))),
-        ("order_card_with_check", ui.order_card(&card(true))),
+        (
+            "history",
+            ui.history(
+                &history_rows(),
+                Some(1),
+                Some(&history_summary()),
+                at(18, 0),
+            ),
+        ),
+        ("history_empty", ui.history(&[], None, None, at(18, 0))),
+        ("order_card", ui.order_card(&card(false), at(18, 0))),
+        (
+            "order_card_with_check",
+            ui.order_card(&card(true), at(18, 0)),
+        ),
         ("help", ui.help(&t)),
         ("privacy", ui.privacy()),
         ("support_with_contact", ui.support(Some("@exch_support"))),

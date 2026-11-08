@@ -63,7 +63,17 @@ pub struct HistoryEntry {
     pub asset: Asset,
     /// Сколько пришло от клиента (`None` — чек не активирован).
     pub intake_amount: Option<Decimal>,
+    /// Сколько выплачено (обмен) и сумма счёта (оплата счёта).
+    pub payout_amount: Option<Decimal>,
+    pub invoice_amount: Option<Decimal>,
     pub state: OrderState,
+}
+
+/// Итог истории клиента: сколько обменов завершено и на какую сумму (пришло от клиента).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HistoryTotals {
+    pub completed: i64,
+    pub volume: Decimal,
 }
 
 /// Действующий бан клиента.
@@ -285,7 +295,8 @@ pub async fn history(
 ) -> Result<Vec<HistoryEntry>, StorageError> {
     let rows = sqlx::query!(
         r#"
-        SELECT public_id, created_at, direction, asset, intake_amount, state
+        SELECT public_id, created_at, direction, asset, intake_amount, payout_amount,
+               invoice_amount, state
           FROM orders
          WHERE user_id = $1
          ORDER BY created_at DESC, id DESC
@@ -305,10 +316,33 @@ pub async fn history(
                 direction: parse("orders.direction", &r.direction)?,
                 asset: parse("orders.asset", &r.asset)?,
                 intake_amount: r.intake_amount,
+                payout_amount: r.payout_amount,
+                invoice_amount: r.invoice_amount,
                 state: parse("orders.state", &r.state)?,
             })
         })
         .collect()
+}
+
+/// «Всего 23 обмена · 2 310 USDT»: завершённые заявки клиента и сумма, что от него пришла.
+pub async fn history_totals(
+    conn: &mut PgConnection,
+    user_id: i64,
+) -> Result<HistoryTotals, StorageError> {
+    let row = sqlx::query!(
+        r#"
+        SELECT count(*) AS "completed!", COALESCE(sum(intake_amount), 0) AS "volume!"
+          FROM orders
+         WHERE user_id = $1 AND state = 'COMPLETED'
+        "#,
+        user_id
+    )
+    .fetch_one(conn)
+    .await?;
+    Ok(HistoryTotals {
+        completed: row.completed,
+        volume: row.volume,
+    })
 }
 
 /// Действующий бан: не снят и не истёк.

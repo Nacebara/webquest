@@ -435,13 +435,25 @@ pub struct InvoiceProblemTexts {
 #[serde(deny_unknown_fields)]
 pub struct HistoryTexts {
     pub title: String,
-    pub col_order: String,
     pub col_when: String,
     pub col_what: String,
-    pub col_amount: String,
     pub col_result: String,
     pub row: String,
-    pub footer: String,
+    /// Короткие направления: «CB → xR», «счёт CB».
+    pub dir_cb_to_xr: String,
+    pub dir_xr_to_cb: String,
+    pub dir_pay_cb: String,
+    pub dir_pay_xr: String,
+    /// «Итог» не-денежных исходов.
+    pub refund: String,
+    pub working: String,
+    pub failed: String,
+    /// «Всего 23 обмена · 2 310 USDT».
+    pub total: String,
+    pub exchange_forms: [String; 3],
+    /// «Когда»: «14:04» сегодня, «вчера», «2 ноя».
+    pub yesterday: String,
+    pub months: [String; 12],
     pub empty: String,
 }
 
@@ -449,13 +461,18 @@ pub struct HistoryTexts {
 #[serde(deny_unknown_fields)]
 pub struct CardTexts {
     pub title: String,
-    pub created: String,
-    pub direction: String,
-    pub received: String,
+    /// «🟢 Готово · 5 ноя, 14:04 · 9 секунд».
+    pub status: String,
+    pub took: String,
+    pub sent: String,
     pub fee: String,
-    pub paid_out: String,
+    pub fee_value: String,
+    pub got: String,
     pub invoice: String,
     pub refunded: String,
+    pub check: String,
+    pub check_ready: String,
+    pub amount_wallet: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
