@@ -9,7 +9,7 @@ expression: "both(p, q)"
 <blockquote>CryptoBot → xRocket · от 1.2 % · 2–500
 xRocket → CryptoBot · 🔥 0.3 % · 2–300
 Оплата счёта · 3 % · 2–200</blockquote>
-🔥 <b>xRocket → CryptoBot</b> — 0.3 % на любую сумму
+🔥 <b>Выгодно:</b> xRocket → CryptoBot — <s>1.5 %</s> <b>0.3 %</b>
 <i>⚡ Курс 1:1 · обычно 10 секунд</i>
 --- rich
 <h3>💱 Обмен CryptoBot ⇄ xRocket</h3>
@@ -20,7 +20,7 @@ xRocket → CryptoBot · 🔥 0.3 % · 2–300
 <tr><td>xRocket → CryptoBot</td><td align="right">🔥 0.3 %</td><td align="right">2–300</td></tr>
 <tr><td>Оплата счёта</td><td align="right">3 %</td><td align="right">2–200</td></tr>
 </table>
-<p>🔥 <b>xRocket → CryptoBot</b> — 0.3 % на любую сумму</p>
+<p>🔥 <b>Выгодно:</b> xRocket → CryptoBot — <s>1.5 %</s> <b>0.3 %</b></p>
 <footer>⚡ Курс 1:1 · обычно 10 секунд</footer>
 --- keyboard: reply {"input_field_placeholder":"Пришлите чек или счёт","is_persistent":true,"resize_keyboard":true}
 [{"style":"primary","text":"💱 Обменять"},{"style":"primary","text":"🧾 Оплатить счёт"}]
@@ -33,7 +33,7 @@ xRocket → CryptoBot · 🔥 0.3 % · 2–300
 <blockquote>CryptoBot → xRocket · от 1.2 % · 2–500
 xRocket → CryptoBot · <tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> 0.3 % · 2–300
 Оплата счёта · 3 % · 2–200</blockquote>
-<tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> <b>xRocket → CryptoBot</b> — 0.3 % на любую сумму
+<tg-emoji emoji-id="5368000000000000038">🔥</tg-emoji> <b>Выгодно:</b> xRocket → CryptoBot — <s>1.5 %</s> <b>0.3 %</b>
 <i><tg-emoji emoji-id="5368000000000000027">⚡</tg-emoji> Курс 1:1 · обычно 10 секунд</i>
 --- rich
 <h3><tg-emoji emoji-id="5368000000000000014">💱</tg-emoji> Обмен CryptoBot ⇄ xRocket</h3>
@@ -44,7 +44,7 @@ xRocket → CryptoBot · <tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji
 <tr><td>xRocket → CryptoBot</td><td align="right"><tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> 0.3 %</td><td align="right">2–300</td></tr>
 <tr><td>Оплата счёта</td><td align="right">3 %</td><td align="right">2–200</td></tr>
 </table>
-<p><tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> <b>xRocket → CryptoBot</b> — 0.3 % на любую сумму</p>
+<p><tg-emoji emoji-id="5368000000000000038">🔥</tg-emoji> <b>Выгодно:</b> xRocket → CryptoBot — <s>1.5 %</s> <b>0.3 %</b></p>
 <footer><tg-emoji emoji-id="5368000000000000027">⚡</tg-emoji> Курс 1:1 · обычно 10 секунд</footer>
 --- keyboard: reply {"input_field_placeholder":"Пришлите чек или счёт","is_persistent":true,"resize_keyboard":true}
 [{"icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять"},{"icon_custom_emoji_id":"5368000000000000004","style":"primary","text":"Оплатить счёт"}]

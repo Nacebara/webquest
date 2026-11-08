@@ -77,10 +77,13 @@ pub enum Emoji {
     Rules,
     /// Стрелка вниз: «Скопируйте, чтобы создать чек» — на кнопку под сообщением.
     Down,
+    /// Огонёк «Выгодно» в строке текста — пламя без плитки (выбор владельца 9 ноября 2026,
+    /// вариант А). В таблицах — плитка [`Emoji::Promo`].
+    Flame,
 }
 
 impl Emoji {
-    pub const ALL: [Emoji; 38] = [
+    pub const ALL: [Emoji; 39] = [
         Emoji::Wait,
         Emoji::Ok,
         Emoji::Err,
@@ -119,6 +122,7 @@ impl Emoji {
         Emoji::RichView,
         Emoji::Rules,
         Emoji::Down,
+        Emoji::Flame,
     ];
 
     pub const fn key(self) -> &'static str {
@@ -161,6 +165,7 @@ impl Emoji {
             Emoji::RichView => "rich_view",
             Emoji::Rules => "rules",
             Emoji::Down => "down",
+            Emoji::Flame => "flame",
         }
     }
 
@@ -205,6 +210,7 @@ impl Emoji {
             Emoji::RichView => "✨",
             Emoji::Rules => "🛡",
             Emoji::Down => "⬇️",
+            Emoji::Flame => "🔥",
         }
     }
 
@@ -253,6 +259,7 @@ impl Emoji {
             Emoji::RichView => "mono/sparkle",
             Emoji::Rules => "color/shield",
             Emoji::Down => "color/down",
+            Emoji::Flame => "color/flame",
         }
     }
 
@@ -297,6 +304,7 @@ impl Emoji {
             Emoji::RichView => "mono/sparkle",
             Emoji::Rules => "mono/shield",
             Emoji::Down => "mono/down",
+            Emoji::Flame => "mono/fire",
         }
     }
 }

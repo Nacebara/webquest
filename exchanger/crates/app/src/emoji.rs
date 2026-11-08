@@ -412,8 +412,8 @@ mod tests {
         let manifest = read_manifest(&dir).unwrap();
         assert_eq!(
             manifest.icons.len(),
-            118,
-            "+ стрелка «вниз» (8 ноября 2026)"
+            119,
+            "+ стрелка «вниз» (8.11) и пламя для текста (9.11)"
         );
         for icon in &manifest.icons {
             assert!(dir.join(&icon.animated).is_file(), "{}", icon.animated);

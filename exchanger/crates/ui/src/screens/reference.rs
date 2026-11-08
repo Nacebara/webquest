@@ -158,8 +158,8 @@ impl Ui {
         out
     }
 
-    /// «🔥 xRocket → CryptoBot — 0.3 % на первые 300 USDT, сверх — 1.5 %»: по строке на каждое
-    /// открытое направление с выгодным курсом.
+    /// «🔥 Выгодно: CryptoBot → xRocket — ~~2.5 %~~ 0.3 % / на чек до 300 USDT» (Л1 владельца):
+    /// по строке на каждое открытое направление с выгодным курсом.
     fn promo_lines(&self, terms: &Terms) -> Vec<Frag> {
         let t = &self.texts.terms;
         terms
@@ -170,12 +170,19 @@ impl Ui {
                     Flow::CheckExchange => self.direction_name(d.direction),
                     Flow::InvoicePayment => Frag::text(&self.texts.offers.get(d.direction).send),
                 };
-                let icon = self.emoji.frag(Emoji::Promo);
+                // В строке текста — пламя без плитки (вариант А владельца); плитка — в таблицах.
+                let icon = self.emoji.frag(Emoji::Flame);
                 let fee = self.pct(pct);
+                let base = self.regular_fee_frag(d);
                 Some(if up_to >= d.max {
                     self.fill(
                         &t.promo_all,
-                        &[("icon", &icon), ("direction", &name), ("fee", &fee)],
+                        &[
+                            ("icon", &icon),
+                            ("direction", &name),
+                            ("fee", &fee),
+                            ("base", &base),
+                        ],
                     )
                 } else {
                     self.fill(
@@ -184,8 +191,8 @@ impl Ui {
                             ("icon", &icon),
                             ("direction", &name),
                             ("fee", &fee),
-                            ("up_to", &Frag::code(&fmt::bare_amount(up_to))),
-                            ("base", &self.regular_fee_frag(d)),
+                            ("up_to", &Frag::text(&fmt::bare_amount(up_to))),
+                            ("base", &base),
                         ],
                     )
                 })
@@ -513,7 +520,7 @@ impl Ui {
                     &match promo_of(d) {
                         Some(_) => {
                             let mut f = Frag::trusted(" ");
-                            f.push(&self.emoji.frag(Emoji::Promo));
+                            f.push(&self.emoji.frag(Emoji::Flame));
                             f
                         }
                         None => Frag::new(),

@@ -30,6 +30,8 @@ const C = {
   grey: '#8A98A8',
   // Стрелка «Вниз» владельца — его цвет.
   arrow: '#3F82F0',
+  // Пламя для текста (вариант А владельца).
+  flame: '#E8890C',
 };
 const W = '#FFFFFF';
 
@@ -375,6 +377,14 @@ const COLOR = {
     tile('fr', C.amber, grp(A.swing(t, 7, 12, 20, 2, 0.06, 0.5), `<path d="${G.flame}"/>${grp(A.pop(t, 0.18, 12, 18), `<path d="${G.flameCore}"/>`)}`), {
       sw: 1.7,
     }),
+  // Пламя для текста (выбор владельца 9 ноября 2026, вариант А): огонёк «Выгодно» без плитки —
+  // оранжевая заливка пламени, белый контур и огонёк, как в плитке. В таблицах — плитка `fire`.
+  flame: (t) => {
+    // Контур — снизу, заливка — поверх: видна внешняя половина белой линии. Так пламя рисует и
+    // Telegram (rlottie), и эталон — владелец выбирал по этому виду.
+    const body = grp(A.swing(t, 7, 12, 20, 2, 0.06, 0.5), `<path d="${G.flame}"/><path d="${G.flame}" fill="${C.flame}" stroke="none"/>${grp(A.pop(t, 0.18, 12, 18), `<path d="${G.flameCore}"/>`)}`);
+    return `<g transform="translate(12 12.4) scale(1.12) translate(-12 -12.1)"><g fill="none" stroke="${W}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</g></g>`;
+  },
   // Пауза: полоски по очереди коротко приседают.
   pause: (t) => tile('ps', C.slate, PAUSE(t), { sw: 2.15 }),
   ban: (t) => tile('bn', C.coral, `${G.banRing}${grp(A.swing(t, 14), G.banSlash)}`),
@@ -653,7 +663,7 @@ const LABELS = {
   eye: 'Смотреть', edit: 'Изменить', plus: 'Добавить', minus: 'Убрать', trash: 'Удалить', calendar: 'Период',
   alert: 'Внимание', flag: 'Отметить', pin: 'Закрепить', topic: 'Тема', ack: 'Принял', take: 'Взять',
   coin: 'Деньги', sparkle: 'Новое', phone: 'Телефон', plug: 'Подключить', inbox: 'Обращения', server: 'Система',
-  wallet: 'Кошелёк', fire: 'Выгодно', scale: 'Встречный поток', tiers: 'Ступени',
+  wallet: 'Кошелёк', fire: 'Выгодно', flame: 'Выгодно (в тексте)', scale: 'Встречный поток', tiers: 'Ступени',
 };
 
 module.exports = { C, COLOR, MONO, LABELS, MONO_W };

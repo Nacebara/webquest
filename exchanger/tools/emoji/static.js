@@ -31,7 +31,7 @@ const BASE = {
     alarm: '🚨', live: '🟢', robot: '🤖', vault: '🏦', flood: '🌊', kill: '🛑', maint: '🛠',
     broadcast: '📢', limit: '📏', confetti: '🎉', step_done: '✅', step_now: '🔵', step_todo: '⚪',
     dot_ok: '🟢', dot_work: '🔵', dot_wait: '🟡', dot_act: '🔴', dot_closed: '⚫',
-    prog_25: '🕒', prog_50: '🕕', prog_75: '🕘', fire: '🔥',
+    prog_25: '🕒', prog_50: '🕕', prog_75: '🕘', fire: '🔥', flame: '🔥',
   },
   mono: {
     swap: '🔄', ticket: '🎫', invoice: '🧾', rates: '📈', history: '📜', support: '💬', help: '❓',

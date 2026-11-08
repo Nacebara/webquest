@@ -149,6 +149,13 @@
    "static": "static/color/fire.png"
   },
   {
+   "key": "color/flame",
+   "label": "Выгодно (в тексте)",
+   "emoji": "🔥",
+   "animated": "color/flame.tgs",
+   "static": "static/color/flame.png"
+  },
+  {
    "key": "color/pause",
    "label": "Пауза",
    "emoji": "⏸",
