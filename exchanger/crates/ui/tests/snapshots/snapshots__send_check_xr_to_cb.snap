@@ -4,14 +4,14 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-🚀 <b>xRocket</b> → 🔵 <b>CryptoBot</b> · 2–300 USDT
-<pre><code class="language-Пример расчёта">Ваш чек xRocket   100.00
+🚀 <b>xRocket</b> → 🔵 <b>CryptoBot</b>
+<pre><code class="language-Пример · можно от 2 до 300 USDT">Ваш чек xRocket   100.00
 Комиссия 1.5 %      1.50
 ————————————————————————
 Чек CryptoBot      98.50</code></pre>
 <i>Скопируйте, чтобы создать чек</i> ⬇️
 --- rich
-<p>🚀 <b>xRocket</b> → 🔵 <b>CryptoBot</b> · 2–300 USDT</p><pre><code class="language-Пример расчёта">Ваш чек xRocket   100.00
+<p>🚀 <b>xRocket</b> → 🔵 <b>CryptoBot</b></p><pre><code class="language-Пример · можно от 2 до 300 USDT">Ваш чек xRocket   100.00
 Комиссия 1.5 %      1.50
 ————————————————————————
 Чек CryptoBot      98.50</code></pre>
@@ -22,14 +22,14 @@ expression: "both(p, q)"
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> → <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> · 2–300 USDT
-<pre><code class="language-Пример расчёта">Ваш чек xRocket   100.00
+<tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> → <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b>
+<pre><code class="language-Пример · можно от 2 до 300 USDT">Ваш чек xRocket   100.00
 Комиссия 1.5 %      1.50
 ————————————————————————
 Чек CryptoBot      98.50</code></pre>
 <i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji>
 --- rich
-<p><tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> → <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> · 2–300 USDT</p><pre><code class="language-Пример расчёта">Ваш чек xRocket   100.00
+<p><tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> → <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b></p><pre><code class="language-Пример · можно от 2 до 300 USDT">Ваш чек xRocket   100.00
 Комиссия 1.5 %      1.50
 ————————————————————————
 Чек CryptoBot      98.50</code></pre>

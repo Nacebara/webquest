@@ -989,7 +989,7 @@ async fn system_screen_and_screen_preview_from_the_panel(pool: PgPool) {
     )
     .await;
     // Экраны идут по порядку макета, с паузой между сообщениями: проверяем начало.
-    o.tg.screen(mark, OWNER, "1/27 · Приветствие").await;
+    o.tg.screen(mark, OWNER, "1/31 · Приветствие").await;
     o.tg.screen(mark, OWNER, "Что меняем?").await;
 }
 

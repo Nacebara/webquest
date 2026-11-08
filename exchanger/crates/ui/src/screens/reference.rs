@@ -57,6 +57,22 @@ fn example_quote(
     Some((policy.average_pct(amount).ok()?, quote))
 }
 
+/// Самая низкая обычная ставка направления: со ступенями — самая дешёвая ступень.
+fn regular_cheapest(d: &DirectionTerms) -> Decimal {
+    d.tiers
+        .iter()
+        .map(|t| t.fee_pct)
+        .fold(d.fee_pct, Decimal::min)
+}
+
+/// Выгодный курс открытого направления, если он дешевле обычной ставки: ставка и «на первые
+/// N USDT» — не больше лимита направления (больше лимита прислать нельзя).
+fn promo_of(d: &DirectionTerms) -> Option<(Decimal, Decimal)> {
+    let p = d.promo?;
+    (d.status == DirectionStatus::Open && p.fee_pct < regular_cheapest(d))
+        .then(|| (p.fee_pct, p.up_to.min(d.max)))
+}
+
 /// Точка статуса строки истории: готово — зелёная, в работе — жёлтая, остальное — серая.
 fn history_dot(state: OrderState) -> Emoji {
     match state {
@@ -92,8 +108,25 @@ impl Ui {
         }
     }
 
-    /// Комиссия: одна ставка или «от …» по самой дешёвой ступени.
+    /// Комиссия, как её видит клиент: выгодный курс — «🔥 0.3 %»; иначе одна ставка или
+    /// «от …» по самой дешёвой ступени.
     fn fee_frag(&self, t: &DirectionTerms) -> Frag {
+        match promo_of(t) {
+            Some((pct, _)) => self.promo_fee(pct),
+            None => self.regular_fee_frag(t),
+        }
+    }
+
+    /// «🔥 0.3 %».
+    fn promo_fee(&self, pct: Decimal) -> Frag {
+        let mut f = self.emoji.frag(Emoji::Promo);
+        f.push(&Frag::trusted(" "));
+        f.push(&self.pct(pct));
+        f
+    }
+
+    /// Обычная комиссия без выгодного курса: одна ставка или «от …».
+    fn regular_fee_frag(&self, t: &DirectionTerms) -> Frag {
         if t.tiers.len() > 1 {
             let cheapest = t.tiers.iter().map(|x| x.fee_pct).min().unwrap_or(t.fee_pct);
             self.fill(&self.texts.terms.fee_from, &[("fee", &self.pct(cheapest))])
@@ -125,20 +158,44 @@ impl Ui {
         out
     }
 
-    /// «🔥 Сейчас выгодно…» для открытых направлений с выгодным курсом.
+    /// «🔥 xRocket → CryptoBot — 0.3 % на первые 300 USDT, сверх — 1.5 %»: по строке на каждое
+    /// открытое направление с выгодным курсом.
+    fn promo_lines(&self, terms: &Terms) -> Vec<Frag> {
+        let t = &self.texts.terms;
+        terms
+            .open()
+            .filter_map(|d| {
+                let (pct, up_to) = promo_of(d)?;
+                let name = match d.direction.flow() {
+                    Flow::CheckExchange => self.direction_name(d.direction),
+                    Flow::InvoicePayment => Frag::text(&self.texts.offers.get(d.direction).send),
+                };
+                let icon = self.emoji.frag(Emoji::Promo);
+                let fee = self.pct(pct);
+                Some(if up_to >= d.max {
+                    self.fill(
+                        &t.promo_all,
+                        &[("icon", &icon), ("direction", &name), ("fee", &fee)],
+                    )
+                } else {
+                    self.fill(
+                        &t.promo,
+                        &[
+                            ("icon", &icon),
+                            ("direction", &name),
+                            ("fee", &fee),
+                            ("up_to", &Frag::code(&fmt::bare_amount(up_to))),
+                            ("base", &self.regular_fee_frag(d)),
+                        ],
+                    )
+                })
+            })
+            .collect()
+    }
+
     fn promo_paras(&self, terms: &Terms, doc: &mut Doc) {
-        for d in terms.open() {
-            if let Some(p) = d.promo {
-                doc.para(&self.fill(
-                    &self.texts.terms.promo,
-                    &[
-                        ("icon", &self.emoji.frag(Emoji::Promo)),
-                        ("direction", &self.direction_name(d.direction)),
-                        ("fee", &self.pct(p.fee_pct)),
-                        ("up_to", &self.usdt(p.up_to)),
-                    ],
-                ));
-            }
+        for line in self.promo_lines(terms) {
+            doc.para(&line);
         }
     }
 
@@ -196,6 +253,7 @@ impl Ui {
             right: &[1, 2],
             plain_quote: true,
         });
+        self.promo_paras(terms, &mut doc);
         if terms.open().next().is_none() {
             doc.para(&self.fill(&t.closed, &[]));
         }
@@ -210,17 +268,31 @@ impl Ui {
             .iter()
             .filter(|d| d.status == DirectionStatus::Open)
             .collect();
-        let Some(cheapest) = open.iter().map(|d| d.fee_pct).min() else {
+        if let [d] = open.as_slice() {
+            // Одно направление — та же ставка, что в «Курсе» и на кнопке «Что меняем?».
+            return self.fee_frag(d);
+        }
+        // Несколько (оба счёта): самая низкая, «от …», если ставки разные; огонёк — если самая
+        // низкая — выгодный курс.
+        let rate = |d: &DirectionTerms| promo_of(d).map_or(regular_cheapest(d), |(p, _)| p);
+        let Some(cheapest) = open.iter().map(|d| rate(d)).min() else {
             return Frag::text("—");
         };
-        let single = open.len() == 1 && open[0].tiers.len() <= 1;
+        let promo = open
+            .iter()
+            .any(|d| promo_of(d).is_some_and(|(p, _)| p == cheapest));
         let same = open
             .iter()
-            .all(|d| d.fee_pct == cheapest && d.tiers.len() <= 1);
-        if single || same {
-            self.pct(cheapest)
+            .all(|d| rate(d) == cheapest && d.tiers.len() <= 1);
+        let fee = if promo {
+            self.promo_fee(cheapest)
         } else {
-            self.fill(&self.texts.terms.fee_from, &[("fee", &self.pct(cheapest))])
+            self.pct(cheapest)
+        };
+        if same {
+            fee
+        } else {
+            self.fill(&self.texts.terms.fee_from, &[("fee", &fee)])
         }
     }
 
@@ -356,20 +428,37 @@ impl Ui {
         let t = &self.texts.exchange;
         let mut rows = Vec::new();
         let mut body = self.fill(&t.title, &[]);
+        // Выгодный курс — строкой под вопросом, как в «Курсе» (только обмен чеков).
+        let checks = Terms {
+            directions: terms
+                .directions
+                .iter()
+                .filter(|d| d.direction.flow() == Flow::CheckExchange)
+                .cloned()
+                .collect(),
+            ..terms.clone()
+        };
+        for line in self.promo_lines(&checks) {
+            body.push(&Frag::trusted("\n"));
+            body.push(&line);
+        }
         for direction in [Direction::CbToXrCheck, Direction::XrToCbCheck] {
             let Some(d) = terms.get(direction) else {
                 continue;
             };
             let name = self.texts.directions.get(direction);
-            // Значок кошелька, куда придут деньги (как в макете: ракета у «→ xRocket»).
-            let role = Some(match direction.target() {
-                domain::Platform::XRocket => Emoji::Xr,
-                domain::Platform::CryptoBot => Emoji::Cb,
+            // Значок кошелька, куда придут деньги (как в макете: ракета у «→ xRocket»); с
+            // выгодным курсом — огонёк.
+            let promo = promo_of(d);
+            let role = Some(match (promo, direction.target()) {
+                (Some(_), _) => Emoji::Promo,
+                (None, domain::Platform::XRocket) => Emoji::Xr,
+                (None, domain::Platform::CryptoBot) => Emoji::Cb,
             });
             let button = if d.status == DirectionStatus::Open {
-                let fee = match d.promo {
-                    Some(p) => fmt::percent(p.fee_pct.min(d.fee_pct)),
-                    None => self.fee_frag(d).plain().to_owned(),
+                let fee = match promo {
+                    Some((pct, _)) => fmt::percent(pct),
+                    None => self.regular_fee_frag(d).plain().to_owned(),
                 };
                 let label = self.button_text(&t.button, &[("direction", name), ("fee", &fee)]);
                 let button = self.cb_button(role, &label, &Callback::Direction(direction));
@@ -419,15 +508,31 @@ impl Ui {
                 ("src", &self.wallet(src)),
                 ("dst_icon", &self.emoji.frag(wallet_emoji(dst))),
                 ("dst", &self.wallet(dst)),
-                ("min", &Frag::text(&fmt::bare_amount(d.min))),
-                ("max", &Frag::text(&fmt::bare_amount(d.max))),
+                (
+                    "promo",
+                    &match promo_of(d) {
+                        Some(_) => {
+                            let mut f = Frag::trusted(" ");
+                            f.push(&self.emoji.frag(Emoji::Promo));
+                            f
+                        }
+                        None => Frag::new(),
+                    },
+                ),
             ],
         ));
         if let Some((pct, q)) = example_quote(d, amount) {
             let r = &self.texts.receipt;
             let pct = fmt::percent(pct);
+            let label = fill_text(
+                &r.example,
+                &[
+                    ("min", &fmt::bare_amount(d.min)),
+                    ("max", &fmt::bare_amount(d.max)),
+                ],
+            );
             doc.block(&self.receipt(
-                Some(&r.example),
+                Some(&label),
                 &[
                     (
                         fill_text(&r.check, &[("wallet", self.wallet_name(src))]),

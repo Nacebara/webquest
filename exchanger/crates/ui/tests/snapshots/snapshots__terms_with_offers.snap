@@ -6,11 +6,11 @@ expression: "both(p, q)"
 --- html
 <b>📈 Курс и лимиты</b>
 <blockquote>🟢 CryptoBot → xRocket · от 1.2 % · 2–500
-🟢 xRocket → CryptoBot · 1.5 % · 2–300
+🟢 xRocket → CryptoBot · 🔥 0.3 % · 2–300
 🟢 Счёт CryptoBot · 3 % · 2–200
 🟡 Счёт xRocket · — · пауза</blockquote>
 Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.
-🔥 <b>Сейчас выгодно:</b> xRocket → CryptoBot — 0.3 % на сумму до <code>450.00</code> USDT, сверх неё — обычная комиссия.
+🔥 <b>xRocket → CryptoBot</b> — 0.3 % на любую сумму
 Для вас действуют личные условия — они уже учтены в таблице.
 <blockquote><b>Комиссия по сумме</b>
 • CryptoBot → xRocket: до <code>100.00</code> USDT — 2.5 % · от <code>100.00</code> USDT — 1.8 % · от <code>250.00</code> USDT — 1.2 %</blockquote>
@@ -20,12 +20,12 @@ expression: "both(p, q)"
 <table striped compact>
 <tr><th></th><th>Куда</th><th align="right">Комиссия</th><th align="right">USDT</th></tr>
 <tr><td>🟢</td><td>CryptoBot → xRocket</td><td align="right">от 1.2 %</td><td align="right">2–500</td></tr>
-<tr><td>🟢</td><td>xRocket → CryptoBot</td><td align="right">1.5 %</td><td align="right">2–300</td></tr>
+<tr><td>🟢</td><td>xRocket → CryptoBot</td><td align="right">🔥 0.3 %</td><td align="right">2–300</td></tr>
 <tr><td>🟢</td><td>Счёт CryptoBot</td><td align="right">3 %</td><td align="right">2–200</td></tr>
 <tr><td>🟡</td><td>Счёт xRocket</td><td align="right">—</td><td align="right">пауза</td></tr>
 </table>
 <p>Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.</p>
-<p>🔥 <b>Сейчас выгодно:</b> xRocket → CryptoBot — 0.3 % на сумму до <code>450.00</code> USDT, сверх неё — обычная комиссия.</p>
+<p>🔥 <b>xRocket → CryptoBot</b> — 0.3 % на любую сумму</p>
 <p>Для вас действуют личные условия — они уже учтены в таблице.</p>
 <details open><summary>Комиссия по сумме</summary>
 <ul>
@@ -39,11 +39,11 @@ expression: "both(p, q)"
 --- html
 <b><tg-emoji emoji-id="5368000000000000015">📈</tg-emoji> Курс и лимиты</b>
 <blockquote><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> CryptoBot → xRocket · от 1.2 % · 2–500
-<tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> xRocket → CryptoBot · 1.5 % · 2–300
+<tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> xRocket → CryptoBot · <tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> 0.3 % · 2–300
 <tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> Счёт CryptoBot · 3 % · 2–200
 <tg-emoji emoji-id="5368000000000000030">🟡</tg-emoji> Счёт xRocket · — · пауза</blockquote>
 Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.
-<tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> <b>Сейчас выгодно:</b> xRocket → CryptoBot — 0.3 % на сумму до <code>450.00</code> USDT, сверх неё — обычная комиссия.
+<tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> <b>xRocket → CryptoBot</b> — 0.3 % на любую сумму
 Для вас действуют личные условия — они уже учтены в таблице.
 <blockquote><b>Комиссия по сумме</b>
 • CryptoBot → xRocket: до <code>100.00</code> USDT — 2.5 % · от <code>100.00</code> USDT — 1.8 % · от <code>250.00</code> USDT — 1.2 %</blockquote>
@@ -53,12 +53,12 @@ expression: "both(p, q)"
 <table striped compact>
 <tr><th></th><th>Куда</th><th align="right">Комиссия</th><th align="right">USDT</th></tr>
 <tr><td><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji></td><td>CryptoBot → xRocket</td><td align="right">от 1.2 %</td><td align="right">2–500</td></tr>
-<tr><td><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji></td><td>xRocket → CryptoBot</td><td align="right">1.5 %</td><td align="right">2–300</td></tr>
+<tr><td><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji></td><td>xRocket → CryptoBot</td><td align="right"><tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> 0.3 %</td><td align="right">2–300</td></tr>
 <tr><td><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji></td><td>Счёт CryptoBot</td><td align="right">3 %</td><td align="right">2–200</td></tr>
 <tr><td><tg-emoji emoji-id="5368000000000000030">🟡</tg-emoji></td><td>Счёт xRocket</td><td align="right">—</td><td align="right">пауза</td></tr>
 </table>
 <p>Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.</p>
-<p><tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> <b>Сейчас выгодно:</b> xRocket → CryptoBot — 0.3 % на сумму до <code>450.00</code> USDT, сверх неё — обычная комиссия.</p>
+<p><tg-emoji emoji-id="5368000000000000019">🔥</tg-emoji> <b>xRocket → CryptoBot</b> — 0.3 % на любую сумму</p>
 <p>Для вас действуют личные условия — они уже учтены в таблице.</p>
 <details open><summary>Комиссия по сумме</summary>
 <ul>

@@ -4,14 +4,14 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-🔵 <b>CryptoBot</b> → 🚀 <b>xRocket</b> · 2–500 USDT
-<pre><code class="language-Пример расчёта">Ваш чек CryptoBot   100.00
+🔵 <b>CryptoBot</b> → 🚀 <b>xRocket</b>
+<pre><code class="language-Пример · можно от 2 до 500 USDT">Ваш чек CryptoBot   100.00
 Комиссия 2.5 %        2.50
 ——————————————————————————
 Чек xRocket          97.50</code></pre>
 <i>Скопируйте, чтобы создать чек</i> ⬇️
 --- rich
-<p>🔵 <b>CryptoBot</b> → 🚀 <b>xRocket</b> · 2–500 USDT</p><pre><code class="language-Пример расчёта">Ваш чек CryptoBot   100.00
+<p>🔵 <b>CryptoBot</b> → 🚀 <b>xRocket</b></p><pre><code class="language-Пример · можно от 2 до 500 USDT">Ваш чек CryptoBot   100.00
 Комиссия 2.5 %        2.50
 ——————————————————————————
 Чек xRocket          97.50</code></pre>
@@ -22,14 +22,14 @@ expression: "both(p, q)"
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> → <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> · 2–500 USDT
-<pre><code class="language-Пример расчёта">Ваш чек CryptoBot   100.00
+<tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> → <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b>
+<pre><code class="language-Пример · можно от 2 до 500 USDT">Ваш чек CryptoBot   100.00
 Комиссия 2.5 %        2.50
 ——————————————————————————
 Чек xRocket          97.50</code></pre>
 <i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji>
 --- rich
-<p><tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> → <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> · 2–500 USDT</p><pre><code class="language-Пример расчёта">Ваш чек CryptoBot   100.00
+<p><tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b> → <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b></p><pre><code class="language-Пример · можно от 2 до 500 USDT">Ваш чек CryptoBot   100.00
 Комиссия 2.5 %        2.50
 ——————————————————————————
 Чек xRocket          97.50</code></pre>

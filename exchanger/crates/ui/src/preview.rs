@@ -75,6 +75,23 @@ pub fn terms() -> Terms {
     }
 }
 
+/// Те же условия, но на CryptoBot → xRocket включён выгодный курс встречного потока (Р15):
+/// 0.3 % на первые 300 USDT.
+pub fn terms_promo() -> Terms {
+    let mut t = terms();
+    if let Some(d) = t
+        .directions
+        .iter_mut()
+        .find(|d| d.direction == Direction::CbToXrCheck)
+    {
+        d.promo = Some(crate::model::PromoTerms {
+            fee_pct: Decimal::new(3, 1),
+            up_to: Decimal::from(300),
+        });
+    }
+    t
+}
+
 fn order() -> OrderRef {
     OrderRef {
         id: ORDER.to_owned(),
@@ -289,5 +306,16 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
             messages: vec![ui.support(None), ui.support_sent(Some(ORDER))],
         },
         one("Без ссылки", ui.no_link()),
+        // Выгодный курс встречного потока (Р15) — на утверждение владельцу, в макете B1 его нет.
+        one("Приветствие · выгодный курс", ui.welcome(&terms_promo())),
+        one("Курс и лимиты · выгодный курс", ui.terms(&terms_promo())),
+        one(
+            "Обменять → куда · выгодный курс",
+            ui.exchange_menu(&terms_promo()),
+        ),
+        one(
+            "Пришлите чек · выгодный курс",
+            ui.send_check(&terms_promo(), Direction::CbToXrCheck),
+        ),
     ]
 }

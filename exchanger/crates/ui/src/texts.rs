@@ -239,6 +239,8 @@ pub struct TermsTexts {
     pub tier_sep: String,
     /// Выгодный курс встречного потока.
     pub promo: String,
+    /// Выгодный курс на весь лимит направления.
+    pub promo_all: String,
     pub personal: String,
 }
 
@@ -258,7 +260,7 @@ pub struct ExchangeTexts {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SendCheckTexts {
-    /// «🔷 CryptoBot → 🚀 xRocket · 1–500 USDT» — путь денег.
+    /// «🔷 CryptoBot → 🚀 xRocket» — путь денег; с выгодным курсом — огонёк в конце.
     pub head: String,
 }
 
@@ -266,7 +268,8 @@ pub struct SendCheckTexts {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReceiptTexts {
-    /// «Пример расчёта» — шапка квитанции в «Пришлите чек»: суммы там — пример.
+    /// «Пример · можно от 2 до 300 USDT» — шапка квитанции в «Пришлите чек»: суммы там —
+    /// пример, лимиты — тут же.
     pub example: String,
     /// «Ваш чек CryptoBot».
     pub check: String,
