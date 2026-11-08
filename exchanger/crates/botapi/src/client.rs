@@ -60,6 +60,9 @@ pub struct BotApiBuilder {
     timeout: Duration,
     connect_timeout: Duration,
     proxy: Option<SecretString>,
+    /// Дополнительные корневые сертификаты (DER) к набору Mozilla: прокси, который
+    /// перешифровывает TLS своим сертификатом.
+    extra_roots: Vec<rustls::pki_types::CertificateDer<'static>>,
 }
 
 impl fmt::Debug for BotApiBuilder {
@@ -68,6 +71,7 @@ impl fmt::Debug for BotApiBuilder {
             .field("base_url", &self.base_url)
             .field("timeout", &self.timeout)
             .field("proxy", &self.proxy.as_ref().map(|_| "[REDACTED]"))
+            .field("extra_roots", &self.extra_roots.len())
             .finish_non_exhaustive()
     }
 }
@@ -96,6 +100,20 @@ impl BotApiBuilder {
         self
     }
 
+    /// Доверять ещё и сертификатам из PEM (файл CA прокси). Встроенный набор Mozilla остаётся.
+    pub fn add_root_pem(mut self, pem: &[u8]) -> Result<Self, Error> {
+        use rustls::pki_types::pem::PemObject as _;
+        let before = self.extra_roots.len();
+        for cert in rustls::pki_types::CertificateDer::pem_slice_iter(pem) {
+            self.extra_roots
+                .push(cert.map_err(|_| Error::Config("CA file is not valid PEM".into()))?);
+        }
+        if self.extra_roots.len() == before {
+            return Err(Error::Config("CA file has no certificates".into()));
+        }
+        Ok(self)
+    }
+
     pub fn build(self) -> Result<BotApi, Error> {
         if !token_looks_valid(self.token.expose_secret()) {
             return Err(Error::Config("malformed bot token".into()));
@@ -108,7 +126,7 @@ impl BotApiBuilder {
         }
 
         let mut builder = reqwest::Client::builder()
-            .tls_backend_preconfigured(tls_config()?)
+            .tls_backend_preconfigured(tls_config(&self.extra_roots)?)
             .connect_timeout(self.connect_timeout)
             .user_agent(concat!("exch-botapi/", env!("CARGO_PKG_VERSION")));
         builder = match &self.proxy {
@@ -131,10 +149,17 @@ impl BotApiBuilder {
     }
 }
 
-/// rustls на ring, корни — встроенный набор Mozilla (webpki-roots).
-fn tls_config() -> Result<rustls::ClientConfig, Error> {
+/// rustls на ring, корни — встроенный набор Mozilla (webpki-roots) и явно добавленные.
+fn tls_config(
+    extra: &[rustls::pki_types::CertificateDer<'static>],
+) -> Result<rustls::ClientConfig, Error> {
     let mut roots = rustls::RootCertStore::empty();
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    for cert in extra {
+        roots
+            .add(cert.clone())
+            .map_err(|e| Error::Config(format!("bad CA certificate: {e}")))?;
+    }
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let config = rustls::ClientConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
@@ -167,6 +192,7 @@ impl BotApi {
             timeout: DEFAULT_TIMEOUT,
             connect_timeout: DEFAULT_CONNECT_TIMEOUT,
             proxy: None,
+            extra_roots: Vec::new(),
         }
     }
 

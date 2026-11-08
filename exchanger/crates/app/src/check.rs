@@ -186,7 +186,7 @@ async fn bot(r: &mut Report, cfg: &Config) {
         r.fail("Бот", "нет CLIENT_BOT_TOKEN — запустите exch setup");
         return;
     };
-    let api = match botapi::BotApi::new(SecretString::from(token.expose_secret().to_owned())) {
+    let api = match crate::telegram::bot_api(SecretString::from(token.expose_secret().to_owned())) {
         Ok(a) => a,
         Err(e) => {
             r.fail("Бот", e.to_string());

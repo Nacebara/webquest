@@ -112,7 +112,7 @@ pub fn client_bot(
     support_contact: Option<String>,
     emoji: ui::EmojiSet,
 ) -> anyhow::Result<tgbot::ClientBot> {
-    let api = botapi::BotApi::new(token).context("cannot build the Bot API client")?;
+    let api = crate::telegram::bot_api(token)?;
     let ui = ui::Ui::builtin(emoji, ui::UiConfig::default())
         .context("built-in client texts are invalid")?;
     let cfg = tgbot::ClientBotConfig {
@@ -132,7 +132,7 @@ pub fn ops_bot(
     engine: Arc<engine::Engine>,
     owner_tg_id: i64,
 ) -> anyhow::Result<ops::OpsBot> {
-    let api = botapi::BotApi::new(token).context("cannot build the Bot API client")?;
+    let api = crate::telegram::bot_api(token)?;
     let cfg = ops::OpsConfig {
         owner_id: Some(owner_tg_id),
         ..ops::OpsConfig::default()

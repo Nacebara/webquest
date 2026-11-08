@@ -45,6 +45,9 @@ enum Command {
     /// Проверить всё по-русски: ✅ готово, ⚠️ стоит поправить, ❌ не заработает.
     #[command(alias = "check-config")]
     Check,
+    /// Демо: настоящий бот и пульт на симуляторе кошельков — без денег и юзербота, на
+    /// отдельной базе `<база>_demo` (пересоздаётся при запуске). Пробы — команда /demo в боте.
+    Demo,
     /// Применить миграции и выйти.
     Migrate,
     /// Войти аккаунтом юзербота и привязать его к кошельку платформы. Телефон, код и пароль
@@ -215,6 +218,7 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
     let result = runtime.block_on(async {
         match command {
             Command::Run => run().await,
+            Command::Demo => demo().await,
             Command::Setup => setup(paths, bare).await,
             Command::Check => check(paths).await,
             Command::Migrate => migrate().await,
@@ -316,7 +320,7 @@ async fn emoji(cmd: EmojiCommand) -> anyhow::Result<()> {
                 .client_bot_token
                 .clone()
                 .context("CLIENT_BOT_TOKEN is not set: the sets belong to the client bot")?;
-            let bot = botapi::BotApi::new(token).context("cannot build the Bot API client")?;
+            let bot = app::telegram::bot_api(token)?;
             let dir = dir.unwrap_or_else(app::emoji::default_dir);
             let packs = app::emoji::install(&mut conn, &bot, owner, &dir).await?;
             println!(
@@ -500,51 +504,115 @@ async fn run() -> anyhow::Result<()> {
                         tracing::warn!("CLIENT_BOT_TOKEN is not set: the client bot is not started")
                     }
                     Some(token) => {
-                        // Один бот: админ-панель — внутри клиентского (решение владельца).
-                        let panel = app::runtime::ops_bot(
-                            &pool,
-                            token.clone(),
-                            engine.clone(),
-                            cfg.owner_tg_id,
-                        )?;
-                        {
-                            let panel = panel.clone();
-                            tasks.spawn(supervise(
-                                "panel-alerts",
-                                cancel.clone(),
-                                RestartPolicy::default(),
-                                move |token| {
-                                    let panel = panel.clone();
-                                    async move {
-                                        panel.run(token).await.map_err(anyhow::Error::from)
-                                    }
-                                },
-                            ));
-                        }
-                        let emoji = app::runtime::emoji_set(&pool).await;
-                        let bot = app::runtime::client_bot(
-                            &pool,
-                            token,
-                            engine,
-                            cfg.support_contact.clone(),
-                            emoji,
-                        )?
-                        .with_hook(Arc::new(panel));
-                        tasks.spawn(supervise(
-                            "client-bot",
-                            cancel.clone(),
-                            RestartPolicy::default(),
-                            move |token| {
-                                let bot = bot.clone();
-                                async move { bot.run(token).await.map_err(anyhow::Error::from) }
-                            },
-                        ));
+                        spawn_bot(&mut tasks, &cancel, &pool, engine, &cfg, token, None).await?;
                     }
                 }
             }
         }
     }
 
+    wait(tasks, cancel).await
+}
+
+/// Клиентский бот и пульт в нём (один токен) поверх движка. В демо перед пультом стоит
+/// перехватчик проб `/demo`.
+async fn spawn_bot(
+    tasks: &mut JoinSet<Result<(), supervisor::GaveUp>>,
+    cancel: &CancellationToken,
+    pool: &storage::PgPool,
+    engine: Arc<engine::Engine>,
+    cfg: &Config,
+    token: secrecy::SecretString,
+    demo: Option<&app::demo::DemoWorld>,
+) -> anyhow::Result<()> {
+    // Один бот: админ-панель — внутри клиентского (решение владельца).
+    let panel = app::runtime::ops_bot(pool, token.clone(), engine.clone(), cfg.owner_tg_id)?;
+    {
+        let panel = panel.clone();
+        tasks.spawn(supervise(
+            "panel-alerts",
+            cancel.clone(),
+            RestartPolicy::default(),
+            move |token| {
+                let panel = panel.clone();
+                async move { panel.run(token).await.map_err(anyhow::Error::from) }
+            },
+        ));
+    }
+    let hook: Arc<dyn tgbot::UpdateHook> = match demo {
+        Some(world) => Arc::new(app::demo::DemoHook::new(
+            token.clone(),
+            world,
+            Arc::new(panel),
+        )?),
+        None => Arc::new(panel),
+    };
+    let emoji = app::runtime::emoji_set(pool).await;
+    let bot = app::runtime::client_bot(pool, token, engine, cfg.support_contact.clone(), emoji)?
+        .with_hook(hook);
+    tasks.spawn(supervise(
+        "client-bot",
+        cancel.clone(),
+        RestartPolicy::default(),
+        move |token| {
+            let bot = bot.clone();
+            async move { bot.run(token).await.map_err(anyhow::Error::from) }
+        },
+    ));
+    Ok(())
+}
+
+/// `exch demo`: тот же бот и пульт, кошельки — симулятор, база — `<база>_demo`.
+async fn demo() -> anyhow::Result<()> {
+    let cfg = load_config()?;
+    let token = cfg
+        .client_bot_token
+        .clone()
+        .context("CLIENT_BOT_TOKEN is not set: the demo runs the real bot on the simulator")?;
+    let url = app::demo::demo_database_url(cfg.database_url.expose_secret())?;
+    let pool = app::demo::fresh_database(&url).await?;
+    let base = engine::Engine::new(pool.clone(), engine::EngineConfig::default());
+    let world = app::demo::seed(&pool, &base).await?;
+    let engine = app::demo::wallets(&pool, &world)
+        .await?
+        .into_iter()
+        .fold(base, engine::Engine::with_wallet);
+    let engine = Arc::new(engine);
+    tracing::warn!(
+        "DEMO: wallets are simulated, no money moves; separate database *_demo; send /demo to the bot"
+    );
+    let cancel = CancellationToken::new();
+    let mut tasks: JoinSet<Result<(), supervisor::GaveUp>> = JoinSet::new();
+    {
+        let engine = engine.clone();
+        tasks.spawn(supervise(
+            "engine",
+            cancel.clone(),
+            RestartPolicy::default(),
+            move |token| {
+                let engine = engine.clone();
+                async move { engine.run(token).await.map_err(anyhow::Error::from) }
+            },
+        ));
+    }
+    spawn_bot(
+        &mut tasks,
+        &cancel,
+        &pool,
+        engine,
+        &cfg,
+        token,
+        Some(&world),
+    )
+    .await?;
+    wait(tasks, cancel).await
+}
+
+/// Работать до сигнала остановки или до отказа задачи; затем мягкая остановка.
+async fn wait(
+    mut tasks: JoinSet<Result<(), supervisor::GaveUp>>,
+    cancel: CancellationToken,
+) -> anyhow::Result<()> {
     let outcome = tokio::select! {
         () = shutdown_signal() => {
             tracing::info!("shutdown signal received");

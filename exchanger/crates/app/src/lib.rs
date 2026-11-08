@@ -9,11 +9,13 @@
 //! - [`runtime`] — подключение юзерботов и сборка движка для `exch run`;
 //! - [`emoji`] — премиум-эмодзи: вариация набора, свои эмодзи по ролям, установка (`exch emoji`);
 //! - [`project`] — папка проекта: `.env` и `config.toml` ([`settings_file`]);
-//! - [`setup`] — мастер `exch setup`; [`check`] — проверка `exch check`; [`db`] — база.
+//! - [`setup`] — мастер `exch setup`; [`check`] — проверка `exch check`; [`db`] — база;
+//! - [`demo`] — `exch demo`: бот и пульт на симуляторе кошельков, без денег.
 
 pub mod check;
 pub mod config;
 pub mod db;
+pub mod demo;
 pub mod emoji;
 pub mod listen;
 pub mod login;

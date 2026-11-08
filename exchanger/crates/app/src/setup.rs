@@ -171,7 +171,7 @@ pub fn explain_bot_error(e: &botapi::Error) -> String {
 
 async fn bot(w: &mut Wizard<'_>) -> anyhow::Result<BotApi> {
     if let Some(token) = w.get("CLIENT_BOT_TOKEN") {
-        let api = BotApi::new(SecretString::from(token)).context("клиент Bot API")?;
+        let api = crate::telegram::bot_api_with(SecretString::from(token), |k| w.get(k))?;
         match api.get_me().await {
             Ok(me) => {
                 println!("✅ Бот @{}.", me.username.unwrap_or_default());
@@ -199,7 +199,7 @@ async fn bot(w: &mut Wizard<'_>) -> anyhow::Result<BotApi> {
             println!("❌ Это не похоже на токен: нужен текст вида 123456789:AA… целиком.");
             continue;
         }
-        let api = BotApi::new(SecretString::from(t.to_owned())).context("клиент Bot API")?;
+        let api = crate::telegram::bot_api_with(SecretString::from(t.to_owned()), |k| w.get(k))?;
         match api.get_me().await {
             Ok(me) => {
                 w.set("CLIENT_BOT_TOKEN", t)?;

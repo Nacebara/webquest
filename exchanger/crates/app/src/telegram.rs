@@ -115,6 +115,40 @@ impl TelegramSettings {
     }
 }
 
+/// Клиент Bot API с сетевыми настройками процесса (`lookup` — переменные окружения или
+/// `.env` мастера):
+/// - `TELEGRAM_PROXY` — прокси до api.telegram.org (`http://`, `https://`, `socks5://`;
+///   логин и пароль в адресе допустимы — поэтому секрет);
+/// - `TELEGRAM_CA_FILE` — PEM корневого сертификата прокси, который перешифровывает TLS.
+///
+/// Прокси из `HTTPS_PROXY` клиент сам не берёт: только явно (как задумано в `botapi`).
+pub fn bot_api_with(
+    token: secrecy::SecretString,
+    lookup: impl Fn(&str) -> Option<String>,
+) -> anyhow::Result<botapi::BotApi> {
+    use anyhow::Context as _;
+    let get = |k: &str| {
+        lookup(k)
+            .map(|v| v.trim().to_owned())
+            .filter(|v| !v.is_empty())
+    };
+    let mut builder = botapi::BotApi::builder(token);
+    if let Some(proxy) = get("TELEGRAM_PROXY") {
+        builder = builder.proxy(secrecy::SecretString::from(proxy));
+    }
+    if let Some(path) = get("TELEGRAM_CA_FILE") {
+        let pem =
+            std::fs::read(&path).with_context(|| format!("cannot read TELEGRAM_CA_FILE {path}"))?;
+        builder = builder.add_root_pem(&pem).context("TELEGRAM_CA_FILE")?;
+    }
+    builder.build().context("cannot build the Bot API client")
+}
+
+/// То же из переменных окружения процесса.
+pub fn bot_api(token: secrecy::SecretString) -> anyhow::Result<botapi::BotApi> {
+    bot_api_with(token, |k| std::env::var(k).ok())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
