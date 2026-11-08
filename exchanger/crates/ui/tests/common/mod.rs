@@ -497,18 +497,27 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
         ("howto_cryptobot", ui.check_howto(&t, cb)),
         ("howto_xrocket", ui.check_howto(&t, Direction::XrToCbCheck)),
         ("invoice_prompt", ui.invoice_prompt(&t)),
-        ("order_checking", ui.order_checking(&order(cb))),
+        // Ход обмена — макет B1: одна строка на шаг, итог — «… ждут вас в xRocket».
+        ("order_checking", ui.order_checking(&order(cb), None, false)),
         (
-            "order_accepted",
-            ui.order_accepted(&order(cb), &breakdown()),
+            "order_checking_amount",
+            ui.order_checking(&order(cb), Some(&usdt(dec!(100))), false),
         ),
         (
-            "order_creating_payout",
-            ui.order_creating_payout(&order(cb), &usdt(dec!(97.5))),
+            "order_sending",
+            ui.order_sending(&order(cb), &usdt(dec!(97.5)), false),
+        ),
+        (
+            "order_sending_slow",
+            ui.order_sending(&order(cb), &usdt(dec!(97.5)), true),
         ),
         (
             "order_done",
-            ui.order_done(&order(cb), &breakdown(), CHECK_URL, at(12, 35)),
+            ui.order_done(&order(cb), &breakdown(), CHECK_URL, 9, false),
+        ),
+        (
+            "order_done_details",
+            ui.order_done(&order(cb), &breakdown(), CHECK_URL, 9, true),
         ),
         (
             "invoice_quote",

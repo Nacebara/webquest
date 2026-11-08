@@ -1,0 +1,21 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+✅ <b>97.50 USDT</b> ждут вас в xRocket
+<blockquote>Получено 100.00 · комиссия 2.5 % (2.50)
+Заявка A1B2C3D4E5 · 9 секунд</blockquote>
+--- keyboard: inline
+[{"style":"success","text":"📥 Забрать","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"}]
+[{"callback_data":"hide:A1B2C3D4E5","text":"✖️ Скрыть"},{"callback_data":"exchange","text":"💱 Ещё обмен"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000001">✅</tg-emoji> <b>97.50 USDT</b> ждут вас в xRocket
+<blockquote>Получено 100.00 · комиссия 2.5 % (2.50)
+Заявка A1B2C3D4E5 · 9 секунд</blockquote>
+--- keyboard: inline
+[{"icon_custom_emoji_id":"5368000000000000023","style":"success","text":"Забрать","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"}]
+[{"callback_data":"hide:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000025","text":"Скрыть"},{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","text":"Ещё обмен"}]

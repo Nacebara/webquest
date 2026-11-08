@@ -276,6 +276,10 @@ impl Inner {
                 )
                 .await
             }
+            MenuAction::Help => {
+                let terms = self.terms_for(user).await?;
+                self.reply(chat, &self.ui().help(&terms.terms)).await
+            }
         }
     }
 
@@ -442,7 +446,7 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
         return Ok(());
     };
     let user = from.id;
-    match action {
+    match action.clone() {
         Callback::Direction(direction) => {
             let terms = inner.terms_for(user).await?;
             let screen = inner.ui().send_check(&terms.terms, direction);
@@ -458,6 +462,27 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
         Callback::Privacy => inner.command(chat, user, Command::Privacy).await,
         Callback::History { page } => inner.history(chat, user, page).await,
         Callback::Order(id) => inner.order_card(chat, user, &id).await,
+        Callback::Details(id) | Callback::HideDetails(id) => {
+            let open = matches!(action, Callback::Details(_));
+            match inner.own_order(user, &id).await? {
+                Some(view) => {
+                    inner.memory(|m| {
+                        if open {
+                            m.details_open.insert(view.id);
+                        } else {
+                            m.details_open.remove(&view.id);
+                        }
+                    });
+                    crate::orders::ensure_message(
+                        inner,
+                        view.id,
+                        crate::orders::Create::UnlessRejected,
+                    )
+                    .await
+                }
+                None => Ok(()),
+            }
+        }
         Callback::Support(_) => inner.menu(chat, user, MenuAction::Support).await,
         Callback::Cancel(None) => {
             inner

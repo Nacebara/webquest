@@ -131,9 +131,21 @@ pub struct MenuTexts {
     pub rates: String,
     pub history: String,
     pub support: String,
+    /// «Помощь» — третья кнопка второго ряда (макет B1).
+    pub help: String,
     /// Только у инвесторов (DESIGN-v0.2 Р18).
     pub invest: String,
     pub placeholder: String,
+    /// Подписи кнопок прежних версий меню: у клиента может остаться старая клавиатура.
+    pub legacy: Vec<LegacyMenu>,
+}
+
+/// Старая подпись кнопки меню и действие, которое она вызывает.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LegacyMenu {
+    pub text: String,
+    pub action: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -146,6 +158,10 @@ pub struct ButtonTexts {
     pub back: String,
     pub copy_order: String,
     pub claim_check: String,
+    /// B1: «Забрать» (зелёная, ссылка на чек), «Детали» / «Скрыть» — то же сообщение.
+    pub claim: String,
+    pub details: String,
+    pub hide: String,
     pub copy_link: String,
     pub copy_amount: String,
     pub pay_by_check: String,
@@ -222,12 +238,14 @@ pub struct TermsTexts {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExchangeTexts {
+    /// «Что меняем?» — один вопрос, две кнопки (макет B1).
     pub title: String,
-    pub lead: String,
-    pub line: String,
-    pub line_paused: String,
-    pub footer: String,
-    pub promo: String,
+    /// Кнопка направления: «CryptoBot → xRocket · 2.5 %».
+    pub button: String,
+    /// Направление на паузе — неактивная кнопка.
+    pub button_paused: String,
+    /// Строка под вопросом, только если что-то на паузе: почему (шаг 0.1 PLAN-v1).
+    pub paused: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -280,10 +298,18 @@ pub struct InvoicePromptTexts {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OrderTexts {
+    /// «Проверяю чек» — сумма чека ещё неизвестна.
     pub checking: String,
-    pub accepted: String,
-    pub creating: String,
+    /// «Проверяю чек на 100.00 USDT».
+    pub checking_amount: String,
+    /// «Отправляю 97.50 USDT в xRocket» — деньги клиента уже у нас.
+    pub sending: String,
+    /// Строка-успокоение через 20 секунд (макет: «Дольше обычного»).
+    pub slow: String,
+    /// B1 «Готово»: «97.50 USDT ждут вас в xRocket».
     pub done: String,
+    /// B1 «Детали»: та же строка + цитата с разбивкой и номером заявки.
+    pub details: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -671,8 +697,8 @@ mod tests {
     #[test]
     fn broken_placeholder_is_rejected() {
         let broken = BUILTIN_RU.replace(
-            "{e_wait} <b>Проверяю чек</b>",
-            "{e_wait <b>Проверяю чек</b>",
+            "checking = \"{e_process} Проверяю чек\"",
+            "checking = \"{e_process Проверяю чек\"",
         );
         assert!(matches!(
             Texts::from_toml(&broken),

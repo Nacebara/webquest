@@ -70,19 +70,36 @@ pub enum MenuAction {
     Rates,
     History,
     Support,
+    /// «Помощь» (макет B1): как пользоваться и кнопка «Написать оператору».
+    Help,
     /// «💼 Инвестиции» — только у инвесторов (DESIGN-v0.2 Р18); бот проверяет доступ.
     Invest,
 }
 
 impl MenuAction {
-    pub const ALL: [MenuAction; 6] = [
+    pub const ALL: [MenuAction; 7] = [
         MenuAction::Exchange,
         MenuAction::PayInvoice,
         MenuAction::Rates,
         MenuAction::History,
         MenuAction::Support,
+        MenuAction::Help,
         MenuAction::Invest,
     ];
+
+    /// Ключ действия в `[menu].legacy` (`ru.toml`).
+    pub fn from_key(key: &str) -> Option<Self> {
+        Some(match key {
+            "exchange" => MenuAction::Exchange,
+            "pay_invoice" => MenuAction::PayInvoice,
+            "rates" => MenuAction::Rates,
+            "history" => MenuAction::History,
+            "support" => MenuAction::Support,
+            "help" => MenuAction::Help,
+            "invest" => MenuAction::Invest,
+            _ => return None,
+        })
+    }
 }
 
 /// Текст кнопки меню без эмодзи, знаков и регистра: «📈 Курс и лимиты» → «курс и лимиты».

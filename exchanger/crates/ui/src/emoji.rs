@@ -45,10 +45,22 @@ pub enum Emoji {
     Promo,
     /// Инвестиции (DESIGN-v0.2 Р18).
     Invest,
+    /// «Проверяю чек» — три точки «в работе» (макет «Эмодзи v2», выбор владельца).
+    Process,
+    /// «Отправляю … в xRocket».
+    Sending,
+    /// Кнопка «Забрать» у чека выплаты.
+    Claim,
+    /// Кнопка «Детали».
+    Details,
+    /// Кнопка «Скрыть».
+    Hide,
+    /// «Помощь» в меню.
+    Help,
 }
 
 impl Emoji {
-    pub const ALL: [Emoji; 21] = [
+    pub const ALL: [Emoji; 27] = [
         Emoji::Wait,
         Emoji::Ok,
         Emoji::Err,
@@ -70,6 +82,12 @@ impl Emoji {
         Emoji::Bell,
         Emoji::Promo,
         Emoji::Invest,
+        Emoji::Process,
+        Emoji::Sending,
+        Emoji::Claim,
+        Emoji::Details,
+        Emoji::Hide,
+        Emoji::Help,
     ];
 
     pub const fn key(self) -> &'static str {
@@ -95,6 +113,12 @@ impl Emoji {
             Emoji::Bell => "bell",
             Emoji::Promo => "promo",
             Emoji::Invest => "invest",
+            Emoji::Process => "process",
+            Emoji::Sending => "sending",
+            Emoji::Claim => "claim",
+            Emoji::Details => "details",
+            Emoji::Hide => "hide",
+            Emoji::Help => "help",
         }
     }
 
@@ -122,6 +146,12 @@ impl Emoji {
             Emoji::Bell => "🔔",
             Emoji::Promo => "🔥",
             Emoji::Invest => "💼",
+            Emoji::Process => "🔄",
+            Emoji::Sending => "📤",
+            Emoji::Claim => "📥",
+            Emoji::Details => "👁",
+            Emoji::Hide => "✖️",
+            Emoji::Help => "❓",
         }
     }
 
@@ -153,6 +183,12 @@ impl Emoji {
             Emoji::Bell => "mono/bell",
             Emoji::Promo => "color/fire",
             Emoji::Invest => "color/vault",
+            Emoji::Process => "color/process",
+            Emoji::Sending => "color/sending",
+            Emoji::Claim => "mono/claim",
+            Emoji::Details => "mono/eye",
+            Emoji::Hide => "mono/close",
+            Emoji::Help => "mono/help",
         }
     }
 
@@ -180,6 +216,12 @@ impl Emoji {
             Emoji::Bell => "mono/bell",
             Emoji::Promo => "mono/fire",
             Emoji::Invest => "mono/vault",
+            Emoji::Process => "mono/spin",
+            Emoji::Sending => "mono/fast",
+            Emoji::Claim => "mono/claim",
+            Emoji::Details => "mono/eye",
+            Emoji::Hide => "mono/close",
+            Emoji::Help => "mono/help",
         }
     }
 }

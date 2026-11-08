@@ -21,6 +21,10 @@ pub enum Callback {
         page: u32,
     },
     Order(String),
+    /// B1: развернуть «Детали» в сообщении заявки.
+    Details(String),
+    /// B1: свернуть «Детали».
+    HideDetails(String),
     /// В поддержку, с номером заявки или без.
     Support(Option<String>),
     /// Отмена шага или заявки.
@@ -67,6 +71,8 @@ impl Callback {
             Callback::Privacy => "privacy".to_owned(),
             Callback::History { page } => format!("history:{page}"),
             Callback::Order(id) => format!("order:{id}"),
+            Callback::Details(id) => format!("det:{id}"),
+            Callback::HideDetails(id) => format!("hide:{id}"),
             Callback::Support(None) => "support".to_owned(),
             Callback::Support(Some(id)) => format!("support:{id}"),
             Callback::Cancel(None) => "cancel".to_owned(),
@@ -111,6 +117,8 @@ impl Callback {
                 .filter(|_| page.bytes().all(|b| b.is_ascii_digit()))
                 .map(|page| Callback::History { page }),
             ("order", _) => order(arg).map(Callback::Order),
+            ("det", _) => order(arg).map(Callback::Details),
+            ("hide", _) => order(arg).map(Callback::HideDetails),
             ("pay_check", _) => order(arg).map(Callback::PayByCheck),
             ("refund", _) => order(arg).map(Callback::Refund),
             ("support", None) => Some(Callback::Support(None)),
@@ -161,6 +169,8 @@ mod tests {
                 page: 4_000_000_000,
             },
             Callback::Order("A1B2C3D4E5".into()),
+            Callback::Details("A1B2C3D4E5".into()),
+            Callback::HideDetails("x".repeat(32)),
             Callback::Support(None),
             Callback::Support(Some("A1B2C3D4E5".into())),
             Callback::Cancel(None),

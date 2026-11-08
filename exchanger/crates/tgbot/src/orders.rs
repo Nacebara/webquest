@@ -53,7 +53,14 @@ pub(crate) struct Extra {
 pub(crate) struct RenderCfg<'a> {
     pub sla: chrono::Duration,
     pub bind_username: Option<&'a str>,
+    /// Клиент развернул «Детали» итога (макет B1).
+    pub details: bool,
+    /// Сейчас: шаг дольше [`SLOW_AFTER`] получает строку «Дольше обычного».
+    pub now: DateTime<Utc>,
 }
+
+/// Через сколько секунд от начала заявки шаг считается долгим (макет B1: 20 секунд).
+pub(crate) const SLOW_AFTER: std::time::Duration = std::time::Duration::from_secs(20);
 
 fn money(view: &OrderView, amount: Option<Decimal>) -> Option<Money> {
     amount.and_then(|a| Money::new(a, view.asset).ok())
@@ -234,18 +241,23 @@ pub(crate) fn render(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Ext
         id: view.public_id.clone(),
         direction: view.direction,
     };
-    let finished =
-        |view: &OrderView| -> DateTime<Utc> { view.finished_at.unwrap_or(view.state_since) };
+    let slow =
+        cfg.now - view.created_at >= chrono::Duration::from_std(SLOW_AFTER).unwrap_or_default();
+    let intake = money(view, view.intake_amount);
     match view.state {
         OrderState::New | OrderState::IntakePending | OrderState::IntakeUnknown => {
-            ui.order_checking(&order)
+            ui.order_checking(&order, intake.as_ref(), slow)
         }
         OrderState::Received | OrderState::PayoutPending => match money(view, view.payout_amount) {
-            Some(payout) => ui.order_creating_payout(&order, &payout),
-            None => ui.order_checking(&order),
+            Some(payout) => ui.order_sending(&order, &payout, slow),
+            None => ui.order_checking(&order, intake.as_ref(), slow),
         },
         OrderState::Completed => match (breakdown(view), view.payout_check_url.as_deref()) {
-            (Some(b), Some(url)) => ui.order_done(&order, &b, url, finished(view)),
+            (Some(b), Some(url)) => {
+                let finished = view.finished_at.unwrap_or(view.state_since);
+                let took = (finished - view.created_at).num_seconds();
+                ui.order_done(&order, &b, url, took, cfg.details)
+            }
             _ => card_plain(ui, view),
         },
         OrderState::RefundPending => match money(view, view.refund_amount) {
@@ -409,6 +421,8 @@ pub(crate) async fn ensure_message(
     let cfg = RenderCfg {
         sla: chrono::Duration::from_std(inner.cfg.manual_review_sla).unwrap_or_default(),
         bind_username: inner.cfg.bind_username.as_deref(),
+        details: inner.memory(|m| m.details_open.contains(&order_id)),
+        now: Utc::now(),
     };
     let screen = render(&inner.ui(), &cfg, &view, &extra);
     let digest = digest(&screen);
@@ -447,9 +461,29 @@ pub(crate) async fn ensure_message(
             // Бот работает только в личке: чат клиента = его id.
             inner
                 .send_progress(&view, view.user_id, &screen, digest)
-                .await
+                .await?;
+            // Шаг затянется — то же сообщение получит «Дольше обычного» (макет B1).
+            if !view.state.is_terminal() {
+                let inner = inner.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(SLOW_AFTER + std::time::Duration::from_secs(1)).await;
+                    if let Err(e) = refresh(inner, order_id).await {
+                        tracing::debug!(order = order_id, error = %e, "slow-step refresh failed");
+                    }
+                });
+            }
+            Ok(())
         }
     }
+}
+
+/// Перерисовать сообщение заявки из фоновой задачи. Явный `Send`-тип разрывает рекурсию
+/// типов: задачу запускает сам [`ensure_message`].
+fn refresh(
+    inner: Arc<Inner>,
+    order_id: i64,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), TgBotError>> + Send>> {
+    Box::pin(async move { ensure_message(&inner, order_id, Create::UnlessRejected).await })
 }
 
 /// «Пришлю чек»: сообщение заявки на оплату счёта — экраном ожидания чека (S6).
@@ -701,6 +735,8 @@ mod tests {
         RenderCfg {
             sla: chrono::Duration::minutes(30),
             bind_username: None,
+            details: false,
+            now: Utc::now(),
         }
     }
 
@@ -733,16 +769,36 @@ mod tests {
     }
 
     #[test]
-    fn completed_has_claim_url_and_copy_link() {
+    fn completed_is_b1_claim_details_again() {
         let ui = ui();
         let url = "https://t.me/xrocket?start=t_val6vkkTbAbxd06";
         let mut v = view(OrderState::Completed);
         v.payout_check_url = Some(url.into());
         let screen = render(&ui, &cfg(), &v, &Extra::default());
         let actions = buttons(&screen);
-        assert!(actions.contains(&botapi::InlineButtonAction::Url(url.into())));
-        assert!(actions.contains(&botapi::InlineButtonAction::CopyText(url.into())));
-        assert!(screen.html.contains("97.50 USDT"), "{}", screen.html);
+        assert_eq!(
+            actions.first(),
+            Some(&botapi::InlineButtonAction::Url(url.into()))
+        );
+        let det = ui::Callback::Details(v.public_id.clone()).encode();
+        assert!(actions.contains(&botapi::InlineButtonAction::CallbackData(det)));
+        assert!(
+            screen
+                .html
+                .contains("97.50\u{a0}USDT</b> ждут вас в xRocket"),
+            "{}",
+            screen.html
+        );
+        // «Детали» — то же сообщение с разбивкой и номером заявки, кнопка «Скрыть».
+        let open = RenderCfg {
+            details: true,
+            ..cfg()
+        };
+        let screen = render(&ui, &open, &v, &Extra::default());
+        assert!(screen.html.contains("Получено 100.00"), "{}", screen.html);
+        assert!(screen.html.contains(&v.public_id), "{}", screen.html);
+        let hide = ui::Callback::HideDetails(v.public_id.clone()).encode();
+        assert!(buttons(&screen).contains(&botapi::InlineButtonAction::CallbackData(hide)));
     }
 
     #[test]

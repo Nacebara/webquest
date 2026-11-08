@@ -63,14 +63,21 @@ expired = "истекла"
 cancelled = "отменена"
 closed_manual = "закрыта оператором"
 
+# Меню — макет B1: [Обменять] [Оплатить счёт] синие, ниже [Курс] [История] [Помощь].
 [menu]
-exchange = "Обменять чек"
+exchange = "Обменять"
 pay_invoice = "Оплатить счёт"
-rates = "Курс и лимиты"
+rates = "Курс"
 history = "История"
 support = "Поддержка"
+help = "Помощь"
 invest = "Инвестиции"
-placeholder = "Пришлите чек или ссылку на счёт"
+placeholder = "Пришлите чек или счёт"
+# Подписи прежних версий меню (у клиента может остаться старая клавиатура).
+legacy = [
+    { text = "Обменять чек", action = "exchange" },
+    { text = "Курс и лимиты", action = "rates" },
+]
 
 [buttons]
 cb_to_xr = "CryptoBot → xRocket"
@@ -80,6 +87,9 @@ cancel = "Отмена"
 back = "Назад"
 copy_order = "Номер заявки"
 claim_check = "Забрать чек"
+claim = "Забрать"
+details = "Детали"
+hide = "Скрыть"
 copy_link = "Скопировать ссылку"
 copy_amount = "Сумма"
 pay_by_check = "Пришлю чек {wallet}"
@@ -147,13 +157,12 @@ tier_sep = " · "
 promo = "{icon} <b>Сейчас выгодно:</b> {direction} — {fee} на сумму до {up_to} USDT, сверх неё — обычная комиссия."
 personal = "Для вас действуют личные условия — они уже учтены в таблице."
 
+# «Обменять» — макет B1: один вопрос, две кнопки, комиссия прямо на кнопке.
 [exchange]
-title = "<b>Обменять чек</b>"
-lead = "Выберите направление:"
-line = "{icon} <b>{direction}</b> — {fee}, от {min} до {max} USDT"
-line_paused = "{icon} <b>{direction}</b> — на паузе: {why}"
-footer = "Курс 1:1. Выплата — чеком другого кошелька: забрать его можно одной кнопкой."
-promo = "{icon} <b>{direction}</b> сейчас выгоднее: {fee} на сумму до {up_to} USDT"
+title = "Что меняем?"
+button = "{direction} · {fee}"
+button_paused = "{direction} · пауза"
+paused = "{e_pause} <i>{direction} на паузе: {why}</i>"
 
 [send_check]
 title = "<b>{direction}</b>"
@@ -191,17 +200,16 @@ line_paused = "{icon} {send} — на паузе"
 examples = "Ссылка выглядит так: {cb} или {xr}"
 rules = "Оплачиваю одноразовые счета с суммой."
 
+# Ход обмена — макет B1: одно сообщение, одна строка на шаг, дальше только правится.
 [order]
-checking = "{e_wait} <b>Проверяю чек</b> {order}\nЧек {src}, выплата чеком {dst}. Обычно до 10 секунд."
-accepted = "{e_wait} <b>Чек принят:</b> {amount_in}\nКомиссия {fee_pct}: {fee}. Готовлю чек {dst} на {payout}…"
-creating = "{e_wait} <b>Создаю чек {dst}</b> на {payout}…\nВаши деньги у меня, чек появится здесь через несколько секунд. Заявка {order}."
-done = """{e_ok} <b>Готово!</b> Ваш чек {dst} на {payout}.
-Нажмите «{claim}» — деньги придут на ваш баланс {dst}.
-<blockquote>Получено: {amount_in}
-Комиссия {fee_pct}: {fee}
-Выплачено: {payout}</blockquote>
-Забрать чек может любой, у кого есть ссылка, — не пересылайте её.
-Заявка {order} · {time}"""
+checking = "{e_process} Проверяю чек"
+checking_amount = "{e_process} Проверяю чек на {amount} USDT"
+sending = "{e_sending} Отправляю {payout} USDT в {dst}"
+slow = "<i>Дольше обычного. Деньги у меня — ничего делать не нужно.</i>"
+done = "{e_ok} <b>{payout}\u00A0USDT</b> ждут вас в {dst}"
+details = """{e_ok} <b>{payout}\u00A0USDT</b> ждут вас в {dst}
+<blockquote>Получено {amount_in} · комиссия {fee_pct} ({fee})
+Заявка {order} · {took}</blockquote>"""
 
 [invoice]
 quote = """{e_invoice} <b>Счёт {inv_wallet} на {inv_amount}</b>{description}

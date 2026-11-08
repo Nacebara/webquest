@@ -34,10 +34,9 @@ expression: "both(p, q)"
 <li>xRocket: наберите здесь <code>@xrocket 10</code> и выберите чек в USDT.</li></ul>
 </details>
 <footer>Курс 1:1, выплата — чеком другого кошелька. Подробно — «Курс и лимиты».</footer>
---- keyboard: reply {"input_field_placeholder":"Пришлите чек или ссылку на счёт","is_persistent":true,"resize_keyboard":true}
-[{"text":"💱 Обменять чек"},{"text":"🧾 Оплатить счёт"}]
-[{"text":"📈 Курс и лимиты"},{"text":"📜 История"}]
-[{"text":"💬 Поддержка"}]
+--- keyboard: reply {"input_field_placeholder":"Пришлите чек или счёт","is_persistent":true,"resize_keyboard":true}
+[{"style":"primary","text":"💱 Обменять"},{"style":"primary","text":"🧾 Оплатить счёт"}]
+[{"text":"📈 Курс"},{"text":"📜 История"},{"text":"❓ Помощь"}]
 
 ### premium
 --- html
@@ -71,7 +70,6 @@ expression: "both(p, q)"
 <li>xRocket: наберите здесь <code>@xrocket 10</code> и выберите чек в USDT.</li></ul>
 </details>
 <footer>Курс 1:1, выплата — чеком другого кошелька. Подробно — «Курс и лимиты».</footer>
---- keyboard: reply {"input_field_placeholder":"Пришлите чек или ссылку на счёт","is_persistent":true,"resize_keyboard":true}
-[{"icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять чек"},{"icon_custom_emoji_id":"5368000000000000004","style":"primary","text":"Оплатить счёт"}]
-[{"icon_custom_emoji_id":"5368000000000000015","text":"Курс и лимиты"},{"icon_custom_emoji_id":"5368000000000000016","text":"История"}]
-[{"icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
+--- keyboard: reply {"input_field_placeholder":"Пришлите чек или счёт","is_persistent":true,"resize_keyboard":true}
+[{"icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять"},{"icon_custom_emoji_id":"5368000000000000004","style":"primary","text":"Оплатить счёт"}]
+[{"icon_custom_emoji_id":"5368000000000000015","text":"Курс"},{"icon_custom_emoji_id":"5368000000000000016","text":"История"},{"icon_custom_emoji_id":"5368000000000000026","text":"Помощь"}]

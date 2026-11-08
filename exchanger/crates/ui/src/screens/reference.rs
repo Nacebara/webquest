@@ -309,75 +309,48 @@ impl Ui {
         self.dual(doc, keyboard)
     }
 
-    /// «Обменять чек»: два направления с текущей комиссией и кнопками (DESIGN-v0.2 §6).
-    /// Основное направление CryptoBot → xRocket — `primary`; на паузе — `disabled`.
+    /// «Обменять» — макет B1: «Что меняем?» и две кнопки, комиссия прямо на кнопке.
+    /// Основное направление CryptoBot → xRocket — синее; на паузе — неактивная «· пауза».
     pub fn exchange_menu(&self, terms: &Terms) -> Screen {
         let t = &self.texts.exchange;
-        let directions = [Direction::CbToXrCheck, Direction::XrToCbCheck];
-        let mut body = self.fill(&t.title, &[]);
-        body.push(&Frag::trusted("\n"));
-        body.push(&self.fill(&t.lead, &[]));
-        body.push(&Frag::trusted("\n"));
         let mut rows = Vec::new();
-        for direction in directions {
+        let mut body = self.fill(&t.title, &[]);
+        for direction in [Direction::CbToXrCheck, Direction::XrToCbCheck] {
             let Some(d) = terms.get(direction) else {
                 continue;
             };
-            let icon = self.emoji.frag(direction_icon(direction));
-            let name = self.direction_name(direction);
-            body.push(&Frag::trusted("\n"));
-            if d.status == DirectionStatus::Open {
-                body.push(&self.fill(
-                    &t.line,
-                    &[
-                        ("icon", &icon),
-                        ("direction", &name),
-                        ("fee", &self.fee_frag(d)),
-                        ("min", &self.usdt(d.min)),
-                        ("max", &self.usdt(d.max)),
-                    ],
-                ));
-                if let Some(p) = d.promo {
-                    body.push(&Frag::trusted("\n"));
-                    body.push(&self.fill(
-                        &t.promo,
-                        &[
-                            ("icon", &self.emoji.frag(Emoji::Promo)),
-                            ("direction", &name),
-                            ("fee", &self.pct(p.fee_pct)),
-                            ("up_to", &self.usdt(p.up_to)),
-                        ],
-                    ));
-                }
-            } else {
-                body.push(&self.fill(
-                    &t.line_paused,
-                    &[
-                        ("icon", &icon),
-                        ("direction", &name),
-                        ("why", &self.pause_why(d)),
-                    ],
-                ));
-            }
-            let b = &self.texts.buttons;
-            let label = match direction {
-                Direction::CbToXrCheck => &b.cb_to_xr,
-                _ => &b.xr_to_cb,
-            };
+            let name = self.texts.directions.get(direction);
+            // Значок кошелька, куда придут деньги (как в макете: ракета у «→ xRocket»).
+            let role = Some(match direction.target() {
+                domain::Platform::XRocket => Emoji::Xr,
+                domain::Platform::CryptoBot => Emoji::Cb,
+            });
             let button = if d.status == DirectionStatus::Open {
-                let button = self.cb_button(None, label, &Callback::Direction(direction));
+                let fee = match d.promo {
+                    Some(p) => fmt::percent(p.fee_pct.min(d.fee_pct)),
+                    None => self.fee_frag(d).plain().to_owned(),
+                };
+                let label = self.button_text(&t.button, &[("direction", name), ("fee", &fee)]);
+                let button = self.cb_button(role, &label, &Callback::Direction(direction));
                 if direction == Direction::CbToXrCheck {
                     button.style(ButtonStyle::Primary)
                 } else {
                     button
                 }
             } else {
-                botapi::InlineKeyboardButton::disabled(label.as_str())
+                body.push(&Frag::trusted("\n"));
+                body.push(&self.fill(
+                    &t.paused,
+                    &[
+                        ("direction", &self.direction_name(direction)),
+                        ("why", &self.pause_why(d)),
+                    ],
+                ));
+                let label = self.button_text(&t.button_paused, &[("direction", name)]);
+                botapi::InlineKeyboardButton::disabled(label)
             };
             rows.push(vec![button]);
         }
-        body.push(&Frag::trusted("\n\n"));
-        body.push(&self.fill(&t.footer, &[]));
         self.plain(body, Keyboard::inline_rows(rows))
     }
 

@@ -30,9 +30,33 @@ pub fn bare_amount(value: Decimal) -> String {
     value.normalize().to_string()
 }
 
-/// Процент: `2,5 %` (неразрывный пробел перед знаком).
+/// Процент: `2.5 %` (точка, как в суммах; неразрывный пробел перед знаком) — макет B1.
 pub fn percent(pct: Decimal) -> String {
-    format!("{}\u{a0}%", pct.normalize().to_string().replace('.', ","))
+    format!("{}\u{a0}%", pct.normalize())
+}
+
+/// Сколько длилась заявка: «9 секунд», «1 минута», «12 минут», «2 ч 5 мин».
+pub fn took(seconds: i64) -> String {
+    let s = seconds.max(1);
+    if s < 60 {
+        return format!("{s} {}", plural(s, ["секунда", "секунды", "секунд"]));
+    }
+    let m = s / 60;
+    if m < 60 {
+        return format!("{m} {}", plural(m, ["минута", "минуты", "минут"]));
+    }
+    format!("{} ч {} мин", m / 60, m % 60)
+}
+
+/// Русское множественное число: 1 секунда, 2 секунды, 5 секунд, 11 секунд, 21 секунда.
+pub fn plural(n: i64, forms: [&'static str; 3]) -> &'static str {
+    let n = n.abs();
+    match (n % 10, n % 100) {
+        (_, 11..=14) => forms[2],
+        (1, _) => forms[0],
+        (2..=4, _) => forms[1],
+        _ => forms[2],
+    }
 }
 
 /// Как показывать момент времени.
@@ -157,10 +181,21 @@ mod tests {
     }
 
     #[test]
-    fn percent_is_russian() {
-        assert_eq!(percent(dec!(2.50)), "2,5\u{a0}%");
+    fn took_reads_naturally() {
+        assert_eq!(took(9), "9 секунд");
+        assert_eq!(took(1), "1 секунда");
+        assert_eq!(took(22), "22 секунды");
+        assert_eq!(took(0), "1 секунда");
+        assert_eq!(took(61), "1 минута");
+        assert_eq!(took(14 * 60), "14 минут");
+        assert_eq!(took(125 * 60), "2 ч 5 мин");
+    }
+
+    #[test]
+    fn percent_like_the_mockup() {
+        assert_eq!(percent(dec!(2.50)), "2.5\u{a0}%");
         assert_eq!(percent(dec!(3)), "3\u{a0}%");
-        assert_eq!(percent(dec!(1.05)), "1,05\u{a0}%");
+        assert_eq!(percent(dec!(1.05)), "1.05\u{a0}%");
     }
 
     #[test]

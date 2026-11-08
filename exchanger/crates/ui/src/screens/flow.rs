@@ -9,6 +9,7 @@ use domain::Money;
 
 use super::Ui;
 use crate::callback::Callback;
+use crate::emoji::Emoji;
 use crate::fmt::{self, TimeFormat};
 use crate::html::{Frag, clip};
 use crate::model::{Breakdown, Excess, InvoiceQuote, OrderRef, RefundReason, UiError};
@@ -18,77 +19,102 @@ use crate::screen::{Keyboard, Screen};
 const DESCRIPTION_MAX_CHARS: usize = 200;
 
 impl Ui {
+    /// Кнопка «Номер заявки» — у экранов счёта и возврата (их перенос на B1 — следующий шаг).
     fn order_keyboard(&self, order: &OrderRef) -> Keyboard {
         Keyboard::inline_rows(vec![vec![self.copy_order_button(&order.id)]])
     }
 
-    /// S3 «Проверяю чек»: активация юзерботом идёт.
-    pub fn order_checking(&self, order: &OrderRef) -> Screen {
+    /// Строка-успокоение под шагом, если он затянулся (макет B1: «Дольше обычного»).
+    fn with_slow(&self, mut body: Frag, slow: bool) -> Frag {
+        if slow {
+            body.push(&Frag::trusted("\n"));
+            body.push(&self.fill(&self.texts.order.slow, &[]));
+        }
+        body
+    }
+
+    /// B1 «Проверяю чек на 100.00 USDT» (три точки «в работе»). Сумма неизвестна, пока
+    /// кошелёк не открыл чек, — тогда просто «Проверяю чек». Без кнопок: одно окно.
+    pub fn order_checking(&self, _order: &OrderRef, amount: Option<&Money>, slow: bool) -> Screen {
+        let t = &self.texts.order;
+        let body = match amount {
+            Some(a) => self.fill(&t.checking_amount, &[("amount", &self.usdt(a.amount()))]),
+            None => self.fill(&t.checking, &[]),
+        };
+        self.plain(self.with_slow(body, slow), Keyboard::None)
+    }
+
+    /// B1 «Отправляю 97.50 USDT в xRocket»: деньги клиента у нас, сумма выплаты не меняется.
+    pub fn order_sending(&self, order: &OrderRef, payout: &Money, slow: bool) -> Screen {
         let body = self.fill(
-            &self.texts.order.checking,
+            &self.texts.order.sending,
             &[
-                ("order", &self.order_id(&order.id)),
-                ("src", &self.wallet(order.direction.source())),
+                ("payout", &self.usdt(payout.amount())),
                 ("dst", &self.wallet(order.direction.target())),
             ],
         );
-        self.plain(body, self.order_keyboard(order))
+        self.plain(self.with_slow(body, slow), Keyboard::None)
     }
 
-    /// S3 «Чек принят»: деньги у нас, расчёт выплаты.
-    pub fn order_accepted(&self, order: &OrderRef, b: &Breakdown) -> Screen {
-        let body = self.fill(
-            &self.texts.order.accepted,
-            &[
-                ("amount_in", &self.money(&b.amount_in)),
-                ("fee_pct", &self.pct(b.fee_pct)),
-                ("fee", &self.money(&b.fee)),
-                ("payout", &self.money(&b.payout)),
-                ("dst", &self.wallet(order.direction.target())),
-            ],
-        );
-        self.plain(body, self.order_keyboard(order))
-    }
-
-    /// S3 «Создаю чек выплаты».
-    pub fn order_creating_payout(&self, order: &OrderRef, payout: &Money) -> Screen {
-        let body = self.fill(
-            &self.texts.order.creating,
-            &[
-                ("order", &self.order_id(&order.id)),
-                ("payout", &self.money(payout)),
-                ("dst", &self.wallet(order.direction.target())),
-            ],
-        );
-        self.plain(body, self.order_keyboard(order))
-    }
-
-    /// S3 итог: «Ваш чек xRocket на 97.50 USDT» + «Забрать чек» (url, `success`) и
-    /// «Скопировать ссылку» (`copy_text`) — DESIGN-v0.2 §6.
+    /// B1 «Готово»: «97.50 USDT ждут вас в xRocket» + [Забрать] (зелёная, ссылка на чек),
+    /// [Детали] [Ещё обмен]. `details` — то же сообщение с разбивкой и номером заявки
+    /// (кнопка «Скрыть» сворачивает обратно).
     pub fn order_done(
         &self,
         order: &OrderRef,
         b: &Breakdown,
         check_url: &str,
-        finished_at: DateTime<Utc>,
+        took_secs: i64,
+        details: bool,
     ) -> Screen {
+        let t = &self.texts.order;
         let buttons = &self.texts.buttons;
-        let body = self.fill(
-            &self.texts.order.done,
-            &[
-                ("dst", &self.wallet(order.direction.target())),
-                ("payout", &self.money(&b.payout)),
-                ("claim", &Frag::text(&buttons.claim_check)),
-                ("amount_in", &self.money(&b.amount_in)),
-                ("fee_pct", &self.pct(b.fee_pct)),
-                ("fee", &self.money(&b.fee)),
-                ("order", &self.order_id(&order.id)),
-                ("time", &self.at(finished_at, TimeFormat::Time)),
-            ],
-        );
+        let payout = Frag::text(&fmt::amount(b.payout.amount(), b.payout.asset()));
+        let dst = self.wallet(order.direction.target());
+        let body = if details {
+            self.fill(
+                &t.details,
+                &[
+                    ("payout", &payout),
+                    ("dst", &dst),
+                    (
+                        "amount_in",
+                        &Frag::text(&fmt::amount(b.amount_in.amount(), b.amount_in.asset())),
+                    ),
+                    ("fee_pct", &self.pct(b.fee_pct)),
+                    (
+                        "fee",
+                        &Frag::text(&fmt::amount(b.fee.amount(), b.fee.asset())),
+                    ),
+                    ("order", &Frag::text(&order.id)),
+                    ("took", &Frag::text(&fmt::took(took_secs))),
+                ],
+            )
+        } else {
+            self.fill(&t.done, &[("payout", &payout), ("dst", &dst)])
+        };
+        let toggle = if details {
+            self.cb_button(
+                Some(Emoji::Hide),
+                &buttons.hide,
+                &Callback::HideDetails(order.id.clone()),
+            )
+        } else {
+            self.cb_button(
+                Some(Emoji::Details),
+                &buttons.details,
+                &Callback::Details(order.id.clone()),
+            )
+        };
         let keyboard = Keyboard::inline_rows(vec![
-            self.claim_row(check_url),
-            vec![self.cb_button(None, &buttons.again, &Callback::Exchange)],
+            vec![
+                self.url_button(Some(Emoji::Claim), &buttons.claim, check_url)
+                    .style(ButtonStyle::Success),
+            ],
+            vec![
+                toggle,
+                self.cb_button(Some(Emoji::Exchange), &buttons.again, &Callback::Exchange),
+            ],
         ]);
         self.plain(body, keyboard)
     }

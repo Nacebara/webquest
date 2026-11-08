@@ -462,11 +462,11 @@ async fn fee_change_needs_a_preview_and_a_single_use_confirmation(pool: PgPool) 
         .press(OWNER, &dirs, "CryptoBot → xRocket", "Рычаг резерва")
         .await;
     let ask = o.press(OWNER, &card, "Комиссия", "Новая комиссия").await;
-    assert!(ask.text().contains("2,5"));
+    assert!(ask.text().contains("2.5"));
     // Неверный ввод — вопрос ещё раз, ничего не меняется.
     o.say(OWNER, "две целых", "Нужно число").await;
     let preview = o.say(OWNER, "3", "проверьте изменение").await;
-    assert!(preview.text().contains("2,5") && preview.text().contains("3\u{a0}%"));
+    assert!(preview.text().contains("2.5") && preview.text().contains("3\u{a0}%"));
     let confirm = preview.button("Подтвердить").unwrap();
     // Чужое подтверждение не срабатывает.
     let mark = o.tg.mark();

@@ -224,6 +224,8 @@ pub(crate) struct Memory {
     /// не обработала их второй раз.
     link_messages: HashMap<(i64, i32), HashSet<String>>,
     link_order: VecDeque<(i64, i32)>,
+    /// Заявки, у которых клиент развернул «Детали» (макет B1).
+    details_open: HashSet<i64>,
 }
 
 /// Сколько сообщений со ссылками помнить для правок.

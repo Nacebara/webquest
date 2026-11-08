@@ -77,23 +77,26 @@ impl Ui {
         Self::new(self.texts.clone(), emoji, self.config.clone())
     }
 
-    /// Главное меню: reply-клавиатура, постоянная и компактная (DESIGN-v0.2 §6). При Premium —
-    /// иконки `icon_custom_emoji_id` вместо эмодзи в тексте и `primary` у главных действий.
+    /// Главное меню — макет B1: [Обменять] [Оплатить счёт] синие, ниже [Курс] [История]
+    /// [Помощь]; подсказка в поле ввода «Пришлите чек или счёт». Цвет кнопок — всем (это не
+    /// премиум), иконки `icon_custom_emoji_id` — при Premium владельца бота, иначе символ.
     pub fn main_menu(&self) -> ReplyKeyboardMarkup {
-        let premium = self.emoji.is_premium();
         let button = |action: MenuAction| {
             let (role, label) = self.menu_item(action);
             let (text, icon) = self.emoji.button(Some(role), label);
             let main = matches!(action, MenuAction::Exchange | MenuAction::PayInvoice);
             KeyboardButton::new(text)
-                .maybe_style((premium && main).then_some(ButtonStyle::Primary))
+                .maybe_style(main.then_some(ButtonStyle::Primary))
                 .maybe_icon(icon)
         };
         ReplyKeyboardMarkup {
             keyboard: vec![
                 vec![button(MenuAction::Exchange), button(MenuAction::PayInvoice)],
-                vec![button(MenuAction::Rates), button(MenuAction::History)],
-                vec![button(MenuAction::Support)],
+                vec![
+                    button(MenuAction::Rates),
+                    button(MenuAction::History),
+                    button(MenuAction::Help),
+                ],
             ],
             is_persistent: Some(true),
             resize_keyboard: Some(true),
@@ -102,7 +105,8 @@ impl Ui {
         }
     }
 
-    /// Текст сообщения → кнопка меню. Терпимо к эмодзи, регистру, «ё» и лишним пробелам.
+    /// Текст сообщения → кнопка меню. Терпимо к эмодзи, регистру, «ё» и лишним пробелам;
+    /// понимает и подписи прежних версий меню (`[menu].legacy`).
     pub fn parse_menu(&self, text: &str) -> Option<MenuAction> {
         let needle = normalize_menu_text(text);
         if needle.is_empty() {
@@ -111,6 +115,14 @@ impl Ui {
         MenuAction::ALL
             .into_iter()
             .find(|action| normalize_menu_text(self.menu_item(*action).1) == needle)
+            .or_else(|| {
+                self.texts
+                    .menu
+                    .legacy
+                    .iter()
+                    .find(|l| normalize_menu_text(&l.text) == needle)
+                    .and_then(|l| MenuAction::from_key(&l.action))
+            })
     }
 
     fn menu_item(&self, action: MenuAction) -> (Emoji, &str) {
@@ -121,6 +133,7 @@ impl Ui {
             MenuAction::Rates => (Emoji::Rates, &m.rates),
             MenuAction::History => (Emoji::History, &m.history),
             MenuAction::Support => (Emoji::Support, &m.support),
+            MenuAction::Help => (Emoji::Help, &m.help),
             MenuAction::Invest => (Emoji::Invest, &m.invest),
         }
     }

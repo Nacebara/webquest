@@ -4,14 +4,10 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-⏳ <b>Проверяю чек</b> <code>A1B2C3D4E5</code>
-Чек CryptoBot, выплата чеком xRocket. Обычно до 10 секунд.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+🔄 Проверяю чек
+--- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> <b>Проверяю чек</b> <code>A1B2C3D4E5</code>
-Чек CryptoBot, выплата чеком xRocket. Обычно до 10 секунд.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+<tg-emoji emoji-id="5368000000000000021">🔄</tg-emoji> Проверяю чек
+--- keyboard: none

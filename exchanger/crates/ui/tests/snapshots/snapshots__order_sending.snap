@@ -1,0 +1,13 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+📤 Отправляю <code>97.50</code> USDT в xRocket
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000022">📤</tg-emoji> Отправляю <code>97.50</code> USDT в xRocket
+--- keyboard: none

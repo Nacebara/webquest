@@ -299,16 +299,22 @@ fn plain_mode_has_no_custom_emoji_premium_mode_does() {
         }
     }
     let premium = common::premium_ui();
-    let screen = premium.order_checking(&common::order(domain::Direction::CbToXrCheck));
+    let screen = premium.order_done(
+        &common::order(domain::Direction::CbToXrCheck),
+        &common::breakdown(),
+        "https://t.me/xrocket?start=t_x",
+        9,
+        false,
+    );
     assert!(
         screen.html.starts_with("<tg-emoji emoji-id=\"5368"),
         "{}",
         screen.html
     );
-    let copy = &screen.keyboard.inline().unwrap().inline_keyboard[0][0];
-    assert!(copy.icon_custom_emoji_id.is_some());
+    let claim = &screen.keyboard.inline().unwrap().inline_keyboard[0][0];
+    assert!(claim.icon_custom_emoji_id.is_some());
     assert!(
-        !copy.text.contains('📋'),
+        !claim.text.contains('📥'),
         "при Premium эмодзи — иконкой, не в тексте"
     );
 }
@@ -402,7 +408,7 @@ proptest! {
                 ui.cancelled(Some(&s)),
                 ui.support(Some(&s)),
                 ui.terms(&terms),
-                ui.order_done(&order, &common::breakdown(), &s, common::at(12, 0)),
+                ui.order_done(&order, &common::breakdown(), &s, 9, true),
                 ui.manual_review(&order, Some(&common::usdt(dec!(1))), common::at(12, 0)),
             ];
             for screen in &screens {

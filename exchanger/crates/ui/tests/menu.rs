@@ -1,5 +1,6 @@
-//! Главное меню: текст кнопки → действие и обратно, терпимо к эмодзи, регистру, «ё» и
-//! пробелам; при Premium — иконки и стиль `primary` у главных действий.
+//! Главное меню — макет B1: [Обменять] [Оплатить счёт] синие, ниже [Курс] [История]
+//! [Помощь]. Текст кнопки → действие и обратно, терпимо к эмодзи, регистру, «ё» и пробелам,
+//! подписи прежних версий меню тоже понимаются; при Premium — иконки вместо символов.
 #![allow(clippy::unwrap_used)]
 
 mod common;
@@ -7,10 +8,9 @@ mod common;
 use botapi::ButtonStyle;
 use ui::MenuAction;
 
-const LAYOUT: [&[MenuAction]; 3] = [
+const LAYOUT: [&[MenuAction]; 2] = [
     &[MenuAction::Exchange, MenuAction::PayInvoice],
-    &[MenuAction::Rates, MenuAction::History],
-    &[MenuAction::Support],
+    &[MenuAction::Rates, MenuAction::History, MenuAction::Help],
 ];
 
 #[test]
@@ -50,6 +50,11 @@ fn texts_from_either_mode_and_typing_variants_are_accepted() {
         );
     }
     let cases = [
+        ("💱 Обменять", MenuAction::Exchange),
+        ("обменять", MenuAction::Exchange),
+        ("📈 Курс", MenuAction::Rates),
+        ("❓ Помощь", MenuAction::Help),
+        // Подписи прежнего меню — у клиента могла остаться старая клавиатура.
         ("💱 Обменять чек", MenuAction::Exchange),
         ("обменять чек", MenuAction::Exchange),
         ("  ОБМЕНЯТЬ   ЧЕК ", MenuAction::Exchange),
@@ -69,7 +74,6 @@ fn texts_from_either_mode_and_typing_variants_are_accepted() {
     for text in [
         "",
         "💱",
-        "Обменять",
         "чек",
         "/start",
         "https://t.me/send?start=CQabcdefghij",
@@ -99,14 +103,18 @@ fn premium_menu_uses_icons_and_primary_style() {
             );
         }
     }
+    // Цвет кнопок — не премиум: главные действия синие и без Premium.
     let plain = common::plain_ui().main_menu();
-    for button in plain.keyboard.iter().flatten() {
-        assert!(button.icon_custom_emoji_id.is_none());
-        assert!(button.style.is_none());
-        assert!(
-            !button.text.chars().next().unwrap().is_alphabetic(),
-            "{}",
-            button.text
-        );
+    for (row, expected) in plain.keyboard.iter().zip(LAYOUT) {
+        for (button, action) in row.iter().zip(expected.iter()) {
+            assert!(button.icon_custom_emoji_id.is_none());
+            let main = matches!(action, MenuAction::Exchange | MenuAction::PayInvoice);
+            assert_eq!(button.style, main.then_some(ButtonStyle::Primary));
+            assert!(
+                !button.text.chars().next().unwrap().is_alphabetic(),
+                "{}",
+                button.text
+            );
+        }
     }
 }
