@@ -402,9 +402,8 @@ async fn message_update(
     if found.is_empty()
         && let Some(platform) = wallet_via_bot(message)
     {
-        return inner
-            .reply(chat, &inner.ui().check_link_pending(platform))
-            .await;
+        crate::checkwait::start(inner.clone(), chat, from.id, message.message_id, platform);
+        return Ok(());
     }
     // Инвестор нажал «Пополнить» или выбрал кошелёк вывода: чек или сумма — туда.
     if (message.forward_origin.is_none() || !found.is_empty())

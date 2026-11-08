@@ -699,11 +699,32 @@ impl Ui {
         }
     }
 
-    /// Чек создаётся через инлайн-режим кошелька прямо в чате: ссылка придёт правкой
-    /// сообщения, бот её подхватит сам.
+    /// Чек создаётся через инлайн-режим кошелька прямо в чате: ссылка придёт позже, бот
+    /// её подхватит сам — клиенту ничего делать не нужно.
     pub fn check_link_pending(&self, platform: domain::Platform) -> Screen {
         let body = self.fill(
             &self.texts.misc.check_pending,
+            &[("wallet", &self.wallet(platform))],
+        );
+        self.plain(body, Keyboard::None)
+    }
+
+    /// То же во время ожидания: сколько секунд ждём (бот обновляет сообщение сам).
+    pub fn check_link_waiting(&self, platform: domain::Platform, secs: u64) -> Screen {
+        let body = self.fill(
+            &self.texts.misc.check_waiting,
+            &[
+                ("wallet", &self.wallet(platform)),
+                ("secs", &Frag::text(&secs.to_string())),
+            ],
+        );
+        self.plain(body, Keyboard::None)
+    }
+
+    /// Кошелёк так и не дописал ссылку: чек не открыт, деньги в нём.
+    pub fn check_link_missing(&self, platform: domain::Platform) -> Screen {
+        let body = self.fill(
+            &self.texts.misc.check_missing,
             &[("wallet", &self.wallet(platform))],
         );
         self.plain(body, Keyboard::None)

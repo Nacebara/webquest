@@ -587,6 +587,14 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
             "check_link_pending",
             ui.check_link_pending(Platform::CryptoBot),
         ),
+        (
+            "check_link_waiting",
+            ui.check_link_waiting(Platform::XRocket, 14),
+        ),
+        (
+            "check_link_missing",
+            ui.check_link_missing(Platform::CryptoBot),
+        ),
     ];
     let mut out: Vec<(String, Screen)> = screens
         .drain(..)

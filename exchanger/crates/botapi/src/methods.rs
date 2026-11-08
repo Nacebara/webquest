@@ -110,8 +110,27 @@ pub struct SendMessage {
     pub disable_notification: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub protect_content: Option<bool>,
+    /// Ответ-цитата на сообщение этого чата.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply_parameters: Option<ReplyParameters>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reply_markup: Option<ReplyMarkup>,
+}
+
+/// `reply_parameters`: на какое сообщение отвечаем. Нет сообщения — отправить без ответа.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct ReplyParameters {
+    pub message_id: i32,
+    pub allow_sending_without_reply: bool,
+}
+
+impl ReplyParameters {
+    pub fn to(message_id: i32) -> Self {
+        Self {
+            message_id,
+            allow_sending_without_reply: true,
+        }
+    }
 }
 
 impl SendMessage {
@@ -125,6 +144,7 @@ impl SendMessage {
             link_preview_options: Some(LinkPreviewOptions::disabled()),
             disable_notification: None,
             protect_content: None,
+            reply_parameters: None,
             reply_markup: None,
         }
     }
@@ -141,6 +161,12 @@ impl SendMessage {
 
     pub fn reply_markup(mut self, markup: impl Into<ReplyMarkup>) -> Self {
         self.reply_markup = Some(markup.into());
+        self
+    }
+
+    /// Ответить цитатой на сообщение `message_id`.
+    pub fn reply_to(mut self, message_id: i32) -> Self {
+        self.reply_parameters = Some(ReplyParameters::to(message_id));
         self
     }
 }
@@ -301,6 +327,20 @@ impl AnswerCallbackQuery {
 impl Method for AnswerCallbackQuery {
     const NAME: &'static str = "answerCallbackQuery";
     type Response = bool;
+}
+
+/// `forwardMessage`: переслать сообщение; ответ — пересланная копия со всеми кнопками.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct ForwardMessage {
+    pub chat_id: i64,
+    pub from_chat_id: i64,
+    pub message_id: i32,
+    pub disable_notification: bool,
+}
+
+impl Method for ForwardMessage {
+    const NAME: &'static str = "forwardMessage";
+    type Response = Message;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

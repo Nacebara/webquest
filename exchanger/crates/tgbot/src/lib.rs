@@ -20,6 +20,7 @@
 //! клиента и что делать (CLAUDE.md, правило 19). Ссылки на чеки в логи не пишутся.
 
 mod api;
+mod checkwait;
 pub mod emoji;
 mod handler;
 mod intake;
@@ -81,6 +82,12 @@ pub struct ClientBotConfig {
     pub notice_interval: Duration,
     /// Сколько ждать незаконченные правки сообщений при остановке.
     pub shutdown_grace: Duration,
+    /// Чек через инлайн-режим кошелька без ссылки: как часто перечитывать сообщение.
+    pub check_link_step: Duration,
+    /// …и сколько всего ждать ссылку.
+    pub check_link_wait: Duration,
+    /// …и на каких моментах ожидания пробовать служебную пересылку.
+    pub check_link_forward_at: Vec<Duration>,
 }
 
 impl Default for ClientBotConfig {
@@ -98,6 +105,13 @@ impl Default for ClientBotConfig {
             rich_messages: true,
             notice_interval: Duration::from_secs(20),
             shutdown_grace: Duration::from_secs(10),
+            check_link_step: Duration::from_secs(2),
+            check_link_wait: Duration::from_secs(60),
+            check_link_forward_at: vec![
+                Duration::from_secs(8),
+                Duration::from_secs(24),
+                Duration::from_secs(44),
+            ],
         }
     }
 }
@@ -361,6 +375,15 @@ impl Inner {
                 fresh |= seen.insert(p);
             }
             fresh
+        })
+    }
+
+    /// Из сообщения уже взята ссылка (правкой или ответом-цитатой).
+    pub(crate) fn links_taken(&self, chat: i64, message_id: i32) -> bool {
+        self.memory(|m| {
+            m.link_messages
+                .get(&(chat, message_id))
+                .is_some_and(|s| !s.is_empty())
         })
     }
 

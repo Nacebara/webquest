@@ -1,0 +1,13 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+⏳ Вижу чек xRocket — жду ссылку от кошелька · 14 с. Ничего делать не нужно.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> Вижу чек xRocket — жду ссылку от кошелька · 14 с. Ничего делать не нужно.
+--- keyboard: none

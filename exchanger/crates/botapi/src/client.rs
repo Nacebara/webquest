@@ -23,8 +23,8 @@ use crate::error::{Error, TransportKind, decode_response, scrub};
 use crate::keyboard::InlineKeyboardMarkup;
 use crate::methods::{
     AddStickerToSet, AnswerCallbackQuery, CreateNewStickerSet, DeleteMessage, EditMessageText,
-    GetMe, GetStickerSet, GetUpdates, Method, SendMessage, SendRichMessage, SetMyCommands,
-    StickerFormat, parse_updates,
+    ForwardMessage, GetMe, GetStickerSet, GetUpdates, Method, SendMessage, SendRichMessage,
+    SetMyCommands, StickerFormat, parse_updates,
 };
 use crate::types::{BotCommand, File, Message, StickerSet, Update, User};
 
@@ -274,6 +274,22 @@ impl BotApi {
         request: &AnswerCallbackQuery,
     ) -> Result<bool, Error> {
         self.execute(request).await
+    }
+
+    /// Переслать сообщение `message_id` из `from_chat_id` в `chat_id` без звука.
+    pub async fn forward_message(
+        &self,
+        chat_id: i64,
+        from_chat_id: i64,
+        message_id: i32,
+    ) -> Result<Message, Error> {
+        self.execute(&ForwardMessage {
+            chat_id,
+            from_chat_id,
+            message_id,
+            disable_notification: true,
+        })
+        .await
     }
 
     pub async fn delete_message(&self, chat_id: i64, message_id: i32) -> Result<bool, Error> {

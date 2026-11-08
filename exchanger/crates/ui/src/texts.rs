@@ -456,6 +456,8 @@ pub struct MiscTexts {
     pub invoice_soon: String,
     /// Чек через инлайн-режим кошелька ещё создаётся — ссылка придёт правкой.
     pub check_pending: String,
+    pub check_waiting: String,
+    pub check_missing: String,
 }
 
 /// Раздел «💼 Инвестиции» (DESIGN-v0.2 Р18).

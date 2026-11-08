@@ -149,6 +149,10 @@ pub struct Message {
     /// Инлайн-клавиатура сообщения. У пересланного чека ссылка на него — в URL-кнопке.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reply_markup: Option<InlineKeyboardMarkup>,
+    /// На какое сообщение это ответ — в его текущем виде (с кнопками), каким Telegram
+    /// отдаёт его в ответ на `sendMessage` / `editMessageText`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reply_to_message: Option<Box<Message>>,
 }
 
 impl Message {

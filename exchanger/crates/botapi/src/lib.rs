@@ -28,8 +28,9 @@ pub use keyboard::{
 };
 pub use methods::{
     AddStickerToSet, AnswerCallbackQuery, CreateNewStickerSet, DeleteMessage, EditContent,
-    EditMessageText, GetMe, GetStickerSet, GetUpdates, InputSticker, LinkPreviewOptions, Method,
-    ParseMode, RichMessage, SendMessage, SendRichMessage, SetMyCommands, StickerFormat,
+    EditMessageText, ForwardMessage, GetMe, GetStickerSet, GetUpdates, InputSticker,
+    LinkPreviewOptions, Method, ParseMode, ReplyParameters, RichMessage, SendMessage,
+    SendRichMessage, SetMyCommands, StickerFormat,
 };
 pub use types::{
     BotCommand, BotCommandScope, CallbackQuery, Chat, ChatType, EntityKind, File, Message,

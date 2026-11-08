@@ -93,6 +93,35 @@ impl Api {
             .await
     }
 
+    /// Экран ответом-цитатой на сообщение `reply_to`. Ответ Telegram содержит текущий вид
+    /// того сообщения (`reply_to_message`) — с его кнопками.
+    pub(crate) async fn send_reply(
+        &self,
+        chat: i64,
+        reply_to: i32,
+        screen: &Screen,
+    ) -> Result<Message, Error> {
+        let mut request = SendMessage::html(chat, screen.html.as_str()).reply_to(reply_to);
+        request.reply_markup = screen.keyboard.reply_markup();
+        self.retry("sendMessage", false, || self.bot.send_message(&request))
+            .await
+    }
+
+    /// Править своё сообщение и получить его новый вид (с `reply_to_message`, если это ответ).
+    pub(crate) async fn edit_for_message(
+        &self,
+        chat: i64,
+        message_id: i32,
+        screen: &Screen,
+    ) -> Result<Message, Error> {
+        let mut request = EditMessageText::html(chat, message_id, screen.html.as_str());
+        request.reply_markup = screen.keyboard.inline().cloned();
+        self.retry("editMessageText", true, || {
+            self.bot.edit_message_text(&request)
+        })
+        .await
+    }
+
     /// Справочный экран rich-сообщением; Telegram отказал по существу — HTML-фолбэк.
     /// Возвращает сообщение и `true`, если ушло rich.
     pub(crate) async fn send_rich(

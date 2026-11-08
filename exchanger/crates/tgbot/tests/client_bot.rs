@@ -68,6 +68,27 @@ struct State {
     next_update: i64,
     next_message: i64,
     calls: Vec<Call>,
+    /// Сообщения клиента в их текущем виде (правки обновляют).
+    messages: HashMap<i64, Value>,
+    /// Ответы бота: его сообщение → на какое сообщение клиента ответ.
+    replies: HashMap<i64, i64>,
+    /// Отдаёт ли Telegram кнопки сообщения в `reply_to_message` (проверяется вживую).
+    no_markup_in_replies: bool,
+}
+
+impl State {
+    /// Сообщение клиента для `reply_to_message` — в текущем виде.
+    fn replied(&self, id: i64) -> Value {
+        let mut m = self.messages.get(&id).cloned().unwrap_or_else(
+            || json!({ "message_id": id, "date": 0, "chat": { "id": CLIENT, "type": "private" } }),
+        );
+        if self.no_markup_in_replies
+            && let Some(o) = m.as_object_mut()
+        {
+            o.remove("reply_markup");
+        }
+        m
+    }
 }
 
 /// Bot API: отдаёт очередь обновлений и запоминает все прочие вызовы.
@@ -181,7 +202,27 @@ impl FakeTelegram {
                 m.insert(k.clone(), v.clone());
             }
         }
+        s.messages.insert(message_id, message.clone());
         s.updates.push(json!({ "update_id": id, kind: message }));
+    }
+
+    /// Кошелёк поправил сообщение клиента, но Telegram правку боту не доставил.
+    fn client_message_edited_silently(&self, message_id: i64, text: &str, extra: Value) {
+        let mut s = self.lock();
+        let Some(m) = s.messages.get_mut(&message_id) else {
+            return;
+        };
+        m["text"] = json!(text);
+        if let Some(e) = extra.as_object() {
+            for (k, v) in e {
+                m[k] = v.clone();
+            }
+        }
+    }
+
+    /// Telegram не кладёт кнопки в `reply_to_message` — остаётся служебная пересылка.
+    fn without_markup_in_replies(&self) {
+        self.lock().no_markup_in_replies = true;
     }
 
     /// Клиент нажимает инлайн-кнопку `data` под сообщением `message_id`.
@@ -261,19 +302,47 @@ impl FakeTelegram {
             }),
             "sendMessage" | "sendRichMessage" => {
                 s.next_message += 1;
-                json!({
-                    "message_id": s.next_message,
+                let id = s.next_message;
+                let mut m = json!({
+                    "message_id": id,
                     "date": 0,
                     "chat": { "id": body["chat_id"], "type": "private" },
                     "text": body["text"],
-                })
+                });
+                if let Some(to) = body["reply_parameters"]["message_id"].as_i64() {
+                    s.replies.insert(id, to);
+                    m["reply_to_message"] = s.replied(to);
+                }
+                m
             }
-            "editMessageText" => json!({
-                "message_id": body["message_id"],
-                "date": 0,
-                "chat": { "id": body["chat_id"], "type": "private" },
-                "text": body["text"],
-            }),
+            "editMessageText" => {
+                let mut m = json!({
+                    "message_id": body["message_id"],
+                    "date": 0,
+                    "chat": { "id": body["chat_id"], "type": "private" },
+                    "text": body["text"],
+                });
+                if let Some(to) = body["message_id"]
+                    .as_i64()
+                    .and_then(|id| s.replies.get(&id).copied())
+                {
+                    m["reply_to_message"] = s.replied(to);
+                }
+                m
+            }
+            "forwardMessage" => {
+                s.next_message += 1;
+                let id = s.next_message;
+                let mut m = body["message_id"]
+                    .as_i64()
+                    .and_then(|m| s.messages.get(&m).cloned())
+                    .unwrap_or_else(|| json!({}));
+                m["message_id"] = json!(id);
+                m["chat"] = json!({ "id": body["chat_id"], "type": "private" });
+                m["forward_origin"] = json!({ "type": "user", "date": 0,
+                    "sender_user": { "id": CLIENT, "is_bot": false, "first_name": "Client" } });
+                m
+            }
             _ => json!(true),
         }
     }
@@ -455,6 +524,9 @@ impl Env {
             poll_timeout_secs: 0,
             rich_messages: false,
             shutdown_grace: Duration::from_secs(5),
+            check_link_step: Duration::from_millis(100),
+            check_link_wait: Duration::from_secs(3),
+            check_link_forward_at: vec![Duration::from_millis(600)],
             ..ClientBotConfig::default()
         };
         let bot = ClientBot::new(
@@ -1124,4 +1196,110 @@ async fn paused_direction_tells_the_client_why(pool: PgPool) {
         })
         .await;
     bot.stop().await;
+}
+
+/// Telegram правку боту не доставил: бот сам перечитывает сообщение с чеком ответом-цитатой
+/// и берёт ссылку, клиент ничего не делает.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn check_link_is_read_from_the_reply_when_the_edit_never_arrives(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    e.fake.client_message(
+        "message",
+        80,
+        "Создание чека…",
+        json!({ "via_bot": via_send() }),
+    );
+    e.fake
+        .wait_for("waiting reply", |c| {
+            c.method == "sendMessage" && c.body["reply_parameters"]["message_id"] == 80
+        })
+        .await;
+    e.fake.client_message_edited_silently(
+        80,
+        "🦋 Чек на 100 USDT",
+        json!({ "reply_markup": { "inline_keyboard": [[{ "text": "Получить", "url": url }]] } }),
+    );
+    let (order_id, _, _) = e.order_message().await;
+    e.fake
+        .wait_for("waiting message removed", |c| c.method == "deleteMessage")
+        .await;
+    e.drain().await;
+    let (_, state, _, _, _) = e.orders().await[0].clone();
+    assert_eq!(state, OrderState::Completed, "заявка {order_id}");
+    bot.stop().await;
+    assert!(!e.calls_contain("ерешлите"), "клиента ни о чём не просим");
+    assert!(
+        e.fake.calls_of("forwardMessage").is_empty(),
+        "хватило ответа-цитаты"
+    );
+}
+
+/// В ответе-цитате кнопок нет — бот берёт ссылку служебной пересылкой и удаляет копию.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn check_link_is_read_by_a_service_forward_as_a_last_resort(pool: PgPool) {
+    let e = env(pool).await;
+    {
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::settings::set(&mut conn, "service_chat", &json!({ "id": 4242 }), None)
+            .await
+            .unwrap();
+    }
+    e.fake.without_markup_in_replies();
+    let bot = e.start_bot();
+    let url = e.world.client_check(XR, usdt(dec!(40))).unwrap();
+    e.fake.client_message(
+        "message",
+        81,
+        "Создание чека…",
+        json!({ "via_bot": { "id": 5_014_831_088_i64, "is_bot": true, "first_name": "xRocket", "username": "xrocket" } }),
+    );
+    e.fake.client_message_edited_silently(
+        81,
+        "Чек на 40 USDT",
+        json!({ "reply_markup": { "inline_keyboard": [[{ "text": "Получить", "url": url }]] } }),
+    );
+    e.order_message().await;
+    let fwd = e
+        .fake
+        .wait_for("service forward", |c| c.method == "forwardMessage")
+        .await;
+    assert_eq!(fwd.body["chat_id"], 4242);
+    assert_eq!(fwd.body["disable_notification"], true);
+    e.fake
+        .wait_for("service copy deleted", |c| {
+            c.method == "deleteMessage" && c.body["chat_id"] == 4242
+        })
+        .await;
+    e.drain().await;
+    assert_eq!(e.orders().await[0].1, OrderState::Completed);
+    bot.stop().await;
+}
+
+/// Ссылка так и не появилась: клиенту — «чек не открыт, деньги в нём», владельцу — событие.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn missing_check_link_tells_where_the_money_is(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    e.fake.client_message(
+        "message",
+        82,
+        "Создание чека…",
+        json!({ "via_bot": via_send() }),
+    );
+    e.fake
+        .wait_for("missing link notice", |c| {
+            c.method == "editMessageText" && c.contains("так и не прислал ссылку")
+        })
+        .await;
+    bot.stop().await;
+    assert!(e.orders().await.is_empty());
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM alerts WHERE title = 'check_link_missing' AND acked_at IS NULL",
+    )
+    .fetch_one(&e.pool)
+    .await
+    .unwrap();
+    assert_eq!(n, 1, "владельцу — событие с устройством сообщения");
 }
