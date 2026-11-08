@@ -173,8 +173,21 @@ impl Ui {
         Frag::text(self.texts.directions.get(direction))
     }
 
+    /// Сумма как в макете: число моноширинным (копируется тапом), валюта — обычным текстом.
     fn money(&self, m: &Money) -> Frag {
-        Frag::code(&fmt::money(m))
+        let mut f = Frag::code(&fmt::amount(m.amount(), m.asset()));
+        f.push_text(&format!("\u{a0}{}", m.asset().code()));
+        f
+    }
+
+    /// Только число моноширинным: «Пришлите ещё чек на <code>1.25</code>».
+    fn amount_code(&self, m: &Money) -> Frag {
+        Frag::code(&fmt::amount(m.amount(), m.asset()))
+    }
+
+    /// Только число обычным текстом: «Получено 51.25 · комиссия …».
+    fn amount_text(&self, m: &Money) -> Frag {
+        Frag::text(&fmt::amount(m.amount(), m.asset()))
     }
 
     fn usdt(&self, value: Decimal) -> Frag {

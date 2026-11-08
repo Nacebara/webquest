@@ -572,15 +572,24 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
         ),
         (
             "manual_review",
-            ui.manual_review(&order(cb), Some(&usdt(dec!(100))), at(13, 0)),
+            ui.manual_review(&order(cb), Some(&usdt(dec!(100))), 15),
         ),
         (
             "manual_review_unknown",
-            ui.manual_review(&order(cb), None, at(13, 0)),
+            ui.manual_review(&order(cb), None, 15),
         ),
         (
             "refund_done",
-            ui.refund_done(&order(cb), &usdt(dec!(750)), REFUND_URL),
+            ui.refund_done(&order(cb), &usdt(dec!(750)), REFUND_URL, None),
+        ),
+        (
+            "refund_done_below_minimum",
+            ui.refund_done(
+                &order(cb),
+                &usdt(dec!(0.5)),
+                REFUND_URL,
+                Some(&RefundReason::BelowMinimum { min: usdt(dec!(1)) }),
+            ),
         ),
         ("history", ui.history(&history_rows(), Some(1))),
         ("history_empty", ui.history(&[], None)),

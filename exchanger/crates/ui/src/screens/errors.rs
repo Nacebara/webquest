@@ -8,6 +8,7 @@ use crate::fmt::TimeFormat;
 use crate::html::{Frag, clip};
 use crate::model::{InvoiceProblem, InvoiceRefusal, UiError};
 use crate::screen::{Keyboard, Screen};
+use domain::Decimal;
 
 /// Сколько символов чужого текста (имя бота, причина бана) показываем.
 const FOREIGN_MAX_CHARS: usize = 64;
@@ -70,7 +71,14 @@ impl Ui {
                 Keyboard::None,
             ),
             UiError::Testnet => (self.fill(&e.testnet, &[]), Keyboard::None),
-            UiError::AlreadyActivated => (self.fill(&e.already_activated, &[]), Keyboard::None),
+            UiError::AlreadyActivated => (
+                self.fill(&e.already_activated, &[]),
+                Keyboard::inline_rows(vec![vec![self.cb_button(
+                    Some(Emoji::Support),
+                    &b.support,
+                    &Callback::Support(None),
+                )]]),
+            ),
             UiError::NotFound => (self.fill(&e.not_found, &[]), Keyboard::None),
             UiError::NotForUs { bind_username } => {
                 let name = bind_username
@@ -90,7 +98,14 @@ impl Ui {
             UiError::NeedsSubscription => (self.fill(&e.subscription, &[]), Keyboard::None),
             UiError::Captcha => (self.fill(&e.captcha, &[]), Keyboard::None),
             UiError::PasswordProtected => (self.fill(&e.password, &[]), Keyboard::None),
-            UiError::MultiCheck => (self.fill(&e.multi_check, &[]), Keyboard::None),
+            UiError::MultiCheck => {
+                // Макет: «Пришлите обычный: @xrocket 100» и та же команда на кнопке-копии.
+                let cmd = super::inline_command(domain::Platform::XRocket, Decimal::TEN);
+                (
+                    self.fill(&e.multi_check, &[("cmd", &Frag::code(&cmd))]),
+                    Keyboard::inline_rows(vec![vec![self.copy_button(&cmd, &cmd)]]),
+                )
+            }
             UiError::CheckUsed => (self.fill(&e.check_used, &[]), Keyboard::None),
             UiError::BelowMinimum {
                 amount_in,
@@ -100,7 +115,7 @@ impl Ui {
                 self.fill(
                     &e.below_minimum,
                     &[
-                        ("amount_in", &self.money(amount_in)),
+                        ("amount_short", &self.amount_code(amount_in)),
                         ("min", &self.money(min)),
                         ("src", &self.wallet(*source)),
                     ],
@@ -115,7 +130,7 @@ impl Ui {
                 self.fill(
                     &e.above_maximum,
                     &[
-                        ("amount_in", &self.money(amount_in)),
+                        ("amount_short", &self.amount_code(amount_in)),
                         ("max", &self.money(max)),
                         ("src", &self.wallet(*source)),
                     ],
@@ -134,11 +149,26 @@ impl Ui {
                     ),
                     None => self.fill(&e.paused, &[("direction", &name)]),
                 };
-                let keyboard = Keyboard::inline_rows(vec![vec![self.cb_button(
-                    Some(Emoji::Bell),
-                    &b.notify,
-                    &Callback::Notify(*direction),
-                )]]);
+                // Макет «Лимит и пауза»: что можно сейчас — [Обменять] [Курс].
+                let keyboard = Keyboard::inline_rows(vec![
+                    vec![self.cb_button(
+                        Some(Emoji::Bell),
+                        &b.notify,
+                        &Callback::Notify(*direction),
+                    )],
+                    vec![
+                        self.cb_button(
+                            Some(Emoji::Exchange),
+                            &self.texts.menu.exchange,
+                            &Callback::Exchange,
+                        ),
+                        self.cb_button(
+                            Some(Emoji::Rates),
+                            &self.texts.menu.rates,
+                            &Callback::Terms,
+                        ),
+                    ],
+                ]);
                 (body, keyboard)
             }
             UiError::NoReserve { max } => (

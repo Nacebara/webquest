@@ -1,0 +1,17 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+↩️ <b>Меньше минимума</b> · от <code>1.00</code> USDT
+Верну <code>0.50</code> чеком CryptoBot.
+--- keyboard: inline
+[{"style":"success","text":"📥 Забрать 0.50 USDT","url":"https://t.me/send?start=CQ5mN8pQ2rT7"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Меньше минимума</b> · от <code>1.00</code> USDT
+Верну <code>0.50</code> чеком CryptoBot.
+--- keyboard: inline
+[{"icon_custom_emoji_id":"5368000000000000023","style":"success","text":"Забрать 0.50 USDT","url":"https://t.me/send?start=CQ5mN8pQ2rT7"}]

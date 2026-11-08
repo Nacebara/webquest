@@ -289,6 +289,60 @@ async fn install_pack(
 }
 
 /// `exch emoji install`: все четыре набора; id сохраняются в `emoji_packs`.
+/// Взять уже установленные наборы exch другого бота (`@from`): значки — публичные, их id
+/// подходят любому боту, у владельца которого Telegram Premium. Ничего не загружает —
+/// только читает наборы и сопоставляет значки с `manifest.json` по порядку, как установщик.
+pub async fn adopt(
+    conn: &mut PgConnection,
+    bot: &BotApi,
+    from: &str,
+    dir: &Path,
+) -> anyhow::Result<EmojiPacks> {
+    let manifest = read_manifest(dir)?;
+    let mut packs = load(conn).await?.packs;
+    for plan in plans(from) {
+        let prefix = format!("{}/", plan.kind);
+        let icons: Vec<&ManifestIcon> = manifest
+            .icons
+            .iter()
+            .filter(|i| i.key.starts_with(&prefix))
+            .collect();
+        let set = with_retry(&format!("getStickerSet {}", plan.name), || {
+            bot.get_sticker_set(&plan.name)
+        })
+        .await?;
+        if set.stickers.len() != icons.len() {
+            bail!(
+                "set {} has {} stickers, the manifest {}: install it fully first",
+                plan.name,
+                set.stickers.len(),
+                icons.len()
+            );
+        }
+        let pack = packs
+            .of_mut(plan.style)
+            .context("installable styles are animated and static")?;
+        for (icon, sticker) in icons.iter().zip(&set.stickers) {
+            let id = sticker
+                .custom_emoji_id
+                .clone()
+                .filter(|id| is_custom_emoji_id(id))
+                .with_context(|| {
+                    format!("set {} has a sticker without custom_emoji_id", plan.name)
+                })?;
+            pack.insert(icon.key.clone(), id);
+        }
+        eprintln!(
+            "{} — {} значков: t.me/addemoji/{}",
+            plan.title,
+            icons.len(),
+            plan.name
+        );
+    }
+    save(conn, PACKS_KEY, serde_json::to_value(&packs)?).await?;
+    Ok(packs)
+}
+
 pub async fn install(
     conn: &mut PgConnection,
     bot: &BotApi,

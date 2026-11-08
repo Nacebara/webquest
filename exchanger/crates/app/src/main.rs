@@ -113,6 +113,14 @@ enum EmojiCommand {
     Set { role: String, id: String },
     /// Вернуть роли эмодзи набора.
     Reset { role: String },
+    /// Взять уже установленные наборы exch другого бота, ничего не загружая:
+    /// `exch emoji adopt --from @my_old_bot`. Нужен Premium у владельца этого бота.
+    Adopt {
+        #[arg(long)]
+        from: String,
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
     /// Создать или дописать наборы exch (анимированные и статичные) от имени клиентского бота
     /// и сохранить их id. Владелец набора — `--owner` (Telegram id, писал боту /start).
     Install {
@@ -313,6 +321,20 @@ async fn emoji(cmd: EmojiCommand) -> anyhow::Result<()> {
                 } else {
                     "своего эмодзи не было"
                 }
+            );
+        }
+        EmojiCommand::Adopt { from, dir } => {
+            let token = cfg
+                .client_bot_token
+                .clone()
+                .context("CLIENT_BOT_TOKEN is not set: sets are read through the bot")?;
+            let bot = app::telegram::bot_api(token)?;
+            let dir = dir.unwrap_or_else(app::emoji::default_dir);
+            let packs = app::emoji::adopt(&mut conn, &bot, &from, &dir).await?;
+            println!(
+                "Наборы взяты: анимированных {}, статичных {}. Перезапустите exch run.",
+                packs.animated.len(),
+                packs.still.len()
             );
         }
         EmojiCommand::Install { owner, dir } => {

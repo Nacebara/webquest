@@ -4,14 +4,10 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-⏳ <b>Чек принят.</b> Оплачиваю счёт CryptoBot…
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+📤 Оплачиваю счёт CryptoBot
+--- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> <b>Чек принят.</b> Оплачиваю счёт CryptoBot…
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+<tg-emoji emoji-id="5368000000000000022">📤</tg-emoji> Оплачиваю счёт CryptoBot
+--- keyboard: none

@@ -269,14 +269,16 @@ pub(crate) fn render(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Ext
                 money(view, view.refund_amount),
                 view.payout_check_url.as_deref(),
             ) {
-                (Some(refund), Some(url)) => ui.refund_done(&order, &refund, url),
+                (Some(refund), Some(url)) => {
+                    ui.refund_done(&order, &refund, url, Some(&refund_reason(view, extra)))
+                }
                 _ => card_plain(ui, view),
             }
         }
         OrderState::ManualReview => ui.manual_review(
             &order,
             money(view, view.intake_amount).as_ref(),
-            view.state_since + cfg.sla,
+            cfg.sla.num_minutes(),
         ),
         OrderState::IntakeFailed => ui.error(&intake_failure(
             view.failure_code.as_deref(),
@@ -651,8 +653,20 @@ mod tests {
         }
     }
 
-    fn html(screen: &Screen) -> &str {
-        &screen.html
+    /// Текст экрана без разметки, с обычными пробелами: «<code>10.30</code>&nbsp;USDT» → «10.30 USDT».
+    fn html(screen: &Screen) -> String {
+        let mut out = String::new();
+        let mut tag = false;
+        for c in screen.html.chars() {
+            match c {
+                '<' => tag = true,
+                '>' => tag = false,
+                '\u{a0}' if !tag => out.push(' '),
+                c if !tag => out.push(c),
+                _ => {}
+            }
+        }
+        out
     }
 
     #[test]
@@ -669,10 +683,16 @@ mod tests {
             &extra,
         );
         assert!(html(&quote).contains("10.30 USDT"), "{}", quote.html);
+        // Макет B1: сумма к оплате — на синей кнопке-копии, ниже команда кошелька и «Отмена».
+        assert!(
+            buttons(&quote).contains(&botapi::InlineButtonAction::CopyText("10.30".into())),
+            "{:?}",
+            buttons(&quote)
+        );
         assert!(
             buttons(&quote).iter().any(|b| matches!(
                 b,
-                botapi::InlineButtonAction::CallbackData(d) if d.starts_with("pay_check:")
+                botapi::InlineButtonAction::CallbackData(d) if d.starts_with("cancel:")
             )),
             "{:?}",
             buttons(&quote)
@@ -692,7 +712,7 @@ mod tests {
         };
         let screen = render(&ui, &cfg(), &rejected, &extra);
         assert!(
-            html(&screen).contains("Чек уже кто-то забрал"),
+            html(&screen).contains("Этот чек уже открыт"),
             "{}",
             screen.html
         );
@@ -843,7 +863,7 @@ mod tests {
             ..Extra::default()
         };
         let screen = render(&ui, &cfg(), &v, &extra);
-        assert!(screen.html.contains("42.50 USDT"), "{}", screen.html);
+        assert!(html(&screen).contains("42.50 USDT"), "{}", screen.html);
     }
 
     #[test]
@@ -870,7 +890,7 @@ mod tests {
         v.failure_code = None;
         assert_eq!(refund_reason(&v, &extra), RefundReason::Operator);
         let screen = render(&ui(), &cfg(), &v, &extra);
-        assert!(screen.html.contains("1.50 USDT"), "{}", screen.html);
+        assert!(html(&screen).contains("1.50 USDT"), "{}", screen.html);
     }
 
     #[test]
@@ -882,9 +902,10 @@ mod tests {
             &view(OrderState::ManualReview),
             &Extra::default(),
         );
-        assert!(known.html.contains("100.00 USDT"), "{}", known.html);
+        assert!(html(&known).contains("100.00 USDT"), "{}", known.html);
+        // Макет B1: «Обычно до 30 минут» — срок из настройки, без часов на циферблате.
         assert!(
-            known.html.contains("12:30") || known.html.contains("15:30"),
+            html(&known).contains("Обычно до 30 минут"),
             "{}",
             known.html
         );

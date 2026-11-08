@@ -48,6 +48,17 @@ pub fn took(seconds: i64) -> String {
     format!("{} ч {} мин", m / 60, m % 60)
 }
 
+/// «до 30 минут», «до 1 минуты», «до 21 минуты» — родительный падеж после «до».
+pub fn minutes_gen(n: i64) -> String {
+    let n = n.max(1);
+    let form = if n % 10 == 1 && n % 100 != 11 {
+        "минуты"
+    } else {
+        "минут"
+    };
+    format!("{n} {form}")
+}
+
 /// Русское множественное число: 1 секунда, 2 секунды, 5 секунд, 11 секунд, 21 секунда.
 pub fn plural(n: i64, forms: [&'static str; 3]) -> &'static str {
     let n = n.abs();

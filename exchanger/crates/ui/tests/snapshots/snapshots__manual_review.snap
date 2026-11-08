@@ -4,16 +4,16 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-🛠 <b>Заявка <code>A1B2C3D4E5</code> на ручной проверке.</b>
-Ваши <code>100.00 USDT</code> у меня и в безопасности.
-Оператор закончит до <tg-time unix="1791378000" format="t">16:00 МСК</tg-time> — я напишу сюда.
+🛠 <b>Проверяю вручную</b>
+Деньги у меня: <code>100.00</code> USDT. Обычно до 15 минут.
+<i>Ничего делать не нужно — напишу сюда.</i>
 --- keyboard: inline
-[{"callback_data":"support:A1B2C3D4E5","text":"💬 Написать в поддержку"}]
+[{"callback_data":"support:A1B2C3D4E5","text":"💬 Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 A1B2C3D4E5"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000006">🛠</tg-emoji> <b>Заявка <code>A1B2C3D4E5</code> на ручной проверке.</b>
-Ваши <code>100.00 USDT</code> у меня и в безопасности.
-Оператор закончит до <tg-time unix="1791378000" format="t">16:00 МСК</tg-time> — я напишу сюда.
+<tg-emoji emoji-id="5368000000000000006">🛠</tg-emoji> <b>Проверяю вручную</b>
+Деньги у меня: <code>100.00</code> USDT. Обычно до 15 минут.
+<i>Ничего делать не нужно — напишу сюда.</i>
 --- keyboard: inline
-[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Написать в поддержку"}]
+[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"A1B2C3D4E5"}]

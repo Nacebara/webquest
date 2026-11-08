@@ -458,6 +458,7 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
             inner.replace(chat, message, &screen).await
         }
         Callback::Exchange => inner.menu(chat, user, MenuAction::Exchange).await,
+        Callback::PayInvoice => inner.menu(chat, user, MenuAction::PayInvoice).await,
         Callback::Terms => inner.menu(chat, user, MenuAction::Rates).await,
         Callback::Privacy => inner.command(chat, user, Command::Privacy).await,
         Callback::History { page } => inner.history(chat, user, page).await,

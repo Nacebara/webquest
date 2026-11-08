@@ -4,22 +4,14 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-✅ <b>Счёт оплачен.</b> Продавец уже видит оплату.
-<blockquote>Счёт: <code>10.00 USDT</code>
-К оплате вами: <code>10.30 USDT</code>
-Комиссия: <code>0.30 USDT</code>
-Переплата <code>5.00 USDT</code> — возвращаю чеком xRocket.</blockquote>
-Заявка <code>A1B2C3D4E5</code> · <tg-time unix="1791376800" format="t">15:40 МСК</tg-time>
+✅ <b>Счёт оплачен</b> · <code>10.00</code> USDT
+Лишние <code>5.00</code> USDT вернул чеком xRocket.
 --- keyboard: inline
-[{"style":"success","text":"Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"text":"📋 Скопировать ссылку"}]
+[{"style":"success","text":"📥 Забрать 5.00 USDT","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000001">✅</tg-emoji> <b>Счёт оплачен.</b> Продавец уже видит оплату.
-<blockquote>Счёт: <code>10.00 USDT</code>
-К оплате вами: <code>10.30 USDT</code>
-Комиссия: <code>0.30 USDT</code>
-Переплата <code>5.00 USDT</code> — возвращаю чеком xRocket.</blockquote>
-Заявка <code>A1B2C3D4E5</code> · <tg-time unix="1791376800" format="t">15:40 МСК</tg-time>
+<tg-emoji emoji-id="5368000000000000001">✅</tg-emoji> <b>Счёт оплачен</b> · <code>10.00</code> USDT
+Лишние <code>5.00</code> USDT вернул чеком xRocket.
 --- keyboard: inline
-[{"style":"success","text":"Забрать чек","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},{"copy_text":{"text":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"},"icon_custom_emoji_id":"5368000000000000013","text":"Скопировать ссылку"}]
+[{"icon_custom_emoji_id":"5368000000000000023","style":"success","text":"Забрать 5.00 USDT","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"}]

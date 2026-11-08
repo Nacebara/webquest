@@ -21,6 +21,8 @@ pub enum Callback {
         page: u32,
     },
     Order(String),
+    /// «Ещё счёт» — то же, что кнопка меню «Оплатить счёт».
+    PayInvoice,
     /// B1: развернуть «Детали» в сообщении заявки.
     Details(String),
     /// B1: свернуть «Детали».
@@ -67,6 +69,7 @@ impl Callback {
             Callback::Direction(d) => format!("dir:{}", d.code()),
             Callback::HowTo(d) => format!("howto:{}", d.code()),
             Callback::Exchange => "exchange".to_owned(),
+            Callback::PayInvoice => "invoice".to_owned(),
             Callback::Terms => "terms".to_owned(),
             Callback::Privacy => "privacy".to_owned(),
             Callback::History { page } => format!("history:{page}"),
@@ -108,6 +111,7 @@ impl Callback {
             ("howto", _) => direction(arg).map(Callback::HowTo),
             ("notify", _) => direction(arg).map(Callback::Notify),
             ("exchange", None) => Some(Callback::Exchange),
+            ("invoice", None) => Some(Callback::PayInvoice),
             ("terms", None) => Some(Callback::Terms),
             ("privacy", None) => Some(Callback::Privacy),
             ("plain", None) => Some(Callback::PlainView),
@@ -161,6 +165,7 @@ mod tests {
     fn all() -> Vec<Callback> {
         let mut v = vec![
             Callback::Exchange,
+            Callback::PayInvoice,
             Callback::Terms,
             Callback::Privacy,
             Callback::PlainView,

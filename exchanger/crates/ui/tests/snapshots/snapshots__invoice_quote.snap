@@ -4,28 +4,20 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-🧾 <b>Счёт CryptoBot на <code>10.00 USDT</code></b>
+🧾 <b>Счёт CryptoBot</b> · <code>10.00</code> USDT
 <i>Оплата заказа #42 &lt;VIP&gt; &amp; &quot;скидка&quot;</i>
-
-Пришлите чек xRocket на <code>10.30 USDT</code> — и я оплачу этот счёт.
-<blockquote>Счёт: <code>10.00 USDT</code>
-Комиссия 3 %: <code>0.30 USDT</code>
-К оплате вами: <code>10.30 USDT</code></blockquote>
-Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>. Деньги пока не списаны.
+Пришлите чек xRocket на <code>10.30</code> USDT
+<i>Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>.</i>
 --- keyboard: inline
-[{"callback_data":"pay_check:A1B2C3D4E5","style":"primary","text":"Пришлю чек xRocket"}]
-[{"copy_text":{"text":"10.30"},"text":"📋 Сумма"},{"callback_data":"cancel:A1B2C3D4E5","text":"Отмена"}]
+[{"copy_text":{"text":"10.30"},"style":"primary","text":"📋 10.30"}]
+[{"copy_text":{"text":"@xrocket 10.3"},"text":"📋 @xrocket 10.3"},{"callback_data":"cancel:A1B2C3D4E5","text":"✖️ Отмена"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> <b>Счёт CryptoBot на <code>10.00 USDT</code></b>
+<tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> <b>Счёт CryptoBot</b> · <code>10.00</code> USDT
 <i>Оплата заказа #42 &lt;VIP&gt; &amp; &quot;скидка&quot;</i>
-
-Пришлите чек xRocket на <code>10.30 USDT</code> — и я оплачу этот счёт.
-<blockquote>Счёт: <code>10.00 USDT</code>
-Комиссия 3 %: <code>0.30 USDT</code>
-К оплате вами: <code>10.30 USDT</code></blockquote>
-Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>. Деньги пока не списаны.
+Пришлите чек xRocket на <code>10.30</code> USDT
+<i>Цена держится до <tg-time unix="1791377340" format="t">15:49 МСК</tg-time>.</i>
 --- keyboard: inline
-[{"callback_data":"pay_check:A1B2C3D4E5","style":"primary","text":"Пришлю чек xRocket"}]
-[{"copy_text":{"text":"10.30"},"icon_custom_emoji_id":"5368000000000000013","text":"Сумма"},{"callback_data":"cancel:A1B2C3D4E5","text":"Отмена"}]
+[{"copy_text":{"text":"10.30"},"icon_custom_emoji_id":"5368000000000000013","style":"primary","text":"10.30"}]
+[{"copy_text":{"text":"@xrocket 10.3"},"icon_custom_emoji_id":"5368000000000000013","text":"@xrocket 10.3"},{"callback_data":"cancel:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000025","text":"Отмена"}]

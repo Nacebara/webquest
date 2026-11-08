@@ -160,6 +160,10 @@ pub struct ButtonTexts {
     pub claim_check: String,
     /// «Инструкция» под «Пришлите чек» (макет B1).
     pub instruction: String,
+    /// «Вернуть 50.00» при недоплате счёта.
+    pub refund_amount: String,
+    /// «Ещё счёт» после оплаты.
+    pub another_invoice: String,
     /// B1: «Забрать» (зелёная, ссылка на чек), «Детали» / «Скрыть» — то же сообщение.
     pub claim: String,
     pub details: String,
@@ -316,12 +320,16 @@ pub struct OrderTexts {
 pub struct InvoiceTexts {
     pub quote: String,
     pub description: String,
-    pub fiat_line: String,
+    /// Счёт в фиате — в скобках после суммы.
+    pub fiat: String,
     pub awaiting: String,
     pub underpaid: String,
     pub paying: String,
     pub paid: String,
+    /// Переплата вернулась чеком (кнопка «Забрать»).
     pub excess_refund: String,
+    /// Переплата возвращается, чек ещё создаётся.
+    pub excess_refund_pending: String,
     pub excess_kept: String,
 }
 
@@ -337,6 +345,10 @@ pub struct ManualTexts {
 pub struct RefundTexts {
     pub started: String,
     pub done: String,
+    /// «Меньше минимума · от 1.00 USDT / Верну 0.50 чеком CryptoBot.» — до и после чека.
+    pub below_minimum: String,
+    /// Кнопка «Забрать 51.25 USDT».
+    pub claim: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

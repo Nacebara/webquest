@@ -5,152 +5,116 @@ expression: refunds.trim_end()
 ## below_minimum
 ### plain
 --- html
-↩️ <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: сумма меньше минимума <code>2.00 USDT</code>.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+↩️ <b>Меньше минимума</b> · от <code>2.00</code> USDT
+Верну <code>750.00</code> чеком CryptoBot.
+--- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: сумма меньше минимума <code>2.00 USDT</code>.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Меньше минимума</b> · от <code>2.00</code> USDT
+Верну <code>750.00</code> чеком CryptoBot.
+--- keyboard: none
 
 ## above_maximum
 ### plain
 --- html
-↩️ <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: сумма больше текущего лимита <code>500.00 USDT</code>.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+↩️ <b>Возвращаю <code>750.00</code> USDT</b>
+Сумма больше текущего лимита <code>500.00</code> USDT.
+--- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: сумма больше текущего лимита <code>500.00 USDT</code>.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00</code> USDT</b>
+Сумма больше текущего лимита <code>500.00</code> USDT.
+--- keyboard: none
 
 ## unsupported_asset
 ### plain
 --- html
-↩️ <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: меняю только USDT.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+↩️ <b>Возвращаю <code>750.00</code> USDT</b>
+Меняю только USDT.
+--- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: меняю только USDT.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00</code> USDT</b>
+Меняю только USDT.
+--- keyboard: none
 
 ## invoice_paid_elsewhere
 ### plain
 --- html
-↩️ <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: счёт оплатили до меня.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+↩️ <b>Возвращаю <code>750.00</code> USDT</b>
+Счёт уже оплатил кто-то другой.
+--- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: счёт оплатили до меня.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00</code> USDT</b>
+Счёт уже оплатил кто-то другой.
+--- keyboard: none
 
 ## invoice_expired
 ### plain
 --- html
-↩️ <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: счёт истёк до оплаты.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+↩️ <b>Возвращаю <code>750.00</code> USDT</b>
+Счёт истёк до оплаты.
+--- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: счёт истёк до оплаты.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00</code> USDT</b>
+Счёт истёк до оплаты.
+--- keyboard: none
 
 ## rate_moved
 ### plain
 --- html
-↩️ <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: курс доллара сдвинулся сильнее запаса, пока шёл чек.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+↩️ <b>Возвращаю <code>750.00</code> USDT</b>
+Курс доллара сдвинулся сильнее запаса, пока шёл чек.
+--- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: курс доллара сдвинулся сильнее запаса, пока шёл чек.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00</code> USDT</b>
+Курс доллара сдвинулся сильнее запаса, пока шёл чек.
+--- keyboard: none
 
 ## client_request
 ### plain
 --- html
-↩️ <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: вы попросили вернуть деньги.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+↩️ <b>Возвращаю <code>750.00</code> USDT</b>
+Вы попросили вернуть деньги.
+--- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: вы попросили вернуть деньги.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00</code> USDT</b>
+Вы попросили вернуть деньги.
+--- keyboard: none
 
 ## underpaid
 ### plain
 --- html
-↩️ <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: не пришла вся сумма для оплаты счёта.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+↩️ <b>Возвращаю <code>750.00</code> USDT</b>
+Не пришла вся сумма для оплаты счёта.
+--- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: не пришла вся сумма для оплаты счёта.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00</code> USDT</b>
+Не пришла вся сумма для оплаты счёта.
+--- keyboard: none
 
 ## operator
 ### plain
 --- html
-↩️ <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: решение оператора.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"text":"📋 Номер заявки"}]
+↩️ <b>Возвращаю <code>750.00</code> USDT</b>
+Так решил оператор.
+--- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00 USDT</code></b> чеком CryptoBot.
-Причина: решение оператора.
-Заявка <code>A1B2C3D4E5</code>.
---- keyboard: inline
-[{"copy_text":{"text":"A1B2C3D4E5"},"icon_custom_emoji_id":"5368000000000000013","text":"Номер заявки"}]
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00</code> USDT</b>
+Так решил оператор.
+--- keyboard: none

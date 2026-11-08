@@ -19,11 +19,6 @@ use crate::screen::{Keyboard, Screen};
 const DESCRIPTION_MAX_CHARS: usize = 200;
 
 impl Ui {
-    /// Кнопка «Номер заявки» — у экранов счёта и возврата (их перенос на B1 — следующий шаг).
-    fn order_keyboard(&self, order: &OrderRef) -> Keyboard {
-        Keyboard::inline_rows(vec![vec![self.copy_order_button(&order.id)]])
-    }
-
     /// Значок шага: свой, а если шаг затянулся — часы (макет B1, состояние «Долго»).
     fn step_icon(&self, role: Emoji, slow: bool) -> Frag {
         self.emoji.frag(if slow { Emoji::Wait } else { role })
@@ -138,7 +133,29 @@ impl Ui {
         }
     }
 
-    /// S5 котировка счёта: что прислать, разбивка, срок цены.
+    /// Кнопки ожидания чека по счёту — макет B1: сумма на синей кнопке (копируется),
+    /// ниже команда кошелька (копируется) и «Отмена».
+    fn pay_keyboard(&self, q: &InvoiceQuote) -> Keyboard {
+        let amount = fmt::amount(q.to_pay.amount(), q.to_pay.asset());
+        let command = super::inline_command(q.order.direction.source(), q.to_pay.amount());
+        Keyboard::inline_rows(vec![
+            vec![
+                self.copy_button(&amount, &amount)
+                    .style(ButtonStyle::Primary),
+            ],
+            vec![
+                self.copy_button(&command, &command),
+                self.cb_button(
+                    Some(Emoji::Hide),
+                    &self.texts.buttons.cancel,
+                    &Callback::Cancel(Some(q.order.id.clone())),
+                ),
+            ],
+        ])
+    }
+
+    /// «Счёт CryptoBot · 50.00 USDT / Пришлите чек xRocket на 51.25 USDT / Цена держится
+    /// до 14:25.» — макет B1 «Счёт: к оплате».
     pub fn invoice_quote(&self, q: &InvoiceQuote) -> Screen {
         let t = &self.texts.invoice;
         let p = self.quote_parts(q);
@@ -149,19 +166,18 @@ impl Ui {
             ),
             _ => Frag::new(),
         };
-        let fiat_line = match &q.fiat {
+        let fiat = match &q.fiat {
             Some(fiat) => self.fill(
-                &t.fiat_line,
+                &t.fiat,
                 &[
                     (
                         "fiat",
-                        &Frag::code(&format!(
-                            "{} {}",
+                        &Frag::text(&format!(
+                            "{}\u{a0}{}",
                             fiat.amount.normalize(),
                             clip(&fiat.currency, 8)
                         )),
                     ),
-                    ("inv_wallet", &p.inv_wallet),
                     ("buffer", &self.pct(fiat.buffer_pct)),
                 ],
             ),
@@ -171,100 +187,65 @@ impl Ui {
             &t.quote,
             &[
                 ("inv_wallet", &p.inv_wallet),
+                ("inv_amount", &self.money(&q.invoice_amount)),
+                ("fiat", &fiat),
+                ("description", &description),
                 ("src", &p.src),
                 ("x", &p.x),
                 ("expires", &p.expires),
-                ("inv_amount", &self.money(&q.invoice_amount)),
-                ("description", &description),
-                ("fiat_line", &fiat_line),
-                ("fee_pct", &self.pct(q.fee_pct)),
-                ("fee", &self.money(&q.fee)),
             ],
         );
-        let b = &self.texts.buttons;
-        let id = &q.order.id;
-        let pay_label = self.button_text(
-            &b.pay_by_check,
-            &[("wallet", self.wallet_name(q.order.direction.source()))],
-        );
-        let keyboard = Keyboard::inline_rows(vec![
-            vec![
-                self.cb_button(None, &pay_label, &Callback::PayByCheck(id.clone()))
-                    .style(ButtonStyle::Primary),
-            ],
-            vec![
-                self.copy_amount_button(&q.to_pay),
-                self.cb_button(None, &b.cancel, &Callback::Cancel(Some(id.clone()))),
-            ],
-        ]);
-        self.plain(body, keyboard)
+        self.plain(body, self.pay_keyboard(q))
     }
 
-    fn copy_amount_button(&self, m: &Money) -> botapi::InlineKeyboardButton {
-        self.copy_button(
-            &self.texts.buttons.copy_amount,
-            &fmt::amount(m.amount(), m.asset()),
-        )
-    }
-
-    /// S6 жду чек на точную сумму.
+    /// Жду чек по счёту (после «чек не подошёл» или «Пришлю чек» у старых сообщений).
     pub fn invoice_awaiting(&self, q: &InvoiceQuote) -> Screen {
         let p = self.quote_parts(q);
         let body = self.fill(
             &self.texts.invoice.awaiting,
             &[("src", &p.src), ("x", &p.x), ("expires", &p.expires)],
         );
-        let b = &self.texts.buttons;
-        let id = &q.order.id;
+        self.plain(body, self.pay_keyboard(q))
+    }
+
+    /// «Не хватает 1.25 USDT / Пришлите ещё чек на 1.25 или верну 50.00.» — макет B1.
+    pub fn invoice_underpaid(&self, q: &InvoiceQuote, got: &Money, rest: &Money) -> Screen {
+        let body = self.fill(
+            &self.texts.invoice.underpaid,
+            &[
+                ("rest", &self.money(rest)),
+                ("rest_short", &self.amount_code(rest)),
+                ("got_short", &self.amount_code(got)),
+            ],
+        );
+        let rest_amount = fmt::amount(rest.amount(), rest.asset());
+        let got_amount = fmt::amount(got.amount(), got.asset());
+        let refund_label = self.button_text(
+            &self.texts.buttons.refund_amount,
+            &[("amount", &got_amount)],
+        );
         let keyboard = Keyboard::inline_rows(vec![
             vec![
-                self.copy_amount_button(&q.to_pay),
-                self.cb_button(None, &b.howto, &Callback::HowTo(q.order.direction)),
+                self.copy_button(&rest_amount, &rest_amount)
+                    .style(ButtonStyle::Primary),
             ],
-            vec![self.cb_button(None, &b.cancel, &Callback::Cancel(Some(id.clone())))],
+            vec![self.cb_button(
+                Some(Emoji::Refund),
+                &refund_label,
+                &Callback::Refund(q.order.id.clone()),
+            )],
         ]);
         self.plain(body, keyboard)
     }
 
-    /// S6 недоплата: дослать остаток или вернуть пришедшее.
-    pub fn invoice_underpaid(&self, q: &InvoiceQuote, got: &Money, rest: &Money) -> Screen {
-        let p = self.quote_parts(q);
-        let body = self.fill(
-            &self.texts.invoice.underpaid,
-            &[
-                ("got", &self.money(got)),
-                ("rest", &self.money(rest)),
-                ("x", &p.x),
-                ("expires", &p.expires),
-            ],
-        );
-        let rest_amount = fmt::amount(rest.amount(), rest.asset());
-        let keyboard = Keyboard::inline_rows(vec![vec![
-            self.copy_button(&rest_amount, &rest_amount),
-            self.cb_button(
-                None,
-                &self.texts.buttons.refund,
-                &Callback::Refund(q.order.id.clone()),
-            )
-            .style(ButtonStyle::Danger),
-        ]]);
-        self.plain(body, keyboard)
-    }
-
-    /// S7 «Чек принят, оплачиваю счёт».
+    /// «Оплачиваю счёт CryptoBot» — шаг, как «Отправляю» у обмена.
     pub fn invoice_paying(&self, q: &InvoiceQuote) -> Screen {
         let p = self.quote_parts(q);
-        let body = self.fill(
-            &self.texts.invoice.paying,
-            &[
-                ("inv_wallet", &p.inv_wallet),
-                ("order", &self.order_id(&q.order.id)),
-            ],
-        );
-        self.plain(body, self.order_keyboard(&q.order))
+        let body = self.fill(&self.texts.invoice.paying, &[("inv_wallet", &p.inv_wallet)]);
+        self.plain(body, Keyboard::None)
     }
 
-    /// S6 после чека, который кошелёк не принял: что случилось и что заявка ждёт дальше.
+    /// После чека, который кошелёк не принял: что случилось и что заявка ждёт дальше.
     pub fn invoice_check_rejected(&self, q: &InvoiceQuote, error: &UiError) -> Screen {
         let error = self.error(error);
         let awaiting = self.invoice_awaiting(q);
@@ -275,8 +256,8 @@ impl Ui {
         }
     }
 
-    /// S7 «Счёт оплачен» и судьба переплаты. `excess_check` — чек на переплату, когда он
-    /// уже создан: под сообщением появляются «Забрать чек» и «Скопировать ссылку».
+    /// «Счёт оплачен · 50.00 USDT» — макет B1: детали свёрнуты в цитату; переплата —
+    /// «Лишние 8.75 USDT вернул чеком xRocket» и [Забрать 8.75 USDT].
     pub fn invoice_paid(
         &self,
         q: &InvoiceQuote,
@@ -286,65 +267,95 @@ impl Ui {
     ) -> Screen {
         let t = &self.texts.invoice;
         let p = self.quote_parts(q);
-        let excess_line = match excess {
-            Some(Excess::Refund(amount)) => self.fill(
-                &t.excess_refund,
-                &[("excess", &self.money(amount)), ("src", &p.src)],
-            ),
-            Some(Excess::Kept { amount, min_refund }) => self.fill(
-                &t.excess_kept,
-                &[
-                    ("excess", &self.money(amount)),
-                    ("min_refund", &self.money(min_refund)),
-                ],
-            ),
-            None => Frag::new(),
+        let inv_amount = self.money(&q.invoice_amount);
+        let again = || {
+            Keyboard::inline_rows(vec![vec![
+                self.cb_button(
+                    Some(Emoji::Invoice),
+                    &self.texts.buttons.another_invoice,
+                    &Callback::PayInvoice,
+                ),
+                self.cb_button(
+                    Some(Emoji::History),
+                    &self.texts.menu.history,
+                    &Callback::History { page: 0 },
+                ),
+            ]])
         };
-        let body = self.fill(
-            &t.paid,
-            &[
-                ("inv_amount", &self.money(&q.invoice_amount)),
-                ("x", &p.x),
-                ("fee", &self.money(&q.fee)),
-                ("excess_line", &excess_line),
-                ("order", &self.order_id(&q.order.id)),
-                ("time", &self.at(finished_at, TimeFormat::Time)),
-            ],
-        );
-        let keyboard = match excess_check {
-            Some(url) => Keyboard::inline_rows(vec![self.claim_row(url)]),
-            None => self.order_keyboard(&q.order),
+        let (body, keyboard) = match excess {
+            Some(Excess::Refund(amount)) => {
+                let args = [
+                    ("inv_amount", &inv_amount),
+                    ("excess", &self.money(amount)),
+                    ("src", &p.src),
+                ];
+                match excess_check {
+                    Some(url) => (
+                        self.fill(&t.excess_refund, &args),
+                        Keyboard::inline_rows(vec![vec![self.claim_button(amount, url)]]),
+                    ),
+                    None => (self.fill(&t.excess_refund_pending, &args), Keyboard::None),
+                }
+            }
+            Some(Excess::Kept { amount, min_refund }) => (
+                self.fill(
+                    &t.excess_kept,
+                    &[
+                        ("inv_amount", &inv_amount),
+                        ("excess", &self.money(amount)),
+                        ("min_refund", &self.money(min_refund)),
+                    ],
+                ),
+                again(),
+            ),
+            None => (
+                self.fill(
+                    &t.paid,
+                    &[
+                        ("inv_amount", &inv_amount),
+                        ("x_short", &self.amount_text(&q.to_pay)),
+                        ("fee_pct", &self.pct(q.fee_pct)),
+                        ("fee_short", &self.amount_text(&q.fee)),
+                        ("order", &Frag::text(&q.order.id)),
+                        ("time", &self.at(finished_at, TimeFormat::Time)),
+                    ],
+                ),
+                again(),
+            ),
         };
         self.plain(body, keyboard)
     }
 
-    /// S8 ручная проверка. `amount` — сколько у нас денег клиента; `None` — исход приёма
-    /// неизвестен (чек мог остаться у клиента), текст говорит об обоих вариантах.
-    pub fn manual_review(
-        &self,
-        order: &OrderRef,
-        amount: Option<&Money>,
-        sla: DateTime<Utc>,
-    ) -> Screen {
+    /// «Забрать 51.25 USDT» — зелёная, ссылка на чек.
+    fn claim_button(&self, amount: &Money, url: &str) -> botapi::InlineKeyboardButton {
+        let label = self.button_text(
+            &self.texts.refund.claim,
+            &[("amount", &fmt::amount(amount.amount(), amount.asset()))],
+        );
+        self.url_button(Some(Emoji::Claim), &label, url)
+            .style(ButtonStyle::Success)
+    }
+
+    /// «Проверяю вручную / Деньги у меня: 100.00 USDT. Обычно до 15 минут. / Ничего делать
+    /// не нужно — напишу сюда.» — макет B1. `amount` — `None`: исход приёма неизвестен.
+    pub fn manual_review(&self, order: &OrderRef, amount: Option<&Money>, minutes: i64) -> Screen {
         let t = &self.texts.manual;
-        let order_id = self.order_id(&order.id);
-        let sla = self.at(sla, TimeFormat::Time);
+        let minutes = Frag::text(&fmt::minutes_gen(minutes));
         let body = match amount {
             Some(m) => self.fill(
                 &t.review,
-                &[
-                    ("order", &order_id),
-                    ("amount", &self.money(m)),
-                    ("sla", &sla),
-                ],
+                &[("amount", &self.money(m)), ("minutes", &minutes)],
             ),
-            None => self.fill(&t.review_unknown, &[("order", &order_id), ("sla", &sla)]),
+            None => self.fill(&t.review_unknown, &[("minutes", &minutes)]),
         };
-        let keyboard = Keyboard::inline_rows(vec![vec![self.cb_button(
-            Some(crate::emoji::Emoji::Support),
-            &self.texts.buttons.support,
-            &Callback::Support(Some(order.id.clone())),
-        )]]);
+        let keyboard = Keyboard::inline_rows(vec![vec![
+            self.cb_button(
+                Some(Emoji::Support),
+                &self.texts.buttons.support,
+                &Callback::Support(Some(order.id.clone())),
+            ),
+            self.copy_button(&order.id, &order.id),
+        ]]);
         self.plain(body, keyboard)
     }
 
@@ -367,37 +378,61 @@ impl Ui {
         }
     }
 
-    /// S9 «Возвращаю … чеком».
+    /// Текст возврата: «Меньше минимума · от 1.00 USDT / Верну 0.50 чеком CryptoBot.» или
+    /// «Возвращаю 51.25 USDT / Счёт уже оплатил кто-то другой.» — макет B1.
+    fn refund_text(&self, order: &OrderRef, refund: &Money, reason: &RefundReason) -> Frag {
+        let t = &self.texts.refund;
+        let src = self.wallet(order.direction.source());
+        match reason {
+            RefundReason::BelowMinimum { min } => self.fill(
+                &t.below_minimum,
+                &[
+                    ("min", &self.money(min)),
+                    ("refund_short", &self.amount_code(refund)),
+                    ("src", &src),
+                ],
+            ),
+            other => self.fill(
+                &t.started,
+                &[
+                    ("refund", &self.money(refund)),
+                    ("reason", &self.refund_reason(other)),
+                ],
+            ),
+        }
+    }
+
+    /// Возврат начат: почему и сколько. Без кнопок — чек ещё создаётся.
     pub fn refund_started(
         &self,
         order: &OrderRef,
         refund: &Money,
         reason: &RefundReason,
     ) -> Screen {
-        let body = self.fill(
-            &self.texts.refund.started,
-            &[
-                ("refund", &self.money(refund)),
-                ("src", &self.wallet(order.direction.source())),
-                ("reason", &self.refund_reason(reason)),
-                ("order", &self.order_id(&order.id)),
-            ],
-        );
-        self.plain(body, self.order_keyboard(order))
+        self.plain(self.refund_text(order, refund, reason), Keyboard::None)
     }
 
-    /// S9 итог: чек возврата с кнопками «Забрать чек» и «Скопировать ссылку».
-    pub fn refund_done(&self, order: &OrderRef, refund: &Money, check_url: &str) -> Screen {
-        let body = self.fill(
-            &self.texts.refund.done,
-            &[
-                ("refund", &self.money(refund)),
-                ("src", &self.wallet(order.direction.source())),
-                ("claim", &Frag::text(&self.texts.buttons.claim_check)),
-                ("order", &self.order_id(&order.id)),
-            ],
-        );
-        self.plain(body, Keyboard::inline_rows(vec![self.claim_row(check_url)]))
+    /// Возврат готов — [Забрать 51.25 USDT]. Чек меньше минимума — та же строка, что и до
+    /// чека, плюс кнопка (макет «Меньше минимума»).
+    pub fn refund_done(
+        &self,
+        order: &OrderRef,
+        refund: &Money,
+        check_url: &str,
+        reason: Option<&RefundReason>,
+    ) -> Screen {
+        let body = match reason {
+            Some(r @ RefundReason::BelowMinimum { .. }) => self.refund_text(order, refund, r),
+            _ => self.fill(
+                &self.texts.refund.done,
+                &[
+                    ("refund", &self.money(refund)),
+                    ("src", &self.wallet(order.direction.source())),
+                ],
+            ),
+        };
+        let keyboard = Keyboard::inline_rows(vec![vec![self.claim_button(refund, check_url)]]);
+        self.plain(body, keyboard)
     }
 }
 

@@ -773,18 +773,19 @@ async fn invoice_link_gets_a_quote_and_the_check_pays_it(pool: PgPool) {
     let quote = e
         .fake
         .wait_for("quote", |c| {
-            c.method == "sendMessage" && c.contains("10.30 USDT")
+            c.method == "sendMessage" && c.contains("Пришлите чек") && c.contains("10.30")
         })
         .await;
     let (_, message, public_id) = e.order_message().await;
     assert_eq!(e.orders().await[0].1, OrderState::AwaitingFunds);
+    // Макет B1: сумма к оплате — на синей кнопке-копии, «Отмена» отменяет заявку.
+    assert!(quote.contains("\"copy_text\""), "{:?}", quote.body);
     assert!(
-        quote.contains(&format!("pay_check:{public_id}")),
+        quote.contains(&format!("cancel:{public_id}")),
         "{:?}",
         quote.body
     );
-
-    // «Пришлю чек» → то же сообщение показывает ожидание чека.
+    // Старое сообщение с «Пришлю чек» по-прежнему работает: экран ожидания чека.
     e.fake
         .client_presses(message, &format!("pay_check:{public_id}"));
     e.fake
@@ -847,7 +848,7 @@ async fn invoice_in_a_forwarded_shop_button_gets_a_quote(pool: PgPool) {
     );
     e.fake
         .wait_for("quote", |c| {
-            c.method == "sendMessage" && c.contains("10.30 USDT")
+            c.method == "sendMessage" && c.contains("Пришлите чек") && c.contains("10.30")
         })
         .await;
     bot.stop().await;
@@ -871,7 +872,7 @@ async fn xrocket_invoice_in_a_url_button_is_read_too(pool: PgPool) {
     );
     e.fake
         .wait_for("quote", |c| {
-            c.method == "sendMessage" && c.contains("20.40 USDT")
+            c.method == "sendMessage" && c.contains("Пришлите чек") && c.contains("20.40")
         })
         .await;
     bot.stop().await;
@@ -890,7 +891,7 @@ async fn cancel_button_closes_the_quote(pool: PgPool) {
     e.fake.client_writes(&inv.url);
     e.fake
         .wait_for("quote", |c| {
-            c.method == "sendMessage" && c.contains("20.40 USDT")
+            c.method == "sendMessage" && c.contains("Пришлите чек") && c.contains("20.40")
         })
         .await;
     let (_, message, public_id) = e.order_message().await;
@@ -924,7 +925,7 @@ async fn xrocket_multi_check_is_refused_and_never_opened(pool: PgPool) {
         .client_writes(&format!("Держи мульти-чек {}", multi.url));
     e.fake
         .wait_for("multi-check refusal", |c| {
-            c.method == "sendMessage" && c.contains("мульти-чек xRocket")
+            c.method == "sendMessage" && c.contains("Мульти-чек не подойдёт")
         })
         .await;
     bot.stop().await;
