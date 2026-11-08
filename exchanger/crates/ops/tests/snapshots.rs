@@ -26,3 +26,25 @@ fn dash_three_states() {
         insta::assert_snapshot!(format!("dash_{name}"), dump(&screen));
     }
 }
+
+#[test]
+fn menu_owner_and_operator() {
+    let t = Texts::builtin().unwrap();
+    let busy = ops::MenuCounts {
+        review: 2,
+        inbox: 1,
+        ..Default::default()
+    };
+    let owner = Look::plain().screen(&ops::menu_screen(&t, storage::staff::Role::Owner, &busy));
+    insta::assert_snapshot!("menu_owner", dump(&owner));
+    let quiet = ops::MenuCounts {
+        kill: true,
+        ..Default::default()
+    };
+    let operator = Look::plain().screen(&ops::menu_screen(
+        &t,
+        storage::staff::Role::Operator,
+        &quiet,
+    ));
+    insta::assert_snapshot!("menu_operator_kill_switch", dump(&operator));
+}

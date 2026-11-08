@@ -649,14 +649,11 @@ async fn demo(preview: bool, preview_panel: bool) -> anyhow::Result<()> {
     .await?;
     if preview || preview_panel {
         let api = app::telegram::bot_api(token)?;
-        let emoji = app::runtime::emoji_set(&pool).await;
-        let look = ops::Look::new(emoji.clone());
-        let ui = ui::Ui::builtin(emoji, ui::UiConfig::default())
-            .context("built-in client texts are invalid")?;
+        let look = ops::Look::new(app::runtime::emoji_set(&pool).await);
         if preview {
-            app::demo::send_preview(&api, &ui, &look, cfg.owner_tg_id).await;
+            ops::preview::send_preview(&api, &look, cfg.owner_tg_id).await;
         } else {
-            app::demo::send_panel_preview(&api, &look, cfg.owner_tg_id).await;
+            ops::preview::send_panel_preview(&api, &look, cfg.owner_tg_id).await;
         }
     }
     wait(tasks, cancel).await

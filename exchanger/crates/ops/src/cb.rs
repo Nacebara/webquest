@@ -194,6 +194,16 @@ pub enum Cb {
     SupportReply(i64),
     /// «Статистика» за 1, 7 или 30 дней (макет: карточка с графиком).
     Stats(u8),
+    /// «Обращения»: вопросы клиентов, ждущие ответа.
+    Inbox,
+    /// Закрыть обращение клиента без ответа.
+    SupportClose(i64),
+    /// «Система»: версия, база, очередь, связь.
+    System,
+    /// «Предпросмотр экранов» клиента и пульта настоящими сообщениями.
+    Preview,
+    /// «Рассылка».
+    Broadcast,
     /// Все инвесторы и движения, ждущие решения.
     Investors,
     /// «💼 Инвестиции» клиента.
@@ -315,6 +325,11 @@ impl Cb {
             Cb::Investors => "iv".into(),
             Cb::SupportReply(id) => format!("sq:{id}"),
             Cb::Stats(days) => format!("sx:{days}"),
+            Cb::Inbox => "ib".into(),
+            Cb::SupportClose(id) => format!("sc:{id}"),
+            Cb::System => "sy".into(),
+            Cb::Preview => "pv".into(),
+            Cb::Broadcast => "bc".into(),
             Cb::Invest(id) => format!("iv:{id}"),
             Cb::InvestEdit(id) => format!("ivt:{id}"),
             Cb::InvestAccess(id, on) => format!("iva:{id}:{}", bit(*on)),
@@ -401,6 +416,11 @@ impl Cb {
             ["iv"] => Cb::Investors,
             ["sq", _] => Cb::SupportReply(id(1)?),
             ["sx", d] => Cb::Stats(d.parse().ok().filter(|d| matches!(d, 1 | 7 | 30))?),
+            ["ib"] => Cb::Inbox,
+            ["sc", _] => Cb::SupportClose(id(1)?),
+            ["sy"] => Cb::System,
+            ["pv"] => Cb::Preview,
+            ["bc"] => Cb::Broadcast,
             ["iv", _] => Cb::Invest(id(1)?),
             ["ivt", _] => Cb::InvestEdit(id(1)?),
             ["iva", _, _] => Cb::InvestAccess(id(1)?, on(2)?),
@@ -459,6 +479,11 @@ mod tests {
             Cb::Investors,
             Cb::SupportReply(big),
             Cb::Stats(7),
+            Cb::Inbox,
+            Cb::SupportClose(big),
+            Cb::System,
+            Cb::Preview,
+            Cb::Broadcast,
             Cb::Invest(big),
             Cb::InvestEdit(big),
             Cb::InvestAccess(big, true),

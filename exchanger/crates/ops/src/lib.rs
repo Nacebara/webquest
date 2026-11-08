@@ -25,8 +25,10 @@ mod alerts;
 mod cb;
 pub mod chart;
 mod dash;
+mod inbox;
 mod invest;
 mod look;
+pub mod preview;
 pub mod stats;
 mod texts;
 mod views;
@@ -48,6 +50,7 @@ pub use cb::Cb;
 pub use dash::{DashData, sample_dash};
 pub use look::Look;
 pub use texts::Texts;
+pub use views::{MenuCounts, menu_screen};
 
 use crate::actions::{Action, Input};
 
@@ -196,6 +199,8 @@ pub(crate) struct Inner {
     state: Mutex<State>,
     /// Вид (эмодзи) и отпечаток настроек, по которому он собран.
     look: std::sync::RwLock<(Arc<Look>, String)>,
+    /// Когда пульт запущен («Система»: «работает 3 дн»).
+    started: Instant,
 }
 
 impl OpsBot {
@@ -215,6 +220,7 @@ impl OpsBot {
                 cfg,
                 state: Mutex::new(State::default()),
                 look: std::sync::RwLock::new((Arc::new(Look::plain()), String::new())),
+                started: Instant::now(),
             }),
         })
     }
@@ -327,9 +333,9 @@ impl Inner {
     }
 
     /// Команды пульта в общем боте. Остальные команды (`/start`, `/help` …) — клиентские.
-    const COMMANDS: [&'static str; 13] = [
-        "admin", "panel", "dash", "queue", "order", "find", "user", "dir", "promo", "settings",
-        "bots", "staff", "audit",
+    const COMMANDS: [&'static str; 15] = [
+        "admin", "panel", "menu", "dash", "queue", "order", "find", "user", "dir", "promo",
+        "settings", "bots", "staff", "audit", "system",
     ];
 
     fn has_awaiting(&self, staff: i64) -> bool {
@@ -396,7 +402,9 @@ impl Inner {
         }
         let screen = self.on_message(&staff, message).await?;
         let sent = self.send(message.chat.id, &screen).await?;
-        if command == Some("dash") {
+        let opened_dash = matches!(command, Some("dash" | "admin" | "panel"))
+            || (command.is_none() && text == self.texts.t("menu.open"));
+        if opened_dash {
             self.remember_dash(sent.chat.id, sent.message_id).await?;
         }
         Ok(true)
@@ -533,9 +541,11 @@ impl Inner {
         message: &Message,
     ) -> Result<Screen, OpsError> {
         let text = message.text.as_deref().unwrap_or("").trim();
+        // Вход в пульт — главный экран (макет: «Первая строка отвечает „надо ли мне что-то
+        // делать“»); меню — кнопкой «Меню» или /menu.
         if text == self.texts.t("menu.open") {
             self.clear_awaiting(staff.tg_user_id);
-            return self.menu(staff).await;
+            return self.dash().await;
         }
         if let Some(command) = text.strip_prefix('/') {
             self.clear_awaiting(staff.tg_user_id);
@@ -543,7 +553,9 @@ impl Inner {
             let name = name.split('@').next().unwrap_or(name);
             let arg = arg.trim();
             return match name {
-                "dash" => self.dash().await,
+                "dash" | "admin" | "panel" => self.dash().await,
+                "menu" => self.menu(staff).await,
+                "system" => self.system().await,
                 "queue" => self.queue().await,
                 "dir" => self.dirs().await,
                 "promo" => self.promo().await,
@@ -602,6 +614,19 @@ impl Inner {
             Cb::Ack(id) => {
                 self.ack(staff, id).await?;
                 return Ok(None);
+            }
+            Cb::Inbox => self.inbox().await?,
+            Cb::SupportClose(client) => self.support_close(staff, client).await?,
+            Cb::System => self.system().await?,
+            Cb::Broadcast => self.broadcast(),
+            Cb::Preview => {
+                let api = self.api.clone();
+                let look = self.look();
+                tokio::spawn(async move {
+                    crate::preview::send_preview(&api, &look, chat).await;
+                });
+                Screen::new(self.texts.t("system.preview_sent"))
+                    .row(vec![btn(self.texts.t("common.home"), &Cb::Menu)])
             }
             Cb::SupportReply(client) => self.prompt_with(
                 staff,
@@ -680,27 +705,10 @@ impl Inner {
             let mut conn = self.pool.acquire().await?;
             storage::staff::list(&mut conn).await?
         };
-        let who = match &from.username {
-            Some(u) => format!("{} · @{}", from.id, texts::esc(u)),
-            None => from.id.to_string(),
-        };
-        let question: String = text.chars().take(1500).collect();
-        let mut body = self.texts.f(
-            "support.question",
-            &[("who", &who), ("text", &texts::esc(&question))],
-        );
-        if let Some(order) = order {
-            body.push('\n');
-            body.push_str(
-                &self
-                    .texts
-                    .f("support.order", &[("order", &texts::esc(order))]),
-            );
-        }
-        let screen = Screen::new(body).row(vec![btn(
-            self.texts.t("support.b_reply"),
-            &Cb::SupportReply(from.id),
-        )]);
+        self.store_question(from, text, order).await?;
+        let screen = self
+            .question_card(from.id, from.username.as_deref(), text, order)
+            .await?;
         let mut delivered = 0;
         for member in staff.iter().filter(|m| m.disabled_at.is_none()) {
             match self.send(member.tg_user_id, &screen).await {
@@ -736,11 +744,14 @@ impl Inner {
             .send_message(&SendMessage::html(client, answer))
             .await
         {
-            Ok(_) => Ok(Screen::new(
-                self.texts
-                    .f("support.sent", &[("client", &client.to_string())]),
-            )
-            .row(vec![home()])),
+            Ok(_) => {
+                self.close_question(client, staff.tg_user_id).await?;
+                Ok(Screen::new(self.texts.f(
+                    "support.sent",
+                    &[("name", &texts::esc(&staff.display_name))],
+                ))
+                .row(vec![btn(self.texts.t("menu.b_inbox"), &Cb::Inbox), home()]))
+            }
             Err(e) => Ok(Screen::new(
                 self.texts
                     .f("support.failed", &[("error", &texts::esc(&e.to_string()))]),

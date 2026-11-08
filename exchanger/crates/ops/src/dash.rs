@@ -175,7 +175,7 @@ fn delta(cur: Decimal, prev: Decimal) -> Option<i64> {
 }
 
 /// Время `14:15`: в карточке — в поясе читателя (`<tg-time>`), в запасном тексте — по Москве.
-fn hhmm(at: DateTime<Utc>) -> String {
+pub(crate) fn hhmm(at: DateTime<Utc>) -> String {
     let clock = ui::Clock::new(3 * 3600, "").unwrap_or_else(ui::Clock::msk);
     format!(
         "<tg-time unix=\"{}\" format=\"t\">{}</tg-time>",

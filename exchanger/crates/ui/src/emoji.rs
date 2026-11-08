@@ -421,6 +421,18 @@ pub fn fallback_char(name: &str) -> &'static str {
         "export" => "📤",
         "sparkle" => "✨",
         "help" => "❓",
+        "order" => "🔖",
+        "server" => "🖥",
+        "power" => "🛑",
+        "edit" => "✏️",
+        "take" => "✋",
+        "trash" => "🗑",
+        "calendar" => "📅",
+        "filter" => "🔽",
+        "star" => "⭐",
+        "gift" => "🎁",
+        "coin" => "🪙",
+        "ack" => "👍",
         _ => "•",
     }
 }

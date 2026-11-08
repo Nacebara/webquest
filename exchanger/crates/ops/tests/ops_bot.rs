@@ -417,12 +417,14 @@ async fn one_bot_staff_see_the_panel_clients_do_not(pool: PgPool) {
         "{}",
         welcome.body
     );
-    // Кнопка меню открывает пульт.
-    let panel = o.say(OWNER, "🛠 Админ-панель", "Админ-панель exch").await;
-    assert!(panel.text().contains("Владелец"));
+    // Кнопка меню открывает пульт: главный экран, оттуда — меню (макет «вариант А»).
+    let dash = o.say(OWNER, "🛠 Админ-панель", "Всё спокойно").await;
+    let panel = o.press(OWNER, &dash, "Меню", "<b>Пульт</b>").await;
+    assert!(panel.text().contains("вы владелец"), "{}", panel.text());
     assert!(panel.button("Персонал").is_some(), "владельцу — персонал");
     assert!(panel.buttons().iter().all(|b| b.starts_with("a:")));
-    let admin = o.say(ADMIN, "/admin", "Админ-панель exch").await;
+    let admin = o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
+    assert!(admin.text().contains("вы админ"), "{}", admin.text());
     assert!(admin.button("Персонал").is_none());
     // Клиент: обычное приветствие без кнопки, на /admin пульт не отвечает.
     let client = o.say(STRANGER, "/start", "Обмен CryptoBot").await;
@@ -435,7 +437,7 @@ async fn one_bot_staff_see_the_panel_clients_do_not(pool: PgPool) {
         o.tg.calls()
             .iter()
             .skip(mark)
-            .all(|c| !c.text().contains("Админ-панель exch")),
+            .all(|c| !c.text().contains("<b>Пульт</b>") && !c.text().contains("Всё спокойно")),
         "постороннему пульт не виден"
     );
     // Кнопка пульта от постороннего (подделка) — ничего не делает.
@@ -447,14 +449,14 @@ async fn one_bot_staff_see_the_panel_clients_do_not(pool: PgPool) {
         o.tg.calls()
             .iter()
             .skip(mark)
-            .all(|c| !c.text().contains("Сводка"))
+            .all(|c| !c.text().contains("Всё спокойно"))
     );
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn fee_change_needs_a_preview_and_a_single_use_confirmation(pool: PgPool) {
     let o = ops(pool).await;
-    let panel = o.say(OWNER, "/admin", "Админ-панель exch").await;
+    let panel = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
     let dirs = o
         .press(OWNER, &panel, "Направления", "Комиссия, ступени")
         .await;
@@ -586,7 +588,7 @@ async fn settings_toggle_the_newcomer_limit_and_the_kill_switch(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn promo_hint_arrives_and_one_button_switches_the_promo_on(pool: PgPool) {
     let o = ops(pool).await;
-    o.say(OWNER, "/admin", "Админ-панель exch").await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
     {
         let mut conn = o.pool.acquire().await.unwrap();
         for (platform, target) in [(CB, dec!(400)), (XR, dec!(2000))] {
@@ -629,7 +631,7 @@ async fn promo_hint_arrives_and_one_button_switches_the_promo_on(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
     let o = ops(pool).await;
-    o.say(OWNER, "/admin", "Админ-панель exch").await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
     // Выплата не удалась: в кошельке xRocket 5 USDT вместо 1000.
     o.world.set_balance(o.ub, XR, Asset::Usdt, dec!(5)).unwrap();
     let url = o.world.client_check(CB, usdt(dec!(100))).unwrap();
@@ -707,8 +709,8 @@ async fn client_card_sets_a_personal_fee(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn owner_top_up_is_posted_from_the_reconciliation_alert(pool: PgPool) {
     let o = ops(pool).await;
-    o.say(OWNER, "/admin", "Админ-панель exch").await;
-    o.say(ADMIN, "/admin", "Админ-панель exch").await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
     // Владелец пополнил CryptoBot на 250 — леджер об этом не знает.
     o.world
         .set_balance(o.ub, CB, Asset::Usdt, dec!(1250))
@@ -755,8 +757,8 @@ async fn selftest_from_the_panel_reports_every_step(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn owner_grants_investor_access_and_admin_approves_a_withdrawal(pool: PgPool) {
     let o = ops(pool).await;
-    o.say(OWNER, "/admin", "Админ-панель exch").await;
-    o.say(ADMIN, "/admin", "Админ-панель exch").await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
 
     // Админ видит карточку, но выдать доступ не может — кнопки нет.
     let card = o
@@ -850,7 +852,7 @@ async fn dash_explains_pauses_and_reconcile_offers_the_top_up(pool: PgPool) {
     );
 
     // Кошелёк не отвечает — владелец получает событие с причиной, а не тишину.
-    o.say(OWNER, "/admin", "Админ-панель exch").await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
     o.world.inject(
         o.ub,
         userbot::sim::Call::SendText,
@@ -897,17 +899,54 @@ async fn support_question_reaches_staff_and_the_answer_reaches_the_client(pool: 
     );
     assert!(question.text().contains("K7M2Q9XR4T"));
     o.tg.screen(mark, OWNER, "Обращение").await;
+    // В меню — счётчик и синяя кнопка: ждут человека (макет «Меню пульта»).
+    let menu = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    assert!(menu.button("Обращения · 1").is_some(), "{:?}", menu.body);
+    let inbox = o
+        .press(OWNER, &menu, "Обращения · 1", "Обращения · 1")
+        .await;
+    assert!(inbox.text().contains("4242"), "{}", inbox.text());
 
     o.press(ADMIN, &question, "Ответить", "Ответ клиенту 4242")
         .await;
     o.say(
         ADMIN,
         "деньги у нас, чек будет через 5 минут",
-        "Отправлено клиенту 4242",
+        "Отправлено клиенту · Анна",
     )
     .await;
     let answer = o.tg.screen(mark, 4242, "Оператор Анна:").await;
     assert!(answer.text().contains("деньги у нас"), "{}", answer.text());
+    // Ответили — обращение закрыто, счётчика больше нет.
+    let menu = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    assert!(menu.button("Обращения · ").is_none(), "{:?}", menu.body);
+    assert!(menu.button("Обращения").is_some());
+}
+
+/// «Система» по макету: версия, база, очередь, Bot API, аккаунты; «Предпросмотр экранов»
+/// присылает экраны клиента и пульта настоящими сообщениями.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn system_screen_and_screen_preview_from_the_panel(pool: PgPool) {
+    let o = ops(pool).await;
+    let menu = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    let system = o.press(OWNER, &menu, "Система", "Очередь операций").await;
+    assert_eq!(system.method, "editMessageText");
+    let body = system.text();
+    assert!(
+        body.contains("Версия") && body.contains("Bot API"),
+        "{body}"
+    );
+    let mark = o.tg.mark();
+    o.press(
+        OWNER,
+        &system,
+        "Предпросмотр экранов",
+        "Предпросмотр отправлен",
+    )
+    .await;
+    // Экраны идут по порядку макета, с паузой между сообщениями: проверяем начало.
+    o.tg.screen(mark, OWNER, "1/27 · Приветствие").await;
+    o.tg.screen(mark, OWNER, "Что меняем?").await;
 }
 
 /// Главный экран по макету («вариант А»): тишина → пожар после недостачи; карточка правится

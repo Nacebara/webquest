@@ -42,6 +42,11 @@ impl Look {
         Self { emoji }
     }
 
+    /// Набор эмодзи вида (тот же для экранов клиента в «Предпросмотре»).
+    pub fn emoji(&self) -> &EmojiSet {
+        &self.emoji
+    }
+
     /// Без Premium: обычные символы.
     pub fn plain() -> Self {
         Self::default()

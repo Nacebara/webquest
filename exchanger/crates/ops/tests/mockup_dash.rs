@@ -52,11 +52,17 @@ fn js(src: &str) -> (Js, &str) {
 /// Кнопка: подпись, ключ иконки, цвет.
 type Button = (String, Option<String>, Option<String>);
 
-/// Сообщение макета: HTML и кнопки.
+/// Сообщение макета `const NAME = R(…)`: HTML и кнопки.
 fn mock(name: &str) -> (String, Vec<Button>) {
+    mock_after(&format!("const {name} = R(`"))
+}
+
+/// Первое сообщение бота (`B(` или `R(`) после метки `start`: HTML и кнопки.
+fn mock_after(start: &str) -> (String, Vec<Button>) {
     let src = template();
-    let start = format!("const {name} = R(`");
-    let i = src.find(&start).expect(&start) + start.len();
+    let at = src.find(start).expect(start);
+    let rel = src[at..].find('`').expect("message text");
+    let i = at + rel + 1;
     let end = src[i..].find('`').unwrap() + i;
     let html = src[i..end].to_owned();
     let after = src[end + 1..].trim_start().strip_prefix(',').unwrap();
@@ -254,5 +260,58 @@ fn dash_says_and_shows_what_the_mockup_does() {
         problems.is_empty(),
         "расхождения с макетом:\n{}",
         problems.join("\n")
+    );
+}
+
+#[test]
+fn menu_is_the_mockup() {
+    let texts = Texts::builtin().unwrap();
+    let (html, buttons) = mock_after("t: 'Меню пульта'");
+    let mut keys: Vec<String> = buttons.iter().filter_map(|b| b.1.clone()).collect();
+    keys.sort();
+    keys.dedup();
+    let (look, back) = numbered(&keys);
+    // Данные макета: владелец, на разборе 2, обращение 1.
+    let counts = ops::MenuCounts {
+        review: 2,
+        inbox: 1,
+        ..Default::default()
+    };
+    let screen = look.screen(&ops::menu_screen(
+        &texts,
+        storage::staff::Role::Owner,
+        &counts,
+    ));
+    let ours = lines(&screen.text).join("|");
+    for line in lines(&html) {
+        assert!(ours.contains(&line), "в макете «{line}», у бота: {ours}");
+    }
+    let ours: Vec<Button> = screen
+        .keyboard
+        .iter()
+        .flatten()
+        .map(|b| {
+            (
+                b.text.clone(),
+                b.icon_custom_emoji_id
+                    .as_ref()
+                    .and_then(|id| back.get(id).cloned()),
+                b.style.map(|s| {
+                    match s {
+                        botapi::ButtonStyle::Primary => "primary",
+                        botapi::ButtonStyle::Success => "success",
+                        botapi::ButtonStyle::Danger => "danger",
+                    }
+                    .to_owned()
+                }),
+            )
+        })
+        .collect();
+    assert_eq!(ours, buttons, "кнопки меню");
+    let rows: Vec<usize> = screen.keyboard.iter().map(Vec::len).collect();
+    assert_eq!(
+        rows,
+        vec![2, 2, 2, 2, 2, 2, 2, 1],
+        "по два в ряд, «Стоп-кран» один внизу"
     );
 }

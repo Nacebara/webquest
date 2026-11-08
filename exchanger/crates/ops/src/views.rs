@@ -63,6 +63,67 @@ fn mask_links(text: &str) -> String {
         .collect()
 }
 
+/// Что показывает меню: счётчики и флаги.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MenuCounts {
+    /// Заявок на ручном разборе.
+    pub review: usize,
+    /// Обращений клиентов без ответа.
+    pub inbox: usize,
+    pub kill: bool,
+    pub maint: bool,
+}
+
+/// Меню пульта для роли (макет «Меню пульта»). «Персонал» — только владельцу.
+pub fn menu_screen(t: &crate::Texts, role: Role, c: &MenuCounts) -> Screen {
+    use botapi::ButtonStyle::{Danger, Primary};
+    let role_name = t.t(&format!("roles.{}", role.as_db_str())).to_lowercase();
+    let mut text = t.f("menu.title", &[("role", &role_name)]);
+    if c.kill {
+        text.push_str(&format!("\n\n{}", t.t("menu.flags_kill")));
+    }
+    if c.maint {
+        text.push_str(&format!("\n{}", t.t("menu.flags_maint")));
+    }
+    let counted = |key: &str, n: usize, cb: Cb| {
+        if n > 0 {
+            btn(t.f(&format!("{key}_n"), &[("n", &n)]), &cb).style(Primary)
+        } else {
+            btn(t.t(key), &cb)
+        }
+    };
+    let mut items = vec![
+        counted("menu.b_queue", c.review, Cb::Queue),
+        btn(t.t("menu.b_orders"), &Cb::OrderAsk),
+        btn(t.t("menu.b_reserves"), &Cb::Reconcile),
+        btn(t.t("menu.b_bots"), &Cb::Bots),
+        btn(t.t("menu.b_dirs"), &Cb::Dirs),
+        btn(t.t("menu.b_users"), &Cb::UserAsk),
+        counted("menu.b_inbox", c.inbox, Cb::Inbox),
+        btn(t.t("menu.b_broadcast"), &Cb::Broadcast),
+        btn(t.t("menu.b_stats"), &Cb::Stats(7)),
+        btn(t.t("menu.b_audit"), &Cb::Audit),
+        btn(t.t("menu.b_settings"), &Cb::Settings),
+    ];
+    if role == Role::Owner {
+        items.push(btn(t.t("menu.b_staff"), &Cb::Staff));
+    }
+    items.push(btn(t.t("menu.b_system"), &Cb::System));
+    items.push(btn(t.t("menu.b_emoji"), &Cb::Emoji));
+    let mut s = Screen::new(text);
+    for pair in items.chunks(2) {
+        s = s.row(pair.to_vec());
+    }
+    let kill_label = if c.kill {
+        "menu.b_kill_off"
+    } else {
+        "menu.b_kill"
+    };
+    s.row(vec![
+        btn(t.t(kill_label), &Cb::Toggle(Flag::KillSwitch)).style(Danger),
+    ])
+}
+
 impl Inner {
     pub(crate) fn dir_name(&self, d: Direction) -> String {
         self.texts.t(&format!("names.{}", d.code()))
@@ -86,61 +147,17 @@ impl Inner {
     // -----------------------------------------------------------------------------------------
     // Пульт
 
+    /// Меню пульта — макет «Меню пульта»: 14 разделов по два в ряд и красный «Стоп-кран».
+    /// Счётчик — только там, где ждут человека (разбор, обращения), такие кнопки синие.
     pub(crate) async fn menu(&self, staff: &StaffMember) -> Result<Screen, OpsError> {
-        let t = &self.texts;
         let mut conn = self.pool.acquire().await?;
-        let review = storage::admin::review_queue(&mut conn).await?.len();
-        let kill = storage::settings::flag(&mut conn, Flag::KillSwitch.key(), false).await?;
-        let maint = storage::settings::flag(&mut conn, Flag::Maintenance.key(), false).await?;
-        let mut text = format!(
-            "{}\n{}",
-            t.t("menu.title"),
-            t.f(
-                "menu.hello",
-                &[
-                    ("role", &self.role_name(staff.role)),
-                    ("name", &esc(&staff.display_name)),
-                ]
-            )
-        );
-        if kill {
-            text.push_str(&format!("\n\n{}", t.t("menu.flags_kill")));
-        }
-        if maint {
-            text.push_str(&format!("\n{}", t.t("menu.flags_maint")));
-        }
-        let queue = if review > 0 {
-            t.f("menu.queue_n", &[("n", &review)])
-        } else {
-            t.t("menu.queue")
+        let counts = MenuCounts {
+            review: storage::admin::review_queue(&mut conn).await?.len(),
+            inbox: crate::inbox::open_questions(&mut conn).await?.len(),
+            kill: storage::settings::flag(&mut conn, Flag::KillSwitch.key(), false).await?,
+            maint: storage::settings::flag(&mut conn, Flag::Maintenance.key(), false).await?,
         };
-        let mut s = Screen::new(text)
-            .row(vec![
-                btn(t.t("menu.dash"), &Cb::Dash),
-                btn(queue, &Cb::Queue),
-            ])
-            .row(vec![btn(t.t("menu.stats"), &Cb::Stats(7))])
-            .row(vec![
-                btn(t.t("menu.dirs"), &Cb::Dirs),
-                btn(t.t("menu.promo"), &Cb::Promo),
-            ])
-            .row(vec![
-                btn(t.t("menu.order"), &Cb::OrderAsk),
-                btn(t.t("menu.user"), &Cb::UserAsk),
-            ])
-            .row(vec![
-                btn(t.t("menu.settings"), &Cb::Settings),
-                btn(t.t("menu.bots"), &Cb::Bots),
-            ]);
-        let mut last = vec![btn(t.t("menu.audit"), &Cb::Audit)];
-        if staff.role >= Role::Admin {
-            last.insert(0, btn(t.t("menu.investors"), &Cb::Investors));
-        }
-        if staff.role == Role::Owner {
-            last.insert(0, btn(t.t("menu.staff"), &Cb::Staff));
-        }
-        s = s.row(last);
-        Ok(s)
+        Ok(menu_screen(&self.texts, staff.role, &counts))
     }
 
     // -----------------------------------------------------------------------------------------
@@ -269,7 +286,9 @@ impl Inner {
             s = s.row(vec![btn(self.dir_name(d), &Cb::Dir(d))]);
         }
         s.text = lines.join("\n");
-        Ok(s.row(vec![btn(t.t("common.home"), &Cb::Menu)]))
+        // Встречный поток — про направления и резерв: вход отсюда (в меню макета его нет).
+        Ok(s.row(vec![btn(t.t("menu.promo"), &Cb::Promo)])
+            .row(vec![btn(t.t("common.home"), &Cb::Menu)]))
     }
 
     pub(crate) fn tiers_text(&self, row: &DirectionRow) -> String {
@@ -1440,7 +1459,15 @@ impl Inner {
                 self.reconcile_now().await
             }
             Cb::OrderAsk => Ok(self.prompt(staff, Input::OrderSearch, "order.ask")),
-            Cb::UserAsk => Ok(self.prompt(staff, Input::UserSearch, "user.ask")),
+            Cb::UserAsk => {
+                // «Клиенты»: поиск клиента; инвесторы — тоже клиенты (в меню макета их нет).
+                let s = self.prompt(staff, Input::UserSearch, "user.ask");
+                Ok(if staff.role >= Role::Admin {
+                    s.row(vec![btn(self.texts.t("menu.investors"), &Cb::Investors)])
+                } else {
+                    s
+                })
+            }
             Cb::Take(id) => {
                 let mut tx = self.pool.begin().await?;
                 let target = id.to_string();
