@@ -37,8 +37,10 @@ pub enum Callback {
     Refund(String),
     /// «Сообщить, когда заработает» направление.
     Notify(Direction),
-    /// «Не отображается?» — переключить на простой вид (SPEC §6.1).
+    /// «Простой вид» — переключить на обычный HTML (SPEC §6.1).
     PlainView,
+    /// «Красивый вид» — вернуть карточку (rich) после «Простого вида».
+    RichView,
     /// Инвестиции (DESIGN-v0.2 Р18).
     Invest(InvestAction),
 }
@@ -84,6 +86,7 @@ impl Callback {
             Callback::Refund(id) => format!("refund:{id}"),
             Callback::Notify(d) => format!("notify:{}", d.code()),
             Callback::PlainView => "plain".to_owned(),
+            Callback::RichView => "rich".to_owned(),
             Callback::Invest(a) => match a {
                 InvestAction::Home => "inv".to_owned(),
                 InvestAction::Deposit => "inv:dep".to_owned(),
@@ -115,6 +118,7 @@ impl Callback {
             ("terms", None) => Some(Callback::Terms),
             ("privacy", None) => Some(Callback::Privacy),
             ("plain", None) => Some(Callback::PlainView),
+            ("rich", None) => Some(Callback::RichView),
             ("history", Some(page)) => page
                 .parse()
                 .ok()
@@ -169,6 +173,7 @@ mod tests {
             Callback::Terms,
             Callback::Privacy,
             Callback::PlainView,
+            Callback::RichView,
             Callback::History { page: 0 },
             Callback::History {
                 page: 4_000_000_000,

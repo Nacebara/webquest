@@ -49,6 +49,14 @@ fn static_form(form: &str) -> &'static str {
     }
 }
 
+/// Значок кошелька.
+fn wallet_icon(platform: domain::Platform) -> Emoji {
+    match platform {
+        domain::Platform::CryptoBot => Emoji::Cb,
+        domain::Platform::XRocket => Emoji::Xr,
+    }
+}
+
 fn direction_icon(direction: Direction) -> Emoji {
     match direction {
         Direction::CbToXrCheck => Emoji::Cb,
@@ -443,8 +451,8 @@ impl Ui {
         let open = self.button_text(&b.open_wallet, &[("wallet", self.wallet_name(src))]);
         let keyboard = Keyboard::inline_rows(vec![
             vec![self.copy_button(&command, &command)],
-            vec![self.url_button(None, &open, wallet_bot_url(src))],
-            vec![self.cb_button(None, &b.back, &Callback::Direction(direction))],
+            vec![self.url_button(Some(wallet_icon(src)), &open, wallet_bot_url(src))],
+            vec![self.cb_button(Some(Emoji::Back), &b.back, &Callback::Direction(direction))],
         ]);
         self.plain(body, keyboard)
     }
@@ -507,8 +515,9 @@ impl Ui {
     ) -> Screen {
         let t = &self.texts.history;
         let b = &self.texts.buttons;
-        let more =
-            next_page.map(|page| vec![self.cb_button(None, &b.more, &Callback::History { page })]);
+        let more = next_page.map(|page| {
+            vec![self.cb_button(Some(Emoji::More), &b.more, &Callback::History { page })]
+        });
         if rows.is_empty() {
             let keyboard = Keyboard::inline_rows(more.into_iter().collect());
             return self.plain(self.fill(&t.empty, &[]), keyboard);
@@ -598,7 +607,11 @@ impl Ui {
                 } else {
                     when.clone()
                 };
-                self.cb_button(None, &label, &Callback::Order(r.order.clone()))
+                self.cb_button(
+                    Some(Emoji::Order),
+                    &label,
+                    &Callback::Order(r.order.clone()),
+                )
             })
             .collect();
         let mut keyboard: Vec<Vec<_>> = buttons.chunks(2).map(<[_]>::to_vec).collect();

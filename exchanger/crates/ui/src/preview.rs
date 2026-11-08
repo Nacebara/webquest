@@ -262,7 +262,7 @@ pub fn client(ui: &Ui) -> Vec<PreviewScreen> {
             "История",
             ui.history(
                 &history(),
-                None,
+                Some(1),
                 Some(&HistorySummary {
                     completed: 23,
                     volume: Decimal::from(2310),

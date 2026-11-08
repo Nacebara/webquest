@@ -519,10 +519,15 @@ impl Running {
 
 impl Env {
     fn start_bot(&self) -> Running {
+        self.start_bot_with(false)
+    }
+
+    /// Бот с rich-сообщениями (справочные экраны — карточками).
+    fn start_bot_with(&self, rich_messages: bool) -> Running {
         let ui = Ui::builtin(EmojiSet::plain(), UiConfig::default()).unwrap();
         let cfg = ClientBotConfig {
             poll_timeout_secs: 0,
-            rich_messages: false,
+            rich_messages,
             shutdown_grace: Duration::from_secs(5),
             check_link_step: Duration::from_millis(100),
             check_link_wait: Duration::from_secs(3),
@@ -1303,4 +1308,47 @@ async fn missing_check_link_tells_where_the_money_is(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(n, 1, "владельцу — событие с устройством сообщения");
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn plain_view_switches_back_to_the_rich_card_in_the_same_message(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot_with(true);
+    e.fake.client_writes("/terms");
+    e.fake
+        .wait_for("rich terms", |c| {
+            c.method == "sendRichMessage" && c.contains("Курс и лимиты") && c.contains("\"plain\"")
+        })
+        .await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let message = e.fake.lock().next_message;
+    e.fake.client_presses(message, "plain");
+    let plain = e
+        .fake
+        .wait_for("plain edit", |c| {
+            c.method == "editMessageText" && c.message_id() == Some(message)
+        })
+        .await;
+    assert!(plain.body["text"].is_string(), "простой вид — обычный HTML");
+    assert!(plain.contains("\"rich\"") && plain.contains("Красивый вид"));
+    assert!(
+        !plain.contains("\"plain\""),
+        "кнопки «Простой вид» больше нет"
+    );
+    e.fake.client_presses(message, "rich");
+    let rich = e
+        .fake
+        .wait_for("rich edit", |c| {
+            c.method == "editMessageText"
+                && c.message_id() == Some(message)
+                && c.body["rich_message"].is_object()
+        })
+        .await;
+    assert!(rich.contains("\"plain\""), "в карточке снова «Простой вид»");
+    bot.stop().await;
+    assert_eq!(
+        e.fake.calls_of("sendRichMessage").len() + e.fake.calls_of("sendMessage").len(),
+        1,
+        "вид меняется в том же сообщении, новых нет"
+    );
 }

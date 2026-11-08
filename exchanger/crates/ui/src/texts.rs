@@ -182,6 +182,7 @@ pub struct ButtonTexts {
     pub not_rendered: String,
     /// «Простой вид» — в «Курс и лимиты» (макет B1).
     pub plain_view: String,
+    pub rich_view: String,
     pub again: String,
     pub privacy: String,
 }

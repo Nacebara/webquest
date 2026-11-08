@@ -171,6 +171,29 @@ impl Api {
         }
     }
 
+    /// Править сообщение rich-разметкой (вернуть карточку после «Простого вида»).
+    pub(crate) async fn edit_rich(
+        &self,
+        chat: i64,
+        message_id: i32,
+        rich_html: &str,
+        keyboard: &Keyboard,
+    ) -> Result<Edited, Error> {
+        let markup = keyboard.inline().cloned();
+        match self
+            .retry("editMessageText", true, || {
+                self.bot
+                    .edit_message_rich(chat, message_id, rich_html, markup.clone())
+            })
+            .await
+        {
+            Ok(_) => Ok(Edited::Done),
+            Err(err) if err.is_not_modified() => Ok(Edited::NotModified),
+            Err(err) if err.is_message_gone() => Ok(Edited::Gone),
+            Err(err) => Err(err),
+        }
+    }
+
     /// Ответ на нажатие кнопки (убрать «часики»). Ошибка — только в лог: кнопка старая или
     /// запрос уже отвечен.
     pub(crate) async fn answer(&self, callback_id: &str) {

@@ -155,6 +155,25 @@ impl Ui {
         screen.keyboard.clone()
     }
 
+    /// Справочный экран простым видом: тот же HTML, а «Простой вид» на клавиатуре заменён на
+    /// «Красивый вид» — вернуть карточку.
+    pub fn plain_screen(&self, screen: &Screen) -> Screen {
+        let plain = Callback::PlainView.encode();
+        let mut out = screen.clone();
+        if let Keyboard::Inline(markup) = &mut out.keyboard {
+            for button in markup.inline_keyboard.iter_mut().flatten() {
+                if button.action == botapi::InlineButtonAction::CallbackData(plain.clone()) {
+                    *button = self.cb_button(
+                        Some(Emoji::RichView),
+                        &self.texts.buttons.rich_view,
+                        &Callback::RichView,
+                    );
+                }
+            }
+        }
+        out
+    }
+
     // ---- общие кусочки ------------------------------------------------------------------
 
     fn fill(&self, template: &str, args: &[(&str, &Frag)]) -> Frag {
@@ -259,7 +278,7 @@ impl Ui {
     fn claim_row(&self, check_url: &str) -> Vec<InlineKeyboardButton> {
         let b = &self.texts.buttons;
         vec![
-            self.url_button(None, &b.claim_check, check_url)
+            self.url_button(Some(Emoji::Claim), &b.claim_check, check_url)
                 .style(ButtonStyle::Success),
             self.copy_button(&b.copy_link, check_url),
         ]

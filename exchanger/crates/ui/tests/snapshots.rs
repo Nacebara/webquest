@@ -106,6 +106,14 @@ fn main_menu_commands_and_rich_keyboard() {
             "### {mode}: terms sent as rich\n{}\n\n",
             dump_keyboard(&ui.rich_keyboard(&terms))
         ));
+        // «Простой вид»: тот же экран HTML, кнопка «Красивый вид» вместо «Простой вид».
+        out.push_str(&format!(
+            "### {mode}: terms in plain view
+{}
+
+",
+            dump_keyboard(&ui.plain_screen(&terms).keyboard)
+        ));
     }
     let commands = common::plain_ui().bot_commands();
     out.push_str(&format!(

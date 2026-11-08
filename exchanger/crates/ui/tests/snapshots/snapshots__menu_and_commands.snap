@@ -11,6 +11,10 @@ expression: out
 --- keyboard: inline
 [{"callback_data":"exchange","style":"primary","text":"💱 Обменять"},{"callback_data":"plain","text":"👁 Простой вид"}]
 
+### plain: terms in plain view
+--- keyboard: inline
+[{"callback_data":"exchange","style":"primary","text":"💱 Обменять"},{"callback_data":"rich","text":"✨ Красивый вид"}]
+
 ### premium: main menu
 --- keyboard: reply {"input_field_placeholder":"Пришлите чек или счёт","is_persistent":true,"resize_keyboard":true}
 [{"icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять"},{"icon_custom_emoji_id":"5368000000000000004","style":"primary","text":"Оплатить счёт"}]
@@ -19,6 +23,10 @@ expression: out
 ### premium: terms sent as rich
 --- keyboard: inline
 [{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять"},{"callback_data":"plain","icon_custom_emoji_id":"5368000000000000024","text":"Простой вид"}]
+
+### premium: terms in plain view
+--- keyboard: inline
+[{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять"},{"callback_data":"rich","icon_custom_emoji_id":"5368000000000000035","text":"Красивый вид"}]
 
 ### setMyCommands
 [

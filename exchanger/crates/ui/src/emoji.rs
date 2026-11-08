@@ -65,10 +65,18 @@ pub enum Emoji {
     DotOk,
     DotWait,
     DotClosed,
+    /// Кнопка «Назад».
+    Back,
+    /// Кнопка заявки в «Истории».
+    Order,
+    /// Кнопка «Ещё» (следующая страница).
+    More,
+    /// Кнопка «Красивый вид» — вернуть карточку после «Простого вида».
+    RichView,
 }
 
 impl Emoji {
-    pub const ALL: [Emoji; 32] = [
+    pub const ALL: [Emoji; 36] = [
         Emoji::Wait,
         Emoji::Ok,
         Emoji::Err,
@@ -101,6 +109,10 @@ impl Emoji {
         Emoji::DotOk,
         Emoji::DotWait,
         Emoji::DotClosed,
+        Emoji::Back,
+        Emoji::Order,
+        Emoji::More,
+        Emoji::RichView,
     ];
 
     pub const fn key(self) -> &'static str {
@@ -137,6 +149,10 @@ impl Emoji {
             Emoji::DotOk => "dot_ok",
             Emoji::DotWait => "dot_wait",
             Emoji::DotClosed => "dot_closed",
+            Emoji::Back => "back",
+            Emoji::Order => "order",
+            Emoji::More => "more",
+            Emoji::RichView => "rich_view",
         }
     }
 
@@ -175,6 +191,10 @@ impl Emoji {
             Emoji::DotOk => "🟢",
             Emoji::DotWait => "🟡",
             Emoji::DotClosed => "⚪",
+            Emoji::Back => "◀️",
+            Emoji::Order => "🔖",
+            Emoji::More => "🔽",
+            Emoji::RichView => "✨",
         }
     }
 
@@ -217,6 +237,10 @@ impl Emoji {
             Emoji::DotOk => "color/dot_ok",
             Emoji::DotWait => "color/dot_wait",
             Emoji::DotClosed => "color/dot_closed",
+            Emoji::Back => "mono/back",
+            Emoji::Order => "mono/order",
+            Emoji::More => "mono/refresh",
+            Emoji::RichView => "mono/sparkle",
         }
     }
 
@@ -255,6 +279,10 @@ impl Emoji {
             Emoji::DotOk => "color/dot_ok",
             Emoji::DotWait => "color/dot_wait",
             Emoji::DotClosed => "color/dot_closed",
+            Emoji::Back => "mono/back",
+            Emoji::Order => "mono/order",
+            Emoji::More => "mono/refresh",
+            Emoji::RichView => "mono/sparkle",
         }
     }
 }
