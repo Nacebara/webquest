@@ -423,6 +423,11 @@ impl tgbot::UpdateHook for DemoHook {
                 self.preview(m.chat.id).await;
                 return true;
             }
+            if let Some(word) = text.strip_prefix("/preview ").map(str::trim) {
+                ops::preview::send_client_preview(&self.api, &self.look, m.chat.id, Some(word))
+                    .await;
+                return true;
+            }
             if text == "/start" {
                 // Приветствие покажет клиентский бот, меню проб — следом за ним.
                 let api = self.api.clone();

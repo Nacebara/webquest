@@ -98,7 +98,7 @@ fn breakdown() -> Breakdown {
     }
 }
 
-fn quote() -> InvoiceQuote {
+fn quote(expires_at: DateTime<Utc>) -> InvoiceQuote {
     InvoiceQuote {
         order: invoice_order(),
         invoice_amount: usdt(50, 0),
@@ -107,7 +107,7 @@ fn quote() -> InvoiceQuote {
         fee_pct: Decimal::new(25, 1),
         fee: usdt(125, 2),
         to_pay: usdt(5125, 2),
-        expires_at: msk(5, 14, 25),
+        expires_at,
     }
 }
 
@@ -168,12 +168,18 @@ fn card() -> OrderCard {
     }
 }
 
-/// Все экраны клиента в порядке макета.
+/// Все экраны клиента в порядке макета, на его данных (котировка счёта — в 14:10 до 14:25).
 pub fn client(ui: &Ui) -> Vec<PreviewScreen> {
+    client_at(ui, msk(5, 14, 10))
+}
+
+/// То же, но котировка счёта сделана в `now` и держится 15 минут: в Telegram живой отсчёт
+/// «через 15 минут», а не «3 дня назад».
+pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
     let t = terms();
     let o = order();
     let b = breakdown();
-    let q = quote();
+    let q = quote(quoted_at + Duration::minutes(15));
     let one = |title, screen| PreviewScreen {
         title,
         messages: vec![screen],
@@ -195,7 +201,7 @@ pub fn client(ui: &Ui) -> Vec<PreviewScreen> {
         one("Детали", ui.order_done(&o, &b, CHECK_URL, 9, true)),
         one("Курс и лимиты", ui.terms(&t)),
         one("Оплатить счёт", ui.invoice_prompt(&t)),
-        one("Счёт: к оплате", ui.invoice_quote(&q, msk(5, 14, 10))),
+        one("Счёт: к оплате", ui.invoice_quote(&q, quoted_at)),
         one(
             "Счёт: не хватает",
             ui.invoice_underpaid(&q, &usdt(50, 0), &usdt(125, 2)),

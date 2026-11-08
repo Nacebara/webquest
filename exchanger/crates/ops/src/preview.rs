@@ -11,6 +11,13 @@ use crate::Look;
 /// «Предпросмотр экранов» (CLAUDE.md п. 21): все экраны клиента по порядку макета, каждый —
 /// с подписью «N/всего · название», чтобы сверить с макетом и принять; затем экраны пульта.
 pub async fn send_preview(api: &BotApi, look: &Look, chat: i64) {
+    send_client_preview(api, look, chat, None).await;
+    send_panel_preview(api, look, chat).await;
+}
+
+/// Экраны клиента, у которых в названии есть `only` (без учёта регистра; `None` — все):
+/// «/preview счёт» в демо — только экраны счёта. Номера — как в полном предпросмотре.
+pub async fn send_client_preview(api: &BotApi, look: &Look, chat: i64, only: Option<&str>) {
     let ui = match ui::Ui::builtin(look.emoji().clone(), ui::UiConfig::default()) {
         Ok(ui) => ui,
         Err(e) => {
@@ -19,9 +26,16 @@ pub async fn send_preview(api: &BotApi, look: &Look, chat: i64) {
         }
     };
     let ui = &ui;
-    let screens = ui::preview::client(ui);
+    let screens = ui::preview::client_at(ui, chrono::Utc::now());
     let total = screens.len();
+    let only = only.map(str::to_lowercase);
     for (i, screen) in screens.iter().enumerate() {
+        if only
+            .as_deref()
+            .is_some_and(|w| !screen.title.to_lowercase().contains(w))
+        {
+            continue;
+        }
         let caption = format!("<b>{}/{total} · {}</b>", i + 1, ui::html::esc(screen.title));
         let _ = api
             .send_message(&SendMessage::html(chat, caption).silent())
@@ -55,13 +69,14 @@ pub async fn send_preview(api: &BotApi, look: &Look, chat: i64) {
             tokio::time::sleep(Duration::from_millis(350)).await;
         }
     }
-    send_panel_preview(api, look, chat).await;
-    let _ = api
-        .send_message(&SendMessage::html(
-            chat,
-            format!("<b>Готово: {total} экранов клиента и экраны пульта.</b> Пишите номер и что не так — например «7: кнопка не того цвета»."),
-        ))
-        .await;
+    if only.is_none() {
+        let _ = api
+            .send_message(&SendMessage::html(
+                chat,
+                format!("<b>Готово: {total} экранов клиента.</b> Пишите номер и что не так — например «7: кнопка не того цвета». Дальше — экраны пульта."),
+            ))
+            .await;
+    }
 }
 
 /// Экраны пульта на данных макета: главный экран в трёх состояниях, «Статистика».

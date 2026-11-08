@@ -54,6 +54,10 @@ enum Command {
         /// Сразу прислать владельцу только экраны пульта (в боте — команда /preview_panel).
         #[arg(long)]
         preview_panel: bool,
+        /// Сразу прислать владельцу экраны клиента, в названии которых есть это слово
+        /// (в боте — «/preview счёт»).
+        #[arg(long, value_name = "СЛОВО")]
+        preview_only: Vec<String>,
     },
     /// Применить миграции и выйти.
     Migrate,
@@ -236,7 +240,8 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
             Command::Demo {
                 preview,
                 preview_panel,
-            } => demo(preview, preview_panel).await,
+                preview_only,
+            } => demo(preview, preview_panel, preview_only).await,
             Command::Setup => setup(paths, bare).await,
             Command::Check => check(paths).await,
             Command::Migrate => migrate().await,
@@ -596,7 +601,7 @@ async fn spawn_bot(
 }
 
 /// `exch demo`: тот же бот и пульт, кошельки — симулятор, база — `<база>_demo`.
-async fn demo(preview: bool, preview_panel: bool) -> anyhow::Result<()> {
+async fn demo(preview: bool, preview_panel: bool, preview_only: Vec<String>) -> anyhow::Result<()> {
     let cfg = load_config()?;
     let token = cfg
         .client_bot_token
@@ -647,13 +652,16 @@ async fn demo(preview: bool, preview_panel: bool) -> anyhow::Result<()> {
         Some(&world),
     )
     .await?;
-    if preview || preview_panel {
+    if preview || preview_panel || !preview_only.is_empty() {
         let api = app::telegram::bot_api(token)?;
         let look = ops::Look::new(app::runtime::emoji_set(&pool).await);
         if preview {
             ops::preview::send_preview(&api, &look, cfg.owner_tg_id).await;
-        } else {
+        } else if preview_panel {
             ops::preview::send_panel_preview(&api, &look, cfg.owner_tg_id).await;
+        }
+        for word in &preview_only {
+            ops::preview::send_client_preview(&api, &look, cfg.owner_tg_id, Some(word)).await;
         }
     }
     wait(tasks, cancel).await
