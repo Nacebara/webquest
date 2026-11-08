@@ -409,16 +409,19 @@ fn queue_and_order_card_are_the_mockup() {
     let texts = Texts::builtin().unwrap();
     let (html, buttons) = mock_after("t: 'Очередь разбора'");
     let (look, back) = numbered(&keys_of(&html, &buttons));
-    let screen = look.screen(&ops::sample_queue().screen(&texts));
+    let screen = look.screen(&ops::sample_queue().screen(&texts, &ops::Links::default(), 0));
     check("Очередь разбора", &html, &buttons, &screen, &back);
 
     let (html, buttons) = mock_after("n: 'Ход заявки");
     let (look, back) = numbered(&keys_of(&html, &buttons));
-    let screen = look.screen(&ops::sample_order().screen(
+    // Карточка открыта из «Разбора»: внизу «‹ Разбор» и «Меню» (как в пульте).
+    let card = ops::sample_order().screen(
         &texts,
         storage::staff::Role::Owner,
         ops::sample_now(),
-    ));
+        &ops::Links::default(),
+    );
+    let screen = look.screen(&card.row(ops::nav::back(&texts, &ops::Cb::Queue)));
     // Отступление: у операции один статус — историю статусов («unknown → failed») база не
     // хранит; в карточке — «failed».
     let known = "ord-…-payoutunknown→failed";

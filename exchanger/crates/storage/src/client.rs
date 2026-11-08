@@ -287,6 +287,16 @@ pub async fn order_view_for_user(
 }
 
 /// История клиента, новые сверху: `limit` строк начиная с `offset`.
+/// Сколько всего заявок у клиента — для страниц «Истории».
+pub async fn history_count(conn: &mut PgConnection, user_id: i64) -> Result<i64, StorageError> {
+    Ok(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM orders WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_one(conn)
+            .await?,
+    )
+}
+
 pub async fn history(
     conn: &mut PgConnection,
     user_id: i64,

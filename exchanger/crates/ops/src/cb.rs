@@ -214,6 +214,12 @@ pub enum Cb {
     Thresholds,
     /// «Прибыль».
     Profit,
+    /// Страница списка («Разбор», «Заявки», «Клиенты», «Обращения», «Журнал», «Инвесторы»).
+    Page(crate::nav::List, u32),
+    /// Заявки клиента, страница.
+    UserOrders(i64, u32),
+    /// Обращение клиента — карточка с «Ответить» и «Закрыть».
+    Question(i64),
     /// Все инвесторы и движения, ждущие решения.
     Investors,
     /// «💼 Инвестиции» клиента.
@@ -345,6 +351,9 @@ impl Cb {
             Cb::Investigate(id) => format!("iq:{id}"),
             Cb::Thresholds => "th".into(),
             Cb::Profit => "pf".into(),
+            Cb::Page(list, page) => format!("pg:{}:{page}", list.code()),
+            Cb::UserOrders(id, page) => format!("uo:{id}:{page}"),
+            Cb::Question(id) => format!("qv:{id}"),
             Cb::Invest(id) => format!("iv:{id}"),
             Cb::InvestEdit(id) => format!("ivt:{id}"),
             Cb::InvestAccess(id, on) => format!("iva:{id}:{}", bit(*on)),
@@ -441,6 +450,9 @@ impl Cb {
             ["iq", _] => Cb::Investigate(id(1)?),
             ["th"] => Cb::Thresholds,
             ["pf"] => Cb::Profit,
+            ["pg", l, p] => Cb::Page(crate::nav::List::of(l)?, p.parse().ok()?),
+            ["uo", _, p] => Cb::UserOrders(id(1)?, p.parse().ok()?),
+            ["qv", _] => Cb::Question(id(1)?),
             ["iv", _] => Cb::Invest(id(1)?),
             ["ivt", _] => Cb::InvestEdit(id(1)?),
             ["iva", _, _] => Cb::InvestAccess(id(1)?, on(2)?),

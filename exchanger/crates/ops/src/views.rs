@@ -15,6 +15,7 @@ use ui::{Emoji, EmojiStyle};
 
 use crate::actions::{Action, Input};
 use crate::cb::{Cb, DecisionKind, DirField, Flag, TermField};
+use crate::nav::{self, List};
 use crate::texts::{code, esc};
 use crate::{Inner, OpsError, Screen, btn};
 
@@ -94,11 +95,11 @@ pub fn menu_screen(t: &crate::Texts, role: Role, c: &MenuCounts) -> Screen {
     };
     let mut items = vec![
         counted("menu.b_queue", c.review, Cb::Queue),
-        btn(t.t("menu.b_orders"), &Cb::OrderAsk),
+        btn(t.t("menu.b_orders"), &Cb::Page(List::Orders, 0)),
         btn(t.t("menu.b_reserves"), &Cb::Reserves),
         btn(t.t("menu.b_bots"), &Cb::Bots),
         btn(t.t("menu.b_dirs"), &Cb::Dirs),
-        btn(t.t("menu.b_users"), &Cb::UserAsk),
+        btn(t.t("menu.b_users"), &Cb::Page(List::Users, 0)),
         counted("menu.b_inbox", c.inbox, Cb::Inbox),
         btn(t.t("menu.b_broadcast"), &Cb::Broadcast),
         btn(t.t("menu.b_stats"), &Cb::Stats(7)),
@@ -138,10 +139,7 @@ impl Inner {
     }
 
     fn back(&self, to: Cb) -> Vec<botapi::InlineKeyboardButton> {
-        vec![
-            btn(self.texts.t("common.back"), &to),
-            btn(self.texts.t("common.home"), &Cb::Menu),
-        ]
+        nav::back(&self.texts, &to)
     }
 
     // -----------------------------------------------------------------------------------------
@@ -278,17 +276,22 @@ impl Inner {
             lines.push(t.f(
                 "dir.line",
                 &[
-                    ("name", &self.dir_name(d)),
+                    ("name", &self.link(&self.dir_name(d), &Cb::Dir(d))),
                     ("fee", &fee),
                     ("status", &self.availability_text(a)),
                 ],
             ));
-            s = s.row(vec![btn(self.dir_name(d), &Cb::Dir(d))]);
+            // Нет имени бота — ссылок не будет: тогда кнопки.
+            if self.bot_username().is_none() {
+                s = s.row(vec![btn(self.dir_name(d), &Cb::Dir(d))]);
+            }
         }
+        lines.push(String::new());
+        lines.push(t.t("dir.hint"));
         s.text = lines.join("\n");
         // Встречный поток — про направления и резерв: вход отсюда (в меню макета его нет).
         Ok(s.row(vec![btn(t.t("menu.promo"), &Cb::Promo)])
-            .row(vec![btn(t.t("common.home"), &Cb::Menu)]))
+            .row(nav::back(t, &Cb::Menu)))
     }
 
     pub(crate) fn tiers_text(&self, row: &DirectionRow) -> String {
@@ -642,10 +645,8 @@ impl Inner {
         for pair in switches.chunks(2) {
             s = s.row(pair.to_vec());
         }
-        Ok(s.row(vec![
-            btn(t.t("common.refresh"), &Cb::Promo),
-            btn(t.t("common.home"), &Cb::Menu),
-        ]))
+        Ok(s.row(vec![btn(t.t("nav.refresh"), &Cb::Promo)])
+            .row(nav::back(t, &Cb::Dirs)))
     }
 
     // -----------------------------------------------------------------------------------------
@@ -803,10 +804,29 @@ impl Inner {
                 ])
                 .row(vec![btn(t.t("user.b_invest"), &Cb::Invest(id))]);
         }
-        Ok(s.row(vec![
-            btn(t.t("common.refresh"), &Cb::User(id)),
-            btn(t.t("common.home"), &Cb::Menu),
-        ]))
+        // Заявки клиента: последние пять ссылками, все — по страницам.
+        let (recent, total) = self.user_recent(id).await?;
+        if total > 0 {
+            s.text.push_str(&format!(
+                "\n\n{}\n{recent}",
+                t.f("user.orders_title", &[("n", &total)])
+            ));
+            s = s.row(vec![btn(
+                t.f("user.b_orders", &[("n", &total)]),
+                &Cb::UserOrders(id, 0),
+            )]);
+        }
+        let back = staff.map_or(Cb::Page(List::Users, 0), |m| {
+            self.list_or(m.tg_user_id, Cb::Page(List::Users, 0))
+        });
+        // Из заявок самого клиента — назад в клиентов, а не по кругу.
+        let back = if matches!(back, Cb::UserOrders(u, _) if u == id) {
+            Cb::Page(List::Users, 0)
+        } else {
+            back
+        };
+        Ok(s.row(vec![btn(t.t("nav.refresh"), &Cb::User(id))])
+            .row(nav::back(t, &back)))
     }
 
     pub(crate) async fn user_terms(&self, id: i64) -> Result<Screen, OpsError> {
@@ -941,7 +961,7 @@ impl Inner {
                 ),
                 btn(t.t("settings.b_emoji"), &Cb::Emoji),
             ])
-            .row(vec![btn(t.t("common.home"), &Cb::Menu)]))
+            .row(nav::back(t, &Cb::Menu)))
     }
 
     pub(crate) fn role_title(&self, r: Emoji) -> String {
@@ -1050,10 +1070,8 @@ impl Inner {
         s.text = lines.join("\n");
         // Самопроверка аккаунтов — здесь: с главного экрана её убрал макет.
         Ok(s.row(vec![btn(t.t("dash.b_selftest"), &Cb::Selftest)])
-            .row(vec![
-                btn(t.t("common.refresh"), &Cb::Bots),
-                btn(t.t("common.home"), &Cb::Menu),
-            ]))
+            .row(vec![btn(t.t("nav.refresh"), &Cb::Bots)])
+            .row(nav::back(t, &Cb::Menu)))
     }
 
     pub(crate) async fn staff_list(&self, staff: &StaffMember) -> Result<Screen, OpsError> {
@@ -1075,23 +1093,29 @@ impl Inner {
             } else {
                 t.t("staff.off")
             };
+            // Имя — ссылка на карточку сотрудника (владельца не меняют).
+            let name = if m.role != Role::Owner && m.active() {
+                self.link(&esc(&m.display_name), &Cb::Member(m.tg_user_id))
+            } else {
+                esc(&m.display_name)
+            };
             lines.push(t.f(
                 "staff.item",
                 &[
-                    ("name", &esc(&m.display_name)),
+                    ("name", &name),
                     ("role", &self.role_name(m.role)),
                     ("id", &m.tg_user_id),
                     ("limit", &limit),
                     ("off", &off),
                 ],
             ));
-            if m.role != Role::Owner && m.active() {
+            if m.role != Role::Owner && m.active() && self.bot_username().is_none() {
                 s = s.row(vec![btn(esc(&m.display_name), &Cb::Member(m.tg_user_id))]);
             }
         }
         s.text = lines.join("\n");
         Ok(s.row(vec![btn(t.t("staff.b_add"), &Cb::StaffAdd)])
-            .row(vec![btn(t.t("common.home"), &Cb::Menu)]))
+            .row(nav::back(t, &Cb::Menu)))
     }
 
     pub(crate) async fn member(&self, staff: &StaffMember, id: i64) -> Result<Screen, OpsError> {
@@ -1126,16 +1150,31 @@ impl Inner {
         .row(self.back(Cb::Staff)))
     }
 
-    pub(crate) async fn audit(&self) -> Result<Screen, OpsError> {
+    /// «Журнал»: кто, что, когда — по [`nav::PAGE`] на странице; заявка и клиент — ссылки.
+    pub(crate) async fn audit(&self, page: u32) -> Result<Screen, OpsError> {
         let t = &self.texts;
         let mut conn = self.pool.acquire().await?;
-        let rows = storage::audit::recent(&mut conn, 20, None, None).await?;
-        let mut lines = vec![t.f("audit.title", &[("n", &rows.len())])];
-        if rows.is_empty() {
-            lines.push(t.t("audit.empty"));
-        }
-        for r in &rows {
-            let target = match (&r.target_type, &r.target_id) {
+        let total: i64 = sqlx::query_scalar("SELECT count(*) FROM admin_audit")
+            .fetch_one(&mut *conn)
+            .await?;
+        let total = usize::try_from(total).unwrap_or(0);
+        let (page, range) = nav::window(total, page);
+        let rows =
+            storage::audit::recent(&mut conn, i64::try_from(range.end).unwrap_or(0), None, None)
+                .await?;
+        let rows = rows.get(range.start..).unwrap_or(&[]);
+        let title = t.f("audit.title", &[("n", &total)]);
+        let mut lines = Vec::new();
+        for r in rows {
+            let target = match (r.target_type.as_deref(), r.target_id.as_deref()) {
+                (Some("order"), Some(id)) => match id.parse::<i64>() {
+                    Ok(n) => format!(" · {}", self.link(&format!("№{n}"), &Cb::Order(n))),
+                    Err(_) => format!(" · {}", esc(id)),
+                },
+                (Some("user"), Some(id)) => match id.parse::<i64>() {
+                    Ok(n) => format!(" · {}", self.link(&esc(id), &Cb::User(n))),
+                    Err(_) => format!(" · {}", esc(id)),
+                },
                 (Some(ty), Some(id)) => format!(" · {} {}", esc(ty), esc(id)),
                 _ => String::new(),
             };
@@ -1158,10 +1197,15 @@ impl Inner {
                 ],
             ));
         }
-        Ok(Screen::new(lines.join("\n")).row(vec![
-            btn(t.t("common.refresh"), &Cb::Audit),
-            btn(t.t("common.home"), &Cb::Menu),
-        ]))
+        let body = if lines.is_empty() {
+            t.t("audit.empty")
+        } else {
+            lines.join("\n")
+        };
+        Ok(Screen::new(format!("{title}\n\n{body}"))
+            .row(nav::pager(t, List::Audit, page, total))
+            .row(vec![btn(t.t("nav.refresh"), &Cb::Page(List::Audit, page))])
+            .row(nav::back(t, &Cb::Menu)))
     }
 
     // -----------------------------------------------------------------------------------------
@@ -1178,7 +1222,32 @@ impl Inner {
             Cb::Dirs => self.dirs().await,
             Cb::Dir(d) => self.dir_card(staff, d).await,
             Cb::Promo => self.promo().await,
-            Cb::Queue => self.queue_for(Some(staff.tg_user_id)).await,
+            Cb::Queue | Cb::Page(List::Queue, _) => {
+                let page = if let Cb::Page(_, p) = cb { p } else { 0 };
+                self.remember_list(staff.tg_user_id, Cb::Page(List::Queue, page));
+                self.queue_for(Some(staff.tg_user_id), page).await
+            }
+            Cb::Page(List::Orders, page) => {
+                self.remember_list(staff.tg_user_id, cb.clone());
+                self.orders(page).await
+            }
+            Cb::Page(List::Users, page) => {
+                self.remember_list(staff.tg_user_id, cb.clone());
+                self.users(staff, page).await
+            }
+            Cb::Page(List::Inbox, page) => self.inbox(page).await,
+            Cb::Page(List::Audit, page) => self.audit(page).await,
+            Cb::Page(List::Investors, page) => {
+                if let Some(denied) = self.deny(staff, Role::Admin) {
+                    return Ok(denied);
+                }
+                self.investors(page).await
+            }
+            Cb::UserOrders(user, page) => {
+                self.remember_list(staff.tg_user_id, cb.clone());
+                self.user_orders(user, page).await
+            }
+            Cb::Question(client) => self.question_from_store(client).await,
             Cb::Order(id) => self.order(Some(staff), id).await,
             Cb::User(id) => self.user(Some(staff), id).await,
             Cb::UserTerms(id) => self.user_terms(id).await,
@@ -1188,7 +1257,7 @@ impl Inner {
             Cb::Bots => self.bots().await,
             Cb::Staff => self.staff_list(staff).await,
             Cb::Member(id) => self.member(staff, id).await,
-            Cb::Audit => self.audit().await,
+            Cb::Audit => self.audit(0).await,
             Cb::Investors | Cb::Invest(_) | Cb::InvestMove(_) => {
                 if let Some(denied) = self.deny(staff, Role::Admin) {
                     return Ok(denied);
@@ -1196,7 +1265,7 @@ impl Inner {
                 match cb {
                     Cb::Invest(id) => self.invest_card(staff, id).await,
                     Cb::InvestMove(id) => self.invest_move(staff, id).await,
-                    _ => self.investors().await,
+                    _ => self.investors(0).await,
                 }
             }
             Cb::InvestEdit(_)
@@ -1215,16 +1284,18 @@ impl Inner {
             Cb::Investigate(id) => self.investigate(staff, id).await,
             Cb::Thresholds => self.thresholds_screen().await,
             Cb::Profit => Ok(self.profit()),
-            Cb::OrderAsk => Ok(self.prompt(staff, Input::OrderSearch, "order.ask")),
-            Cb::UserAsk => {
-                // «Клиенты»: поиск клиента; инвесторы — тоже клиенты (в меню макета их нет).
-                let s = self.prompt(staff, Input::UserSearch, "user.ask");
-                Ok(if staff.role >= Role::Admin {
-                    s.row(vec![btn(self.texts.t("menu.investors"), &Cb::Investors)])
-                } else {
-                    s
-                })
-            }
+            Cb::OrderAsk => Ok(self.prompt_to(
+                staff,
+                Input::OrderSearch,
+                "order.ask",
+                &Cb::Page(List::Orders, 0),
+            )),
+            Cb::UserAsk => Ok(self.prompt_to(
+                staff,
+                Input::UserSearch,
+                "user.ask",
+                &Cb::Page(List::Users, 0),
+            )),
             Cb::Take(id) => {
                 let mut tx = self.pool.begin().await?;
                 let target = id.to_string();

@@ -609,12 +609,32 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
             "history",
             ui.history(
                 &history_rows(),
-                Some(1),
+                &ui::HistoryPage {
+                    page: 0,
+                    pages: 2,
+                    bot: None,
+                },
                 Some(&history_summary()),
                 at(18, 0),
             ),
         ),
-        ("history_empty", ui.history(&[], None, None, at(18, 0))),
+        (
+            "history_links_page_2",
+            ui.history(
+                &history_rows(),
+                &ui::HistoryPage {
+                    page: 1,
+                    pages: 3,
+                    bot: Some("exch_bot".into()),
+                },
+                Some(&history_summary()),
+                at(18, 0),
+            ),
+        ),
+        (
+            "history_empty",
+            ui.history(&[], &ui::HistoryPage::default(), None, at(18, 0)),
+        ),
         ("order_card", ui.order_card(&card(false), at(18, 0))),
         (
             "order_card_with_check",

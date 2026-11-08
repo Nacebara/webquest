@@ -163,7 +163,7 @@ impl Inner {
     }
 
     /// Все инвесторы и движения, которые ждут решения.
-    pub(crate) async fn investors(&self) -> Result<Screen, OpsError> {
+    pub(crate) async fn investors(&self, page: u32) -> Result<Screen, OpsError> {
         let t = &self.texts;
         let mut conn = self.pool.acquire().await?;
         let totals = storage::invest::totals(&mut conn).await?;
@@ -199,28 +199,43 @@ impl Inner {
                 &Cb::InvestMove(m.id),
             )]);
         }
-        for i in list.iter().take(20) {
+        // Инвесторы — строками со ссылкой на карточку, по страницам.
+        let (page, range) = crate::nav::window(list.len(), page);
+        let mut rows = Vec::new();
+        for i in &list[range] {
             let balance = storage::invest::figures(&mut conn, i.user_id, i.lock_days)
                 .await?
                 .balance;
-            let label = t.f(
+            rows.push(t.f(
                 if i.is_active {
-                    "invest.b_investor"
+                    "invest.row_investor"
                 } else {
-                    "invest.b_investor_off"
+                    "invest.row_investor_off"
                 },
                 &[
-                    ("id", &i.user_id),
+                    (
+                        "id",
+                        &self.link(&i.user_id.to_string(), &Cb::Invest(i.user_id)),
+                    ),
                     ("share", &pct(i.share_pct)),
                     ("balance", &usdt(balance)),
                 ],
-            );
-            s = s.row(vec![btn(label, &Cb::Invest(i.user_id))]);
+            ));
         }
-        Ok(s.row(vec![
-            btn(t.t("common.refresh"), &Cb::Investors),
-            btn(t.t("common.home"), &Cb::Menu),
-        ]))
+        if !rows.is_empty() {
+            s.text.push_str(&format!("\n\n{}", rows.join("\n")));
+        }
+        Ok(s.row(crate::nav::pager(
+            t,
+            crate::nav::List::Investors,
+            page,
+            list.len(),
+        ))
+        .row(vec![btn(
+            t.t("nav.refresh"),
+            &Cb::Page(crate::nav::List::Investors, page),
+        )])
+        .row(crate::nav::back(t, &Cb::Page(crate::nav::List::Users, 0))))
     }
 
     /// Карточка «💼 Инвестиции» клиента.

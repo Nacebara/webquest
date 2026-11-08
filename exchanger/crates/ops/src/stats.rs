@@ -145,7 +145,7 @@ impl StatsData {
                 period(7, "stats.b_7"),
                 period(30, "stats.b_30"),
             ],
-            vec![btn(t.t("common.home"), &Cb::Menu)],
+            crate::nav::back(t, &Cb::Menu),
         ]);
         StatsCard {
             html,
@@ -300,6 +300,8 @@ impl Inner {
     /// Прислать карточку статистики. Картинку Telegram не принял — те же цифры текстом.
     pub(crate) async fn send_stats(&self, chat: i64, days: u8) -> Result<(), OpsError> {
         let card = self.stats_data(days).await?.card(&self.texts);
+        // Премиум-эмодзи в заголовке, разделах и на кнопках — как во всём пульте.
+        let card = self.look().stats(card);
         let sent = match card.chart.png() {
             Ok(png) => self
                 .api
@@ -341,7 +343,8 @@ mod tests {
     fn sample_card_is_the_mockup() {
         let card = sample_card().unwrap();
         assert!(
-            card.html.starts_with("<h3>📊 7 дней · 29 окт – 4 ноя</h3>"),
+            card.html
+                .starts_with("<h3>{e:chart} 7 дней · 29 окт – 4 ноя</h3>"),
             "{}",
             card.html
         );

@@ -28,7 +28,9 @@ pub mod chart;
 mod dash;
 mod inbox;
 mod invest;
+mod lists;
 mod look;
+pub mod nav;
 pub mod preview;
 mod reserves;
 mod review;
@@ -52,6 +54,7 @@ use tokio_util::sync::CancellationToken;
 pub use cb::Cb;
 pub use dash::{DashData, sample_dash};
 pub use look::Look;
+pub use nav::Links;
 pub use reserves::{ReservesData, sample_reserves};
 pub use review::{OrderView, QueueData, QueueRow, sample_now, sample_order, sample_queue};
 pub use texts::Texts;
@@ -179,6 +182,10 @@ pub(crate) struct State {
     pending: HashMap<String, Pending>,
     /// Сообщения событий у персонала: id события → (чат, сообщение).
     delivered: HashMap<i64, Vec<(i64, i32)>>,
+    /// Окно пульта в чате: последнее сообщение экрана (туда открываются ссылки из таблиц).
+    windows: HashMap<i64, i32>,
+    /// Последний открытый список сотрудника — куда ведёт «‹ Назад» из карточки.
+    last_list: HashMap<i64, Cb>,
 }
 
 /// Пульт. Дешёвый `Clone`.
@@ -206,6 +213,8 @@ pub(crate) struct Inner {
     look: std::sync::RwLock<(Arc<Look>, String)>,
     /// Когда пульт запущен («Система»: «работает 3 дн»).
     started: Instant,
+    /// Имя бота для ссылок-переходов в таблицах.
+    bot_username: std::sync::OnceLock<String>,
 }
 
 impl OpsBot {
@@ -226,6 +235,7 @@ impl OpsBot {
                 state: Mutex::new(State::default()),
                 look: std::sync::RwLock::new((Arc::new(Look::plain()), String::new())),
                 started: Instant::now(),
+                bot_username: std::sync::OnceLock::new(),
             }),
         })
     }
@@ -298,6 +308,14 @@ impl Inner {
     }
 
     async fn startup(&self) -> Result<(), OpsError> {
+        match self.api.get_me().await {
+            Ok(me) => {
+                if let Some(name) = me.username {
+                    let _ = self.bot_username.set(name);
+                }
+            }
+            Err(e) => tracing::warn!(error = %e, "ops: getMe failed, table rows will not be links"),
+        }
         if let Some(owner) = self.cfg.owner_id {
             let mut conn = self.pool.acquire().await?;
             let o = storage::staff::ensure_owner(&mut conn, owner, "Владелец").await?;
@@ -373,13 +391,8 @@ impl Inner {
                 return Ok(true);
             };
             let chat = message.chat.id;
-            let dash = cb == Cb::Dash;
-            if let Some(screen) = self.on_callback(&staff, chat, message, cb).await? {
-                self.edit(chat, message.message_id, &screen).await?;
-                if dash {
-                    self.remember_dash(chat, message.message_id).await?;
-                }
-            }
+            self.open(&staff, chat, message.message_id, message, cb)
+                .await?;
             return Ok(true);
         }
         let Some(message) = &update.message else {
@@ -398,6 +411,26 @@ impl Inner {
         let command = text
             .strip_prefix('/')
             .map(|c| c.split([' ', '@']).next().unwrap_or(c));
+        // Нажатая строка таблицы: «/start a__…» — открыть экран в окне пульта.
+        if command == Some("start")
+            && let Some(cb) = text
+                .split_whitespace()
+                .nth(1)
+                .and_then(crate::nav::parse_payload)
+        {
+            let chat = message.chat.id;
+            // Служебное «/start» сотрудника — убрать, чтобы не засоряло чат.
+            let _ = self.api.delete_message(chat, message.message_id).await;
+            match self.window_of(chat) {
+                Some(window) => self.open(&staff, chat, window, message, cb).await?,
+                None => {
+                    if let Some(screen) = self.on_callback(&staff, chat, message, cb).await? {
+                        self.send(chat, &screen).await?;
+                    }
+                }
+            }
+            return Ok(true);
+        }
         let ours = match command {
             Some(name) => Self::COMMANDS.contains(&name),
             None => text == self.texts.t("menu.open") || self.has_awaiting(staff.tg_user_id),
@@ -415,6 +448,28 @@ impl Inner {
         Ok(true)
     }
 
+    /// Открыть экран по кнопке или ссылке в сообщении `message_id`: та же правка окна, а
+    /// главный экран, которое окно перестало показывать, больше не обновляется.
+    async fn open(
+        self: &Arc<Self>,
+        staff: &StaffMember,
+        chat: i64,
+        message_id: i32,
+        message: &Message,
+        cb: Cb,
+    ) -> Result<(), OpsError> {
+        let dash = cb == Cb::Dash;
+        if let Some(screen) = self.on_callback(staff, chat, message, cb).await? {
+            self.edit(chat, message_id, &screen).await?;
+            if dash {
+                self.remember_dash(chat, message_id).await?;
+            } else {
+                self.forget_dash(chat, message_id).await?;
+            }
+        }
+        Ok(())
+    }
+
     /// Отправить экран: карточку — `sendRichMessage` (Telegram отказал — обычным HTML).
     pub(crate) async fn send(&self, chat: i64, screen: &Screen) -> Result<Message, OpsError> {
         let screen = self.look().screen(screen);
@@ -422,7 +477,10 @@ impl Inner {
             let mut request = botapi::SendRichMessage::new(chat, rich.clone());
             request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
             match self.api.send_rich_message(&request).await {
-                Ok(m) => return Ok(m),
+                Ok(m) => {
+                    self.set_window(chat, m.message_id);
+                    return Ok(m);
+                }
                 Err(e) if e.is_rejection() => {
                     tracing::info!(error = %e, "ops card rejected, sending plain HTML");
                 }
@@ -431,7 +489,9 @@ impl Inner {
         }
         let mut request = SendMessage::html(chat, screen.text.clone());
         request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
-        Ok(self.api.send_message(&request).await?)
+        let m = self.api.send_message(&request).await?;
+        self.set_window(chat, m.message_id);
+        Ok(m)
     }
 
     /// Править экран на месте (карточка ⇄ обычный HTML — тоже правкой); не вышло (старое
@@ -449,7 +509,10 @@ impl Inner {
                 .edit_message_rich(chat, message_id, rich.clone(), look.markup())
                 .await
             {
-                Ok(_) => return Ok(()),
+                Ok(_) => {
+                    self.set_window(chat, message_id);
+                    return Ok(());
+                }
                 Err(e) if e.is_not_modified() => return Ok(()),
                 Err(e) if e.is_message_gone() => {
                     self.send(chat, screen).await?;
@@ -464,7 +527,10 @@ impl Inner {
         let mut request = EditMessageText::html(chat, message_id, look.text.clone());
         request.reply_markup = look.markup();
         match self.api.edit_message_text(&request).await {
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                self.set_window(chat, message_id);
+                Ok(())
+            }
             Err(e) if e.is_not_modified() => Ok(()),
             Err(e) if e.is_rejection() || e.is_message_gone() => {
                 self.send(chat, screen).await?;
@@ -561,13 +627,13 @@ impl Inner {
                 "dash" | "admin" | "panel" => self.dash().await,
                 "menu" => self.menu(staff).await,
                 "system" => self.system().await,
-                "queue" => self.queue_for(Some(staff.tg_user_id)).await,
+                "queue" => self.queue_for(Some(staff.tg_user_id), 0).await,
                 "dir" => self.dirs().await,
                 "promo" => self.promo().await,
                 "settings" => self.settings().await,
                 "bots" => self.bots().await,
                 "staff" => self.staff_list(staff).await,
-                "audit" => self.audit().await,
+                "audit" => self.audit(0).await,
                 "order" | "find" if !arg.is_empty() => self.find_order(arg).await,
                 "order" | "find" => Ok(self.prompt(staff, Input::OrderSearch, "order.ask")),
                 "user" if !arg.is_empty() => self.find_user(arg).await,
@@ -589,6 +655,19 @@ impl Inner {
             .row(vec![btn(t.t("common.cancel"), &Cb::Cancel)])
     }
 
+    /// Вопрос с возвратом: «‹ Заявки» и «Меню» вместо «Отмена»; уйти можно любой кнопкой.
+    pub(crate) fn prompt_to(
+        &self,
+        staff: &StaffMember,
+        input: Input,
+        key: &str,
+        back: &Cb,
+    ) -> Screen {
+        self.ask(staff.tg_user_id, input);
+        let t = &self.texts;
+        Screen::new(format!("{}\n\n{}", t.t(key), t.t("common.input_hint"))).row(nav::back(t, back))
+    }
+
     pub(crate) fn prompt_with(&self, staff: &StaffMember, input: Input, text: String) -> Screen {
         self.ask(staff.tg_user_id, input);
         let t = &self.texts;
@@ -603,6 +682,8 @@ impl Inner {
         _message: &Message,
         cb: Cb,
     ) -> Result<Option<Screen>, OpsError> {
+        // Ушли с вопроса любой кнопкой — вопрос отменён (экран вопроса задаст новый).
+        self.clear_awaiting(staff.tg_user_id);
         let screen = match cb {
             Cb::Stats(days) => {
                 self.send_stats(chat, days).await?;
@@ -620,7 +701,7 @@ impl Inner {
                 self.ack(staff, id).await?;
                 return Ok(None);
             }
-            Cb::Inbox => self.inbox().await?,
+            Cb::Inbox => self.inbox(0).await?,
             Cb::SupportClose(client) => self.support_close(staff, client).await?,
             Cb::System => self.system().await?,
             Cb::Broadcast => self.broadcast(),

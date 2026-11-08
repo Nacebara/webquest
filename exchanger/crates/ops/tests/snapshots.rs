@@ -71,15 +71,17 @@ fn reserves_and_shortfall() {
 #[test]
 fn queue_and_order_card() {
     let t = Texts::builtin().unwrap();
-    let queue = Look::plain().screen(&ops::sample_queue().screen(&t));
+    let links = ops::Links::new(Some("exch_bot".into()));
+    let queue = Look::plain().screen(&ops::sample_queue().screen(&t, &links, 0));
     insta::assert_snapshot!("queue", dump(&queue));
-    let empty = Look::plain().screen(&ops::QueueData::default().screen(&t));
+    let empty = Look::plain().screen(&ops::QueueData::default().screen(&t, &links, 0));
     insta::assert_snapshot!("queue_empty", dump(&empty));
     for (role, name) in [
         (storage::staff::Role::Owner, "order_card_owner"),
         (storage::staff::Role::Operator, "order_card_operator"),
     ] {
-        let card = Look::plain().screen(&ops::sample_order().screen(&t, role, ops::sample_now()));
+        let card =
+            Look::plain().screen(&ops::sample_order().screen(&t, role, ops::sample_now(), &links));
         insta::assert_snapshot!(name, dump(&card));
     }
 }

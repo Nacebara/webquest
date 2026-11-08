@@ -183,6 +183,9 @@ pub struct ButtonTexts {
     /// «Простой вид» — в «Курс и лимиты» (макет B1).
     pub plain_view: String,
     pub rich_view: String,
+    pub prev: String,
+    pub next: String,
+    pub page: String,
     pub again: String,
     pub privacy: String,
 }

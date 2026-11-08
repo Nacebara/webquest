@@ -1,7 +1,7 @@
 //! Справочные экраны: приветствие, курс и лимиты, выбор направления, инструкции, история,
 //! карточка заявки, помощь, конфиденциальность, поддержка.
 
-use botapi::ButtonStyle;
+use botapi::{ButtonStyle, InlineKeyboardButton};
 use chrono::{DateTime, Utc};
 use domain::fsm::OrderState;
 use domain::{Decimal, Direction, Flow};
@@ -11,10 +11,10 @@ use crate::callback::{Callback, order_id_ok};
 use crate::doc::{Doc, Row, Table};
 use crate::emoji::Emoji;
 use crate::fmt::{self, TimeFormat};
-use crate::html::{Frag, clip};
+use crate::html::{Frag, clip, fill_text};
 use crate::model::{
-    DirectionStatus, DirectionTerms, HistoryRow, HistorySummary, OrderCard, PauseReason, Terms,
-    UiError,
+    DirectionStatus, DirectionTerms, HistoryPage, HistoryRow, HistorySummary, OrderCard,
+    PauseReason, Terms, UiError,
 };
 use crate::screen::{Keyboard, Screen};
 
@@ -554,15 +554,31 @@ impl Ui {
     pub fn history(
         &self,
         rows: &[HistoryRow],
-        next_page: Option<u32>,
+        nav: &HistoryPage,
         summary: Option<&HistorySummary>,
         now: DateTime<Utc>,
     ) -> Screen {
         let t = &self.texts.history;
         let b = &self.texts.buttons;
-        let more = next_page.map(|page| {
-            vec![self.cb_button(Some(Emoji::More), &b.more, &Callback::History { page })]
+        // Страницы: «‹ Назад · 2 / 5 · Дальше ›» (решение владельца 8 ноября 2026).
+        let pager = (nav.pages > 1).then(|| {
+            let mut row = Vec::new();
+            if nav.page > 0 {
+                row.push(self.cb_button(None, &b.prev, &Callback::History { page: nav.page - 1 }));
+            }
+            row.push(InlineKeyboardButton::disabled(fill_text(
+                &b.page,
+                &[
+                    ("n", &(nav.page + 1).to_string()),
+                    ("of", &nav.pages.to_string()),
+                ],
+            )));
+            if nav.page + 1 < nav.pages {
+                row.push(self.cb_button(None, &b.next, &Callback::History { page: nav.page + 1 }));
+            }
+            row
         });
+        let more = pager;
         if rows.is_empty() {
             let keyboard = Keyboard::inline_rows(more.into_iter().collect());
             return self.plain(self.fill(&t.empty, &[]), keyboard);
@@ -583,7 +599,16 @@ impl Ui {
             .zip(&labels)
             .map(|(r, when)| {
                 let dot = self.emoji.frag(history_dot(r.state));
-                let when = Frag::text(when);
+                // «Когда» — ссылка на карточку заявки (как в гаранте: строка таблицы нажимается).
+                let when = match nav.bot.as_deref().filter(|_| order_id_ok(&r.order)) {
+                    Some(bot) => Frag::trusted(&format!(
+                        "<a href=\"https://t.me/{}?start=ord_{}\">{}</a>",
+                        crate::html::esc(bot),
+                        r.order,
+                        crate::html::esc(when)
+                    )),
+                    None => Frag::text(when),
+                };
                 let what = Frag::text(match r.direction {
                     Direction::CbToXrCheck => &t.dir_cb_to_xr,
                     Direction::XrToCbCheck => &t.dir_xr_to_cb,
@@ -639,12 +664,12 @@ impl Ui {
             ));
         }
 
-        // Тап — карточка заявки (макет: кнопки с «Когда»). Одинаковые подписи («вчера» дважды)
-        // различаем итогом. Номер — только корректный: длинные данные Telegram отвергнет.
+        // Тап — карточка заявки. Есть имя бота — «Когда» в строке уже ссылка, кнопки не нужны;
+        // нет — кнопки с «Когда» (одинаковые подписи различаем итогом).
         let buttons: Vec<_> = rows
             .iter()
             .zip(&labels)
-            .filter(|(r, _)| order_id_ok(&r.order))
+            .filter(|(r, _)| order_id_ok(&r.order) && nav.bot.is_none())
             .map(|(r, when)| {
                 let repeated = labels.iter().filter(|l| *l == when).count() > 1;
                 let label = if repeated {

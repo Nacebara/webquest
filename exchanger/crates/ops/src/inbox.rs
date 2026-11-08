@@ -10,6 +10,7 @@ use sqlx::PgConnection;
 use storage::alerts::{AlertRow, Level, NewAlert, Topic};
 use storage::staff::StaffMember;
 
+use crate::nav::{self, List};
 use crate::texts::esc;
 use crate::{Cb, Inner, OpsError, Screen, btn};
 
@@ -137,8 +138,9 @@ impl Inner {
             .row(vec![btn(t.t("support.b_close"), &Cb::SupportClose(client))]))
     }
 
-    /// «Обращения»: кто ждёт ответа, что спросил, сколько ждёт.
-    pub(crate) async fn inbox(&self) -> Result<Screen, OpsError> {
+    /// «Обращения»: кто ждёт ответа, что спросил, сколько ждёт; клиент — ссылка на карточку
+    /// обращения («Ответить», «Заявка», «Закрыть»). По [`nav::PAGE`] на странице.
+    pub(crate) async fn inbox(&self, page: u32) -> Result<Screen, OpsError> {
         let t = &self.texts;
         let list = {
             let mut conn = self.pool.acquire().await?;
@@ -155,8 +157,11 @@ impl Inner {
                 t.t("support.inbox_empty_title"),
                 t.t("support.inbox_empty")
             );
-            return Ok(Screen::card(rich, plain).row(vec![btn(t.t("common.home"), &Cb::Menu)]));
+            return Ok(Screen::card(rich, plain)
+                .row(vec![btn(t.t("nav.refresh"), &Cb::Inbox)])
+                .row(nav::back(t, &Cb::Menu)));
         }
+        let (page, range) = nav::window(list.len(), page);
         let title = t.f("support.inbox_title", &[("n", &list.len())]);
         let mut rich = format!(
             "<h3>{title}</h3><table striped compact><tr><th>{}</th><th>{}</th><th align=\"right\">{}</th></tr>",
@@ -165,8 +170,7 @@ impl Inner {
             t.t("support.c_wait"),
         );
         let mut lines = Vec::new();
-        let mut s = Screen::default();
-        for a in list.iter().take(10) {
+        for a in &list[range] {
             let client = a.payload["client"].as_i64().unwrap_or_default();
             let text: String = a.payload["text"]
                 .as_str()
@@ -175,38 +179,53 @@ impl Inner {
                 .take(40)
                 .collect();
             let wait = age((Utc::now() - a.first_at).num_minutes(), t);
+            let who = self.link(&client.to_string(), &Cb::Question(client));
             rich.push_str(&format!(
-                "<tr><td><code>{client}</code></td><td>{}</td><td align=\"right\">{wait}</td></tr>",
+                "<tr><td>{who}</td><td>{}</td><td align=\"right\">{wait}</td></tr>",
                 esc(&text)
             ));
             lines.push(t.f(
                 "support.inbox_plain",
-                &[
-                    ("client", &format!("<code>{client}</code>")),
-                    ("text", &esc(&text)),
-                    ("wait", &wait),
-                ],
+                &[("client", &who), ("text", &esc(&text)), ("wait", &wait)],
             ));
-            s = s.row(vec![
-                btn(
-                    t.f("support.b_reply_to", &[("client", &client)]),
-                    &Cb::SupportReply(client),
-                )
-                .style(botapi::ButtonStyle::Primary),
-                btn(t.t("support.b_close"), &Cb::SupportClose(client)),
-            ]);
         }
-        rich.push_str("</table>");
+        rich.push_str(&format!(
+            "</table><footer>{}</footer>",
+            t.t("support.inbox_hint")
+        ));
         let plain = format!(
-            "<b>{title}</b>\n<blockquote>{}</blockquote>",
-            lines.join("\n")
+            "<b>{title}</b>\n<blockquote>{}</blockquote>\n<i>{}</i>",
+            lines.join("\n"),
+            t.t("support.inbox_hint")
         );
-        s.text = plain;
-        s.rich = Some(rich);
-        Ok(s.row(vec![
-            btn(t.t("common.refresh"), &Cb::Inbox),
-            btn(t.t("common.home"), &Cb::Menu),
-        ]))
+        Ok(Screen::card(rich, plain)
+            .row(nav::pager(t, List::Inbox, page, list.len()))
+            .row(vec![btn(t.t("nav.refresh"), &Cb::Page(List::Inbox, page))])
+            .row(nav::back(t, &Cb::Menu)))
+    }
+
+    /// Карточка обращения из хранилища (нажали строку в «Обращениях»).
+    pub(crate) async fn question_from_store(&self, client: i64) -> Result<Screen, OpsError> {
+        let a = {
+            let mut conn = self.pool.acquire().await?;
+            storage::alerts::open_by_key(&mut conn, &key(client)).await?
+        };
+        let Some(a) = a else {
+            return Ok(self
+                .inbox(0)
+                .await?
+                .notice(&self.texts.t("support.already_closed")));
+        };
+        let p = &a.payload;
+        let card = self
+            .question_card(
+                client,
+                p["username"].as_str(),
+                p["text"].as_str().unwrap_or_default(),
+                p["order"].as_str(),
+            )
+            .await?;
+        Ok(card.row(nav::back(&self.texts, &Cb::Inbox)))
     }
 
     /// «Закрыть» обращение без ответа.
@@ -216,7 +235,7 @@ impl Inner {
         client: i64,
     ) -> Result<Screen, OpsError> {
         self.close_question(client, staff.tg_user_id).await?;
-        Ok(self.inbox().await?.notice(
+        Ok(self.inbox(0).await?.notice(
             &self
                 .texts
                 .f("support.closed", &[("name", &esc(&staff.display_name))]),
@@ -330,10 +349,8 @@ impl Inner {
         Ok(Screen::card(rich, plain)
             .row(vec![btn(t.t("system.b_selftest"), &Cb::Selftest)])
             .row(vec![btn(t.t("system.b_preview"), &Cb::Preview)])
-            .row(vec![
-                btn(t.t("common.refresh"), &Cb::System),
-                btn(t.t("common.home"), &Cb::Menu),
-            ]))
+            .row(vec![btn(t.t("nav.refresh"), &Cb::System)])
+            .row(nav::back(t, &Cb::Menu)))
     }
 
     /// Состояние аккаунта юзербота словами.
@@ -359,6 +376,6 @@ impl Inner {
             t.t("broadcast.title"),
             t.t("broadcast.soon")
         );
-        Screen::card(rich, plain).row(vec![btn(t.t("common.home"), &Cb::Menu)])
+        Screen::card(rich, plain).row(nav::back(t, &Cb::Menu))
     }
 }

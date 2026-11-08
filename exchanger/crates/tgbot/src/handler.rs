@@ -214,21 +214,34 @@ impl Inner {
         Ok(())
     }
 
-    async fn history(&self, chat: i64, user: i64, page: u32) -> Result<(), TgBotError> {
+    /// «История» по страницам (по [`HISTORY_PAGE`]); `edit` — листание кнопкой: та же
+    /// карточка правится на месте, а не приходит новым сообщением.
+    async fn history_page(
+        &self,
+        chat: i64,
+        user: i64,
+        page: u32,
+        edit: Option<&Message>,
+    ) -> Result<(), TgBotError> {
+        let total = {
+            let mut conn = self.pool.acquire().await?;
+            storage::client::history_count(&mut conn, user).await?
+        };
+        let pages =
+            u32::try_from(((total + HISTORY_PAGE - 1) / HISTORY_PAGE).max(1)).unwrap_or(u32::MAX);
+        let page = page.min(pages - 1);
         let entries = {
             let mut conn = self.pool.acquire().await?;
             storage::client::history(
                 &mut conn,
                 user,
-                HISTORY_PAGE + 1,
+                HISTORY_PAGE,
                 i64::from(page) * HISTORY_PAGE,
             )
             .await?
         };
-        let more = usize::try_from(HISTORY_PAGE).is_ok_and(|n| entries.len() > n);
         let rows: Vec<HistoryRow> = entries
             .into_iter()
-            .take(usize::try_from(HISTORY_PAGE).unwrap_or(10))
             .map(|e| HistoryRow {
                 order: e.public_id,
                 created_at: e.created_at,
@@ -241,7 +254,6 @@ impl Inner {
                 state: e.state,
             })
             .collect();
-        let next = more.then(|| page.saturating_add(1));
         let summary = {
             let mut conn = self.pool.acquire().await?;
             storage::client::history_totals(&mut conn, user).await?
@@ -250,10 +262,38 @@ impl Inner {
             completed: summary.completed,
             volume: summary.volume,
         };
+        let nav = ui::HistoryPage {
+            page,
+            pages,
+            bot: self.bot_username().map(str::to_owned),
+        };
         let screen = self
             .ui()
-            .history(&rows, next, Some(&summary), chrono::Utc::now());
+            .history(&rows, &nav, Some(&summary), chrono::Utc::now());
+        if let (Some(message), Some(rich)) = (edit, screen.rich_html.as_deref())
+            && !self.prefers_plain(user)
+        {
+            match self
+                .api
+                .edit_rich(chat, message.message_id, rich, &screen.keyboard)
+                .await
+            {
+                Ok(crate::api::Edited::Done | crate::api::Edited::NotModified) => {
+                    self.remember_rich(chat, message.message_id, &screen);
+                    return Ok(());
+                }
+                Ok(crate::api::Edited::Gone) => {}
+                Err(e) if e.is_rejection() => {
+                    tracing::debug!(error = %e, "history page cannot be edited, sending anew");
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
         self.reply_doc(chat, user, &screen).await
+    }
+
+    async fn history(&self, chat: i64, user: i64, page: u32) -> Result<(), TgBotError> {
+        self.history_page(chat, user, page, None).await
     }
 
     async fn order_card(&self, chat: i64, user: i64, public_id: &str) -> Result<(), TgBotError> {
@@ -410,6 +450,18 @@ async fn message_update(
 
     if let Some(command) = Command::parse(text, inner.bot_username()) {
         // Диплинк `t.me/<бот>?start=CQ…` — это чек.
+        // Нажали время в «Истории»: «/start ord_<номер>» — карточка заявки; служебное
+        // «/start» клиента убираем, чтобы не засоряло чат.
+        if let Command::Start(Some(payload)) = &command
+            && let Some(public) = payload.strip_prefix("ord_")
+        {
+            let _ = inner
+                .api
+                .bot()
+                .delete_message(chat, message.message_id)
+                .await;
+            return inner.order_card(chat, from.id, public).await;
+        }
         if let Command::Start(Some(payload)) = &command
             && let Some(found) = parse_bare_code(payload)
         {
@@ -515,7 +567,7 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
         Callback::PayInvoice => inner.menu(chat, user, MenuAction::PayInvoice).await,
         Callback::Terms => inner.menu(chat, user, MenuAction::Rates).await,
         Callback::Privacy => inner.command(chat, user, Command::Privacy).await,
-        Callback::History { page } => inner.history(chat, user, page).await,
+        Callback::History { page } => inner.history_page(chat, user, page, message).await,
         Callback::Order(id) => inner.order_card(chat, user, &id).await,
         Callback::Details(id) | Callback::HideDetails(id) => {
             let open = matches!(action, Callback::Details(_));

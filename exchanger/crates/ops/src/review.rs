@@ -13,6 +13,7 @@ use storage::staff::{Role, StaffMember};
 
 use crate::cb::DecisionKind;
 use crate::dash::amount;
+use crate::nav::{self, Links, List};
 use crate::reserves::short;
 use crate::texts::{Texts, code, esc};
 use crate::{Cb, Inner, OpsError, Screen, btn};
@@ -46,12 +47,6 @@ fn age(t: &Texts, minutes: i64) -> String {
     }
 }
 
-/// «K7M2…» — номер на кнопке.
-fn short_id(public: &str) -> String {
-    let head: String = public.chars().take(4).collect();
-    format!("{head}…")
-}
-
 /// Причина коротко: до 32 символов.
 fn brief(reason: &str) -> String {
     let chars: Vec<char> = reason.chars().collect();
@@ -64,7 +59,9 @@ fn brief(reason: &str) -> String {
 }
 
 impl QueueData {
-    pub fn screen(&self, t: &Texts) -> Screen {
+    /// Очередь, страница `page`: номер заявки — ссылка на карточку (решение владельца
+    /// 8 ноября: нажимать по номеру в таблице, а не кнопками; «Взять» — в карточке).
+    pub fn screen(&self, t: &Texts, links: &Links, page: u32) -> Screen {
         let n = self.items.len() + self.invoices.len();
         if n == 0 {
             let title = t.t("queue.title_empty");
@@ -72,8 +69,10 @@ impl QueueData {
                 format!("<h3>{title}</h3><p>{}</p>", t.t("queue.empty")),
                 format!("<b>{title}</b>\n{}", t.t("queue.empty")),
             )
-            .row(vec![btn(t.t("queue.b_refresh"), &Cb::Queue)]);
+            .row(vec![btn(t.t("queue.b_refresh"), &Cb::Queue)])
+            .row(nav::back(t, &Cb::Menu));
         }
+        let (page, range) = nav::window(self.items.len(), page);
         let title = t.f("queue.title", &[("n", &self.items.len())]);
         let table = |rows: &[QueueRow], head: bool| {
             let mut html = String::from("<table striped compact>");
@@ -88,24 +87,20 @@ impl QueueData {
             let mut plain = Vec::new();
             for r in rows {
                 let what = match &r.taken_by {
-                    Some(name) => format!("{} · {}", esc(&r.what), esc(name)),
+                    Some(name) => format!("{} · {{m:take}} {}", esc(&r.what), esc(name)),
                     None => esc(&r.what),
                 };
+                let num = links.link(&esc(&r.public_id), &Cb::Order(r.id));
                 html.push_str(&format!(
-                    "<tr><td>{}</td><td>{what}</td><td align=\"right\">{}</td></tr>",
-                    code(&r.public_id),
+                    "<tr><td>{num}</td><td>{what}</td><td align=\"right\">{}</td></tr>",
                     age(t, r.minutes)
                 ));
-                plain.push(format!(
-                    "{} — {what} · {}",
-                    code(&r.public_id),
-                    age(t, r.minutes)
-                ));
+                plain.push(format!("{num} — {what} · {}", age(t, r.minutes)));
             }
             html.push_str("</table>");
             (html, plain.join("\n"))
         };
-        let (items_html, items_plain) = table(&self.items, true);
+        let (items_html, items_plain) = table(&self.items[range], true);
         let mut rich = format!("<h3>{title}</h3>{items_html}");
         let mut plain = format!("<b>{title}</b>\n<blockquote>{items_plain}</blockquote>");
         if !self.invoices.is_empty() {
@@ -114,43 +109,15 @@ impl QueueData {
             rich.push_str(&format!("<h4>{sub}</h4>{html}"));
             plain.push_str(&format!("\n<b>{sub}</b>\n<blockquote>{text}</blockquote>"));
         }
-        let mut s = Screen::card(rich, plain);
-        let buttons: Vec<_> = self
-            .items
-            .iter()
-            .enumerate()
-            .map(|(i, r)| match &r.taken_by {
-                // Взята другим — только открыть; своя или ничья — взять.
-                Some(name) if !r.mine => btn(
-                    t.f(
-                        "queue.b_taken",
-                        &[("id", &short_id(&r.public_id)), ("name", &esc(name))],
-                    ),
-                    &Cb::Order(r.id),
-                ),
-                _ => {
-                    let b = btn(
-                        t.f("queue.b_take", &[("id", &short_id(&r.public_id))]),
-                        &Cb::Take(r.id),
-                    );
-                    if i == 0 {
-                        b.style(botapi::ButtonStyle::Primary)
-                    } else {
-                        b
-                    }
-                }
-            })
-            .collect();
-        for pair in buttons.chunks(2) {
-            s = s.row(pair.to_vec());
-        }
-        for r in &self.invoices {
-            s = s.row(vec![btn(
-                t.f("queue.b_pay", &[("id", &short_id(&r.public_id))]),
-                &Cb::Order(r.id),
-            )]);
-        }
-        s.row(vec![btn(t.t("queue.b_refresh"), &Cb::Queue)])
+        rich.push_str(&format!("<footer>{}</footer>", t.t("queue.hint")));
+        plain.push_str(&format!("\n<i>{}</i>", t.t("queue.hint")));
+        Screen::card(rich, plain)
+            .row(nav::pager(t, List::Queue, page, self.items.len()))
+            .row(vec![btn(
+                t.t("queue.b_refresh"),
+                &Cb::Page(List::Queue, page),
+            )])
+            .row(nav::back(t, &Cb::Menu))
     }
 }
 
@@ -204,7 +171,7 @@ fn capitalized(s: &str) -> String {
 
 impl OrderView {
     /// Карточка для роли `role`; `now` — для возраста.
-    pub fn screen(&self, t: &Texts, role: Role, now: DateTime<Utc>) -> Screen {
+    pub fn screen(&self, t: &Texts, role: Role, now: DateTime<Utc>, links: &Links) -> Screen {
         let c = &self.card;
         let state_name = |s: &str| t.t(&format!("states.{s}"));
         let since = c.transitions.last().map_or(c.created_at, |s| s.at);
@@ -228,9 +195,8 @@ impl OrderView {
         let mut rows: Vec<(String, String)> = vec![(
             t.t("order.r_client"),
             format!(
-                "<a href=\"tg://user?id={}\">{}</a> · {} {}",
-                c.user_id,
-                c.user_id,
+                "{} · {} {}",
+                links.link(&c.user_id.to_string(), &Cb::User(c.user_id)),
                 self.completed,
                 ui::fmt::plural(self.completed, ["обмен", "обмена", "обменов"])
             ),
@@ -592,8 +558,15 @@ impl Inner {
         })
     }
 
-    pub(crate) async fn queue_for(&self, viewer: Option<i64>) -> Result<Screen, OpsError> {
-        Ok(self.queue_data(viewer).await?.screen(&self.texts))
+    pub(crate) async fn queue_for(
+        &self,
+        viewer: Option<i64>,
+        page: u32,
+    ) -> Result<Screen, OpsError> {
+        Ok(self
+            .queue_data(viewer)
+            .await?
+            .screen(&self.texts, &self.links(), page))
     }
 
     /// Данные карточки заявки из базы.
@@ -664,7 +637,18 @@ impl Inner {
     ) -> Result<Screen, OpsError> {
         let t = &self.texts;
         match self.order_view(id).await? {
-            Some(v) => Ok(v.screen(t, staff.map_or(Role::Operator, |m| m.role), Utc::now())),
+            Some(v) => {
+                let role = staff.map_or(Role::Operator, |m| m.role);
+                let screen = v.screen(t, role, Utc::now(), &self.links());
+                // «‹ Назад» — в список, откуда открыли; иначе — в разбор или «Заявки».
+                let default = if v.card.state == OrderState::ManualReview {
+                    Cb::Queue
+                } else {
+                    Cb::Page(List::Orders, 0)
+                };
+                let back = staff.map_or(default.clone(), |m| self.list_or(m.tg_user_id, default));
+                Ok(screen.row(nav::back(t, &back)))
+            }
             None => {
                 Ok(Screen::new(t.t("order.not_found"))
                     .row(vec![btn(t.t("common.home"), &Cb::Menu)]))

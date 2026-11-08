@@ -195,7 +195,7 @@ fn lines(html: &str) -> Vec<String> {
 fn every_client_screen_says_what_the_mockup_says() {
     let mockup = mockup();
     let ui = Ui::builtin(EmojiSet::plain(), UiConfig::default()).unwrap();
-    let preview = ui::preview::client(&ui);
+    let preview = ui::preview::client(&ui, Some("exch_test_bot"));
     let mut problems = Vec::new();
     for screen in &preview {
         let Some(expected) = mockup.get(screen.title) else {
@@ -239,7 +239,7 @@ fn known_deviations_are_still_needed() {
     // Отступление исправили — убрать его из KNOWN, чтобы тест снова сторожил эту строку.
     let ui = Ui::builtin(EmojiSet::plain(), UiConfig::default()).unwrap();
     for (title, line, why) in KNOWN {
-        let screen = ui::preview::client(&ui)
+        let screen = ui::preview::client(&ui, Some("exch_test_bot"))
             .into_iter()
             .find(|s| s.title == *title)
             .unwrap();
@@ -494,7 +494,7 @@ fn every_client_screen_has_the_mockup_emoji_and_buttons() {
     let ui = Ui::builtin(emoji, UiConfig::default()).unwrap();
     let key = |id: &str| back.get(id).cloned().unwrap_or_else(|| format!("?{id}"));
     let mut problems = Vec::new();
-    for screen in ui::preview::client(&ui) {
+    for screen in ui::preview::client(&ui, Some("exch_test_bot")) {
         let Some(expected) = mockup.get(screen.title) else {
             continue;
         };

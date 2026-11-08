@@ -104,6 +104,19 @@ impl Look {
         b
     }
 
+    /// Карточка «Статистики» со значками: текст карточки и кнопки.
+    pub fn stats(&self, mut card: crate::stats::StatsCard) -> crate::stats::StatsCard {
+        card.html = self.text(&card.html);
+        card.keyboard = botapi::InlineKeyboardMarkup::new(
+            card.keyboard
+                .inline_keyboard
+                .into_iter()
+                .map(|row| row.into_iter().map(|b| self.button(b)).collect())
+                .collect(),
+        );
+        card
+    }
+
     /// Экран со значками: текст, карточка и кнопки.
     pub fn screen(&self, s: &Screen) -> Screen {
         Screen {

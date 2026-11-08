@@ -390,6 +390,21 @@ impl Ops {
         self.tg.screen(mark, user, needle).await
     }
 
+    /// Нажать ссылку-строку таблицы с текстом `label`: Telegram пришлёт «/start <метка>».
+    async fn follow(&self, user: i64, screen: &Call, label: &str, needle: &str) -> Call {
+        let body = screen.text().replace("\\\"", "\"");
+        let payload = body
+            .split("?start=")
+            .skip(1)
+            .find_map(|rest| {
+                let (p, tail) = rest.split_once('"')?;
+                let text = tail.strip_prefix('>')?.split('<').next()?;
+                text.contains(label).then(|| p.to_owned())
+            })
+            .unwrap_or_else(|| panic!("no link {label:?} in {body}"));
+        self.say(user, &format!("/start {payload}"), needle).await
+    }
+
     async fn say(&self, user: i64, text: &str, needle: &str) -> Call {
         let mark = self.tg.mark();
         self.tg.writes(user, text);
@@ -461,7 +476,7 @@ async fn fee_change_needs_a_preview_and_a_single_use_confirmation(pool: PgPool) 
         .press(OWNER, &panel, "Направления", "Комиссия, ступени")
         .await;
     let card = o
-        .press(OWNER, &dirs, "CryptoBot → xRocket", "Рычаг резерва")
+        .follow(OWNER, &dirs, "CryptoBot → xRocket", "Рычаг резерва")
         .await;
     let ask = o.press(OWNER, &card, "Комиссия", "Новая комиссия").await;
     assert!(ask.text().contains("2.5"));
@@ -501,7 +516,7 @@ async fn admin_cannot_move_the_fee_by_more_than_one_point(pool: PgPool) {
     let o = ops(pool).await;
     let panel = o.say(ADMIN, "/dir", "Комиссия, ступени").await;
     let card = o
-        .press(ADMIN, &panel, "xRocket → CryptoBot", "Рычаг резерва")
+        .follow(ADMIN, &panel, "xRocket → CryptoBot", "Рычаг резерва")
         .await;
     let ask = o.press(ADMIN, &card, "Комиссия", "Новая комиссия").await;
     let _ = ask;
@@ -510,7 +525,7 @@ async fn admin_cannot_move_the_fee_by_more_than_one_point(pool: PgPool) {
     assert!(preview.button("Подтвердить").is_none());
     // Небольшое изменение админ делает сам.
     let card = o
-        .press(ADMIN, &panel, "xRocket → CryptoBot", "Рычаг резерва")
+        .follow(ADMIN, &panel, "xRocket → CryptoBot", "Рычаг резерва")
         .await;
     o.press(ADMIN, &card, "Комиссия", "Новая комиссия").await;
     let preview = o.say(ADMIN, "2", "проверьте изменение").await;
@@ -522,7 +537,7 @@ async fn tiers_and_switch_to_flat_and_back(pool: PgPool) {
     let o = ops(pool).await;
     let panel = o.say(OWNER, "/dir", "Комиссия, ступени").await;
     let card = o
-        .press(OWNER, &panel, "CryptoBot → xRocket", "Рычаг резерва")
+        .follow(OWNER, &panel, "CryptoBot → xRocket", "Рычаг резерва")
         .await;
     // Режим ступеней без ступеней — нельзя.
     o.press(
@@ -533,7 +548,7 @@ async fn tiers_and_switch_to_flat_and_back(pool: PgPool) {
     )
     .await;
     let card = o
-        .press(OWNER, &panel, "CryptoBot → xRocket", "Рычаг резерва")
+        .follow(OWNER, &panel, "CryptoBot → xRocket", "Рычаг резерва")
         .await;
     o.press(OWNER, &card, "Ступени", "Ступени: строка").await;
     o.say(OWNER, "10 2.5", "Не понял формат").await;
@@ -1055,4 +1070,50 @@ async fn shortfall_asks_the_owner_and_investigation_keeps_payouts_paused(pool: P
         .await
         .unwrap();
     assert!(row.auto_paused, "выплаты в xRocket на паузе");
+}
+
+/// Решение владельца 8 ноября: номер в таблице нажимается — карточка открывается в том же
+/// окне пульта, служебное «/start» удаляется; длинный список — страницами «1 / 2»; внизу
+/// карточки — «‹ Заявки» обратно на ту же страницу.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn table_rows_open_cards_in_the_same_window_and_lists_have_pages(pool: PgPool) {
+    let o = ops(pool).await;
+    for i in 0..10 {
+        let url = o
+            .world
+            .client_check(CB, usdt(domain::Decimal::from(10 + i)))
+            .unwrap();
+        let link = parsers::links::parse_url(&url).unwrap();
+        accepted(o.engine.submit_check(common::CLIENT, &link).await.unwrap());
+    }
+    let menu = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    let orders = o.press(OWNER, &menu, "Заявки", "Заявки · 10").await;
+    assert!(orders.text().contains("1 / 2"), "{}", orders.text());
+    assert!(orders.text().contains("Нажмите номер"), "{}", orders.text());
+    let page2 = o.press(OWNER, &orders, "Дальше", "2 / 2").await;
+    assert_eq!(
+        page2.message_id, orders.message_id,
+        "листание — в том же окне"
+    );
+    // Самая старая заявка — на второй странице.
+    let (oldest,): (String,) = sqlx::query_as("SELECT public_id FROM orders ORDER BY id LIMIT 1")
+        .fetch_one(&o.pool)
+        .await
+        .unwrap();
+    let mark = o.tg.mark();
+    let card = o.follow(OWNER, &page2, &oldest, "Заявка").await;
+    assert_eq!(card.method, "editMessageText");
+    assert_eq!(
+        card.message_id, page2.message_id,
+        "карточка — в том же окне"
+    );
+    assert!(
+        o.tg.calls()
+            .iter()
+            .skip(mark)
+            .any(|c| c.method == "deleteMessage"),
+        "служебное «/start» удалено"
+    );
+    let back = o.press(OWNER, &card, "Заявки", "2 / 2").await;
+    assert!(back.text().contains(&oldest), "назад — на ту же страницу");
 }

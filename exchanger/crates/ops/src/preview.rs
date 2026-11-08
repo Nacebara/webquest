@@ -19,7 +19,9 @@ pub async fn send_preview(api: &BotApi, look: &Look, chat: i64) {
         }
     };
     let ui = &ui;
-    let screens = ui::preview::client(ui);
+    // Ссылки в «Истории» — на этого же бота (нажатие откроет карточку, если заявка есть).
+    let bot = api.get_me().await.ok().and_then(|m| m.username);
+    let screens = ui::preview::client(ui, bot.as_deref());
     let total = screens.len();
     for (i, screen) in screens.iter().enumerate() {
         let caption = format!("<b>{}/{total} · {}</b>", i + 1, ui::html::esc(screen.title));
@@ -152,7 +154,7 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
     send_card(
         api,
         chat,
-        &look.screen(&crate::sample_queue().screen(&texts)),
+        &look.screen(&crate::sample_queue().screen(&texts, &crate::Links::default(), 0)),
     )
     .await;
     let _ = api
@@ -160,8 +162,12 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
             &SendMessage::html(chat, "<b>Пульт · Карточка заявки</b> (данные макета)").silent(),
         )
         .await;
-    let card =
-        crate::sample_order().screen(&texts, storage::staff::Role::Owner, crate::sample_now());
+    let card = crate::sample_order().screen(
+        &texts,
+        storage::staff::Role::Owner,
+        crate::sample_now(),
+        &crate::Links::default(),
+    );
     send_card(api, chat, &look.screen(&card)).await;
     // Пульт: «Статистика» на данных макета — плитки и график одной картинкой.
     let _ = api
@@ -169,7 +175,7 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
             &SendMessage::html(chat, "<b>Пульт · Статистика</b> (данные макета)").silent(),
         )
         .await;
-    match crate::stats::sample_card() {
+    match crate::stats::sample_card().map(|c| look.stats(c)) {
         Ok(card) => match card.chart.png() {
             Ok(png) => {
                 if let Err(e) = api

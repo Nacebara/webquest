@@ -433,3 +433,12 @@ pub enum InvestProblem {
     /// Сбой у сервиса.
     Internal,
 }
+
+/// Страница «Истории»: номер (с нуля), сколько всего и имя бота для ссылок «Когда» → карточка.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HistoryPage {
+    pub page: u32,
+    pub pages: u32,
+    /// Имя бота: «Когда» в строке — ссылка `t.me/<бот>?start=ord_<номер>`. Нет — кнопки.
+    pub bot: Option<String>,
+}

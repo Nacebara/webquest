@@ -801,6 +801,19 @@ impl Inner {
         Ok(())
     }
 
+    /// Сообщение больше не главный экран (в нём открыли другой экран) — не обновлять его.
+    pub(crate) async fn forget_dash(&self, chat: i64, message_id: i32) -> Result<(), OpsError> {
+        let mut conn = self.pool.acquire().await?;
+        let mut list = dash_messages(&mut conn).await?;
+        let before = list.len();
+        list.retain(|m| *m != (chat, message_id));
+        if list.len() != before {
+            storage::settings::set(&mut conn, DASH_MESSAGES, &serde_json::json!(list), None)
+                .await?;
+        }
+        Ok(())
+    }
+
     /// Поправить все главные экраны (раз в минуту и после нового события). Сообщение удалено
     /// или слишком старое для правки — забыть его; нового не присылать.
     pub(crate) async fn refresh_dashes(&self) -> Result<(), OpsError> {

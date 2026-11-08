@@ -10,3 +10,4 @@ expression: dump(&empty)
 Очередь пуста — решать нечего.
 --- keyboard
 [{"text":"🔄 Обновить","callback_data":"a:q"}]
+[{"text":"◀️ Меню","callback_data":"a:m"}]

@@ -1352,3 +1352,41 @@ async fn plain_view_switches_back_to_the_rich_card_in_the_same_message(pool: PgP
         "вид меняется в том же сообщении, новых нет"
     );
 }
+
+/// «История» по решению владельца 8 ноября: время в строке — ссылка на карточку заявки;
+/// нажали — бот убирает служебное «/start» и присылает карточку.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn history_row_link_opens_the_order_card(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot_with(true);
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    e.fake.client_writes(&url);
+    let (_, _, public_id) = e.order_message().await;
+    e.fake.client_writes("/history");
+    let history = e
+        .fake
+        .wait_for("history", |c| {
+            c.method == "sendRichMessage" && c.contains("История")
+        })
+        .await;
+    let link = format!("https://t.me/exch_test_bot?start=ord_{public_id}");
+    assert!(history.contains(&link), "время — ссылка: {}", history.body);
+    let mark = e.fake.calls().len();
+    e.fake.client_writes(&format!("/start ord_{public_id}"));
+    e.fake
+        .wait_for("card", |c| {
+            matches!(c.method.as_str(), "sendRichMessage" | "sendMessage")
+                && c.contains(&public_id)
+                && c.contains("Заявка")
+        })
+        .await;
+    bot.stop().await;
+    assert!(
+        e.fake
+            .calls()
+            .iter()
+            .skip(mark)
+            .any(|c| c.method == "deleteMessage"),
+        "служебное «/start» удалено"
+    );
+}

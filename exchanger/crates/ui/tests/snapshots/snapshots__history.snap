@@ -26,7 +26,7 @@ expression: "both(p, q)"
 [{"callback_data":"order:ORD0000000","text":"🔖 12:15"},{"callback_data":"order:ORD0000001","text":"🔖 13:15"}]
 [{"callback_data":"order:ORD0000002","text":"🔖 14:15"},{"callback_data":"order:ORD0000003","text":"🔖 15:15"}]
 [{"callback_data":"order:ORD0000004","text":"🔖 16:15"}]
-[{"callback_data":"history:1","text":"🔽 Ещё"}]
+[{"disabled":true,"text":"1 / 2"},{"callback_data":"history:1","text":"Дальше ›"}]
 
 ### premium
 --- html
@@ -52,4 +52,4 @@ expression: "both(p, q)"
 [{"callback_data":"order:ORD0000000","icon_custom_emoji_id":"5368000000000000033","text":"12:15"},{"callback_data":"order:ORD0000001","icon_custom_emoji_id":"5368000000000000033","text":"13:15"}]
 [{"callback_data":"order:ORD0000002","icon_custom_emoji_id":"5368000000000000033","text":"14:15"},{"callback_data":"order:ORD0000003","icon_custom_emoji_id":"5368000000000000033","text":"15:15"}]
 [{"callback_data":"order:ORD0000004","icon_custom_emoji_id":"5368000000000000033","text":"16:15"}]
-[{"callback_data":"history:1","icon_custom_emoji_id":"5368000000000000034","text":"Ещё"}]
+[{"disabled":true,"text":"1 / 2"},{"callback_data":"history:1","text":"Дальше ›"}]

@@ -411,7 +411,16 @@ proptest! {
                 ui.error(&UiError::Banned { until: None, reason: s.clone() }),
                 ui.error(&UiError::Duplicate { order: s.clone() }),
                 ui.error(&UiError::NotForUs { bind_username: Some(s.clone()) }),
-                ui.history(&rows, None, None, common::at(18, 0)),
+                ui.history(
+                    &rows,
+                    &ui::HistoryPage {
+                        page: 0,
+                        pages: 1,
+                        bot: Some("exch_bot".into()),
+                    },
+                    None,
+                    common::at(18, 0),
+                ),
                 ui.order_card(&card, common::at(18, 0)),
                 ui.cancelled(Some(&s)),
                 ui.support(Some(&s)),
