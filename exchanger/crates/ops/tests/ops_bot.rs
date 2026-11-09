@@ -601,6 +601,31 @@ async fn settings_toggle_the_newcomer_limit_and_the_kill_switch(pool: PgPool) {
     let admin = o.say(ADMIN, "/settings", "Настройки").await;
     o.press(ADMIN, &admin, "Выключить стоп-кран", "роли «Владелец»")
         .await;
+    // Снять стоп-кран — ещё и контрольная строка (макет «Стоп-кран», шаг 3): не то слово —
+    // ничего не сделано; «подтверждаю» в любом регистре — снят.
+    let settings = o.say(OWNER, "/settings", "Настройки").await;
+    let preview = o
+        .press(OWNER, &settings, "Выключить стоп-кран", "Стоп-кран выплат")
+        .await;
+    o.press(OWNER, &preview, "Подтвердить", "ПОДТВЕРЖДАЮ").await;
+    o.say(OWNER, "да", "Не совпало").await;
+    assert!(
+        storage::settings::flag(&mut conn, "kill_switch_payouts", false)
+            .await
+            .unwrap(),
+        "не то слово — стоп-кран на месте"
+    );
+    let settings = o.say(OWNER, "/settings", "Настройки").await;
+    let preview = o
+        .press(OWNER, &settings, "Выключить стоп-кран", "Стоп-кран выплат")
+        .await;
+    o.press(OWNER, &preview, "Подтвердить", "ПОДТВЕРЖДАЮ").await;
+    o.say(OWNER, " подтверждаю ", "Сохранено").await;
+    assert!(
+        !storage::settings::flag(&mut conn, "kill_switch_payouts", false)
+            .await
+            .unwrap()
+    );
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]
@@ -678,10 +703,24 @@ async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
     assert!(card.text().contains("Ход · "), "{}", card.text());
     o.press(OWNER, &card, "Вернуть", "Коротко причина").await;
     o.say(OWNER, "ок", "короче 3 символов").await;
+    // Макет «Подтверждение» (шаг 3): вопрос, публичный номер, что произойдёт, «Необратимо»,
+    // 60 с; кнопка — красная, с действием и суммой.
     let preview = o
-        .say(OWNER, "клиент просит вернуть", "Деньги двинутся")
+        .say(OWNER, "клиент просит вернуть", "Вернуть клиенту?")
         .await;
-    let done = o.press(OWNER, &preview, "Подтвердить", "возврат").await;
+    let text = preview.text();
+    assert!(text.contains(&order.public_id), "{text}");
+    assert!(
+        text.contains("Необратимо") && text.contains("60 с"),
+        "{text}"
+    );
+    let confirm = preview.body["reply_markup"]["inline_keyboard"][0][0].clone();
+    assert!(
+        confirm["text"].as_str().unwrap().contains("Вернуть"),
+        "{confirm}"
+    );
+    assert_eq!(confirm["style"], "danger", "{confirm}");
+    let done = o.press(OWNER, &preview, "Вернуть", "возврат").await;
     assert!(done.text().contains(&format!("Заявка №{}", order.id)));
     o.drain().await;
     let mut conn = o.pool.acquire().await.unwrap();

@@ -747,8 +747,21 @@ impl Inner {
             Some(s) => s,
             None => return Ok(Screen::new(self.texts.t("common.expired"))),
         };
-        if let Some(denied) = self.deny(&staff, action.min_role()) {
+        // «Прежней попытки не было» (неясный исход) — админ и выше (шаг 3, таблица прав).
+        let need = if previous_failed {
+            action.min_role().max(Role::Admin)
+        } else {
+            action.min_role()
+        };
+        if let Some(denied) = self.deny(&staff, need) {
             return Ok(denied);
+        }
+        // Самые опасные — ещё и контрольная строка (макет «Контрольная строка», шаг 3).
+        if let Some(ask) = self
+            .control_prompt(&staff, &action, previous_failed)
+            .await?
+        {
+            return Ok(ask);
         }
         self.apply(&staff, action, previous_failed).await
     }

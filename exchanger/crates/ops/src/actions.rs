@@ -22,8 +22,15 @@ use crate::views::{pct, usdt};
 use crate::{Inner, OpsError, Screen, btn};
 
 /// Чего ждём от сотрудника.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Input {
+    /// Контрольная строка (шаг 3, макет «Контрольная строка»): самое опасное действие ждёт,
+    /// пока сотрудник введёт номер заявки или «ПОДТВЕРЖДАЮ».
+    Control {
+        action: Box<Action>,
+        expected: String,
+        previous_failed: bool,
+    },
     OrderSearch,
     UserSearch,
     Dir(Direction, DirField),
@@ -220,6 +227,52 @@ impl Action {
     }
 }
 
+/// Что нужно ввести после «Подтвердить» (макет «Контрольная строка», шаг 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Control {
+    /// Номер заявки (публичный).
+    Order(i64),
+    /// Слово «ПОДТВЕРЖДАЮ».
+    Word,
+}
+
+/// Слово контрольной строки.
+pub(crate) const CONTROL_WORD: &str = "ПОДТВЕРЖДАЮ";
+
+impl Action {
+    /// Самые опасные действия — с контрольной строкой: закрыть без выплаты, «прежней попытки
+    /// не было» (неясный исход), снять стоп-кран.
+    pub(crate) fn control(&self, previous_failed: bool) -> Option<Control> {
+        match self {
+            Action::Decide {
+                order,
+                kind: DecisionKind::Close,
+                ..
+            } => Some(Control::Order(*order)),
+            Action::Decide { order, .. } if previous_failed => Some(Control::Order(*order)),
+            Action::Flag {
+                flag: Flag::KillSwitch,
+                on: false,
+            } => Some(Control::Word),
+            _ => None,
+        }
+    }
+
+    /// Необратимое — красная кнопка подтверждения.
+    pub(crate) fn irreversible(&self) -> bool {
+        matches!(
+            self,
+            Action::Decide { .. }
+                | Action::Capital { .. }
+                | Action::StaffDisable { .. }
+                | Action::Flag {
+                    flag: Flag::KillSwitch,
+                    ..
+                }
+        )
+    }
+}
+
 /// Число из ответа: «2,5», «2.5 %», «10 USDT».
 fn num(s: &str) -> Option<Decimal> {
     let cleaned: String = s
@@ -329,6 +382,68 @@ impl Inner {
         self.prompt_with(staff, input, text)
     }
 
+    /// Контрольная строка: совпало (без учёта регистра и пробелов по краям) — применить, права
+    /// проверяются заново; нет — ничего не делать.
+    async fn control_input(
+        self: &Arc<Self>,
+        staff: &StaffMember,
+        action: Action,
+        expected: &str,
+        previous_failed: bool,
+        text: &str,
+    ) -> Result<Screen, OpsError> {
+        let t = &self.texts;
+        if text.trim().to_uppercase() != expected.to_uppercase() {
+            return Ok(Screen::new(t.t("common.control_mismatch"))
+                .row(vec![btn(t.t("nav.menu"), &Cb::Menu)]));
+        }
+        let Some(staff) = self.staff(staff.tg_user_id).await? else {
+            return Ok(Screen::new(t.t("common.expired")));
+        };
+        let need = if previous_failed {
+            action.min_role().max(Role::Admin)
+        } else {
+            action.min_role()
+        };
+        if let Some(denied) = self.deny(&staff, need) {
+            return Ok(denied);
+        }
+        self.apply(&staff, action, previous_failed).await
+    }
+
+    /// Шаг «введите …» перед самым опасным действием; не нужен — `None`.
+    pub(crate) async fn control_prompt(
+        &self,
+        staff: &StaffMember,
+        action: &Action,
+        previous_failed: bool,
+    ) -> Result<Option<Screen>, OpsError> {
+        let t = &self.texts;
+        let (expected, text) = match action.control(previous_failed) {
+            None => return Ok(None),
+            Some(Control::Word) => (CONTROL_WORD.to_owned(), t.t("common.type_word")),
+            Some(Control::Order(order)) => {
+                let public = {
+                    let mut conn = self.pool.acquire().await?;
+                    storage::admin::order_card(&mut conn, order)
+                        .await?
+                        .public_id
+                };
+                let text = t.f("common.type_order", &[("public", &esc(&public))]);
+                (public, text)
+            }
+        };
+        Ok(Some(self.prompt_with(
+            staff,
+            Input::Control {
+                action: Box::new(action.clone()),
+                expected,
+                previous_failed,
+            },
+            text,
+        )))
+    }
+
     fn retry_number(&self, staff: &StaffMember, input: Input) -> Screen {
         self.prompt_with(staff, input, self.texts.t("common.bad_number"))
     }
@@ -342,6 +457,15 @@ impl Inner {
         let text = message.text.as_deref().unwrap_or("").trim().to_owned();
         let t = &self.texts;
         let action = match input.clone() {
+            Input::Control {
+                action,
+                expected,
+                previous_failed,
+            } => {
+                return self
+                    .control_input(staff, *action, &expected, previous_failed, &text)
+                    .await;
+            }
             Input::Invest(i) => return self.invest_input(staff, i, &text).await,
             Input::SupportReply(client) => return self.support_reply(staff, client, &text).await,
             Input::OrderSearch => return self.find_order(&text).await,
@@ -627,6 +751,8 @@ impl Inner {
         let t = &self.texts;
         let need = action.min_role();
         let mut unknown_key: Option<String> = None;
+        // Подпись кнопки «Подтвердить» по действию («Повторить выплату 97.50»).
+        let mut confirm_label: Option<String> = None;
         let text = match &action {
             Action::Direction { before, after } => {
                 let mut changes = Vec::new();
@@ -891,22 +1017,114 @@ impl Inner {
                             .map(|o| o.key.clone())
                     });
                 }
-                let warning = match (&unknown_key, kind) {
-                    (Some(k), _) => t.f("order.warn_unknown", &[("key", &esc(k))]),
-                    (None, DecisionKind::Close) => t.t("order.warn_close"),
-                    (
-                        None,
-                        DecisionKind::RetryPayout
-                        | DecisionKind::RetryInvoice
-                        | DecisionKind::Refund,
-                    ) => t.t("order.warn_money"),
-                    _ => String::new(),
+                // Макет «Подтверждение»: что произойдёт, сумма, кошелёк, клиент, публичный
+                // номер, прежняя попытка, «Необратимо», 60 с.
+                let Some(c) = card else {
+                    return Ok(Screen::new(t.t("order.not_found"))
+                        .row(vec![btn(t.t("nav.menu"), &Cb::Menu)]));
                 };
-                t.f(
-                    "order.preview",
+                let client = c.user_id.to_string();
+                let money =
+                    |v: Option<Decimal>| v.map_or_else(|| "—".to_owned(), crate::dash::amount);
+                let (q, what, wallet, sum) = match kind {
+                    DecisionKind::RetryPayout => (
+                        "order.q_retry",
+                        "order.what_retry",
+                        c.direction.target(),
+                        c.payout_amount,
+                    ),
+                    DecisionKind::RetryInvoice => (
+                        "order.q_retry_invoice",
+                        "order.what_retry_invoice",
+                        c.direction.target(),
+                        c.invoice_amount,
+                    ),
+                    DecisionKind::Refund => (
+                        "order.q_refund",
+                        "order.what_refund",
+                        c.direction.source(),
+                        c.refund_amount.or(c.intake_amount),
+                    ),
+                    DecisionKind::ClosePaid => (
+                        "order.q_paid",
+                        "order.what_paid",
+                        c.direction.target(),
+                        None,
+                    ),
+                    DecisionKind::Close => (
+                        "order.q_close",
+                        "order.what_close",
+                        c.direction.source(),
+                        c.intake_amount.or(c.quote_amount_in),
+                    ),
+                    DecisionKind::Intake => (
+                        "order.q_intake",
+                        "order.what_intake",
+                        c.direction.source(),
+                        *amount,
+                    ),
+                };
+                let what = t.f(
+                    what,
                     &[
-                        ("action", &self.decision_name(*kind)),
-                        ("id", order),
+                        ("wallet", &self.platform_name(wallet)),
+                        ("amount", &money(sum)),
+                        ("client", &client),
+                    ],
+                );
+                let money_kinds = matches!(
+                    kind,
+                    DecisionKind::RetryPayout | DecisionKind::RetryInvoice | DecisionKind::Refund
+                );
+                let previous = if let Some(op) = c
+                    .operations
+                    .iter()
+                    .find(|o| money_kinds && unknown_key.as_deref() == Some(o.key.as_str()))
+                {
+                    t.f(
+                        "order.prev_unknown",
+                        &[
+                            ("at", &crate::dash::hhmm(op.created_at)),
+                            ("key", &esc(&op.key)),
+                        ],
+                    )
+                } else if let Some(op) = c.operations.iter().rev().find(|o| {
+                    money_kinds
+                        && o.status == "failed"
+                        && matches!(
+                            o.kind.as_str(),
+                            "create_payout_check" | "create_refund_check" | "pay_invoice"
+                        )
+                }) {
+                    t.f(
+                        "order.prev_failed",
+                        &[("at", &crate::dash::hhmm(op.created_at))],
+                    )
+                } else {
+                    String::new()
+                };
+                let mut warning = t.t("order.irreversible");
+                if *kind == DecisionKind::Close {
+                    warning = format!("{}\n{warning}", t.t("order.warn_close"));
+                }
+                confirm_label = Some(t.f(
+                    match kind {
+                        DecisionKind::RetryPayout => "order.b_do_retry",
+                        DecisionKind::RetryInvoice => "order.b_do_retry_invoice",
+                        DecisionKind::Refund => "order.b_do_refund",
+                        DecisionKind::ClosePaid => "order.b_do_paid",
+                        DecisionKind::Close => "order.b_do_close",
+                        DecisionKind::Intake => "order.b_do_intake",
+                    },
+                    &[("amount", &money(sum))],
+                ));
+                t.f(
+                    "order.confirm",
+                    &[
+                        ("question", &t.t(q)),
+                        ("public", &esc(&c.public_id)),
+                        ("what", &what),
+                        ("previous", &previous),
                         ("reason", &esc(reason)),
                         ("extra", &extra),
                         ("warning", &warning),
@@ -1128,12 +1346,27 @@ impl Inner {
             Action::Selftest { amount } => t.f("selftest.preview", &[("amount", &usdt(*amount))]),
             Action::Invest(op) => self.invest_preview(op),
         };
+        // «Прежней попытки не было» при неясном исходе — админ и выше (шаг 3, таблица прав).
+        let need = if unknown_key.is_some() {
+            need.max(Role::Admin)
+        } else {
+            need
+        };
         let mut s = Screen::new(text);
         if staff.role >= need {
+            let danger = action.irreversible();
             let nonce = self.hold(staff.tg_user_id, action);
             let confirm = match unknown_key {
-                Some(_) => btn(t.t("order.b_confirm_unknown"), &Cb::ConfirmUnknown(nonce)),
-                None => btn(t.t("common.confirm"), &Cb::Confirm(nonce)),
+                Some(_) => btn(t.t("order.b_do_unknown"), &Cb::ConfirmUnknown(nonce)),
+                None => btn(
+                    confirm_label.unwrap_or_else(|| t.t("common.confirm")),
+                    &Cb::Confirm(nonce),
+                ),
+            };
+            let confirm = if danger {
+                confirm.style(botapi::ButtonStyle::Danger)
+            } else {
+                confirm
             };
             s = s.row(vec![confirm, btn(t.t("common.cancel"), &Cb::Cancel)]);
         } else {

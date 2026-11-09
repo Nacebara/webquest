@@ -2,6 +2,10 @@
 # {подстановки} экранируются кодом; ключи проверяет тест `every_used_text_exists`.
 
 [common]
+# Контрольная строка (шаг 3): самые опасные действия — ещё и ввести строку.
+type_order = "Введите номер заявки <code>{public}</code> — без него ничего не сделаю."
+type_word = "Введите <code>ПОДТВЕРЖДАЮ</code> — без этого ничего не сделаю."
+control_mismatch = "Не совпало — ничего не сделал. Начните заново, если действие нужно."
 sample = "Это пример экрана — кнопка ничего не делает."
 back = "‹ Назад"
 home = "🏠 Пульт"
@@ -449,6 +453,31 @@ ask_reason = "<b>{action}</b> · заявка №{id}\nКоротко причи
 ask_evidence = "Доказательство выплаты: ссылка на созданный чек или что и где проверили:"
 ask_amount = "Сколько пришло в кошелёк, USDT (сверьте с чатом кошелька):"
 preview = "<b>{action}</b> · заявка №{id}\nПричина: <i>{reason}</i>{extra}\n\n{warning}"
+# Подтверждение денежного действия — по утверждённому макету «Подтверждение» (шаг 3, 9.11):
+# что произойдёт, сумма, кошелёк, клиент, публичный номер, прежняя попытка, «Необратимо», 60 с.
+confirm = "<b>{question}</b> · заявка <code>{public}</code>\n{what}{previous}\nПричина: <i>{reason}</i>{extra}\n\n{warning}"
+q_retry = "Повторить выплату?"
+q_retry_invoice = "Повторить оплату счёта?"
+q_refund = "Вернуть клиенту?"
+q_paid = "Отметить выплаченной?"
+q_close = "Закрыть без выплаты?"
+q_intake = "Зачислить приход?"
+what_retry = "Новый чек {wallet} на <code>{amount}</code> USDT клиенту {client}."
+what_retry_invoice = "Оплатить счёт {wallet} на <code>{amount}</code> USDT."
+what_refund = "Чек {wallet} на <code>{amount}</code> USDT клиенту {client} — возврат."
+what_paid = "Клиент {client} получил деньги вне бота — заявка закроется выплаченной."
+what_close = "<code>{amount}</code> USDT клиента {client} остаются у сервиса."
+what_intake = "В кошелёк пришло <code>{amount}</code> USDT по заявке клиента {client}."
+prev_unknown = "\nПрежняя попытка {at} — исход неясен (<code>{key}</code>). Подтверждая, вы утверждаете: <b>чек не создан / счёт не оплачен</b> — проверено в кошельке."
+prev_failed = "\nПрежняя попытка {at} — не удалась (<code>failed</code>)."
+irreversible = "<b>Необратимо.</b> <i>Кнопка действует 60 с.</i>"
+b_do_retry = "{m:refresh} Повторить выплату {amount}"
+b_do_retry_invoice = "{m:refresh} Оплатить счёт {amount}"
+b_do_refund = "{m:refund} Вернуть {amount}"
+b_do_paid = "{m:done} Отметить выплаченной"
+b_do_close = "{m:close} Закрыть без выплаты"
+b_do_intake = "{m:done} Зачислить {amount}"
+b_do_unknown = "{m:done} Проверил — подтверждаю"
 preview_evidence = "\nДоказательство: <i>{evidence}</i>"
 preview_amount = "\nПриход: <b>{amount}</b>"
 warn_unknown = "⚠️ У прежней попытки <code>{key}</code> неясный исход. Подтверждая, вы утверждаете: <b>чек не создан / счёт не оплачен</b> — проверено в кошельке."
