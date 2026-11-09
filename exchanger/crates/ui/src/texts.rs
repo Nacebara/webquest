@@ -123,6 +123,16 @@ impl StateTexts {
     }
 }
 
+/// Рассылка «🔥 Выгодно» (Р1).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PromoBroadcastTexts {
+    pub title: String,
+    pub line: String,
+    /// Выгодный курс на весь лимит направления.
+    pub line_all: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MenuTexts {
@@ -666,6 +676,7 @@ pub struct Texts {
     pub direction_status: DirectionStatusTexts,
     pub states: StateTexts,
     pub menu: MenuTexts,
+    pub promo_broadcast: PromoBroadcastTexts,
     pub buttons: ButtonTexts,
     pub commands: CommandTexts,
     pub welcome: WelcomeTexts,

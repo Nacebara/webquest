@@ -161,6 +161,11 @@ pub(crate) fn amount(v: Decimal) -> String {
     format!("{sign}{}.{frac}", ui::fmt::grouped(int))
 }
 
+/// «2 140» — целые USDT с разбивкой на тысячи (резервы в «Ребалансировке»).
+pub(crate) fn whole(v: Decimal) -> String {
+    ui::fmt::grouped(v.trunc())
+}
+
 /// «143 %» — доля от цели, целым.
 fn share(part: Decimal, whole: Decimal) -> Option<i64> {
     if whole <= Decimal::ZERO {

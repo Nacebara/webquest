@@ -29,6 +29,7 @@ mod limits;
 mod locks;
 mod orders;
 mod poll;
+mod promo;
 mod terms;
 
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -203,8 +204,10 @@ impl ClientBot {
         let listener = tokio::spawn(orders::listen(inner.clone(), updates, stop.clone()));
         let investors = tokio::spawn(invest::listen(inner.clone(), invest_updates, stop.clone()));
         let reload = tokio::spawn(emoji::watch(inner.clone(), stop.clone()));
+        let broadcast = tokio::spawn(promo::run(inner.clone(), stop.clone()));
         poll::run(inner, cancel).await;
         stop.cancel();
+        let _ = broadcast.await;
         let _ = reload.await;
         let _ = investors.await;
         if let Err(e) = listener.await {

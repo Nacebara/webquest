@@ -309,6 +309,8 @@ fn money_flow_is_plain_html_reference_screens_have_fallback() {
         "invoice_quote",
         "invoice_awaiting",
         "invoice_underpaid",
+        // Рассылка «🔥 Выгодно» (Р1).
+        "promo_broadcast",
     ];
     for (name, screen) in common::gallery(&ui) {
         let expect_rich = rich

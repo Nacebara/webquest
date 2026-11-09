@@ -77,6 +77,11 @@ pub(crate) enum Action {
         on: bool,
         room: Decimal,
     },
+    /// Рассылка «🔥 Выгодно» клиентам: вкл / выкл; `recipients` — сколько получат сейчас.
+    PromoBroadcast {
+        on: bool,
+        recipients: i64,
+    },
     Target {
         platform: Platform,
         target: Decimal,
@@ -207,6 +212,7 @@ impl Action {
             | Action::StaffRole { .. }
             | Action::StaffDisable { .. }
             | Action::Capital { .. }
+            | Action::PromoBroadcast { .. }
             | Action::Selftest { .. } => Role::Owner,
             Action::Invest(op) => op.min_role(),
             _ => Role::Admin,
@@ -735,6 +741,25 @@ impl Inner {
                     ("notes", &""),
                 ],
             ),
+            Action::PromoBroadcast { on, recipients } => {
+                let (before, after) = if *on {
+                    (t.t("promo.bc_word_off"), t.t("promo.bc_word_on"))
+                } else {
+                    (t.t("promo.bc_word_on"), t.t("promo.bc_word_off"))
+                };
+                t.f(
+                    if *on {
+                        "promo.bc_preview"
+                    } else {
+                        "promo.bc_preview_off"
+                    },
+                    &[
+                        ("before", &before),
+                        ("after", &after),
+                        ("n", &ui::fmt::grouped(Decimal::from(*recipients))),
+                    ],
+                )
+            }
             Action::PromoSettings { before, after } => {
                 let mut changes = Vec::new();
                 if before.mode != after.mode {
@@ -1246,11 +1271,31 @@ impl Inner {
                     Cb::Promo,
                 )
             }
+            Action::PromoBroadcast { on, .. } => {
+                let before =
+                    storage::settings::flag(&mut tx, engine::fees::PROMO_BROADCAST, false).await?;
+                storage::settings::set(
+                    &mut tx,
+                    engine::fees::PROMO_BROADCAST,
+                    &json!({ "on": on }),
+                    Some(staff_id),
+                )
+                .await?;
+                (
+                    "promo.broadcast",
+                    "settings",
+                    engine::fees::PROMO_BROADCAST.to_owned(),
+                    Some(json!({ "on": before })),
+                    Some(json!({ "on": on })),
+                    Cb::Promo,
+                )
+            }
             Action::PromoSwitch { direction, on, .. } => {
                 engine::fees::switch_promo(&mut tx, *direction, *on, staff_id).await?;
                 if *on {
                     storage::alerts::resolve(&mut tx, &format!("promo_hint:{}", direction.code()))
                         .await?;
+                    engine::fees::announce_promo(&mut tx, *direction).await?;
                 }
                 (
                     "promo.switch",
@@ -1539,7 +1584,7 @@ impl Inner {
         tracing::info!(staff = staff_id, action = audit_action, target = %target_id, "ops change applied");
         let screen = match back {
             Cb::Dir(d) => self.dir_card(staff, d).await?,
-            Cb::Promo => self.promo().await?,
+            Cb::Promo => self.promo(staff).await?,
             Cb::UserDir(id, d) => self.user_dir(id, d).await?,
             Cb::User(id) => self.user(Some(staff), id).await?,
             Cb::Settings => self.settings().await?,

@@ -317,5 +317,10 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
             "Пришлите чек · выгодный курс",
             ui.send_check(&terms_promo(), Direction::CbToXrCheck),
         ),
+        one(
+            "Рассылка · выгодный курс",
+            ui.promo_broadcast(&terms_promo(), Direction::CbToXrCheck)
+                .unwrap_or_else(|| ui.no_link()),
+        ),
     ]
 }

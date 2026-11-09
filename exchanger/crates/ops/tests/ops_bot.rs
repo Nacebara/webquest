@@ -632,7 +632,12 @@ async fn promo_hint_arrives_and_one_button_switches_the_promo_on(pool: PgPool) {
         .press(OWNER, &hint, "Включить", "Включить выгодный курс")
         .await;
     let promo = o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
-    assert!(promo.text().contains("выгодный курс</b> (вручную)"));
+    // Карточка «Ребалансировка» (шаг 2): кто включил — в строке выгодного курса.
+    assert!(
+        promo.text().contains("включили вручную"),
+        "{}",
+        promo.text()
+    );
     let mut conn = o.pool.acquire().await.unwrap();
     let states = engine::fees::promo_states(&mut conn).await.unwrap();
     assert!(states["xr_to_cb_check"].on);
@@ -989,7 +994,7 @@ async fn system_screen_and_screen_preview_from_the_panel(pool: PgPool) {
     )
     .await;
     // Экраны идут по порядку макета, с паузой между сообщениями: проверяем начало.
-    o.tg.screen(mark, OWNER, "1/31 · Приветствие").await;
+    o.tg.screen(mark, OWNER, "1/32 · Приветствие").await;
     o.tg.screen(mark, OWNER, "Что меняем?").await;
 }
 
@@ -1119,4 +1124,40 @@ async fn table_rows_open_cards_in_the_same_window_and_lists_have_pages(pool: PgP
     );
     let back = o.press(OWNER, &card, "Заявки", "2 / 2").await;
     assert!(back.text().contains(&oldest), "назад — на ту же страницу");
+}
+
+/// «Ребалансировка» карточкой (шаг 2): рассылку «🔥 Выгодно» включает только владелец — с
+/// подтверждением «было → станет»; админ видит её состояние, но кнопки нет.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn rebalance_card_broadcast_switch_is_owner_only(pool: PgPool) {
+    let o = ops(pool).await;
+    let card = o.say(OWNER, "/promo", "Ребалансировка").await;
+    assert_eq!(card.method, "sendRichMessage", "карточка");
+    assert!(
+        card.text().contains("Рассылка клиентам: выключена"),
+        "{}",
+        card.text()
+    );
+    let preview = o
+        .press(OWNER, &card, "Включить рассылку", "не чаще раза в 3 часа")
+        .await;
+    assert!(preview.text().contains("выкл"), "{}", preview.text());
+    o.press(
+        OWNER,
+        &preview,
+        "Подтвердить",
+        "Рассылка клиентам: включена",
+    )
+    .await;
+    let admin = o.say(ADMIN, "/promo", "Ребалансировка").await;
+    assert!(
+        admin.text().contains("Рассылка клиентам: включена"),
+        "{}",
+        admin.text()
+    );
+    assert!(
+        admin.button("Выключить рассылку").is_none(),
+        "{:?}",
+        admin.buttons()
+    );
 }

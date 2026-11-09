@@ -485,80 +485,59 @@ impl Inner {
     // -----------------------------------------------------------------------------------------
     // Встречный поток
 
-    pub(crate) async fn promo(&self) -> Result<Screen, OpsError> {
+    /// «Ребалансировка» карточкой (шаг 2, принят владельцем 9 ноября 2026): резервы с точками,
+    /// где горит выгодный курс и кто включил, рассылка клиентам, режим и пороги в подвале.
+    pub(crate) async fn promo(&self, staff: &StaffMember) -> Result<Screen, OpsError> {
         let t = &self.texts;
         let mut conn = self.pool.acquire().await?;
         let settings = engine::fees::promo_settings(&mut conn).await?;
         let states = engine::fees::promo_states(&mut conn).await?;
-        let mut lines = vec![t.t("promo.title"), t.t("promo.explain"), String::new()];
-        lines.push(t.f(
-            "promo.mode",
-            &[("mode", &self.promo_mode_name(settings.mode))],
-        ));
-        lines.push(t.f(
-            "promo.rate",
-            &[
-                ("fee", &pct(settings.fee_pct)),
-                ("min_fee", &usdt(settings.min_fee)),
-            ],
-        ));
-        lines.push(t.f(
-            "promo.thresholds",
-            &[
-                ("trigger", &pct(settings.trigger_pct)),
-                ("release", &pct(settings.release_pct)),
-            ],
-        ));
-        lines.push(String::new());
-        lines.push(t.t("promo.reserves"));
-        let mut targets = true;
+        let th = settings.thresholds();
+        // Резервы: есть · от цели (точка: нехватка от порога — красная, меньше — жёлтая).
+        let mut rows = String::new();
+        let mut plain_rows = Vec::new();
         for p in Platform::ALL {
-            match engine::fees::reserve_of(&mut conn, p, Asset::Usdt).await? {
+            let icon = match p {
+                Platform::CryptoBot => "{e:cb}",
+                Platform::XRocket => "{e:xr}",
+            };
+            let name = format!("{icon} {}", self.platform_name(p));
+            let (have, share) = match engine::fees::reserve_of(&mut conn, p, Asset::Usdt).await? {
                 Some(r) => {
-                    let state = match r.deficit_pct() {
-                        Some(d) if d > Decimal::ZERO => {
-                            t.f("promo.deficit", &[("pct", &pct(d.round_dp(1)))])
-                        }
-                        Some(d) if d < Decimal::ZERO => {
-                            t.f("promo.surplus", &[("pct", &pct((-d).round_dp(1)))])
-                        }
-                        _ => t.t("promo.balanced"),
+                    let dot = match r.deficit_pct() {
+                        Some(d) if d >= th.trigger_pct => "{e:dot_act}",
+                        Some(d) if d > th.release_pct => "{e:dot_wait}",
+                        _ => "{e:dot_ok}",
                     };
-                    lines.push(t.f(
-                        "promo.reserve",
-                        &[
-                            ("name", &self.platform_name(p)),
-                            ("available", &usdt(r.available)),
-                            ("target", &usdt(r.target)),
-                            ("state", &state),
-                        ],
-                    ));
+                    let share = if r.target > Decimal::ZERO {
+                        format!(
+                            "{dot} {}\u{a0}%",
+                            (r.available * Decimal::ONE_HUNDRED / r.target).round()
+                        )
+                    } else {
+                        t.t("promo.c_no_target")
+                    };
+                    (crate::dash::whole(r.available), share)
                 }
                 None => {
-                    targets = false;
-                    let wallet = storage::wallets::active(&mut conn, p).await?;
-                    let available = match wallet {
+                    let available = match storage::wallets::active(&mut conn, p).await? {
                         Some((w, _)) => {
                             storage::holds::available(&mut conn, w, Asset::Usdt).await?
                         }
                         None => Decimal::ZERO,
                     };
-                    lines.push(t.f(
-                        "promo.reserve_no_target",
-                        &[
-                            ("name", &self.platform_name(p)),
-                            ("available", &usdt(available)),
-                        ],
-                    ));
+                    (crate::dash::whole(available), t.t("promo.c_no_target"))
                 }
-            }
+            };
+            rows.push_str(&format!(
+                "<tr><td>{name}</td><td align=\"right\">{have}</td><td align=\"right\">{share}</td></tr>"
+            ));
+            plain_rows.push(format!("{name} — {have} · {share}"));
         }
-        if !targets {
-            lines.push(t.t("promo.no_targets"));
-        }
-        lines.push(String::new());
-        lines.push(t.t("promo.dirs"));
-        let mut switches = Vec::new();
+        // Где горит выгодный курс; где его можно включить.
+        let mut lines = Vec::new();
+        let mut on_dirs = Vec::new();
+        let mut can_on = Vec::new();
         for d in DIRECTIONS {
             let (_, _, room) = engine::fees::direction_reserves(
                 &mut conn,
@@ -570,36 +549,158 @@ impl Inner {
             .await?;
             let st = states.get(d.code());
             let on = st.is_some_and(|s| s.on) && settings.mode != PromoMode::Off;
-            let state = if on {
-                let by = match st.map(|s| s.by) {
-                    Some(SwitchedBy::Manual) => t.t("promo.by_manual"),
-                    _ => t.t("promo.by_auto"),
+            if on && let Some(st) = st {
+                let dir = storage::directions::get(&mut conn, d).await?;
+                let by = match st.by {
+                    SwitchedBy::Manual => t.t("promo.c_by_manual"),
+                    SwitchedBy::Auto => t.t("promo.c_by_auto"),
                 };
-                t.f("promo.dir_on", &[("by", &by)])
+                lines.push(t.f(
+                    "promo.c_on",
+                    &[
+                        ("name", &self.dir_name(d)),
+                        ("base", &pct(dir.fee_pct)),
+                        ("fee", &pct(settings.fee_pct)),
+                        ("room", &crate::dash::whole(room.min(dir.max_amount))),
+                        ("by", &by),
+                        ("at", &crate::dash::hhmm(st.since)),
+                    ],
+                ));
+                on_dirs.push(d);
+            } else if room > Decimal::ZERO && settings.mode != PromoMode::Off {
+                can_on.push(d);
+            }
+        }
+        if lines.is_empty() {
+            lines.push(if can_on.is_empty() {
+                t.t("promo.c_balanced")
             } else {
-                t.t("promo.dir_off")
-            };
-            lines.push(t.f(
-                "promo.dir",
-                &[
-                    ("name", &self.dir_name(d)),
-                    ("state", &state),
-                    ("room", &usdt(room)),
-                ],
-            ));
-            let short = self.dir_name(d);
-            switches.push(if on {
-                btn(
-                    t.f("promo.b_off_dir", &[("name", &short)]),
-                    &Cb::PromoSwitch(d, false),
-                )
-            } else {
-                btn(
-                    t.f("promo.b_on_dir", &[("name", &short)]),
-                    &Cb::PromoSwitch(d, true),
-                )
+                t.t("promo.c_off")
             });
         }
+        // Рассылка клиентам.
+        let broadcast =
+            storage::settings::flag(&mut conn, engine::fees::PROMO_BROADCAST, false).await?;
+        let last = storage::promo::last(&mut conn).await?;
+        let bc = if broadcast {
+            let note = match &last {
+                Some(b) if b.finished_at.is_none() => t.f(
+                    "promo.c_bc_running",
+                    &[("delivered", &b.delivered), ("total", &b.total)],
+                ),
+                Some(b) => t.f(
+                    "promo.c_bc_last",
+                    &[
+                        ("at", &crate::dash::hhmm(b.started_at)),
+                        ("delivered", &b.delivered),
+                        ("total", &b.total),
+                    ],
+                ),
+                None => t.t("promo.c_bc_wait"),
+            };
+            format!("{}\n<i>{note}</i>", t.t("promo.c_bc_on"))
+        } else if staff.role >= Role::Owner {
+            t.t("promo.c_bc_off")
+        } else {
+            format!(
+                "{}\n<i>{}</i>",
+                t.t("promo.c_bc_off"),
+                t.t("promo.c_bc_owner")
+            )
+        };
+        let foot = match settings.mode {
+            PromoMode::Auto => t.f(
+                "promo.c_foot_auto",
+                &[
+                    ("trigger", &pct(settings.trigger_pct)),
+                    ("release", &pct(settings.release_pct)),
+                ],
+            ),
+            PromoMode::Hint => t.t("promo.c_foot_hint"),
+            PromoMode::Off => t.t("promo.c_foot_off"),
+        };
+        let title = t.t("promo.c_title");
+        let para = |l: &str| format!("<p>{}</p>", l.replace('\n', "<br>"));
+        let rich = format!(
+            "<h3>{title}</h3><table striped compact><tr><th>{}</th><th align=\"right\">{}</th><th align=\"right\">{}</th></tr>{rows}</table>{}{}<footer>{foot}</footer>",
+            t.t("promo.c_reserve"),
+            t.t("promo.c_have"),
+            t.t("promo.c_of_target"),
+            lines.iter().map(|l| para(l)).collect::<String>(),
+            para(&bc),
+        );
+        let plain = format!(
+            "<b>{title}</b>\n<blockquote>{}</blockquote>\n{}\n{bc}\n<i>{foot}</i>",
+            plain_rows.join("\n"),
+            lines.join("\n"),
+        );
+        // Кнопки: выгодный курс по направлениям, рассылка (владелец), режим, ставка, пороги.
+        let named = on_dirs.len() + can_on.len() > 1;
+        let label = |key: &str, d: Direction| {
+            if named {
+                t.f(&format!("{key}_named"), &[("name", &self.dir_name(d))])
+            } else {
+                t.t(key)
+            }
+        };
+        let mut s = Screen::card(rich, plain);
+        for d in &on_dirs {
+            s = s.row(vec![btn(
+                label("promo.b_dir_off", *d),
+                &Cb::PromoSwitch(*d, false),
+            )]);
+        }
+        for d in &can_on {
+            s = s.row(vec![btn(
+                label("promo.b_dir_on", *d),
+                &Cb::PromoSwitch(*d, true),
+            )]);
+        }
+        if staff.role >= Role::Owner {
+            s = s.row(vec![if broadcast {
+                btn(t.t("promo.b_bc_off"), &Cb::PromoBroadcast(false))
+            } else {
+                btn(t.t("promo.b_bc_on"), &Cb::PromoBroadcast(true))
+            }]);
+        }
+        Ok(s.row(vec![
+            btn(
+                t.f(
+                    "promo.b_mode",
+                    &[("mode", &self.promo_mode_name(settings.mode))],
+                ),
+                &Cb::PromoModes,
+            ),
+            btn(t.t("promo.b_rate_c"), &Cb::PromoRate),
+            btn(t.t("promo.b_thresholds_c"), &Cb::PromoThresholds),
+        ])
+        .row(nav::back(t, &Cb::Reserves)))
+    }
+
+    /// Режим ребалансировки: что делает каждый, текущий — с галочкой.
+    pub(crate) async fn promo_modes(&self) -> Result<Screen, OpsError> {
+        let t = &self.texts;
+        let settings = {
+            let mut conn = self.pool.acquire().await?;
+            engine::fees::promo_settings(&mut conn).await?
+        };
+        let auto = t.f(
+            "promo.modes_auto",
+            &[
+                ("trigger", &pct(settings.trigger_pct)),
+                ("release", &pct(settings.release_pct)),
+            ],
+        );
+        let lines = [t.t("promo.modes_off"), t.t("promo.modes_hint"), auto];
+        let title = t.t("promo.modes_title");
+        let rich = format!(
+            "<h3>{title}</h3>{}",
+            lines
+                .iter()
+                .map(|l| format!("<p>{l}</p>"))
+                .collect::<String>()
+        );
+        let plain = format!("<b>{title}</b>\n{}", lines.join("\n"));
         let mark = |m: PromoMode, key: &str| {
             let label = t.t(key);
             if settings.mode == m {
@@ -608,7 +709,7 @@ impl Inner {
                 label
             }
         };
-        let mut s = Screen::new(lines.join("\n"))
+        Ok(Screen::card(rich, plain)
             .row(vec![
                 btn(
                     mark(PromoMode::Off, "promo.b_off"),
@@ -623,26 +724,7 @@ impl Inner {
                     &Cb::PromoMode(PromoMode::Auto),
                 ),
             ])
-            .row(vec![
-                btn(t.t("promo.b_rate"), &Cb::PromoRate),
-                btn(t.t("promo.b_thresholds"), &Cb::PromoThresholds),
-            ])
-            .row(
-                Platform::ALL
-                    .iter()
-                    .map(|p| {
-                        btn(
-                            t.f("promo.b_target", &[("name", &self.platform_name(*p))]),
-                            &Cb::PromoTarget(*p),
-                        )
-                    })
-                    .collect(),
-            );
-        for pair in switches.chunks(2) {
-            s = s.row(pair.to_vec());
-        }
-        Ok(s.row(vec![btn(t.t("nav.refresh"), &Cb::Promo)])
-            .row(nav::back(t, &Cb::Dirs)))
+            .row(nav::back(t, &Cb::Promo)))
     }
 
     // -----------------------------------------------------------------------------------------
@@ -1214,7 +1296,8 @@ impl Inner {
             Cb::Dash => self.dash().await,
             Cb::Dirs => self.dirs().await,
             Cb::Dir(d) => self.dir_card(staff, d).await,
-            Cb::Promo => self.promo().await,
+            Cb::Promo => self.promo(staff).await,
+            Cb::PromoModes => self.promo_modes().await,
             Cb::Queue | Cb::Page(List::Queue, _) => {
                 let page = if let Cb::Page(_, p) = cb { p } else { 0 };
                 self.remember_list(staff.tg_user_id, Cb::Page(List::Queue, page));
@@ -1455,6 +1538,10 @@ impl Inner {
                 );
                 return Ok(self.prompt_with(staff, Input::Target(p), text));
             }
+            Cb::PromoBroadcast(on) => Action::PromoBroadcast {
+                on,
+                recipients: storage::promo::recipients(&mut conn).await?,
+            },
             Cb::PromoSwitch(direction, on) => {
                 let (_, _, room) = engine::fees::direction_reserves(
                     &mut conn,

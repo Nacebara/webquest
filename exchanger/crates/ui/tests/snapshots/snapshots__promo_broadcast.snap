@@ -1,0 +1,23 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+🔥 <b>Выгодно: CryptoBot → xRocket</b>
+Комиссия <s>2.5 %</s> <b>0.3 %</b> — на чек до 300 USDT
+--- rich
+<p>🔥 <b>Выгодно: CryptoBot → xRocket</b></p>
+<p>Комиссия <s>2.5 %</s> <b>0.3 %</b> — на чек до 300 USDT</p>
+--- keyboard: inline
+[{"callback_data":"dir:cb_to_xr_check","style":"primary","text":"🔥 Обменять"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000038">🔥</tg-emoji> <b>Выгодно: CryptoBot → xRocket</b>
+Комиссия <s>2.5 %</s> <b>0.3 %</b> — на чек до 300 USDT
+--- rich
+<p><tg-emoji emoji-id="5368000000000000038">🔥</tg-emoji> <b>Выгодно: CryptoBot → xRocket</b></p>
+<p>Комиссия <s>2.5 %</s> <b>0.3 %</b> — на чек до 300 USDT</p>
+--- keyboard: inline
+[{"callback_data":"dir:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000019","style":"primary","text":"Обменять"}]

@@ -200,6 +200,51 @@ impl Ui {
             .collect()
     }
 
+    /// Рассылка «🔥 Выгодно» (Р1, выбор владельца 9 ноября 2026): «🔥 Выгодно: CryptoBot →
+    /// xRocket / Комиссия ~~2.5 %~~ 0.3 % — на чек до 300 USDT» и одна кнопка — к обмену этого
+    /// направления или к оплате счёта. Выгодного курса на направлении уже нет — `None`:
+    /// рассылка останавливается.
+    pub fn promo_broadcast(&self, terms: &Terms, direction: Direction) -> Option<Screen> {
+        let d = terms.get(direction)?;
+        let (pct, up_to) = promo_of(d)?;
+        let t = &self.texts.promo_broadcast;
+        let name = match direction.flow() {
+            Flow::CheckExchange => self.direction_name(direction),
+            Flow::InvoicePayment => Frag::text(&self.texts.offers.get(direction).send),
+        };
+        let mut doc = Doc::new();
+        doc.para(&self.fill(
+            &t.title,
+            &[
+                ("icon", &self.emoji.frag(Emoji::Flame)),
+                ("direction", &name),
+            ],
+        ));
+        let fee = self.pct(pct);
+        let base = self.regular_fee_frag(d);
+        doc.para(&if up_to >= d.max {
+            self.fill(&t.line_all, &[("fee", &fee), ("base", &base)])
+        } else {
+            self.fill(
+                &t.line,
+                &[
+                    ("fee", &fee),
+                    ("base", &base),
+                    ("up_to", &Frag::text(&fmt::bare_amount(up_to))),
+                ],
+            )
+        });
+        let (label, callback) = match direction.flow() {
+            Flow::CheckExchange => (&self.texts.menu.exchange, Callback::Direction(direction)),
+            Flow::InvoicePayment => (&self.texts.menu.pay_invoice, Callback::PayInvoice),
+        };
+        let keyboard = Keyboard::inline_rows(vec![vec![
+            self.cb_button(Some(Emoji::Promo), label, &callback)
+                .style(ButtonStyle::Primary),
+        ]]);
+        Some(self.dual(doc, keyboard))
+    }
+
     fn promo_paras(&self, terms: &Terms, doc: &mut Doc) {
         for line in self.promo_lines(terms) {
             doc.para(&line);

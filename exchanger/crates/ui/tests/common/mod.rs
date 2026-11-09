@@ -503,6 +503,11 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
         ),
         ("send_check_cb_to_xr", ui.send_check(&t, cb)),
         (
+            "promo_broadcast",
+            ui.promo_broadcast(&ui::preview::terms_promo(), cb)
+                .expect("выгодный курс горит"),
+        ),
+        (
             "send_check_xr_to_cb",
             ui.send_check(&t, Direction::XrToCbCheck),
         ),

@@ -21,6 +21,7 @@ pub mod invest;
 pub mod ledger;
 pub mod operations;
 pub mod orders;
+pub mod promo;
 pub mod sessions;
 pub mod settings;
 pub mod staff;

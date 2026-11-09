@@ -33,6 +33,28 @@ use crate::{Engine, EngineError};
 
 pub const PROMO_SETTINGS: &str = "rebalance_promo";
 pub const PROMO_ACTIVE: &str = "rebalance_promo_active";
+/// Рассылка «🔥 Выгодно» клиентам: `{"on": true}` — включена (включает владелец).
+pub const PROMO_BROADCAST: &str = "promo_broadcast";
+
+/// Выгодный курс включился: если рассылка включена — завести её в журнале (отправит клиентский
+/// бот). Уже идёт другая — новой не будет. Решение владельца 9 ноября 2026.
+pub async fn announce_promo(
+    conn: &mut PgConnection,
+    direction: Direction,
+) -> Result<Option<i64>, EngineError> {
+    if !storage::settings::flag(&mut *conn, PROMO_BROADCAST, false).await? {
+        return Ok(None);
+    }
+    let id = storage::promo::start(&mut *conn, direction.code()).await?;
+    if let Some(id) = id {
+        tracing::info!(
+            direction = direction.code(),
+            broadcast = id,
+            "promo broadcast queued"
+        );
+    }
+    Ok(id)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -376,6 +398,9 @@ impl Engine {
                     },
                 )
                 .await?;
+                if next {
+                    announce_promo(&mut tx, direction).await?;
+                }
                 events.push(if next {
                     PromoEvent::Started { direction, room }
                 } else {

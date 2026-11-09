@@ -1455,3 +1455,102 @@ async fn send_check_receipt_opens_in_place_and_back_returns(pool: PgPool) {
         "всё в том же сообщении"
     );
 }
+
+/// Рассылка «🔥 Выгодно» (шаг 2, решение владельца 9 ноября 2026): выгодный курс горит,
+/// рассылка включена — сообщение Р1 уходит клиентам по одному разу; кому писали меньше 3 часов
+/// назад — не уходит; рассылка закрывается.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn promo_broadcast_reaches_clients_once(pool: PgPool) {
+    let e = env(pool).await;
+    {
+        let mut tx = e.pool.begin().await.unwrap();
+        sqlx::query(
+            "INSERT INTO staff (tg_user_id, role, display_name) VALUES (1, 'owner', 'owner') \
+             ON CONFLICT DO NOTHING",
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        // CryptoBot ниже цели, xRocket выше — выгодно CryptoBot → xRocket.
+        for (platform, target) in [(CB, dec!(2000)), (XR, dec!(500))] {
+            let (wallet, _) = storage::wallets::active(&mut tx, platform)
+                .await
+                .unwrap()
+                .unwrap();
+            storage::admin::set_thresholds(
+                &mut tx,
+                wallet,
+                Asset::Usdt,
+                storage::admin::Thresholds::from_target(target),
+            )
+            .await
+            .unwrap();
+        }
+        engine::fees::switch_promo(&mut tx, Direction::CbToXrCheck, true, 1)
+            .await
+            .unwrap();
+        storage::settings::set(
+            &mut tx,
+            engine::fees::PROMO_BROADCAST,
+            &json!({ "on": true }),
+            None,
+        )
+        .await
+        .unwrap();
+        for (user, notified) in [(201_i64, false), (202, false), (203, true)] {
+            sqlx::query(
+                "INSERT INTO users (tg_user_id, promo_notified_at) \
+                 VALUES ($1, CASE WHEN $2 THEN now() - interval '1 hour' END)",
+            )
+            .bind(user)
+            .bind(notified)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+        assert!(
+            engine::fees::announce_promo(&mut tx, Direction::CbToXrCheck)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        tx.commit().await.unwrap();
+    }
+    let bot = e.start_bot_with(true);
+    for user in [201, 202] {
+        let msg = e
+            .fake
+            .wait_for("promo", |c| {
+                c.method == "sendRichMessage"
+                    && c.body["chat_id"] == json!(user)
+                    && c.contains("Выгодно")
+            })
+            .await;
+        assert!(msg.contains("CryptoBot → xRocket"), "{:?}", msg.body);
+        assert!(
+            msg.contains("dir:cb_to_xr_check"),
+            "кнопка «Обменять» — к обмену"
+        );
+    }
+    let mut finished = false;
+    for _ in 0..100 {
+        let mut conn = e.pool.acquire().await.unwrap();
+        let last = storage::promo::last(&mut conn).await.unwrap().unwrap();
+        if last.finished_at.is_some() {
+            assert_eq!((last.delivered, last.skipped, last.failed), (2, 1, 0));
+            finished = true;
+            break;
+        }
+        drop(conn);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    bot.stop().await;
+    assert!(finished, "рассылка закрылась");
+    assert!(
+        !e.fake
+            .calls()
+            .iter()
+            .any(|c| c.body["chat_id"] == json!(203)),
+        "писали меньше 3 часов назад — не пишем"
+    );
+}
