@@ -1400,6 +1400,19 @@ impl Inner {
                         .f("order.taken", &[("name", &esc(&staff.display_name))]),
                 ))
             }
+            Cb::IntakeAsCheck(id) => {
+                if let Some(denied) = self.deny(staff, Role::Admin) {
+                    return Ok(denied);
+                }
+                return Ok(match self.check_amount(id).await? {
+                    Some(check) => self.intake_reason(staff, id, check),
+                    None => self.prompt(
+                        staff,
+                        Input::DecisionAmount { order: id },
+                        "order.ask_amount",
+                    ),
+                });
+            }
             Cb::Decide(id, kind) => {
                 let need = match kind {
                     DecisionKind::Close => Role::Owner,
@@ -1419,7 +1432,41 @@ impl Inner {
                     }
                 };
                 if kind == DecisionKind::Intake {
-                    return Ok(self.prompt(staff, input, "order.ask_amount"));
+                    // Сумма по чеку — кнопкой (шаг 3): «1000» вместо «100» руками не набрать.
+                    let card = {
+                        let mut conn = self.pool.acquire().await?;
+                        storage::admin::order_card(&mut conn, id).await?
+                    };
+                    let Some(check) = card.intake_amount.or(card.quote_amount_in) else {
+                        return Ok(self.prompt(staff, input, "order.ask_amount"));
+                    };
+                    let bot = match card.intake_platform {
+                        Platform::CryptoBot => "@send",
+                        Platform::XRocket => "@xrocket",
+                    };
+                    let text = t.f(
+                        "order.ask_amount_check",
+                        &[
+                            ("public", &esc(&card.public_id)),
+                            ("amount", &crate::dash::amount(check)),
+                            ("bot", &bot),
+                        ],
+                    );
+                    let mut s = self.prompt_with(staff, input, text);
+                    s.keyboard.insert(
+                        0,
+                        vec![
+                            btn(
+                                t.f(
+                                    "order.b_as_check",
+                                    &[("amount", &crate::dash::amount(check))],
+                                ),
+                                &Cb::IntakeAsCheck(id),
+                            )
+                            .style(botapi::ButtonStyle::Primary),
+                        ],
+                    );
+                    return Ok(s);
                 }
                 let text = t.f(
                     "order.ask_reason",
@@ -1578,6 +1625,7 @@ impl Inner {
                     user: id,
                     before,
                     after,
+                    base_pct: storage::directions::get(&mut conn, d).await?.fee_pct,
                 }
             }
             Cb::UserReset(id, d) => {
@@ -1590,6 +1638,7 @@ impl Inner {
                     user: id,
                     before,
                     after,
+                    base_pct: storage::directions::get(&mut conn, d).await?.fee_pct,
                 }
             }
             Cb::UserDaily(id) => return Ok(self.prompt(staff, Input::Daily(id), "user.ask_daily")),

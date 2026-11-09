@@ -99,11 +99,15 @@ pub(crate) enum Action {
         reason: String,
         evidence: Option<String>,
         amount: Option<Decimal>,
+        /// Сумма по чеку (для «Деньги пришли»): расхождение больше 1 % — решает владелец.
+        check: Option<Decimal>,
     },
     Terms {
         user: i64,
         before: UserTerms,
         after: UserTerms,
+        /// Обычная ставка направления — для правила «больше 1 п.п. — владелец».
+        base_pct: Decimal,
     },
     Daily {
         user: i64,
@@ -191,15 +195,52 @@ fn big_change(before: &DirectionRow, after: &DirectionRow) -> bool {
             amounts.extend(s.tiers().iter().map(|t| t.from));
         }
     }
-    amounts
-        .into_iter()
-        .any(|a| (base(after, a) - base(before, a)).abs() > Decimal::ONE)
+    let one = Decimal::ONE;
+    // Рычаг тоже двигает итог для клиента: пол, потолок и сила (шаг 3 — «итоговая ставка»).
+    (after.fee_floor_pct - before.fee_floor_pct).abs() > one
+        || (after.fee_cap_pct - before.fee_cap_pct).abs() > one
+        || (after.skew_k_pct - before.skew_k_pct).abs() > one
+        || amounts
+            .into_iter()
+            .any(|a| (base(after, a) - base(before, a)).abs() > one)
+}
+
+/// Приход отличается от суммы чека больше чем на 1 %.
+pub(crate) fn off_check(amount: Decimal, check: Decimal) -> bool {
+    check > Decimal::ZERO && (amount - check).abs() * Decimal::ONE_HUNDRED > check
+}
+
+/// Личная ставка: сдвиг больше 1 п.п. или ниже обычной больше чем на 1 п.п. — решает владелец.
+fn personal_big(before: &UserTerms, after: &UserTerms, base: Decimal) -> bool {
+    if before.fee_pct == after.fee_pct {
+        return false;
+    }
+    let old = before.fee_pct.unwrap_or(base);
+    let new = after.fee_pct.unwrap_or(base);
+    (new - old).abs() > Decimal::ONE || base - new > Decimal::ONE
 }
 
 impl Action {
     pub(crate) fn min_role(&self) -> Role {
         match self {
             Action::Direction { before, after } if big_change(before, after) => Role::Owner,
+            Action::Terms {
+                before,
+                after,
+                base_pct,
+                ..
+            } if personal_big(before, after, *base_pct) => Role::Owner,
+            Action::PromoSettings { before, after }
+                if (after.fee_pct - before.fee_pct).abs() > Decimal::ONE =>
+            {
+                Role::Owner
+            }
+            Action::Decide {
+                kind: DecisionKind::Intake,
+                amount: Some(a),
+                check: Some(c),
+                ..
+            } if off_check(*a, *c) => Role::Owner,
             Action::Decide { kind, .. } => match kind {
                 DecisionKind::Close => Role::Owner,
                 DecisionKind::ClosePaid | DecisionKind::Intake => Role::Admin,
@@ -444,6 +485,34 @@ impl Inner {
         )))
     }
 
+    /// Сумма по чеку заявки (приход или котировка); нет — `None`.
+    pub(crate) async fn check_amount(&self, order: i64) -> Result<Option<Decimal>, OpsError> {
+        let mut conn = self.pool.acquire().await?;
+        let card = storage::admin::order_card(&mut conn, order).await?;
+        Ok(card.intake_amount.or(card.quote_amount_in))
+    }
+
+    /// Вопрос причины «Деньги пришли» с уже известной суммой.
+    pub(crate) fn intake_reason(&self, staff: &StaffMember, order: i64, amount: Decimal) -> Screen {
+        let t = &self.texts;
+        let text = t.f(
+            "order.ask_reason",
+            &[
+                ("action", &self.decision_name(DecisionKind::Intake)),
+                ("id", &order),
+            ],
+        );
+        self.prompt_with(
+            staff,
+            Input::DecisionReason {
+                order,
+                kind: DecisionKind::Intake,
+                amount: Some(amount),
+            },
+            text,
+        )
+    }
+
     fn retry_number(&self, staff: &StaffMember, input: Input) -> Screen {
         self.prompt_with(staff, input, self.texts.t("common.bad_number"))
     }
@@ -589,22 +658,7 @@ impl Inner {
                 let Some(amount) = num(&text).filter(|v| *v > Decimal::ZERO) else {
                     return Ok(self.retry_number(staff, input));
                 };
-                let text = t.f(
-                    "order.ask_reason",
-                    &[
-                        ("action", &self.decision_name(DecisionKind::Intake)),
-                        ("id", &order),
-                    ],
-                );
-                return Ok(self.prompt_with(
-                    staff,
-                    Input::DecisionReason {
-                        order,
-                        kind: DecisionKind::Intake,
-                        amount: Some(amount),
-                    },
-                    text,
-                ));
+                return Ok(self.intake_reason(staff, order, amount));
             }
             Input::DecisionReason {
                 order,
@@ -624,12 +678,18 @@ impl Inner {
                         "order.ask_evidence",
                     ));
                 }
+                let check = if kind == DecisionKind::Intake {
+                    self.check_amount(order).await?
+                } else {
+                    None
+                };
                 Action::Decide {
                     order,
                     kind,
                     reason: text,
                     evidence: None,
                     amount,
+                    check,
                 }
             }
             Input::DecisionEvidence { order, reason } => {
@@ -642,6 +702,7 @@ impl Inner {
                     reason,
                     evidence: Some(text),
                     amount: None,
+                    check: None,
                 }
             }
             Input::Term(user, d, field) => {
@@ -676,6 +737,7 @@ impl Inner {
                     user,
                     before,
                     after,
+                    base_pct: dir.fee_pct,
                 }
             }
             Input::Daily(user) => {
@@ -747,6 +809,60 @@ impl Inner {
         self: &Arc<Self>,
         staff: &StaffMember,
         action: Action,
+    ) -> Result<Screen, OpsError> {
+        self.preview_for(staff, action, self.cfg.confirm_ttl).await
+    }
+
+    /// «Отправить владельцу» (шаг 3): тот же предпросмотр уходит владельцам с пометкой, кто
+    /// предлагает; решают они обычным «Подтвердить» (кнопка живёт сутки) или «Отмена».
+    pub(crate) async fn ask_owner(
+        self: &Arc<Self>,
+        staff: &StaffMember,
+        nonce: &str,
+    ) -> Result<Screen, OpsError> {
+        let t = &self.texts;
+        let Some(action) = self.take_pending(staff.tg_user_id, nonce) else {
+            return Ok(
+                Screen::new(t.t("common.expired")).row(vec![btn(t.t("nav.menu"), &Cb::Menu)])
+            );
+        };
+        let owners: Vec<StaffMember> = {
+            let mut conn = self.pool.acquire().await?;
+            storage::staff::list(&mut conn)
+                .await?
+                .into_iter()
+                .filter(|m| m.role == Role::Owner && m.active())
+                .collect()
+        };
+        if owners.is_empty() {
+            return Ok(Screen::new(t.t("common.request_no_owner"))
+                .row(vec![btn(t.t("nav.menu"), &Cb::Menu)]));
+        }
+        for owner in &owners {
+            let mut screen = self
+                .preview_for(
+                    owner,
+                    action.clone(),
+                    std::time::Duration::from_secs(24 * 3600),
+                )
+                .await?;
+            let head = t.f(
+                "common.request_from",
+                &[("name", &esc(&staff.display_name))],
+            );
+            screen.text = format!("{head}\n\n{}", screen.text);
+            if let Err(e) = self.send(owner.tg_user_id, &screen).await {
+                tracing::warn!(owner = owner.tg_user_id, error = %e, "owner request not delivered");
+            }
+        }
+        Ok(Screen::new(t.t("common.request_sent")).row(vec![btn(t.t("nav.menu"), &Cb::Menu)]))
+    }
+
+    pub(crate) async fn preview_for(
+        self: &Arc<Self>,
+        staff: &StaffMember,
+        action: Action,
+        ttl: std::time::Duration,
     ) -> Result<Screen, OpsError> {
         let t = &self.texts;
         let need = action.min_role();
@@ -986,8 +1102,20 @@ impl Inner {
                 reason,
                 evidence,
                 amount,
+                check,
             } => {
                 let mut extra = String::new();
+                if let (Some(a), Some(c)) = (amount, check)
+                    && off_check(*a, *c)
+                {
+                    extra.push_str(&t.f(
+                        "order.intake_mismatch",
+                        &[
+                            ("amount", &crate::dash::amount(*a)),
+                            ("check", &crate::dash::amount(*c)),
+                        ],
+                    ));
+                }
                 if let Some(e) = evidence {
                     extra.push_str(&t.f("order.preview_evidence", &[("evidence", &esc(e))]));
                 }
@@ -1135,6 +1263,7 @@ impl Inner {
                 user,
                 before,
                 after,
+                ..
             } => {
                 let d = after.direction;
                 let name = self.dir_name(d);
@@ -1355,7 +1484,7 @@ impl Inner {
         let mut s = Screen::new(text);
         if staff.role >= need {
             let danger = action.irreversible();
-            let nonce = self.hold(staff.tg_user_id, action);
+            let nonce = self.hold_for(staff.tg_user_id, action, ttl);
             let confirm = match unknown_key {
                 Some(_) => btn(t.t("order.b_do_unknown"), &Cb::ConfirmUnknown(nonce)),
                 None => btn(
@@ -1369,6 +1498,16 @@ impl Inner {
                 confirm
             };
             s = s.row(vec![confirm, btn(t.t("common.cancel"), &Cb::Cancel)]);
+        } else if need == Role::Owner {
+            // Решает владелец: предложить ему одной кнопкой (шаг 3, макет «решает владелец»).
+            s.text
+                .push_str(&format!("\n\n{}", t.t("common.owner_decides")));
+            let nonce = self.hold(staff.tg_user_id, action);
+            s = s.row(vec![
+                btn(t.t("common.b_ask_owner"), &Cb::AskOwner(nonce))
+                    .style(botapi::ButtonStyle::Primary),
+                btn(t.t("common.cancel"), &Cb::Cancel),
+            ]);
         } else {
             s.text.push_str(&format!(
                 "\n\n{}",
@@ -1394,6 +1533,7 @@ impl Inner {
             reason,
             evidence,
             amount,
+            ..
         } = &action
         {
             let decision = match kind {
@@ -1567,6 +1707,7 @@ impl Inner {
                 user,
                 before,
                 after,
+                ..
             } => {
                 storage::user_terms::save(&mut tx, *user, after, staff_id).await?;
                 (
@@ -1874,6 +2015,50 @@ mod tests {
     use rust_decimal_macros::dec;
 
     use super::*;
+
+    /// Шаг 3: «Деньги пришли» дальше 1 % от чека, личная ставка ниже обычной больше чем на
+    /// 1 п.п. — решает владелец.
+    #[test]
+    fn owner_decides_off_check_intake_and_big_personal_discounts() {
+        use rust_decimal_macros::dec;
+        assert!(!off_check(dec!(100.5), dec!(100)));
+        assert!(!off_check(dec!(101), dec!(100)), "ровно 1 % — ещё можно");
+        assert!(off_check(dec!(101.01), dec!(100)));
+        assert!(off_check(dec!(1000), dec!(100)));
+        let intake = |amount| Action::Decide {
+            order: 1,
+            kind: DecisionKind::Intake,
+            reason: "ok".into(),
+            evidence: None,
+            amount: Some(amount),
+            check: Some(dec!(100)),
+        };
+        assert_eq!(intake(dec!(100)).min_role(), Role::Admin);
+        assert_eq!(intake(dec!(1000)).min_role(), Role::Owner);
+
+        let d = Direction::CbToXrCheck;
+        let terms = |fee| storage::user_terms::UserTerms {
+            fee_pct: fee,
+            ..storage::user_terms::UserTerms::empty(d)
+        };
+        let action = |before, after| Action::Terms {
+            user: 7,
+            before: terms(before),
+            after: terms(after),
+            base_pct: dec!(2.5),
+        };
+        assert_eq!(action(None, Some(dec!(2))).min_role(), Role::Admin);
+        assert_eq!(action(None, Some(dec!(1.4))).min_role(), Role::Owner);
+        assert_eq!(
+            action(Some(dec!(2)), Some(dec!(0.5))).min_role(),
+            Role::Owner
+        );
+        assert_eq!(
+            action(Some(dec!(1)), None).min_role(),
+            Role::Owner,
+            "сдвиг 1.5 п.п."
+        );
+    }
 
     #[test]
     fn numbers_and_tiers_parse_like_people_type_them() {

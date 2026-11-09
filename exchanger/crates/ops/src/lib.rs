@@ -584,8 +584,13 @@ impl Inner {
 
     /// Положить действие на подтверждение: одноразовый nonce, привязан к сотруднику.
     pub(crate) fn hold(&self, staff: i64, action: Action) -> String {
+        self.hold_for(staff, action, self.cfg.confirm_ttl)
+    }
+
+    /// Подтверждение со своим сроком: запрос владельцу живёт сутки, а не 60 секунд.
+    pub(crate) fn hold_for(&self, staff: i64, action: Action, ttl: Duration) -> String {
         let nonce = nonce();
-        let until = Instant::now() + self.cfg.confirm_ttl;
+        let until = Instant::now() + ttl;
         self.state(|s| {
             let now = Instant::now();
             s.pending.retain(|_, p| p.until > now);
@@ -704,6 +709,7 @@ impl Inner {
             }
             Cb::Confirm(nonce) => self.confirm(staff, &nonce, false).await?,
             Cb::ConfirmUnknown(nonce) => self.confirm(staff, &nonce, true).await?,
+            Cb::AskOwner(nonce) => self.ask_owner(staff, &nonce).await?,
             Cb::Ack(id) => {
                 self.ack(staff, id).await?;
                 return Ok(None);

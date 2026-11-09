@@ -191,6 +191,10 @@ pub enum Cb {
     Confirm(String),
     /// Подтверждение «проверил: прежней попытки не было» по заявке.
     ConfirmUnknown(String),
+    /// «Отправить владельцу»: действие, которое решает владелец, уходит ему на подтверждение.
+    AskOwner(String),
+    /// «Деньги пришли»: сумма — как в чеке.
+    IntakeAsCheck(i64),
     Cancel,
     Ack(i64),
     Reconcile,
@@ -343,6 +347,8 @@ impl Cb {
             Cb::Audit => "au".into(),
             Cb::Confirm(n) => format!("ok:{n}"),
             Cb::ConfirmUnknown(n) => format!("ou:{n}"),
+            Cb::AskOwner(n) => format!("ao:{n}"),
+            Cb::IntakeAsCheck(id) => format!("iac:{id}"),
             Cb::Cancel => "no".into(),
             Cb::Ack(id) => format!("ack:{id}"),
             Cb::Reconcile => "rc".into(),
@@ -444,6 +450,8 @@ impl Cb {
             ["smd", _] => Cb::MemberDisable(id(1)?),
             ["au"] => Cb::Audit,
             ["ok", n] => Cb::Confirm((*n).to_owned()),
+            ["ao", n] => Cb::AskOwner((*n).to_owned()),
+            ["iac", _] => Cb::IntakeAsCheck(id(1)?),
             ["ou", n] => Cb::ConfirmUnknown((*n).to_owned()),
             ["no"] => Cb::Cancel,
             ["ack", _] => Cb::Ack(id(1)?),

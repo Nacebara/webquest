@@ -526,12 +526,31 @@ async fn admin_cannot_move_the_fee_by_more_than_one_point(pool: PgPool) {
     let preview = o.say(ADMIN, "4", "проверьте изменение").await;
     assert!(preview.text().contains("только владелец"));
     assert!(preview.button("Подтвердить").is_none());
+    // «Отправить владельцу» (шаг 3): владелец получает тот же предпросмотр с пометкой, кто
+    // предлагает, и решает сам.
+    let mark = o.tg.mark();
+    o.press(ADMIN, &preview, "Отправить владельцу", "Отправил владельцу")
+        .await;
+    let request = o.tg.screen(mark, OWNER, "Анна предлагает").await;
+    assert!(
+        request.text().contains("проверьте изменение"),
+        "{}",
+        request.text()
+    );
+    o.press(OWNER, &request, "Подтвердить", "Сохранено").await;
+    let mut conn = o.pool.acquire().await.unwrap();
+    let row = storage::directions::get(&mut conn, Direction::XrToCbCheck)
+        .await
+        .unwrap();
+    assert_eq!(row.fee_pct, dec!(4), "владелец применил");
+    drop(conn);
     // Небольшое изменение админ делает сам.
     let card = o
         .follow(ADMIN, &panel, "xRocket → CryptoBot", "Рычаг резерва")
         .await;
     o.press(ADMIN, &card, "Комиссия", "Новая комиссия").await;
-    let preview = o.say(ADMIN, "2", "проверьте изменение").await;
+    // Владелец поставил 4 %: 3.5 % — сдвиг на 0.5 п.п.
+    let preview = o.say(ADMIN, "3.5", "проверьте изменение").await;
     o.press(ADMIN, &preview, "Подтвердить", "Сохранено").await;
 }
 
