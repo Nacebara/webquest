@@ -132,8 +132,11 @@ struct WireInlineButton {
     callback_data: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     copy_text: Option<CopyTextButton>,
+    /// Неактивная кнопка. Bot API 10.3 принимает и возвращает пустой объект `{}`; раньше бот
+    /// слал `true`, а в ответе получал `{}` и не мог его разобрать (аудит 11.11.2026, Ж-1).
+    /// Читаем любую форму, шлём объект.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    disabled: Option<bool>,
+    disabled: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     web_app: Option<WebAppInfo>,
     /// Во входящих сообщениях: кнопка входа по ссылке — для нас это обычная ссылка.
@@ -149,7 +152,11 @@ impl From<WireInlineButton> for InlineKeyboardButton {
             InlineButtonAction::CallbackData(data)
         } else if let Some(copy) = w.copy_text {
             InlineButtonAction::CopyText(copy.text)
-        } else if w.disabled == Some(true) {
+        } else if w
+            .disabled
+            .as_ref()
+            .is_some_and(|v| !v.is_null() && *v != serde_json::Value::Bool(false))
+        {
             InlineButtonAction::Disabled
         } else if let Some(app) = w.web_app {
             InlineButtonAction::WebApp(app.url)
@@ -177,7 +184,7 @@ impl From<InlineKeyboardButton> for WireInlineButton {
             InlineButtonAction::Url(url) => w.url = Some(url),
             InlineButtonAction::CallbackData(data) => w.callback_data = Some(data),
             InlineButtonAction::CopyText(text) => w.copy_text = Some(CopyTextButton { text }),
-            InlineButtonAction::Disabled => w.disabled = Some(true),
+            InlineButtonAction::Disabled => w.disabled = Some(serde_json::json!({})),
             InlineButtonAction::WebApp(url) => w.web_app = Some(WebAppInfo { url }),
             // Отправлять такую кнопку незачем; без действия Telegram её отвергнет.
             InlineButtonAction::Other => {}

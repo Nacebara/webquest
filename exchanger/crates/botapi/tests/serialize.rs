@@ -61,7 +61,7 @@ fn send_message_with_inline_keyboard() {
                      "callback_data": "dir:cb_to_xr_check"},
                     {"text": "Вернуть деньги", "style": "danger",
                      "callback_data": "refund:A1B2C3D4E5"},
-                    {"text": "xRocket → CryptoBot", "disabled": true}
+                    {"text": "xRocket → CryptoBot", "disabled": {}}
                 ]
             ]}
         })
@@ -399,4 +399,37 @@ fn links_are_read_from_every_kind_of_button() {
             "https://t.me/send?start=CQcccccccccc".to_owned(),
         ]
     );
+}
+
+/// Аудит 11.11.2026, Ж-1. Живой ответ Telegram на сообщение с неактивной кнопкой (записан с
+/// тестовым ботом): `disabled` приходит объектом `{}`. Раньше разбор падал с «invalid type: map,
+/// expected a boolean», и бот считал уже доставленное сообщение неотправленным.
+#[test]
+fn disabled_button_from_a_live_telegram_reply_is_parsed() {
+    let live = r#"{"inline_keyboard": [[{"text": "1 / 3", "disabled": {}}, {"text": "Дальше", "callback_data": "noop"}]]}"#;
+    let markup: botapi::InlineKeyboardMarkup = serde_json::from_str(live).unwrap();
+    let row = &markup.inline_keyboard[0];
+    assert_eq!(row[0].action, botapi::InlineButtonAction::Disabled);
+    assert_eq!(
+        row[1].action,
+        botapi::InlineButtonAction::CallbackData("noop".to_owned())
+    );
+    // Прежняя форма (`true`) тоже читается; `false` — не «неактивная».
+    let old: botapi::InlineKeyboardMarkup =
+        serde_json::from_str(r#"{"inline_keyboard": [[{"text": "a", "disabled": true}]]}"#)
+            .unwrap();
+    assert_eq!(
+        old.inline_keyboard[0][0].action,
+        botapi::InlineButtonAction::Disabled
+    );
+    let off: botapi::InlineKeyboardMarkup =
+        serde_json::from_str(r#"{"inline_keyboard": [[{"text": "a", "disabled": false}]]}"#)
+            .unwrap();
+    assert_ne!(
+        off.inline_keyboard[0][0].action,
+        botapi::InlineButtonAction::Disabled
+    );
+    // Шлём в форме, которую Telegram возвращает сам.
+    let sent = serde_json::to_value(botapi::InlineKeyboardButton::disabled("1 / 3")).unwrap();
+    assert_eq!(sent, serde_json::json!({"text": "1 / 3", "disabled": {}}));
 }

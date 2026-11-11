@@ -23,7 +23,7 @@ expression: "both(p, q)"
 </table>
 <footer>Всего 23 обмена · 2 310 USDT</footer>
 --- keyboard: inline
-[{"callback_data":"history:0","text":"‹ Назад"},{"disabled":true,"text":"2 / 3"},{"callback_data":"history:2","text":"Дальше ›"}]
+[{"callback_data":"history:0","text":"‹ Назад"},{"disabled":{},"text":"2 / 3"},{"callback_data":"history:2","text":"Дальше ›"}]
 
 ### premium
 --- html
@@ -46,4 +46,4 @@ expression: "both(p, q)"
 </table>
 <footer>Всего 23 обмена · 2 310 USDT</footer>
 --- keyboard: inline
-[{"callback_data":"history:0","text":"‹ Назад"},{"disabled":true,"text":"2 / 3"},{"callback_data":"history:2","text":"Дальше ›"}]
+[{"callback_data":"history:0","text":"‹ Назад"},{"disabled":{},"text":"2 / 3"},{"callback_data":"history:2","text":"Дальше ›"}]
