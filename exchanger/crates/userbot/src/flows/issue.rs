@@ -44,14 +44,51 @@ pub fn is_marker(text: &str) -> bool {
     text.starts_with(MARKER_PREFIX)
 }
 
+/// Метка повторной попытки операции (`… #2`, `… #3`): у попытки своё окно в чате кошелька.
+/// `attempts` — сколько меток этой операции уже есть.
+fn retry_marker_text(key: &str, attempts: u64) -> String {
+    format!("{MARKER_PREFIX}{key} #{}", attempts + 1)
+}
+
+/// Метка именно этой операции: первая (`🏷 exch <ключ>`) или повторной попытки (`… #k`).
+fn is_marker_of(text: &str, key: &str) -> bool {
+    text.strip_prefix(MARKER_PREFIX)
+        .and_then(|t| t.strip_prefix(key))
+        .is_some_and(|rest| {
+            rest.is_empty()
+                || rest
+                    .strip_prefix(" #")
+                    .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+        })
+}
+
+/// Окна попыток операции в общем счётчике id аккаунта: от метки попытки до следующей метки
+/// любой операции. Пусто — меток этой операции в «Избранном» не видно.
+fn attempt_windows(saved: &[RawMessage], key: &str) -> Vec<(i32, i32)> {
+    saved
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| m.out && is_marker_of(&m.text, key))
+        .map(|(i, m)| {
+            let until = saved[i + 1..]
+                .iter()
+                .find(|x| x.out && is_marker(&x.text))
+                .map_or(i32::MAX, |x| x.id);
+            (m.id, until)
+        })
+        .collect()
+}
+
 pub(crate) async fn run<T: Transport>(
     w: &UserbotWallet<T>,
     amount: &Money,
     tag: &OpTag,
 ) -> Result<IssueOutcome, BotError> {
     let mut conv = Conv::open(w, Some(&tag.key)).await;
-    // «Чистота» чата бота — до метки, пока ничего не начато.
-    conv.ensure_clear(Chat::WalletBot(w.platform), None).await?;
+    // «Чистота» чата бота — до метки, пока ничего не начато. Команда меню названа заранее:
+    // если прошлая попытка остановилась на ней же без ответа, это повтор, а не новая команда.
+    conv.ensure_clear(Chat::WalletBot(w.platform), Some(menu_command(w.platform)))
+        .await?;
     match conv
         .send(
             Chat::SavedMessages,
@@ -65,18 +102,52 @@ pub(crate) async fn run<T: Transport>(
         // Ничего не создаём — только сверка. Так `issue_check` безопасен даже при повторном
         // вызове с тем же `OpTag` (движок так делает после `Err`: операция возвращается в
         // очередь с той же меткой).
+        // Метка уже стояла: эту операцию начинал прошлый вызов. Сначала сверка — чек мог быть
+        // создан. Не найден — меню проходим заново, только если точно известно, что сумма ещё
+        // не отправлялась (чек появляется не раньше суммы; аудит 11.11.2026, М-1). Иначе —
+        // «неясно», решает человек. Так `issue_check` безопасен при повторном вызове с тем же
+        // `OpTag` (движок так делает после `Err`: операция возвращается в очередь).
         Ok(sent) if sent.earlier_call => {
-            tracing::warn!(op = %tag.key, "operation marker already exists, reconciling instead of issuing");
-            return Ok(match find_with(&conv, amount, tag).await {
-                Ok(Some(check)) => IssueOutcome::Issued {
-                    check,
-                    method: IssueMethod::Menu,
-                },
-                Ok(None) => unknown("operation was started earlier and no check was found"),
-                Err(e) => unknown(format!(
-                    "operation was started earlier; reconciliation failed: {e}"
-                )),
-            });
+            match find_with(&conv, amount, tag).await {
+                Ok(Some(check)) => {
+                    return Ok(IssueOutcome::Issued {
+                        check,
+                        method: IssueMethod::Menu,
+                    });
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    return Ok(unknown(format!(
+                        "operation was started earlier; reconciliation failed: {e}"
+                    )));
+                }
+            }
+            let Some(attempts) = retry_room(&conv, amount, tag).await else {
+                tracing::warn!(op = %tag.key, "operation was started earlier and may have sent the amount: reconciling only");
+                return Ok(unknown(
+                    "operation was started earlier and no check was found",
+                ));
+            };
+            tracing::warn!(op = %tag.key, attempts, "earlier attempt never sent the amount: going through the check menu again");
+            match conv
+                .send(
+                    Chat::SavedMessages,
+                    &retry_marker_text(&tag.key, attempts),
+                    rid::derive(tag.random_id, rid::attempt(rid::MARKER, attempts)),
+                    Pace::Own,
+                )
+                .await
+            {
+                Ok(sent) if sent.earlier_call => {
+                    return Ok(unknown("retry marker already exists"));
+                }
+                Ok(_) => {}
+                Err(SendError::NotSent(e)) => return Err(e),
+                Err(SendError::Unknown(detail)) => {
+                    return Err(BotError::Unavailable(format!("operation marker: {detail}")));
+                }
+            }
+            return menu(&mut conv, amount, tag, attempts).await;
         }
         Ok(_) => {}
         Err(SendError::NotSent(e)) => return Err(e),
@@ -85,7 +156,43 @@ pub(crate) async fn run<T: Transport>(
             return Err(BotError::Unavailable(format!("operation marker: {detail}")));
         }
     }
-    menu(&mut conv, amount, tag).await
+    menu(&mut conv, amount, tag, 0).await
+}
+
+fn menu_command(platform: Platform) -> &'static str {
+    match platform {
+        Platform::CryptoBot => "/checks",
+        Platform::XRocket => "/cheques",
+    }
+}
+
+/// Можно ли пройти меню заново: `Some(n)` — да, и у операции уже `n` меток. Только когда точно
+/// известно, что сумма в этой операции не отправлялась: первая метка видна в «Избранном»,
+/// история чата кошелька после неё прочитана целиком, и ни в одном окне попыток нет нашего
+/// сообщения с суммой.
+async fn retry_room<T: Transport>(conv: &Conv<'_, T>, amount: &Money, tag: &OpTag) -> Option<u64> {
+    let saved = conv.recent(Chat::SavedMessages).await.ok()?;
+    let windows = attempt_windows(&saved, &tag.key);
+    let first = windows.first()?.0;
+    let label = marker_text(&tag.key);
+    if !saved
+        .iter()
+        .any(|m| m.out && m.id == first && m.text == label)
+    {
+        return None;
+    }
+    let bot = conv
+        .history_complete(Chat::WalletBot(conv.platform()), first)
+        .await?;
+    let typed = typed_amount(amount);
+    let amount_sent = windows.iter().any(|&(from, until)| {
+        bot.iter()
+            .any(|m| m.out && m.id > from && m.id < until && m.text == typed)
+    });
+    if amount_sent {
+        return None;
+    }
+    u64::try_from(windows.len()).ok()
 }
 
 fn unknown(detail: impl Into<String>) -> IssueOutcome {
@@ -184,22 +291,20 @@ async fn menu<T: Transport>(
     conv: &mut Conv<'_, T>,
     amount: &Money,
     tag: &OpTag,
+    attempt: u64,
 ) -> Result<IssueOutcome, BotError> {
     let platform = conv.platform();
     let chat = Chat::WalletBot(platform);
     let asset = amount.asset();
     conv.wait_quarantine(chat).await;
 
-    let command = match platform {
-        Platform::CryptoBot => "/checks",
-        Platform::XRocket => "/cheques",
-    };
+    let command = menu_command(platform);
     let mark = conv.mark().await;
     let cmd = match conv
         .send(
             chat,
             command,
-            rid::derive(tag.random_id, rid::MENU_COMMAND),
+            rid::derive(tag.random_id, rid::attempt(rid::MENU_COMMAND, attempt)),
             Pace::Bot,
         )
         .await
@@ -262,7 +367,7 @@ async fn menu<T: Transport>(
         .send(
             chat,
             &typed_amount(amount),
-            rid::derive(tag.random_id, rid::MENU_AMOUNT),
+            rid::derive(tag.random_id, rid::attempt(rid::MENU_AMOUNT, attempt)),
             Pace::Bot,
         )
         .await
@@ -385,27 +490,21 @@ async fn find_with<T: Transport>(
         .recent(Chat::SavedMessages)
         .await
         .map_err(unavailable)?;
-    let label = marker_text(&tag.key);
-    let Some(pos) = saved.iter().rposition(|m| m.out && m.text == label) else {
+    let windows = attempt_windows(&saved, &tag.key);
+    if windows.is_empty() {
         tracing::warn!(op = %tag.key, "operation marker not found in Saved Messages");
         return Ok(None);
-    };
-    let from = saved[pos].id;
-    let until = saved[pos + 1..]
-        .iter()
-        .find(|m| m.out && is_marker(&m.text))
-        .map_or(i32::MAX, |m| m.id);
-    let in_window = |m: &RawMessage| m.id > from && m.id < until;
+    }
 
     let bot = conv
         .recent(Chat::WalletBot(platform))
         .await
         .map_err(unavailable)?;
     // Экран засчитывается, только если перед ним (без других наших сообщений между) стоит
-    // НАШЕ сообщение из окна этой операции: команда меню (xRocket правит экран, пришедший на
+    // НАШЕ сообщение из того же окна попытки: команда меню (xRocket правит экран, пришедший на
     // `/cheques`) или сумма (CryptoBot отвечает на неё новым сообщением). Поздний экран чека
     // другой операции так не попадёт в чужое окно.
-    let ours_before = |m: &RawMessage| {
+    let ours_before = |m: &RawMessage, from: i32, until: i32| {
         bot.iter()
             .filter(|o| o.out && o.id < m.id)
             .map(|o| o.id)
@@ -413,19 +512,21 @@ async fn find_with<T: Transport>(
             .is_some_and(|o| o > from && o < until)
     };
     let mut found: Vec<IssuedCheck> = Vec::new();
-    for m in bot
-        .iter()
-        .filter(|m| !m.out && in_window(m) && ours_before(m))
-    {
-        if let CheckCreationReply::Created(_) = creation(platform, m) {
-            match check_in(platform, m, amount) {
-                Ok(check) => {
-                    if !found.iter().any(|c| c.param == check.param) {
-                        found.push(check);
+    for &(from, until) in &windows {
+        for m in bot
+            .iter()
+            .filter(|m| !m.out && m.id > from && m.id < until && ours_before(m, from, until))
+        {
+            if let CheckCreationReply::Created(_) = creation(platform, m) {
+                match check_in(platform, m, amount) {
+                    Ok(check) => {
+                        if !found.iter().any(|c| c.param == check.param) {
+                            found.push(check);
+                        }
                     }
-                }
-                Err(e) => {
-                    tracing::warn!(op = %tag.key, error = %e, "menu screen without a matching check")
+                    Err(e) => {
+                        tracing::warn!(op = %tag.key, error = %e, "menu screen without a matching check")
+                    }
                 }
             }
         }

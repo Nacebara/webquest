@@ -1451,3 +1451,110 @@ async fn after_a_human_cleared_the_chat_the_next_activation_goes_through() {
     let out = wallet.activate_check(param(&b), &tb).await.unwrap();
     assert_eq!(out, ActivationOutcome::Received(usdt(dec!(7))));
 }
+
+// ============================== повтор меню, если сумма не отправлялась (аудит 11.11.2026, М-1) ====
+
+/// Меню кошелька не ответило на команду: сумма не отправлялась, чек появиться не мог. Повтор
+/// той же операции проходит меню заново и создаёт ровно один чек.
+#[tokio::test(start_paused = true)]
+async fn menu_silence_before_the_amount_is_retried_with_exactly_one_check() {
+    for platform in [CB, XR] {
+        let e = env();
+        e.fund(platform, dec!(100));
+        let wallet = e.wallet(platform);
+        let t = tag("ord-1-payout-1");
+        let command = if platform == CB {
+            "/checks"
+        } else {
+            "/cheques"
+        };
+        e.transport.fault_on_text(command, Fault::NoReply);
+        let first = wallet.issue_check(&usdt(dec!(10)), &t).await;
+        assert!(
+            matches!(first, Err(BotError::Unavailable(_))),
+            "{platform:?}: {first:?}"
+        );
+        assert!(e.world.checks_created_by(e.ub).is_empty());
+
+        let again = wallet.issue_check(&usdt(dec!(10)), &t).await.unwrap();
+        let IssueOutcome::Issued { check, .. } = again else {
+            panic!("{platform:?}: {again:?}")
+        };
+        assert_eq!(e.world.checks_created_by(e.ub).len(), 1, "{platform:?}");
+        assert_eq!(e.balance(platform), dec!(90));
+
+        // Третий вызов с той же меткой находит тот же чек и ничего не создаёт.
+        match wallet.issue_check(&usdt(dec!(10)), &t).await.unwrap() {
+            IssueOutcome::Issued { check: same, .. } => assert_eq!(same.param, check.param),
+            other => panic!("{platform:?}: {other:?}"),
+        }
+        assert_eq!(e.world.checks_created_by(e.ub).len(), 1, "{platform:?}");
+    }
+}
+
+/// То же при FLOOD_WAIT на нажатии кнопки меню (до суммы).
+#[tokio::test(start_paused = true)]
+async fn flood_wait_on_a_menu_button_is_retried_with_exactly_one_check() {
+    for platform in [CB, XR] {
+        let e = env();
+        e.fund(platform, dec!(100));
+        let wallet = e.wallet(platform);
+        let t = tag("ord-1-payout-1");
+        e.world.inject(
+            e.ub,
+            Call::Press,
+            Fault::FloodWait(Duration::from_secs(61)),
+            1,
+        );
+        let first = wallet.issue_check(&usdt(dec!(10)), &t).await;
+        assert_eq!(first, Err(BotError::FloodWait(Duration::from_secs(61))));
+        assert!(e.world.checks_created_by(e.ub).is_empty());
+        tokio::time::advance(Duration::from_secs(62)).await;
+        let again = wallet.issue_check(&usdt(dec!(10)), &t).await.unwrap();
+        assert!(
+            matches!(again, IssueOutcome::Issued { .. }),
+            "{platform:?}: {again:?}"
+        );
+        assert_eq!(e.world.checks_created_by(e.ub).len(), 1, "{platform:?}");
+        assert_eq!(e.balance(platform), dec!(90));
+    }
+}
+
+/// Между попытками прошла другая операция той же суммы: у повтора своё окно (новая метка), и
+/// каждый чек остаётся у своей операции.
+#[tokio::test(start_paused = true)]
+async fn retried_issue_after_another_operation_keeps_the_checks_apart() {
+    let e = env();
+    e.fund(CB, dec!(100));
+    let wallet = e.wallet(CB);
+    let t1 = tag("ord-1-payout-1");
+    let t2 = tag("ord-2-payout-1");
+    e.transport.fault_on_text("/checks", Fault::NoReply);
+    assert!(wallet.issue_check(&usdt(dec!(10)), &t1).await.is_err());
+
+    let IssueOutcome::Issued { check: second, .. } =
+        wallet.issue_check(&usdt(dec!(10)), &t2).await.unwrap()
+    else {
+        panic!("second operation must issue")
+    };
+    let IssueOutcome::Issued { check: first, .. } =
+        wallet.issue_check(&usdt(dec!(10)), &t1).await.unwrap()
+    else {
+        panic!("retried operation must issue")
+    };
+    assert_ne!(first.param, second.param);
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 2);
+    assert_eq!(e.balance(CB), dec!(80));
+    let found1 = wallet
+        .find_issued_check(&usdt(dec!(10)), &t1)
+        .await
+        .unwrap()
+        .unwrap();
+    let found2 = wallet
+        .find_issued_check(&usdt(dec!(10)), &t2)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(found1.param, first.param);
+    assert_eq!(found2.param, second.param);
+}

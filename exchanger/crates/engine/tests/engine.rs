@@ -785,3 +785,31 @@ async fn engine_restarts_after_a_database_error(pool: PgPool) {
         assert!(again.is_ok(), "restart {attempt}: {again:?}");
     }
 }
+
+/// Аудит 11.11.2026, М-1. FLOOD_WAIT на команде меню чеков после метки операции: сумма не
+/// отправлялась, чек появиться не мог. Раньше заявка уходила к человеку, а выплаты кошелька
+/// вставали на паузу; теперь повтор проходит меню заново и заявка завершается сама.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn menu_flood_wait_before_the_amount_does_not_need_a_human(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    // 1-й SendText — /start чека, 2-й — метка операции в «Избранном», 3-й — /cheques.
+    e.world
+        .inject(e.ub, Call::SendText, Fault::DelayReply(Duration::ZERO), 2);
+    e.world
+        .inject(e.ub, Call::SendText, Fault::FloodWait(Duration::ZERO), 1);
+    e.drain().await;
+
+    let (order_now, d) = e.order(order.id).await;
+    assert_eq!(order_now.state, OrderState::Completed);
+    let checks = e.world.checks_created_by(e.ub);
+    assert_eq!(checks.len(), 1, "ровно один чек");
+    assert_eq!(d.payout_check_url.as_deref(), Some(checks[0].url.as_str()));
+    let paused: i64 = sqlx::query_scalar("SELECT count(*) FROM directions WHERE auto_paused")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    assert_eq!(paused, 0, "выплаты не встали на паузу");
+    e.assert_books_match().await;
+}

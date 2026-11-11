@@ -446,6 +446,25 @@ impl<'a, T: Transport> Conv<'a, T> {
         Ok(msgs)
     }
 
+    /// Все сообщения чата после `after_id` — или `None`, если история недоступна либо могла
+    /// обрезаться по `scan_depth`: тогда по ней нельзя судить, чего в чате не было.
+    pub async fn history_complete(&self, chat: Chat, after_id: i32) -> Option<Vec<RawMessage>> {
+        let depth = self.w.cfg.scan_depth;
+        match self.w.transport.history(chat, after_id, depth).await {
+            Ok(msgs) if u32::try_from(msgs.len()).is_ok_and(|n| n < depth) => {
+                for m in &msgs {
+                    self.record(m, false).await;
+                }
+                Some(msgs)
+            }
+            Ok(_) => None,
+            Err(e) => {
+                tracing::warn!(account = self.w.gate.label(), error = %e, "history unavailable");
+                None
+            }
+        }
+    }
+
     async fn history_after(&self, chat: Chat, after_id: i32) -> Vec<RawMessage> {
         match self
             .w

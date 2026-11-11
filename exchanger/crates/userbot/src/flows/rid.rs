@@ -13,6 +13,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub(crate) const MARKER: u64 = 1;
 pub(crate) const MENU_COMMAND: u64 = 2;
 pub(crate) const MENU_AMOUNT: u64 = 3;
+
+/// Шаг `step` для попытки `n` (0 — первая). У повторной попытки свои `random_id`: на команду
+/// прошлой попытки Telegram ответил бы `RANDOM_ID_DUPLICATE`.
+pub(crate) const fn attempt(step: u64, n: u64) -> u64 {
+    step + 16 * n
+}
 pub(crate) const XROCKET_RETRY: u64 = 4;
 pub(crate) const INVOICE_OPEN: u64 = 5;
 
