@@ -17,7 +17,11 @@
 //! «Чистый чат»: первая команда операции в чат бота уходит, только если на нашу прошлую
 //! команду в этом чате уже есть ответ (по истории Telegram, а не по таймеру в памяти — это
 //! переживает рестарт). Иначе ждём `late_reply_quarantine`, затем операция возвращается
-//! движку (`BotError::Unavailable`, ничего не выполнялось). Через `unanswered_block` чат
+//! движку (`BotError::Unavailable`, ничего не выполнялось). Команда активации чека без ответа
+//! держит чат, пока ответ не придёт или заявку не разберёт человек
+//! ([`AccountGate::acknowledge_unanswered`](super::AccountGate::acknowledge_unanswered)): её
+//! поздний ответ несёт сумму, и следующая заявка получила бы чужие деньги (аудит 11.11.2026,
+//! Ю-2). Для остальных команд — через `unanswered_block` чат
 //! считается свободным. Исключение — повтор той же команды (тот же текст): это повтор
 //! операции с тем же `random_id`, её ответ ищется в её же окне.
 
@@ -61,6 +65,15 @@ pub(crate) struct Sent {
     pub earlier_call: bool,
 }
 
+/// Команда, ответ на которую несёт деньги: `/start <код чека>`. Её поздний ответ нельзя отдать
+/// следующей заявке, поэтому по времени чат после неё не освобождается.
+fn carries_money(platform: domain::Platform, text: &str) -> bool {
+    text.strip_prefix("/start ").is_some_and(|param| {
+        parsers::links::classify_start_param(platform, param)
+            == Some(parsers::links::LinkKind::Check)
+    })
+}
+
 pub(crate) struct Conv<'a, T: Transport> {
     w: &'a UserbotWallet<T>,
     gate: MutexGuard<'a, GateState>,
@@ -70,6 +83,9 @@ pub(crate) struct Conv<'a, T: Transport> {
     op: Option<String>,
     /// Чаты, проверенные на «чистоту» в этой операции.
     cleared: HashSet<Chat>,
+    /// Чаты, открытые решением человека при неотвеченной активации: её поздний ответ ещё
+    /// может прийти.
+    after_ack: HashSet<Chat>,
 }
 
 impl<'a, T: Transport> Conv<'a, T> {
@@ -84,6 +100,7 @@ impl<'a, T: Transport> Conv<'a, T> {
             seen: Vec::new(),
             op: op.map(str::to_owned),
             cleared: HashSet::new(),
+            after_ack: HashSet::new(),
         }
     }
 
@@ -93,6 +110,22 @@ impl<'a, T: Transport> Conv<'a, T> {
 
     pub fn deadline(&self) -> Instant {
         Instant::now() + self.w.cfg.reply_timeout
+    }
+
+    /// До какого момента ждать поздний ответ на прошлую команду.
+    pub fn late_deadline(&self) -> Instant {
+        Instant::now() + self.w.cfg.late_reply_quarantine
+    }
+
+    /// Чат открыт решением человека, хотя прошлая активация чека осталась без ответа.
+    pub fn after_ack(&self, chat: Chat) -> bool {
+        self.after_ack.contains(&chat)
+    }
+
+    /// Команда `cmd_id` в `chat` осталась без ответа: ворота запоминают её, чтобы человек мог
+    /// признать её разобранной.
+    pub fn unanswered(&mut self, chat: Chat, cmd_id: i32) {
+        self.gate.unanswered_since(chat, cmd_id);
     }
 
     /// Записать сообщение в журнал. `ours` — наша команда или признанный ответ на неё.
@@ -250,9 +283,22 @@ impl<'a, T: Transport> Conv<'a, T> {
             if answered || next_text == Some(last.text.as_str()) {
                 break;
             }
+            if self.gate.acknowledged(chat, last.id) {
+                self.after_ack.insert(chat);
+                break;
+            }
             let since = self.gate.unanswered_since(chat, last.id);
             let waited = since.elapsed();
             let block = self.w.cfg.unanswered_block;
+            if waited >= block && carries_money(platform, &last.text) {
+                tracing::error!(
+                    account = self.w.gate.label(),
+                    ?chat,
+                    command = last.id,
+                    "check activation has no reply: the chat stays blocked until a human clears it"
+                );
+                return Err(BotError::ChatBlocked);
+            }
             if waited >= block {
                 tracing::warn!(
                     account = self.w.gate.label(),

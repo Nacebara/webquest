@@ -787,3 +787,81 @@ async fn paused_userbot_account_postpones_operations_without_spending_attempts(p
     assert_eq!(e.order(order.id).await.0.state, OrderState::Completed);
     e.assert_books_match().await;
 }
+
+/// Аудит 11.11.2026, Ю-2. Активация без ответа: чат кошелька занят ею, поздний ответ несёт
+/// сумму. Кошелёк на паузе — новые заявки через него не принимаются, чеки клиентов не тронуты.
+/// Человек подтвердил приход — пауза снята, следующая заявка получает свою сумму.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn unanswered_activation_pauses_the_wallet_until_the_order_is_resolved(pool: PgPool) {
+    let e = env(pool).await;
+    let a = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    let order_a = accepted(e.submit(&a).await);
+    e.world.inject(e.ub, Call::SendText, Fault::NoReply, 1);
+    e.drain().await;
+    assert_eq!(e.order(order_a.id).await.0.state, OrderState::ManualReview);
+
+    // Через CryptoBot сейчас нельзя ни принять чек, ни выплатить.
+    let b = e.world.client_check(CB, usdt(dec!(7))).unwrap();
+    let refused = e.submit(&b).await;
+    assert!(
+        matches!(refused, engine::Submitted::Rejected { .. }),
+        "{refused:?}"
+    );
+    let c = e.world.client_check(XR, usdt(dec!(7))).unwrap();
+    let refused = e.submit(&c).await;
+    assert!(
+        matches!(refused, engine::Submitted::Rejected { .. }),
+        "{refused:?}"
+    );
+    let paused: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT code, pause_reason FROM directions WHERE auto_paused ORDER BY code")
+            .fetch_all(&e.pool)
+            .await
+            .unwrap();
+    assert_eq!(paused.len(), 4, "{paused:?}");
+    assert!(
+        paused
+            .iter()
+            .all(|(_, r)| r.as_deref() == Some(engine::UNANSWERED_PAUSE)),
+        "{paused:?}"
+    );
+
+    // Человек видит деньги в кошельке и подтверждает приход: пауза снята, чат открыт.
+    let admin = staff(&e.pool, 20, Role::Admin).await;
+    e.engine
+        .operator_decide(request(
+            order_a.id,
+            OperatorDecision::ConfirmIntake { amount: dec!(100) },
+            &admin,
+        ))
+        .await
+        .unwrap();
+    let still_paused: i64 = sqlx::query_scalar("SELECT count(*) FROM directions WHERE auto_paused")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    assert_eq!(still_paused, 0);
+
+    let order_b = accepted(e.submit(&b).await);
+    e.drain().await;
+    let (b_now, b_details) = e.order(order_b.id).await;
+    assert_eq!(b_now.state, OrderState::Completed);
+    assert_eq!(
+        b_details.intake_amount,
+        Some(dec!(7)),
+        "B получает свою сумму"
+    );
+    e.engine
+        .operator_decide(request(
+            order_a.id,
+            OperatorDecision::RetryPayout {
+                previous_failed: false,
+            },
+            &admin,
+        ))
+        .await
+        .unwrap();
+    e.drain().await;
+    assert_eq!(e.order(order_a.id).await.0.state, OrderState::Completed);
+    e.assert_books_match().await;
+}

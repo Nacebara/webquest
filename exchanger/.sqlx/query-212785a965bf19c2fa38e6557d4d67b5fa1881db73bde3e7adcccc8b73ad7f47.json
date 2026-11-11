@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE directions SET auto_paused = FALSE, pause_reason = NULL, updated_at = now()\n         WHERE auto_paused AND pause_reason = $2\n           AND (source_platform = $1 OR target_platform = $1)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "212785a965bf19c2fa38e6557d4d67b5fa1881db73bde3e7adcccc8b73ad7f47"
+}

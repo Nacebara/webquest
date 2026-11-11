@@ -592,7 +592,22 @@ impl Engine {
         )
         .await?;
         let m = storage::invest::get(&mut tx, move_id, false).await?;
+        // Пополнение, чья активация осталась без ответа, держало кошелёк на паузе (Ю-2).
+        let unanswered = open_op
+            .filter(|o| o.kind == OpKind::ActivateCheck && o.status == OpStatus::Unknown)
+            .map(|o| o.platform);
+        if let Some(platform) = unanswered {
+            storage::directions::clear_auto_pause_reason(
+                &mut tx,
+                platform,
+                crate::UNANSWERED_PAUSE,
+            )
+            .await?;
+        }
         tx.commit().await?;
+        if let Some(platform) = unanswered {
+            self.unanswered_resolved(platform).await;
+        }
         self.notify_invest(&m);
         Ok(m)
     }
@@ -803,6 +818,9 @@ impl Engine {
                     "исход активации чека пополнения неизвестен: проверьте чат кошелька и баланс"
                 };
                 self.invest_manual(&mut tx, &m, note).await?;
+                if !unrecognised && !repeated_loss {
+                    Self::pause_unanswered(&mut tx, op.platform).await?;
+                }
                 if unrecognised {
                     storage::directions::auto_pause_platform(
                         &mut tx,

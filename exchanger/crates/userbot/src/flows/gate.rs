@@ -40,6 +40,8 @@ pub(crate) struct GateState {
     quarantine: HashMap<Chat, Instant>,
     /// Чаты, где последняя наша команда ещё без ответа: (id команды, с какого момента видим).
     unanswered: HashMap<Chat, (i32, Instant)>,
+    /// Команда без ответа, которую человек признал разобранной: её ответа больше не ждём.
+    acked: HashMap<Chat, i32>,
 }
 
 impl AccountGate {
@@ -53,6 +55,20 @@ impl AccountGate {
 
     pub fn label(&self) -> &str {
         &self.label
+    }
+
+    /// Человек разобрал команду, оставшуюся в `chat` без ответа (заявка решена вручную): чат
+    /// можно использовать снова. Признаётся только команда, которую ворота уже видели
+    /// неотвеченной, — будущую команду заранее признать нельзя. `false` — признавать нечего.
+    pub async fn acknowledge_unanswered(&self, chat: Chat) -> bool {
+        let mut st = self.state.lock().await;
+        match st.unanswered.get(&chat).map(|(cmd, _)| *cmd) {
+            Some(cmd) => {
+                st.acked.insert(chat, cmd);
+                true
+            }
+            None => false,
+        }
     }
 
     /// Сколько ещё длится пауза FLOOD_WAIT (для ops-бота и сохранения в БД).
@@ -142,6 +158,11 @@ impl GateState {
 
     pub(crate) fn clear_unanswered(&mut self, chat: Chat) {
         self.unanswered.remove(&chat);
+    }
+
+    /// Команду `cmd_id` человек признал разобранной ([`AccountGate::acknowledge_unanswered`]).
+    pub(crate) fn acknowledged(&self, chat: Chat, cmd_id: i32) -> bool {
+        self.acked.get(&chat) == Some(&cmd_id)
     }
 }
 

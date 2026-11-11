@@ -373,8 +373,15 @@ async fn silence_unknown_text_and_old_message_edit_give_unknown() {
         "{refused:?}"
     );
     assert_eq!(e.sent_texts(Chat::WalletBot(CB)).len(), 1);
-    // Через `unanswered_block` чат снова свободен.
+    // Чат после активации без ответа сам не освобождается и через `unanswered_block`: её поздний
+    // ответ несёт сумму (аудит 11.11.2026, Ю-2). Открывает его человек, разобрав заявку.
     tokio::time::advance(FlowConfig::default().unanswered_block).await;
+    let still = wallet
+        .activate_check(param(&url), &tag("ord-2-intake-1"))
+        .await;
+    assert!(matches!(still, Err(BotError::ChatBlocked)), "{still:?}");
+    assert_eq!(e.sent_texts(Chat::WalletBot(CB)).len(), 1);
+    wallet.acknowledge_unanswered().await;
 
     e.world.inject(
         e.ub,
@@ -1269,14 +1276,21 @@ async fn retried_activation_never_takes_the_next_orders_reply() {
     let out = wallet.activate_check(param(&a), &ta).await.unwrap();
     assert_eq!(out, ActivationOutcome::Unknown { raw: None });
 
-    // B: чат занят неотвеченной командой A — сначала отказ, через `unanswered_block` проходит.
+    // B: чат занят неотвеченной командой A — отказ, пока человек не откроет чат; затем проходит.
     let b = e.world.client_check(CB, usdt(dec!(300))).unwrap();
     let tb = tag("ord-2-intake-1");
     assert!(matches!(
         wallet.activate_check(param(&b), &tb).await,
         Err(BotError::Unavailable(_))
     ));
+    // Сам чат не освобождается и через `unanswered_block` (аудит 11.11.2026, Ю-2): его
+    // открывает человек, разобрав заявку A.
     tokio::time::advance(FlowConfig::default().unanswered_block).await;
+    assert!(matches!(
+        wallet.activate_check(param(&b), &tb).await,
+        Err(BotError::ChatBlocked)
+    ));
+    wallet.acknowledge_unanswered().await;
     let out = wallet.activate_check(param(&b), &tb).await.unwrap();
     assert_eq!(out, ActivationOutcome::Received(usdt(dec!(300))));
 
@@ -1323,4 +1337,117 @@ async fn very_late_reply_is_kept_out_of_the_next_operation() {
     let retry = wallet.activate_check(param(&a), &ta).await.unwrap();
     assert_eq!(retry, ActivationOutcome::Received(usdt(dec!(300))));
     assert_eq!(e.balance(CB), dec!(302));
+}
+
+// ============================== молчание кошелька дольше блока (аудит 11.11.2026, Ю-2) =============
+
+/// Бот кошелька молчал полчаса. Пока активация A без ответа, B в чат не уходит — ни сразу, ни
+/// через `unanswered_block`: поздний ответ на A несёт сумму и достался бы B. Ответ пришёл —
+/// каждая заявка получает свою сумму.
+#[tokio::test(start_paused = true)]
+async fn unanswered_activation_keeps_the_chat_until_its_reply_arrives() {
+    let e = env();
+    let wallet = e.wallet(CB);
+    let a = e.world.client_check(CB, usdt(dec!(300))).unwrap();
+    let ta = tag("ord-1-intake-1");
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::DelayReply(Duration::from_secs(1800)),
+        1,
+    );
+    let out = wallet.activate_check(param(&a), &ta).await.unwrap();
+    assert!(matches!(out, ActivationOutcome::Unknown { .. }), "{out:?}");
+
+    let b = e.world.client_check(CB, usdt(dec!(2))).unwrap();
+    let tb = tag("ord-2-intake-1");
+    assert!(matches!(
+        wallet.activate_check(param(&b), &tb).await,
+        Err(BotError::Unavailable(_))
+    ));
+    tokio::time::advance(FlowConfig::default().unanswered_block).await;
+    let blocked = wallet.activate_check(param(&b), &tb).await;
+    assert!(
+        matches!(blocked, Err(BotError::ChatBlocked)),
+        "B must not be sent while A has no reply: {blocked:?}"
+    );
+
+    // Ответ на A пришёл: чат чист без участия человека.
+    tokio::time::advance(Duration::from_secs(1300)).await;
+    let retry = wallet.activate_check(param(&a), &ta).await.unwrap();
+    assert_eq!(retry, ActivationOutcome::Received(usdt(dec!(300))));
+    let out = wallet.activate_check(param(&b), &tb).await.unwrap();
+    assert_eq!(out, ActivationOutcome::Received(usdt(dec!(2))));
+    assert_eq!(e.balance(CB), dec!(302));
+}
+
+/// Человек открыл чат, хотя ответ на A так и не пришёл, а потом бот ответил на A и B подряд.
+/// Два итоговых ответа в окне B — исход неясен: ни одна заявка не получает чужую сумму.
+#[tokio::test(start_paused = true)]
+async fn late_backlog_after_a_human_cleared_the_chat_is_ambiguous_not_misattributed() {
+    let e = env();
+    let wallet = e.wallet(CB);
+    let a = e.world.client_check(CB, usdt(dec!(300))).unwrap();
+    let ta = tag("ord-1-intake-1");
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::DelayReply(Duration::from_secs(1800)),
+        1,
+    );
+    let out = wallet.activate_check(param(&a), &ta).await.unwrap();
+    assert!(matches!(out, ActivationOutcome::Unknown { .. }), "{out:?}");
+    let b = e.world.client_check(CB, usdt(dec!(2))).unwrap();
+    let tb = tag("ord-2-intake-1");
+    tokio::time::advance(FlowConfig::default().unanswered_block).await;
+    assert!(matches!(
+        wallet.activate_check(param(&b), &tb).await,
+        Err(BotError::ChatBlocked)
+    ));
+
+    wallet.acknowledge_unanswered().await;
+    // Ответ на B бот отдаст сразу после ответа на A (очередь после молчания).
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::DelayReply(Duration::from_secs(1210)),
+        1,
+    );
+    let out = wallet.activate_check(param(&b), &tb).await.unwrap();
+    assert!(matches!(out, ActivationOutcome::Unknown { .. }), "{out:?}");
+
+    tokio::time::advance(Duration::from_secs(1400)).await;
+    let retry_b = wallet.activate_check(param(&b), &tb).await.unwrap();
+    assert!(
+        matches!(retry_b, ActivationOutcome::Unknown { .. }),
+        "B must not adopt A's 300: {retry_b:?}"
+    );
+    let retry_a = wallet.activate_check(param(&a), &ta).await.unwrap();
+    assert!(
+        matches!(retry_a, ActivationOutcome::Unknown { .. }),
+        "A must not adopt B's 2: {retry_a:?}"
+    );
+    assert_eq!(e.balance(CB), dec!(302), "both checks are in the wallet");
+}
+
+/// Ответ на A потерян навсегда, человек разобрал заявку и открыл чат: B получает свой ответ.
+#[tokio::test(start_paused = true)]
+async fn after_a_human_cleared_the_chat_the_next_activation_goes_through() {
+    let e = env();
+    let wallet = e.wallet(CB);
+    let a = e.world.client_check(CB, usdt(dec!(5))).unwrap();
+    let ta = tag("ord-1-intake-1");
+    e.world.inject(e.ub, Call::SendText, Fault::NoReply, 1);
+    let out = wallet.activate_check(param(&a), &ta).await.unwrap();
+    assert_eq!(out, ActivationOutcome::Unknown { raw: None });
+    let b = e.world.client_check(CB, usdt(dec!(7))).unwrap();
+    let tb = tag("ord-2-intake-1");
+    tokio::time::advance(FlowConfig::default().unanswered_block).await;
+    assert!(matches!(
+        wallet.activate_check(param(&b), &tb).await,
+        Err(BotError::ChatBlocked)
+    ));
+    wallet.acknowledge_unanswered().await;
+    let out = wallet.activate_check(param(&b), &tb).await.unwrap();
+    assert_eq!(out, ActivationOutcome::Received(usdt(dec!(7))));
 }

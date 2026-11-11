@@ -149,6 +149,10 @@ pub enum BotError {
     /// Операция не начата: транспорт недоступен.
     #[error("transport unavailable: {0}")]
     Unavailable(String),
+    /// Операция не начата: чат кошелька занят активацией чека, оставшейся без ответа, и ждёт
+    /// её ответа или решения человека (аудит 11.11.2026, Ю-2).
+    #[error("the wallet chat is blocked by a check activation without a reply")]
+    ChatBlocked,
     /// Кошелёк сообщил об ограничении аккаунта — направление на паузу (SPEC §4, П15).
     #[error("wallet account restricted")]
     AccountRestricted,
@@ -195,4 +199,8 @@ pub trait WalletBot: Send + Sync {
 
     /// Балансы кошелька по активам (экран «Кошелёк»).
     async fn balances(&self) -> Result<Vec<Money>, BotError>;
+
+    /// Человек разобрал заявку, чья активация осталась без ответа: чат кошелька можно
+    /// использовать снова (см. `flows::conv`, «чистый чат»). По умолчанию — ничего.
+    async fn acknowledge_unanswered(&self) {}
 }

@@ -22,8 +22,8 @@
 //! Один созданный чек не закроет две операции (`operations_check_issued_once`).
 
 use chrono::Utc;
-use domain::Money;
 use domain::fsm::{Event, Flow, OpKind, OrderState, Settlement};
+use domain::{Money, Platform};
 use serde_json::json;
 use sqlx::PgConnection;
 use storage::StorageError;
@@ -186,6 +186,15 @@ impl Engine {
     /// Действие не выполнялось: вернуть операцию в очередь. Аккаунт ограничен или
     /// разлогинен, или операция не выполняется дольше `escalate_after` — к человеку и пауза.
     pub(crate) async fn release(&self, op: &OperationRow, e: &BotError) -> Result<(), EngineError> {
+        // Чат занят активацией без ответа: причина известна, кошелёк уже на паузе с тревогой.
+        // Операция ждёт, пока чат не откроют, — в «слишком долго не выполняется» не уходит.
+        if matches!(e, BotError::ChatBlocked) {
+            let at = Utc::now()
+                + chrono::Duration::from_std(self.cfg.unavailable_backoff).unwrap_or_default();
+            let mut conn = self.pool.acquire().await?;
+            storage::operations::postpone(&mut conn, op.id, at, crate::UNANSWERED_PAUSE).await?;
+            return Ok(());
+        }
         let fatal = matches!(e, BotError::AccountRestricted | BotError::NotAuthorized);
         let stuck = op.first_released_at.is_some_and(|t| {
             Utc::now() - t
@@ -491,6 +500,10 @@ impl Engine {
                     cause,
                 )
                 .await?;
+                // Ответа нет вовсе: чат кошелька занят этой активацией, пока её не разберут.
+                if !unrecognised && !repeated_loss {
+                    Self::pause_unanswered(&mut tx, op.platform).await?;
+                }
                 // Незнакомый ответ кошелька — приём на этой платформе на паузу (CLAUDE.md п. 13).
                 if unrecognised {
                     storage::directions::auto_pause_platform(
@@ -512,6 +525,36 @@ impl Engine {
         tx.commit().await?;
         self.notify(&order);
         Ok(())
+    }
+
+    /// Активация чека осталась без ответа: приём и выплаты через этот кошелёк — на паузу
+    /// ([`crate::UNANSWERED_PAUSE`]), пока ответ не придёт или заявку не разберёт человек.
+    pub(crate) async fn pause_unanswered(
+        conn: &mut PgConnection,
+        platform: Platform,
+    ) -> Result<(), EngineError> {
+        for side in [Side::Source, Side::Target] {
+            storage::directions::auto_pause_platform(
+                &mut *conn,
+                platform,
+                side,
+                crate::UNANSWERED_PAUSE,
+            )
+            .await?;
+        }
+        tracing::error!(
+            platform = platform.db_name(),
+            "check activation has no reply: the wallet is paused until a human resolves it"
+        );
+        Ok(())
+    }
+
+    /// Человек разобрал заявку с неотвеченной активацией (после коммита решения): чат
+    /// кошелька можно использовать снова.
+    pub(crate) async fn unanswered_resolved(&self, platform: Platform) {
+        if let Ok(wallet) = self.wallet(platform) {
+            wallet.acknowledge_unanswered().await;
+        }
     }
 
     /// После зачисления: выплата, возврат или человек — в той же транзакции. Ошибка расчёта

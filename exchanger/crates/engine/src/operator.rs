@@ -292,6 +292,18 @@ impl Engine {
             ..EffectCtx::default()
         };
         let staff_id = staff.tg_user_id;
+        // Активация без ответа держит кошелёк на паузе, а чат — занятым (аудит 11.11.2026,
+        // Ю-2). Решение, которое закрывает её исход, снимает и то и другое.
+        let unanswered_intake = ops
+            .iter()
+            .find(|o| o.kind == OpKind::ActivateCheck && o.status == OpStatus::Unknown)
+            .map(|o| o.platform)
+            .filter(|_| {
+                matches!(
+                    req.decision,
+                    OperatorDecision::ConfirmIntake { .. } | OperatorDecision::CloseWithoutPayout
+                )
+            });
 
         let updated = match &req.decision {
             OperatorDecision::ConfirmIntake { amount } => {
@@ -547,7 +559,18 @@ impl Engine {
             },
         )
         .await?;
+        if let Some(platform) = unanswered_intake {
+            storage::directions::clear_auto_pause_reason(
+                &mut tx,
+                platform,
+                crate::UNANSWERED_PAUSE,
+            )
+            .await?;
+        }
         tx.commit().await?;
+        if let Some(platform) = unanswered_intake {
+            self.unanswered_resolved(platform).await;
+        }
         tracing::info!(
             order = order.id,
             staff = staff_id,

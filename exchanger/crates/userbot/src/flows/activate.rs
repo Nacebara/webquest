@@ -9,6 +9,7 @@
 use domain::{Money, Platform};
 use parsers::ActivationReply;
 use parsers::replies::classify_activation;
+use tokio::time::Instant;
 
 use super::conv::{Conv, SendError};
 use super::gate::Pace;
@@ -81,8 +82,37 @@ async fn once<T: Transport>(
         })
         .await;
     match reply {
-        Some(m) => Ok(Attempt::Reply(classify_activation(platform, &m.text), m)),
+        Some(m) => {
+            // Один `/start` — один итоговый ответ. Второй в том же окне значит, что сюда попал
+            // поздний ответ на прошлую команду (аудит 11.11.2026, Ю-2): чья сумма чья, решает
+            // человек. По истории проверяем при повторе и после того, как чат открыл человек
+            // (тогда ещё и ждём: ответы после молчания бота приходят пачкой).
+            if sent.located || conv.after_ack(chat) {
+                let until = if conv.after_ack(chat) {
+                    conv.late_deadline()
+                } else {
+                    Instant::now()
+                };
+                let first = m.id;
+                let second = conv
+                    .wait(chat, sent.msg.id, mark, until, sent.located, |x| {
+                        x.id != first && classify_activation(platform, &x.text).is_terminal()
+                    })
+                    .await;
+                if second.is_some() {
+                    tracing::error!(
+                        command = sent.msg.id,
+                        "two final replies in one activation window: outcome is ambiguous"
+                    );
+                    conv.unanswered(chat, sent.msg.id);
+                    conv.quarantine(chat);
+                    return Ok(Attempt::NoReply(None));
+                }
+            }
+            Ok(Attempt::Reply(classify_activation(platform, &m.text), m))
+        }
         None => {
+            conv.unanswered(chat, sent.msg.id);
             conv.quarantine(chat);
             Ok(Attempt::NoReply(last_unknown))
         }

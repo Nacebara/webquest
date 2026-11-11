@@ -227,6 +227,17 @@ impl<T: Transport> WalletBot for UserbotWallet<T> {
     async fn balances(&self) -> Result<Vec<Money>, BotError> {
         balance::run(self).await
     }
+
+    async fn acknowledge_unanswered(&self) {
+        let chat = crate::transport::Chat::WalletBot(self.platform);
+        if self.gate.acknowledge_unanswered(chat).await {
+            tracing::warn!(
+                account = self.gate.label(),
+                platform = ?self.platform,
+                "unanswered command acknowledged by a human, the chat is used again"
+            );
+        }
+    }
 }
 
 /// Сумма так, как её вводит человек: `97.5`, `10`, `0.25`.

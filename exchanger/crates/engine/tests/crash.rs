@@ -138,6 +138,11 @@ async fn two_hundred_orders_with_faults_and_crashes_keep_money_exact(pool: PgPoo
             .execute(&e.pool)
             .await
             .unwrap();
+        // …и разбирает активации без ответа: без этого чат кошелька остаётся занятым
+        // (аудит 11.11.2026, Ю-2).
+        for wallet in e.wallets.values() {
+            wallet.acknowledge_unanswered().await;
+        }
     }
     e.engine.recover().await.unwrap();
     e.engine.resolve_unknown().await.unwrap();

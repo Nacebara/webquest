@@ -249,6 +249,28 @@ pub async fn auto_pause_platform(
     Ok(n)
 }
 
+/// Снять автопаузу с направлений платформы, поставленную ровно с этой причиной (другие
+/// причины не трогаются). Сколько направлений снято.
+pub async fn clear_auto_pause_reason(
+    conn: &mut PgConnection,
+    platform: domain::Platform,
+    reason: &str,
+) -> Result<u64, StorageError> {
+    let n = sqlx::query!(
+        r#"
+        UPDATE directions SET auto_paused = FALSE, pause_reason = NULL, updated_at = now()
+         WHERE auto_paused AND pause_reason = $2
+           AND (source_platform = $1 OR target_platform = $1)
+        "#,
+        platform.db_name(),
+        reason
+    )
+    .execute(conn)
+    .await?
+    .rows_affected();
+    Ok(n)
+}
+
 /// Минимальная сумма чека актива на платформе (`platform_assets.min_check`).
 pub async fn min_check(
     conn: &mut PgConnection,

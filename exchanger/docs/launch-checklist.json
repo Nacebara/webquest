@@ -7,14 +7,14 @@
       "milestone": 0,
       "criterion": "fmt, clippy без предупреждений, все тесты, sqlx prepare --check, CI — зелёные на коммите запуска",
       "status": "done",
-      "evidence": "10–11.11.2026, коммит 692211e: 601 тест, 0 упало; CI № 94 зелёный. Перепроверяется на коммите запуска"
+      "evidence": "10–11.11.2026, коммит 692211e: 601 тест, 0 упало; CI № 94 зелёный. Перепроверяется на коммите запуска; 11.11.2026 после шага 1.1: 605 тестов, 0 упало"
     },
     {
       "id": "yu-2",
       "milestone": 1,
       "criterion": "Неотвеченная активация не даёт зачесть чужую сумму: приём чеков кошелька на паузе до разбора (Ю-2)",
-      "status": "todo",
-      "evidence": ""
+      "status": "done",
+      "evidence": "11.11.2026: тесты userbot `unanswered_activation_keeps_the_chat_until_its_reply_arrives`, `late_backlog_after_a_human_cleared_the_chat_is_ambiguous_not_misattributed`, `after_a_human_cleared_the_chat_the_next_activation_goes_through`; тест движка `unanswered_activation_pauses_the_wallet_until_the_order_is_resolved`; все 605 тестов зелёные. Вживую не проверено: нужен живой прогон (молчание кошелька)"
     },
     {
       "id": "yu-2-check",
