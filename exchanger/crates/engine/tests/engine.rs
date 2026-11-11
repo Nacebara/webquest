@@ -746,3 +746,42 @@ async fn settlement_error_keeps_the_intake_and_calls_a_human(pool: PgPool) {
     assert!(d.manual_reason.unwrap().contains("расчёт не удался"));
     e.assert_books_match().await;
 }
+
+/// Аудит 11.11.2026, М-2. Сбой базы внутри цикла движка: блокировка «один движок» не должна
+/// пережить ошибку — иначе перезапущенный в том же процессе движок отвечает «уже запущен
+/// другой экземпляр», супервизор сдаётся и обменник выключается.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn engine_restarts_after_a_database_error(pool: PgPool) {
+    let e = env(pool).await;
+    // В пуле несколько свободных соединений, как в работающем процессе (бот, пульт, пульс).
+    {
+        let a = e.pool.acquire().await.unwrap();
+        let b = e.pool.acquire().await.unwrap();
+        let c = e.pool.acquire().await.unwrap();
+        drop((a, b, c));
+    }
+    sqlx::query("ALTER TABLE operations RENAME TO operations_gone")
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    let engine = engine::Engine::new(e.pool.clone(), engine::EngineConfig::default());
+    let failed = engine.run(tokio_util::sync::CancellationToken::new()).await;
+    assert!(
+        matches!(failed, Err(engine::EngineError::Storage(_))),
+        "{failed:?}"
+    );
+    sqlx::query("ALTER TABLE operations_gone RENAME TO operations")
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    for attempt in 1..=5 {
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let stop = cancel.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            stop.cancel();
+        });
+        let again = engine.run(cancel).await;
+        assert!(again.is_ok(), "restart {attempt}: {again:?}");
+    }
+}

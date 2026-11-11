@@ -31,6 +31,7 @@ use std::time::Duration;
 
 use domain::fsm::OrderState;
 use domain::{Asset, Decimal, Platform};
+use sqlx::Connection as _;
 use sqlx::PgPool;
 use storage::StorageError;
 use tokio::sync::broadcast;
@@ -247,15 +248,28 @@ impl Engine {
         &self,
         cancel: tokio_util::sync::CancellationToken,
     ) -> Result<(), EngineError> {
-        let mut leader = self.pool.acquire().await?;
+        // Блокировка — на отдельном соединении вне пула: оно закрывается при любом выходе отсюда,
+        // и блокировка уходит вместе с ним. На соединении из пула она пережила бы ошибку, и
+        // перезапущенный движок принял бы её за чужую (аудит 11.11.2026, М-2).
+        let mut leader = self.pool.acquire().await?.detach();
         let locked: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock($1, $2)")
             .bind(LEADER_LOCK.0)
             .bind(LEADER_LOCK.1)
-            .fetch_one(&mut *leader)
+            .fetch_one(&mut leader)
             .await?;
         if !locked {
+            let _ = leader.close().await;
             return Err(EngineError::AnotherInstance);
         }
+        let result = self.work(cancel).await;
+        if let Err(e) = leader.close().await {
+            tracing::warn!(error = %e, "leader connection did not close cleanly");
+        }
+        result
+    }
+
+    /// Работа движка под блокировкой лидера (см. [`Engine::run`]).
+    async fn work(&self, cancel: tokio_util::sync::CancellationToken) -> Result<(), EngineError> {
         self.recover().await?;
         let mut listener = sqlx::postgres::PgListener::connect_with(&self.pool).await?;
         listener.listen("exch_operations").await?;
@@ -296,12 +310,6 @@ impl Engine {
                 }
             }
         }
-        // Блокировка уходит вместе с соединением; явно — чтобы не ждать его закрытия.
-        let _ = sqlx::query("SELECT pg_advisory_unlock($1, $2)")
-            .bind(LEADER_LOCK.0)
-            .bind(LEADER_LOCK.1)
-            .execute(&mut *leader)
-            .await;
         Ok(())
     }
 }
