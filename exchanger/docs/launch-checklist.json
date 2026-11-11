@@ -1,0 +1,356 @@
+{
+  "about": "Критерии запуска exch. Пункты не удаляются и не ослабляются, меняется только status (todo / done / verified_live) и evidence. План — docs/PLAN-v2.md, находки — docs/AUDIT-2026-11-11.md.",
+  "updated": "2026-11-11",
+  "items": [
+    {
+      "id": "base-checks",
+      "milestone": 0,
+      "criterion": "fmt, clippy без предупреждений, все тесты, sqlx prepare --check, CI — зелёные на коммите запуска",
+      "status": "done",
+      "evidence": "10–11.11.2026, коммит 692211e: 601 тест, 0 упало; CI № 94 зелёный. Перепроверяется на коммите запуска"
+    },
+    {
+      "id": "yu-2",
+      "milestone": 1,
+      "criterion": "Неотвеченная активация не даёт зачесть чужую сумму: приём чеков кошелька на паузе до разбора (Ю-2)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "yu-2-check",
+      "milestone": 1,
+      "criterion": "Поздний экран созданного чека не становится результатом другой операции (Ю-2)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "m-1",
+      "milestone": 1,
+      "criterion": "Сбой меню кошелька до ввода суммы не уводит заявку к человеку: бот проходит меню заново, чек один (М-1)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "m-2",
+      "milestone": 1,
+      "criterion": "После сбоя базы движок перезапускается сам (М-2)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "m-6",
+      "milestone": 1,
+      "criterion": "Сверка балансов работает и при висящей неясной операции; тревога, если сверка не проходит (М-6)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "m-5",
+      "milestone": 1,
+      "criterion": "«Деньги пришли» ограничено в движке излишком кошелька и потолком сотрудника (М-5)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "m-4",
+      "milestone": 1,
+      "criterion": "Результат активации не теряется при сбое базы (М-4)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "n-1",
+      "milestone": 2,
+      "criterion": "Мягкая остановка на Windows при остановке службы, закрытии окна, выключении (Н-1)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "n-2",
+      "milestone": 2,
+      "criterion": "Ошибка старта под службой завершает процесс, а не ждёт Enter (Н-2)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "n-3",
+      "milestone": 2,
+      "criterion": "Старт ждёт базу и Telegram; после перезагрузки сервера exch поднимается сам (Н-3)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "n-4",
+      "milestone": 2,
+      "criterion": "Минута без базы или сети не выключает exch (Н-4)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "n-5",
+      "milestone": 2,
+      "criterion": "Пинг наружу работает; об остановке exch владелец получает сообщение (Н-5)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "n-8",
+      "milestone": 2,
+      "criterion": "Журнал пишется в файл с ротацией (Н-8)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "n-9",
+      "milestone": 2,
+      "criterion": "Сторож зависания; второй экземпляр бота распознаётся и даёт тревогу (Н-9)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "alerts",
+      "milestone": 2,
+      "criterion": "Критичные тревоги (вход сброшен, аккаунт ограничен, FLOOD надолго, незнакомый ответ, стоп-кран, движок стоит) приходят персоналу, повторяются до «Принял», не множатся (Ю-3, AUDIT-UI П1–П3)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "n-7",
+      "milestone": 2,
+      "criterion": "Ссылка на счёт при молчащем кошельке не останавливает бота для других клиентов (Н-7)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "zh-1",
+      "milestone": 3,
+      "criterion": "Экраны со страницами отправляются без ошибки (Ж-1)",
+      "status": "todo",
+      "evidence": "Ошибка подтверждена вживую 11.11.2026: sendMessage вернул \"disabled\": {}"
+    },
+    {
+      "id": "t-2",
+      "milestone": 3,
+      "criterion": "Тесты botapi разбирают записанные настоящие ответы Telegram (Т-2)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "t-1",
+      "milestone": 3,
+      "criterion": "CI собирает exch под Windows (Т-1)",
+      "status": "todo",
+      "evidence": "11.11.2026: cargo check --target x86_64-pc-windows-gnu проходит (разовая проверка, не CI)"
+    },
+    {
+      "id": "t-3",
+      "milestone": 3,
+      "criterion": "cargo audit без уязвимостей и в CI (Т-3)",
+      "status": "todo",
+      "evidence": "11.11.2026: 9 уязвимостей, все с исправленными версиями"
+    },
+    {
+      "id": "zh-2",
+      "milestone": 3,
+      "criterion": "Премиум-эмодзи: перенос наборов по ключу, все роли с эмодзи (Ж-2)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "b-1-3",
+      "milestone": 3,
+      "criterion": "Чужая заявка не прикладывается к вопросу; .env.* вне git; демо не стартует на боевых данных (Б-1…Б-3)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "ub-accounts",
+      "milestone": 4,
+      "criterion": "Один или два аккаунта юзербота настраиваются мастером; видно, какой аккаунт на каком кошельке (БП-2)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "ub-procedure",
+      "milestone": 4,
+      "criterion": "Процедура «аккаунт заблокирован / вход сброшен» описана и пройдена на симуляторе (БП-2)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "yu-1",
+      "milestone": 4,
+      "criterion": "Суммы и балансы от 1 000 USDT читаются по живым записям обоих кошельков (Ю-1)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "invest-p4",
+      "milestone": 5,
+      "criterion": "Доля инвестора считается от прибыли, а не от выручки; период с убытком не начисляет (М-8, П4)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "invest-screens",
+      "milestone": 5,
+      "criterion": "Экраны инвестора — карточки в стиле бота, приняты владельцем",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "k-1",
+      "milestone": 6,
+      "criterion": "Итог после ожидания приходит новым сообщением с уведомлением (К-1)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "k-2",
+      "milestone": 6,
+      "criterion": "Под каждой ошибкой клиента есть кнопка «что дальше» (К-2)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "k-3-4",
+      "milestone": 6,
+      "criterion": "Нет кнопок-заглушек; сроки и строки ожидания как в макете; диалог поддержки переживает перезапуск (К-3, К-4)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "client-audit-ui",
+      "milestone": 6,
+      "criterion": "Открытые находки AUDIT-UI по клиенту закрыты или приняты владельцем",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "client-accept",
+      "milestone": 6,
+      "criterion": "Каждый экран клиента из макета принят владельцем в «Предпросмотре»",
+      "status": "todo",
+      "evidence": "11.11.2026: «Предпросмотр» дошёл (32 карточки), построчной приёмки не было"
+    },
+    {
+      "id": "ops-audit-ui",
+      "milestone": 7,
+      "criterion": "Открытые находки AUDIT-UI тяжести 3 по пульту закрыты (П4, П5, П11, П12)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "ops-manual-pay",
+      "milestone": 7,
+      "criterion": "«Ручная оплата счёта» — экран-задача по макету",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "ops-snapshots",
+      "milestone": 7,
+      "criterion": "У каждого экрана пульта есть снимок rich и HTML (П-1)",
+      "status": "todo",
+      "evidence": "11.11.2026: 12 снимков"
+    },
+    {
+      "id": "ops-accept",
+      "milestone": 7,
+      "criterion": "Экраны пульта, нужные для запуска, приняты владельцем",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "docs",
+      "milestone": 8,
+      "criterion": "Документы соответствуют коду: README, LAPTOP, DEPLOY (Windows), PROGRESS, план, инструкция; HANDOVER в архиве; Docker-файлов обменника нет (Д-1…Д-5)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "live-check",
+      "milestone": 9,
+      "criterion": "exch check без ошибок и самопроверка на сервере владельца",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "live-exchange",
+      "milestone": 9,
+      "criterion": "Обмены по 1 USDT в обе стороны, счета обоих кошельков, возврат — пройдены вживую",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "live-bad",
+      "milestone": 9,
+      "criterion": "Неприятные случаи вживую: чек с паролем, мульти-чек, уже открытый чек, молчание кошелька, перезапуск посреди заявки",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "live-reconcile",
+      "milestone": 9,
+      "criterion": "После живого прогона сверка балансов сходится",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "svc",
+      "milestone": 10,
+      "criterion": "exch работает службой Windows с автозапуском; после перезагрузки сервера поднимаются и гарант, и обменник",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "watchdog",
+      "milestone": 10,
+      "criterion": "Внешний сторож и уведомления в Telegram об остановке exch",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "backup",
+      "milestone": 10,
+      "criterion": "Бэкап базы по расписанию; восстановление проверено на деле",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "update",
+      "milestone": 10,
+      "criterion": "Обновление и откат — одна понятная последовательность, пройдена владельцем",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "ub-watch",
+      "milestone": 10,
+      "criterion": "Наблюдение за аккаунтами юзерботов: вход, ограничения, чужие сессии",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "runbook",
+      "milestone": 10,
+      "criterion": "Инструкция «что делать, если…» для владельца и персонала, включая вывод прибыли руками и блокировку аккаунта (БП-1)",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "neighbour",
+      "milestone": 10,
+      "criterion": "Обменник не мешает гаранту: память и порты проверены на сервере",
+      "status": "todo",
+      "evidence": ""
+    },
+    {
+      "id": "token",
+      "milestone": 10,
+      "criterion": "Токен тестового бота @fexchbot перевыпущен владельцем после окончания работ",
+      "status": "todo",
+      "evidence": ""
+    }
+  ]
+}
