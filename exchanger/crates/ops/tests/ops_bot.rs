@@ -1210,12 +1210,19 @@ async fn table_rows_open_cards_in_the_same_window_and_lists_have_pages(pool: PgP
         card.message_id, page2.message_id,
         "карточка — в том же сообщении"
     );
-    assert!(
+    // Только окно сотрудника: клиентский бот в это время может слать клиенту сообщения его
+    // заявок («Проверяю чек») — это другой чат, и CI ловил их здесь как ложную ошибку.
+    let sent: Vec<String> =
         o.tg.calls()
             .iter()
             .skip(mark)
-            .all(|c| c.method != "sendMessage" && c.method != "sendRichMessage"),
-        "никаких новых сообщений и «/start» — нажатие приходит кнопкой"
+            .filter(|c| c.chat() == Some(OWNER))
+            .filter(|c| c.method == "sendMessage" || c.method == "sendRichMessage")
+            .map(|c| format!("{} → {:?}: {}", c.method, c.chat(), c.text()))
+            .collect();
+    assert!(
+        sent.is_empty(),
+        "никаких новых сообщений и «/start» — нажатие приходит кнопкой: {sent:#?}"
     );
     let back = o.press(OWNER, &card, "Заявки", "2 / 2").await;
     assert!(back.text().contains(&oldest), "назад — на ту же страницу");
