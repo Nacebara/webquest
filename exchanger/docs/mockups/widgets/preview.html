@@ -262,7 +262,7 @@ table.sz { max-width: 820px; }
   </section>
 
   <section class="block">
-    <h2>Инвест-панель<small>13 ноября · на приёмку</small></h2>
+    <h2>Инвест-панель<small>13 ноября · принято, вариант Б</small></h2>
     <p class="lead">Экраны инвестора есть в боте, но в утверждённых макетах их не было — их надо было показать вместе со всеми. Ниже — клиент и пульт целиком: карточками в стиле бота, денежные сообщения — обычным текстом, виджеты — где они правда помогают. Пример в «Как это работает» — уже по вашему решению П4: доля от <b>прибыли</b> (комиссии минус потери), а не от выручки. Значок 💼 нарисую в нашем наборе премиум-эмодзи.</p>
     <div class="demo rec" data-w="inv_home">
       <div><div class="chips"></div><div class="phones"></div></div>
@@ -342,7 +342,7 @@ table.sz { max-width: 820px; }
 
 
   <section class="block">
-    <h2>Панель эмодзи · пульт<small>13 ноября · на приёмку</small></h2>
+    <h2>Панель эмодзи · пульт<small>13 ноября · принято</small></h2>
     <p class="lead">В утверждённых макетах панель была одной карточкой-наброском, в коде — список ролей и «пришлите эмодзи». Здесь — целиком. Как в гаранте: на любую роль — свой премиум-эмодзи, «было → стало». Лучше гаранта: роли по разделам и с примером, где роль видна; предупреждение про статичный эмодзи среди анимированных; ночная проверка, что свои эмодзи не пропали из Telegram (на их месте сам встанет наш значок); дописать новые значки в наборы — одной кнопкой с ходом загрузки.</p>
     <div class="demo" data-w="emo_home"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Новое</span><h3>Эмодзи · главная</h3><p>Состояние наборов, вид, сколько ролей свои, живой пример строки. Если свой эмодзи пропал (автор удалил набор) — красная точка и «Заменить».</p><div class="k">Переключите: «Главная» → «Свой эмодзи перестал работать».</div></div></div>
     <div class="demo" data-w="emo_style"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Новое</span><h3>Вид эмодзи</h3><p>Анимированные, статичные или обычные — с примером в каждой строке; выбор подтверждается «было → стало».</p></div></div>
@@ -353,13 +353,38 @@ table.sz { max-width: 820px; }
   </section>
 
   <section class="block">
-    <h2>Пульт: денежные действия<small>13 ноября · не было в макетах</small></h2>
+    <h2>Пульт: денежные действия<small>13 ноября · принято</small></h2>
     <p class="lead">Сверка всех кнопок пульта с макетами нашла действия, которые есть в коде, но не нарисованы. Здесь — денежные: найти заявку, «Деньги пришли» (с новым правилом шага 1.6), «Отметить выплаченной», отказ бота и «Отправить владельцу». Остальное — следующей партией, список — <code>GAPS.md</code>.</p>
     <div class="demo" data-w="ops_find"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Найти заявку</h3><p>Любой номер или код чека одним сообщением; не нашлось — что проверить.</p></div></div>
     <div class="demo" data-w="ops_intake"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт · деньги</span><h3>Деньги пришли</h3><p>Сумма по чеку — одной кнопкой; другая — числом. Перед зачислением бот сам сверяет кошелёк: больше, чем реально лежит, не зачислит (шаг 1.6). Расхождение с чеком больше 1 % — решает владелец.</p><div class="k">Переключите: «Сколько пришло» → «Подтверждение» → «Больше, чем в кошельке» → «Не совпадает с чеком».</div></div></div>
     <div class="demo" data-w="ops_paid"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт · деньги</span><h3>Отметить выплаченной</h3><p>Доказательство (ссылка на чек) → подтверждение с «Необратимо» и 60 секундами, как в утверждённом «Подтверждении».</p></div></div>
     <div class="demo" data-w="ops_refusal"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Бот не сделал</h3><p>Каждый отказ: что не так, где деньги клиента, и кнопка следующего шага — а не тупик.</p></div></div>
     <div class="demo" data-w="ops_owner"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Отправить владельцу</h3><p>Решение выше прав сотрудника уходит владельцу карточкой «кто предлагает — что — почему» с «Подтвердить / Отклонить»; итог возвращается сотруднику.</p></div></div>
+  </section>
+
+
+  <section class="block">
+    <h2>Пульт: настройки и люди<small>13 ноября · партия 2</small></h2>
+    <p class="lead">Остальные экраны пульта, которых не было в макетах. Везде один приём, как в гаранте: поле → новое значение → «было → стало» → «Сохранить»; что решает только владелец — кнопкой «Отправить владельцу».</p>
+    <div class="demo" data-w="ops_dir"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Направление</h3><p>Карточка: комиссия, рычаг, лимиты, запас курса, примеры «отдаёте → получаете». Новое значение — с примером «было / станет»; больше 1 п.п. — решает владелец.</p><div class="k">Переключите: «Карточка» → «Новое значение» → «Было → стало» → «Больше 1 п.п.».</div></div></div>
+    <div class="demo" data-w="ops_tiers"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Ступени комиссии</h3><p>Ступени — строками «от суммы процент»; бот покажет таблицу, режим «фикс → ступени» и пример на 300. Ступень дороже предыдущей — переспросит.</p></div></div>
+    <div class="demo" data-w="ops_dir_state"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Автопауза и закрытое направление</h3><p>Почему стоит и что сделать: автопауза снимается вручную после «Резервов»; закрытое — зелёной «Открыть приём».</p></div></div>
+    <div class="demo" data-w="ops_client"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Клиент и личные условия</h3><p>Карточка клиента, личные условия по направлению рядом с общими, «было → стало», бан с причиной и сроком.</p><div class="k">Переключите: «Карточка» → «Личные условия» → «Было → стало» → «В бане».</div></div></div>
+    <div class="demo" data-w="ops_promo"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Встречный поток</h3><p>Режим (выкл / подсказывать / авто), ставка и пороги, резервы с нехваткой и излишком, огонёк по направлению, рассылка клиентам — включает владелец.</p></div></div>
+    <div class="demo" data-w="ops_inv_admin"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Инвесторы: доступ и условия</h3><p>Дать доступ, условия и отключение — «было → стало»; неясное движение — «Деньги пришли / Ничего не было».</p></div></div>
+    <div class="demo" data-w="ops_capital"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт · деньги</span><h3>Излишек и капитал</h3><p>Излишек в кошельке: ваш взнос — провести одной кнопкой; чек клиента без ответа — в «Разбор». Вывод владельца мимо бота — так же.</p></div></div>
+    <div class="demo" data-w="ops_kill"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Стоп-кран</h3><p>Включается из «Настроек» словом ПОДТВЕРЖДАЮ; пока включён — тревога в меню и зелёная «Снять стоп-кран».</p></div></div>
+    <div class="demo" data-w="ops_thresholds"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Пороги резерва</h3><p>Цели обоих кошельков рядом; новая цель сразу показывает новые пороги.</p></div></div>
+    <div class="demo" data-w="ops_alerts"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Тревоги — все виды</h3><p>Каждая тревога: что случилось, где деньги, кнопка к месту, где это чинится, и «Принял». Повторы не плодят сообщения — «×3, последнее 14:02».</p><div class="k">Переключайте вкладки — шесть видов.</div></div></div>
+    <div class="demo" data-w="ops_support"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Пульт</span><h3>Обращения</h3><p>Пусто, ответ клиенту, отправлено, не ушло — с тем, что делать дальше.</p></div></div>
+  </section>
+
+  <section class="block">
+    <h2>Клиент: недостающие листы<small>13 ноября · партия 2</small></h2>
+    <p class="lead">Экран «Конфиденциальность» и все причины, по которым счёт или ссылка не подошли. Каждый отказ говорит, что деньги не тронуты, и что делать.</p>
+    <div class="demo" data-w="cl_privacy"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Клиент</span><h3>Конфиденциальность</h3><p>Что храним, зачем и чего никогда не просим — карточкой, из «Помощи».</p></div></div>
+    <div class="demo" data-w="cl_invoice_bad"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Клиент</span><h3>Счёт не подошёл</h3><p>Шесть причин «не оплачу» и «сейчас не возьму» — всегда «деньги не списаны».</p><div class="k">Переключайте вкладки.</div></div></div>
+    <div class="demo" data-w="cl_link_bad"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge v">Клиент</span><h3>Ссылка не подошла</h3><p>Не чек, чужой бот, тестовая сеть, пароль, капча, только для Premium — и «деньги в чеке».</p><div class="k">Переключайте вкладки.</div></div></div>
   </section>
 
   <section class="block">
