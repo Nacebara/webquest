@@ -8,6 +8,7 @@ pub mod fsm;
 pub mod ledger;
 pub mod money;
 pub mod pricing;
+pub mod reconcile;
 
 pub use asset::{Asset, Platform, wallet_label};
 pub use direction::Direction;
