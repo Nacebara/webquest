@@ -37,10 +37,10 @@ function draw(){let x=null;try{x=JSON.parse(W.chatData)}catch(e){}
  $('di').textContent=D.in+' '+D.src;$('df').textContent=D.fee+' · '+D.pct;$('do').textContent=D.out+' '+D.dst;$('id').textContent=D.id+' ⧉';
  tick();clearInterval(tk);if(!D.t1)tk=setInterval(tick,1e3);
  if(st=='done'&&was&&was!='done')W.HapticFeedback?.notificationOccurred('success')}
-function fold(v){op=v;$('dt').className=op?'on':'';$('tg').textContent=op?'Скрыть ▴':'Детали ▾';try{localStorage.setItem('o',op?'1':'')}catch(e){}}
-$('tg').onclick=()=>fold(!op);
+function fold(v,s){op=v;$('dt').className=op?'on':'';$('tg').textContent=op?'Скрыть ▴':'Детали ▾';if(s)try{localStorage.setItem('o',op?'1':'')}catch(e){}}
+$('tg').onclick=()=>fold(!op,1);
 $('id').onclick=()=>D&&W.copyText?.(D.id);
 W.onEvent?.('chatDataChanged',draw);
-try{op=!!localStorage.getItem('o')}catch(e){}
-fold(op);draw();
+draw();let sv=null;try{sv=localStorage.getItem('o')}catch(e){}
+fold(sv!=null?!!sv:!!(D&&D.o));
 </script>

@@ -1,0 +1,49 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--wa:light-dark(#d98200,#f2a93b);--bd:light-dark(#e0453a,#ff6b5e);--fi:light-dark(#e8590c,#ff8a3d);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--ln:light-dark(#e1e6eb,#2f3c49);--tx:var(--tg-theme-text-color,#000)}
+body{margin:0;padding:8px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+.w+.w{margin-top:10px}
+.hd{display:flex;justify-content:space-between;align-items:baseline;font-size:.92em}
+.hd small{color:var(--h)}
+.hd em{font-style:normal;font-size:.8em;font-weight:600}
+.up{color:var(--ok)}.dn{color:var(--a)}
+.g{position:relative;height:8px;margin-top:5px;border-radius:4px;background:var(--ln)}
+.g s{position:absolute;left:0;top:0;bottom:0;border-radius:4px;transition:width .6s}
+.g i{position:absolute;top:-3px;bottom:-3px;left:62.5%;width:2px;border-radius:1px;background:var(--tx)}
+.pr{margin-top:12px;padding:8px 10px;border-radius:10px;background:var(--t);font-size:.86em}
+.pr .hd{font-size:1em}
+.pr b{color:var(--fi);white-space:nowrap}.pr s{color:var(--h);white-space:nowrap}
+.pr small{display:block;color:var(--h);font-size:.9em}
+.pl{font-size:.78em;font-weight:600;color:var(--ok);white-space:nowrap}
+.pl:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:4px;animation:p 1.6s infinite}
+.off .pl{color:var(--h)}.off .pl:before{background:var(--h);animation:none}
+@keyframes p{50%{opacity:.25}}
+.tr{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.8em;color:var(--h)}
+.tr svg{width:84px;height:22px;flex:none}
+.tr path{fill:none;stroke:var(--wa);stroke-width:1.6}
+.bc{margin-top:10px;font-size:.8em;color:var(--h)}
+.bc .b{height:3px;border-radius:2px;background:var(--ln);margin-top:4px}
+.bc .b i{display:block;height:100%;border-radius:2px;background:var(--a)}
+.ft{margin-top:8px;font-size:.74em;color:var(--h);padding-right:var(--tg-content-safe-area-corner-right,0px)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<div id=w></div>
+<div class=pr id=pr></div>
+<div class=tr id=tr></div>
+<div class=bc id=bc></div>
+<div class=ft id=ft></div>
+<script>
+const W=window.TelegramWidget||{},$=s=>document.getElementById(s);
+const hm=t=>{const d=new Date(t*1e3);return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')};
+const nf=v=>String(v).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+function draw(){let D=null;try{D=JSON.parse(W.chatData)}catch(e){}if(!D)return;
+ $('w').innerHTML=D.w.map(r=>{const[n,v,tg,dir]=r,p=Math.round(v/tg*100),c=p<70?'var(--bd)':p<90?'var(--wa)':'var(--ok)';
+  return '<div class=w><div class=hd><span>'+n+' <small>· '+nf(v)+' · '+p+' % от цели</small></span>'+(dir?'<em class='+(dir>0?'up':'dn')+'>'+(dir>0?'↑ пополняется':'↓ отдаёт')+'</em>':'')+'</div><div class=g><s style="width:'+Math.min(100,p/1.6)+'%;background:'+c+'"></s><i></i></div></div>'}).join('');
+ const P=D.p;$('pr').className='pr'+(P.on?'':' off');
+ $('pr').innerHTML='<div class=hd><span>'+P.d+'</span><span class=pl>'+(P.on?'выгодный курс включён':'выгодный курс выключен')+'</span></div>'+(P.on?'<b>🔥 '+P.r+'</b> <s>'+P.o+'</s> · на чек до '+nf(P.up)+' USDT<small>'+(P.who||'')+' в '+hm(P.at)+'</small>':'<span>обычная ставка '+P.o+'</span><small>выключен в '+hm(P.at)+' — резервы выровнены</small>');
+ const h=D.h||[];if(h.length>1){const mx=Math.max(...h),mn=Math.min(...h),pt=h.map((y,j)=>(j/(h.length-1)*84).toFixed(1)+','+(20-(y-mn)/((mx-mn)||1)*18).toFixed(1));
+  $('tr').innerHTML='<svg viewBox="0 0 84 22"><path d="M'+pt.join('L')+'"/></svg><span>Нехватка '+D.lo+': '+h[0]+' % → <b>'+h[h.length-1]+' %</b> за '+D.hh+' ч</span>'}
+ const B=D.b;$('bc').hidden=!B;if(B)$('bc').innerHTML='Рассылка клиентам: доставлено '+nf(B[0])+' из '+nf(B[1])+' · '+hm(B[2])+'<div class=b><i style="width:'+(B[0]/B[1]*100).toFixed(0)+'%"></i></div>';
+ $('ft').textContent=D.md}
+W.onEvent?.('chatDataChanged',draw);
+draw();
+</script>

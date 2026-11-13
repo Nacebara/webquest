@@ -1,0 +1,48 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--wa:light-dark(#d98200,#f2a93b);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--at:var(--tg-theme-button-text-color,#fff);--ln:light-dark(#d9dfe5,#36434f);--tx:var(--tg-theme-text-color,#000)}
+body{margin:0;padding:10px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+button{all:unset;box-sizing:border-box;cursor:pointer;text-align:center}
+small{display:block;font-size:.76em;color:var(--h)}
+.am{font-size:1.6em;font-weight:700;line-height:1.2}
+.to{font-size:.84em;color:var(--h)}
+#tr{position:relative;height:36px;margin:8px 13px 0;touch-action:pan-y}
+#tr:before{content:"";position:absolute;left:0;right:0;top:16px;height:4px;border-radius:2px;background:var(--ln)}
+#fl{position:absolute;left:0;top:16px;height:4px;border-radius:2px;background:var(--a)}
+#th{position:absolute;top:5px;width:26px;height:26px;margin-left:-13px;border-radius:50%;background:light-dark(#fff,#eef2f6);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.sc{display:flex;justify-content:space-between;margin:0 6px;font-size:.72em;color:var(--h)}
+.rs{margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--t)}
+.rs .hd{display:flex;justify-content:space-between;font-size:.86em}
+.rs .hd b{font-weight:600}
+.g{position:relative;height:6px;margin-top:6px;border-radius:3px;background:var(--ln)}
+.g s{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ok);transition:width .2s}
+.g s.w{background:var(--wa)}
+.g i{position:absolute;top:-3px;bottom:-3px;width:2px;border-radius:1px;background:var(--tx)}
+#go{display:block;width:100%;margin-top:10px;padding:10px;border-radius:10px;background:var(--a);color:var(--at);font-weight:600;font-size:.92em}
+#go[disabled]{background:var(--t);color:var(--h)}
+.nt{margin:6px 0 0;font-size:.76em;color:var(--h);text-align:center}
+</style>
+<small>Вывести</small><div class=am id=am></div><div class=to id=to></div>
+<div id=tr><div id=fl></div><div id=th></div></div>
+<div class=sc><span>0</span><span id=mx></span></div>
+<div class=rs><div class=hd><span id=rn></span><b id=ra></b></div><div class=g><s id=rg></s><i id=tg></i></div><small id=rp style="margin-top:4px"></small></div>
+<button id=go></button>
+<p class=nt>Подтверждение придёт отдельным сообщением — одноразовой кнопкой, как сейчас.</p>
+<script>
+const W=window.TelegramWidget||{},H=W.HapticFeedback,$=s=>document.getElementById(s);
+let D=null,i=0,R=null,busy=0;
+function load(){try{D=JSON.parse(W.chatData)}catch(e){}if(!D)return;i=D.i|0;$('mx').textContent=D.s[D.s.length-1][0]+' (макс.)';$('to').textContent=D.to;$('rn').textContent='Резерв '+D.w+' после';draw()}
+function draw(){if(!D)return;const[a,r,p]=D.s[i],n=D.s.length,x=i/(n-1)*100;
+ $('am').textContent=a+' USDT';$('fl').style.width=x+'%';$('th').style.left=x+'%';
+ $('ra').textContent=r;const sc=Math.max(...D.s.map(s=>s[2]));$('rg').style.width=(p/sc*100)+'%';$('rg').className=p<110?'w':'';$('tg').style.left=(100/sc*100)+'%';
+ $('rp').textContent=p+' % от цели · цель '+D.tg;
+ const b=$('go');b.disabled=i==0||busy;b.textContent=busy?'Готовлю подтверждение…':i==0?'Выберите сумму':'Вывести '+a}
+function at(e){const k=Math.max(0,Math.min(D.s.length-1,Math.round((e.clientX-R.left)/R.width*(D.s.length-1))));if(k!=i){i=k;H?.selectionChanged();draw()}}
+const tr=$('tr');
+tr.onpointerdown=e=>{if(!D)return;R=tr.getBoundingClientRect();tr.setPointerCapture(e.pointerId);at(e)};
+tr.onpointermove=e=>{if(R&&tr.hasPointerCapture(e.pointerId))at(e)};
+tr.onpointerup=tr.onpointercancel=()=>R=null;
+$('go').onclick=()=>{if(!D||!i||busy||!W.request)return;busy=1;draw();
+ W.request('wd:'+i).then(()=>{busy=0;$('go').textContent='Подтвердите в сообщении ниже ↓';$('go').disabled=true},()=>{busy=0;$('go').textContent='Бот не ответил — нажмите ещё раз'})};
+W.onEvent?.('chatDataChanged',load);
+load();
+</script>

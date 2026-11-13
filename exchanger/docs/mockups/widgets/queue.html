@@ -1,0 +1,34 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--wa:light-dark(#d98200,#f2a93b);--bd:light-dark(#e0453a,#ff6b5e);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--ln:light-dark(#e1e6eb,#2f3c49);--tx:var(--tg-theme-text-color,#000)}
+body{margin:0;padding:6px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+h4{margin:8px 0 2px;font-size:.78em;font-weight:600;color:var(--h);text-transform:uppercase;letter-spacing:.04em}
+button{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;width:100%;padding:7px 0;border-top:1px solid var(--ln)}
+button:active{background:var(--t)}
+.ag{font-size:.82em;font-weight:600;text-align:center;padding:3px 0;border-radius:7px;background:var(--t)}
+.ag.w{background:light-dark(#fff1d6,#3a2f1c);color:var(--wa)}.ag.r{background:light-dark(#fde4e1,#3d2321);color:var(--bd)}
+.id{font:600 .86em ui-monospace,monospace}
+.wt{display:block;font-size:.8em;color:var(--h)}
+.by{font-size:.78em;color:var(--h);text-align:right}
+.by b{color:var(--tx);font-weight:500}
+.em{padding:12px 0;color:var(--ok);font-size:.92em}
+.ft{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:.76em;color:var(--h);padding-right:var(--tg-content-safe-area-corner-right,0px)}
+.ft i{width:7px;height:7px;border-radius:50%;background:var(--ok)}.ft i.r{background:var(--bd)}
+</style>
+<div id=l></div><div class=ft><i id=fi></i><span id=ft></span></div>
+<script>
+const W=window.TelegramWidget||{},$=s=>document.getElementById(s),SEC=['','Разбор','Оплатить вручную'];
+let D=null,sk=0,got=0,miss=0;
+const age=s=>s<3600?Math.floor(s/60)+':'+String(s%60).padStart(2,'0'):Math.floor(s/3600)+' ч '+Math.floor(s%3600/60);
+function draw(){if(!D)return;const t=Date.now()/1e3-sk;
+ if(!D.q.length){$('l').innerHTML='<p class=em>✓ Очередь пуста — разбирать нечего</p>';return}
+ $('l').innerHTML=[1,2].map(g=>{const r=D.q.filter(x=>x[4]==g).sort((a,b)=>a[2]-b[2]);return r.length?'<h4>'+SEC[g]+' · '+r.length+'</h4>'+r.map(x=>{const a=Math.max(0,Math.floor(t-x[2]));
+  return '<button data-o="'+x[0]+'"><span class="ag '+(a>=D.z?'r':a>=D.y?'w':'')+'">'+age(a)+'</span><span><span class=id>'+x[0]+'</span><span class=wt>'+x[1]+'</span></span><span class=by>'+(x[3]?'взял<br><b>'+x[3]+'</b>':'свободна')+'</span></button>'}).join(''):''}).join('')}
+function foot(){const a=Math.floor((Date.now()-got)/1e3);$('fi').className=miss>1?'r':'';$('ft').textContent=miss>1?'Бот не отвечает — очередь может быть старой':'Нажмите заявку — откроется карточка · обновлено '+(a<15?'только что':Math.floor(a/60)+' мин назад')}
+function set(x){if(!x)return;D=x;got=Date.now();sk=Date.now()/1e3-(x.u||Date.now()/1e3);draw();foot()}
+$('l').onclick=e=>{const b=e.target.closest('button');if(b&&W.request)W.request('o:'+b.dataset.o).catch(()=>{})};
+function pull(){if(!W.request||W.chatType!='private'||!W.isActive)return;W.request('q').then(a=>{miss=0;try{set(JSON.parse(a.result))}catch(e){}},e=>{if(e.code!='BUSY'&&e.code!='RATE_LIMITED'){miss++;foot()}})}
+W.onEvent?.('chatDataChanged',()=>{try{set(JSON.parse(W.chatData))}catch(e){}});
+W.onEvent?.('activated',pull);
+try{set(JSON.parse(W.chatData))}catch(e){}
+setInterval(draw,1e3);setInterval(foot,5e3);setInterval(pull,1e4);pull();
+</script>

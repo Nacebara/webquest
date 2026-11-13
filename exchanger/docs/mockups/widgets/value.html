@@ -1,0 +1,53 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--wa:light-dark(#d98200,#f2a93b);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--at:var(--tg-theme-button-text-color,#fff);--ln:light-dark(#d9dfe5,#36434f)}
+body{margin:0;padding:10px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+button{all:unset;box-sizing:border-box;cursor:pointer;text-align:center}
+.bs{display:flex;align-items:baseline;justify-content:space-between}
+.bs small{display:block;font-size:.76em;color:var(--h)}
+.bs b{font-size:1.5em}.bs .o{color:var(--h);font-weight:500;font-size:1.15em}
+.bs i{font-style:normal;color:var(--h)}
+.ef{font-size:.86em;color:var(--h);margin-top:2px}.ef b{color:var(--tg-theme-text-color);font-weight:500}
+.sl{display:flex;align-items:center;gap:8px;margin-top:10px}
+.sl button{width:34px;height:34px;border-radius:50%;background:var(--t);font-size:1.2em;line-height:34px;flex:none}
+#tr{position:relative;flex:1;height:34px;touch-action:pan-y}
+#tr:before{content:"";position:absolute;left:0;right:0;top:15px;height:4px;border-radius:2px;background:var(--ln)}
+#fl{position:absolute;left:0;top:15px;height:4px;border-radius:2px;background:var(--a)}
+#was{position:absolute;top:10px;width:2px;height:14px;margin-left:-1px;background:var(--h)}
+#th{position:absolute;top:4px;width:26px;height:26px;margin-left:-13px;border-radius:50%;background:light-dark(#fff,#eef2f6);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.sc{display:flex;justify-content:space-between;margin:0 42px;font-size:.72em;color:var(--h)}
+.nt{margin:10px 0 0;font-size:.84em;color:var(--h)}
+.nt.w{color:var(--wa)}
+#sv{display:block;width:100%;margin-top:10px;padding:10px;border-radius:10px;background:var(--a);color:var(--at);font-weight:600;font-size:.92em}
+#sv[disabled]{background:var(--t);color:var(--h)}
+#sv.ok{background:var(--ok)}
+</style>
+<div class=bs><div><small>Было</small><span class=o id=v0></span></div><i>→</i><div style="text-align:right"><small>Станет</small><b id=v1></b></div></div>
+<div class=ef id=ef></div>
+<div class=sl><button id=mn>−</button><div id=tr><div id=fl></div><div id=was></div><div id=th></div></div><button id=pl>+</button></div>
+<div class=sc><span id=lo></span><span id=hi></span></div>
+<p class=nt id=nt></p>
+<button id=sv></button>
+<script>
+const W=window.TelegramWidget||{},H=W.HapticFeedback,$=s=>document.getElementById(s);
+let D=null,v=0,R=null,busy=0,done=0;
+const f=x=>(x/10).toFixed(1)+(D.u?' '+D.u:'');
+const pos=x=>(x-D.lo)/(D.hi-D.lo)*100;
+function load(){try{D=JSON.parse(W.chatData)}catch(e){}if(!D)return;v=D.v;$('lo').textContent=f(D.lo);$('hi').textContent=f(D.hi);draw()}
+function draw(){if(!D)return;const dv=Math.abs(v-D.v),big=dv>D.own;
+ $('v0').textContent=f(D.v);$('v1').textContent=f(v);
+ $('ef').innerHTML=D.k?D.kl+' станет <b>'+f(v+D.k)+'</b>':'';
+ $('fl').style.width=pos(v)+'%';$('th').style.left=pos(v)+'%';$('was').style.left=pos(D.v)+'%';
+ const n=$('nt');n.className='nt'+(big?' w':'');n.textContent=big?'Изменение больше '+(D.own/10).toFixed(1)+' п.п. — бот попросит подтверждение у владельца.':D.m;
+ const b=$('sv');b.disabled=v==D.v||busy;b.className=done?'ok':'';if(!done)b.textContent=busy?'Сохраняю…':v==D.v?'Без изменений':(big?'Отправить владельцу ':'Сохранить ')+f(v)}
+function set(x){x=Math.max(D.lo,Math.min(D.hi,x));if(x!=v){v=x;done=0;H?.selectionChanged();draw()}}
+function at(e){set(D.lo+Math.round((e.clientX-R.left)/R.width*(D.hi-D.lo)/D.d)*D.d)}
+const tr=$('tr');
+tr.onpointerdown=e=>{if(!D)return;R=tr.getBoundingClientRect();tr.setPointerCapture(e.pointerId);at(e)};
+tr.onpointermove=e=>{if(R&&tr.hasPointerCapture(e.pointerId))at(e)};
+tr.onpointerup=tr.onpointercancel=()=>R=null;
+$('mn').onclick=()=>D&&set(v-D.d);$('pl').onclick=()=>D&&set(v+D.d);
+$('sv').onclick=()=>{if(!D||v==D.v||busy||!W.request)return;busy=1;draw();
+ W.request('set:'+v).then(a=>{busy=0;done=1;if(a.result!='owner')D.v=v;$('sv').textContent=a.result=='owner'?'Запрос владельцу отправлен':'Сохранено ✓';H?.notificationOccurred('success');draw()},()=>{busy=0;$('sv').textContent='Бот не ответил — нажмите ещё раз'})};
+W.onEvent?.('chatDataChanged',load);
+load();
+</script>

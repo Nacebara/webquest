@@ -3,12 +3,7 @@
 body{margin:0;padding:4px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
 .c{display:grid;grid-template-columns:auto 1fr auto;gap:0 10px;align-items:center;padding:9px 0}
 .c+.c{border-top:1px solid var(--ln)}
-svg{width:30px;height:30px;display:block}
-circle{fill:none;stroke-width:2}
-.k{stroke:var(--ln)}
-.v{stroke-linecap:round;transition:stroke-dashoffset 1s linear}
-text{font-size:12px;font-weight:600;text-anchor:middle}
-.dt{width:8px;height:8px;border-radius:50%;margin:0 2px}
+.dt{width:8px;height:8px;border-radius:50%;margin:0 2px;align-self:start;margin-top:6px}
 .n{font-weight:600;font-size:.95em}
 .s{display:block;font-size:.8em;color:var(--h)}
 .f .s{color:var(--wa)}.o .s{color:var(--bd)}
@@ -21,15 +16,13 @@ text{font-size:12px;font-weight:600;text-anchor:middle}
 </style>
 <div id=l></div><div class=ft><span>Резерв</span><b id=rs></b></div>
 <script>
-const W=window.TelegramWidget||{},$=s=>document.getElementById(s),C=2*Math.PI*13,COL=['var(--ok)','var(--wa)','var(--bd)'];
+const W=window.TelegramWidget||{},$=s=>document.getElementById(s),COL=['var(--ok)','var(--wa)','var(--bd)'];
 let D=null,sk=0;
 const mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
-function ico(a,fr){const c=COL[a[1]],no=a[0].replace(/\D/g,'');
- if(D.v)return '<i class=dt style="background:'+c+'"></i>';
- return '<svg viewBox="0 0 30 30"><circle class=k cx=15 cy=15 r=13 /><circle class=v cx=15 cy=15 r=13 transform="rotate(-90 15 15)" style="stroke:'+c+'" stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-fr)).toFixed(1)+'"/><text x=15 y=19 style="fill:'+c+'">'+no+'</text></svg>'}
-function row(a){const[nm,s,txt]=a;let fr=1,st=txt;
- if(s==1){const left=Math.max(0,Math.ceil(a[3]-(Date.now()/1e3-sk)));fr=left/a[4];st=left>0?txt+' · ещё '+mm(left):'пауза кончилась — проверяю связь'}
- return '<div class="c'+(s==1?' f':s==2?' o':'')+'">'+ico(a,fr)+'<div><span class=n>'+nm+'</span><span class=s>'+st+'</span></div><div class=b>'+a[5]+'<small>CB</small><br>'+a[6]+'<small>xR</small></div>'+(s==0?'<div class=ld><i style="width:'+Math.min(100,a[3]/a[4]*100)+'%"></i></div>':'')+'</div>'}
+const ico=a=>'<i class=dt style="background:'+COL[a[1]]+'"></i>';
+function row(a){const[nm,s,txt]=a;let st=txt;
+ if(s==1){const left=Math.max(0,Math.ceil(a[3]-(Date.now()/1e3-sk)));st=left>0?txt+' · ещё '+mm(left):'пауза кончилась — проверяю связь'}
+ return '<div class="c'+(s==1?' f':s==2?' o':'')+'">'+ico(a)+'<div><span class=n>'+nm+'</span><span class=s>'+st+'</span></div><div class=b>'+a[5]+'<small>CB</small><br>'+a[6]+'<small>xR</small></div>'+(s==0?'<div class=ld><i style="width:'+Math.min(100,a[3]/a[4]*100)+'%"></i></div>':'')+'</div>'}
 function draw(){if(!D)return;$('l').innerHTML=D.a.map(row).join('');$('rs').textContent='CryptoBot '+D.r[0]+' · xRocket '+D.r[1]}
 function set(x){if(!x)return;D=x;sk=Date.now()/1e3-(x.n||Date.now()/1e3);draw()}
 W.onEvent?.('chatDataChanged',()=>{try{set(JSON.parse(W.chatData))}catch(e){}});
