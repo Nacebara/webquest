@@ -85,3 +85,27 @@ jobs:
 
       - name: cargo test
         run: cargo test --workspace --all-features
+
+  # Владелец запускает exch на Windows, а код под cfg(windows) (сигналы остановки, служба) на
+  # Linux не компилируется. Кросс-проверка ловит его ошибки до живого прогона (шаг 2.1).
+  windows-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SQLX_OFFLINE: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain and the Windows target
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup target add x86_64-pc-windows-gnu
+          sudo apt-get install -y -q gcc-mingw-w64-x86-64
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: exchanger
+          key: windows-gnu
+
+      - name: cargo clippy for Windows
+        run: cargo clippy --workspace --all-targets --all-features --target x86_64-pc-windows-gnu -- -D warnings

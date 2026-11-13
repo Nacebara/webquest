@@ -26,6 +26,7 @@ pub mod runtime;
 pub mod session_store;
 pub mod settings_file;
 pub mod setup;
+pub mod stop;
 pub mod supervisor;
 pub mod telegram;
 pub mod wallet_log;

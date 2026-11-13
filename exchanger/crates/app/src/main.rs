@@ -18,9 +18,6 @@ use app::login::MtprotoAuthenticator;
 use app::supervisor::{self, RestartPolicy, supervise};
 use app::telegram::TelegramSettings;
 
-/// Сколько ждать задачи после SIGTERM (Docker даёт 90 с, SPEC §12, шаг 6).
-const SHUTDOWN_GRACE: Duration = Duration::from_secs(60);
-
 #[derive(Parser)]
 #[command(
     name = "exch",
@@ -449,7 +446,7 @@ async fn record(label: String, out: PathBuf, history: u32) -> anyhow::Result<()>
     let cancel = CancellationToken::new();
     let stop = cancel.clone();
     tokio::spawn(async move {
-        shutdown_signal().await;
+        app::stop::wait().await;
         stop.cancel();
     });
     let stats = app::record::record_stream(rx, &mut file, &log, &label, &cancel).await?;
@@ -672,24 +669,22 @@ async fn wait(
     mut tasks: JoinSet<Result<(), supervisor::GaveUp>>,
     cancel: CancellationToken,
 ) -> anyhow::Result<()> {
-    let outcome = tokio::select! {
-        () = shutdown_signal() => {
-            tracing::info!("shutdown signal received");
-            Ok(())
+    let (outcome, grace) = tokio::select! {
+        signal = app::stop::wait() => {
+            tracing::info!(signal = signal.name(), grace_secs = signal.grace().as_secs(), "shutdown signal received");
+            (Ok(()), signal.grace())
         }
-        Some(joined) = tasks.join_next() => match joined {
+        Some(joined) = tasks.join_next() => (match joined {
             Ok(Ok(())) => Ok(()),
             Ok(Err(gave_up)) => Err(anyhow::Error::new(gave_up)),
             Err(join) => Err(anyhow::Error::new(join).context("supervisor panicked")),
-        },
+        }, app::stop::GRACE),
     };
 
     cancel.cancel();
-    if tokio::time::timeout(SHUTDOWN_GRACE, async {
-        while tasks.join_next().await.is_some() {}
-    })
-    .await
-    .is_err()
+    if tokio::time::timeout(grace, async { while tasks.join_next().await.is_some() {} })
+        .await
+        .is_err()
     {
         tracing::warn!(
             "tasks did not stop within the grace period; in-flight work resumes on restart"
@@ -712,28 +707,5 @@ async fn heartbeat(pool: storage::PgPool, cancel: CancellationToken) -> anyhow::
                 tracing::info!(wallets = balances.len(), "alive");
             }
         }
-    }
-}
-
-async fn shutdown_signal() {
-    #[cfg(unix)]
-    {
-        use tokio::signal::unix::{SignalKind, signal};
-        match signal(SignalKind::terminate()) {
-            Ok(mut term) => {
-                tokio::select! {
-                    _ = term.recv() => {}
-                    _ = tokio::signal::ctrl_c() => {}
-                }
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, "cannot listen for SIGTERM, falling back to Ctrl-C");
-                let _ = tokio::signal::ctrl_c().await;
-            }
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = tokio::signal::ctrl_c().await;
     }
 }
