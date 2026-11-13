@@ -317,6 +317,13 @@
    "static": "static/color/prog_75.png"
   },
   {
+   "key": "color/invest",
+   "label": "Инвестиции",
+   "emoji": "💼",
+   "animated": "color/invest.tgs",
+   "static": "static/color/invest.png"
+  },
+  {
    "key": "mono/swap",
    "label": "Обмен",
    "emoji": "🔄",
@@ -833,6 +840,13 @@
    "emoji": "📶",
    "animated": "mono/tiers.tgs",
    "static": "static/mono/tiers.png"
+  },
+  {
+   "key": "mono/invest",
+   "label": "Инвестиции",
+   "emoji": "💼",
+   "animated": "mono/invest.tgs",
+   "static": "static/mono/invest.png"
   }
  ]
 }

@@ -31,7 +31,7 @@ const BASE = {
     alarm: '🚨', live: '🟢', robot: '🤖', vault: '🏦', flood: '🌊', kill: '🛑', maint: '🛠',
     broadcast: '📢', limit: '📏', confetti: '🎉', step_done: '✅', step_now: '🔵', step_todo: '⚪',
     dot_ok: '🟢', dot_work: '🔵', dot_wait: '🟡', dot_act: '🔴', dot_closed: '⚫',
-    prog_25: '🕒', prog_50: '🕕', prog_75: '🕘', fire: '🔥', flame: '🔥',
+    prog_25: '🕒', prog_50: '🕕', prog_75: '🕘', fire: '🔥', flame: '🔥', invest: '💼',
   },
   mono: {
     swap: '🔄', ticket: '🎫', invoice: '🧾', rates: '📈', history: '📜', support: '💬', help: '❓',
@@ -44,7 +44,7 @@ const BASE = {
     lock: '🔒', eye: '👁', edit: '✏️', plus: '➕', minus: '➖', trash: '🗑', calendar: '📅',
     limit: '📏', alert: '⚠️', flag: '🚩', pin: '📌', topic: '💭', ack: '👍', take: '✋',
     coin: '🪙', sparkle: '✨', phone: '📱', plug: '🔌', inbox: '📥', server: '🖥', wallet: '👛',
-    fire: '🔥', scale: '⚖️', tiers: '📶',
+    fire: '🔥', scale: '⚖️', tiers: '📶', invest: '💼',
   },
 };
 

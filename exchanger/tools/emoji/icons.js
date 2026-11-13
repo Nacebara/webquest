@@ -199,6 +199,10 @@ const G = {
   vaultBox: '<rect x="5.4" y="5.8" width="13.2" height="12.4" rx="2.4"/>',
   // Ручка сейфа: четыре спицы — поворот на 90° даёт тот же рисунок.
   vaultDial: '<circle cx="12" cy="12" r="2.8"/><path d="M12 7.6v1.6M12 14.8v1.6M7.6 12h1.6M14.8 12h1.6"/>',
+  // Инвестиции (13 ноября 2026): портфель, внутри — линия роста со стрелкой.
+  briefBody: '<rect x="4.6" y="8.2" width="14.8" height="10.6" rx="2.4"/>',
+  briefHandle: '<path d="M9.4 8.2V6.9a1.5 1.5 0 0 1 1.5-1.5h2.2a1.5 1.5 0 0 1 1.5 1.5v1.3"/>',
+  briefGrowth: '<path d="M8 15.8l2.5-2.4 2 1.5 3.4-3.3M13.8 11.6h2.1v2.1"/>',
   hourglass: '<path d="M8.4 5.6h7.2M8.4 18.4h7.2M9.4 5.7v1.6c0 1.7 2.6 2.9 2.6 4.7s-2.6 3-2.6 4.7v1.6M14.6 5.7v1.6c0 1.7-2.6 2.9-2.6 4.7s2.6 3 2.6 4.7v1.6"/>',
   // Знак CryptoBot в exch — «орбита»: дуга с точкой в просвете (не логотип кошелька).
   orbit: `<path d="M16.7 8.3a6.1 6.1 0 1 0 0 7.4"/><circle cx="17.3" cy="12" r="1.45" fill="${W}" stroke="none"/>`,
@@ -460,6 +464,9 @@ const COLOR = {
   prog_25: PROG(0.25),
   prog_50: PROG(0.5),
   prog_75: PROG(0.75),
+  // Новые значки — только в конец: установщик дописывает набор по счёту стикеров.
+  invest: (t) =>
+    tile('iv', C.coin, `${G.briefBody}${G.briefHandle}${grp(A.nudge(t, 0.8, -0.8, 0.06, 0.36), G.briefGrowth)}`, { sw: 1.75 }),
 };
 
 // ── Линейные значки (перекрашиваются Telegram) ───────────────────────────────────────
@@ -644,6 +651,8 @@ const MONO = {
   fire: (t) => grp(A.swing(t, 7, 12, 20, 2, 0.06, 0.5), `<path d="${G.flame}"/>${grp(A.pop(t, 0.18, 12, 18), `<path d="${G.flameCore}"/>`)}`),
   scale: (t) => `${G.scalePost}${grp(A.swing(t, 9, 12, 7.6, 1, 0.06, 0.6), G.scaleBeam)}`,
   tiers: (t) => `${G.stairs}${grp(A.nudge(t, 1.1, -1.1, 0.06, 0.34), G.stairsArrow)}`,
+  // Новые значки — только в конец: установщик дописывает набор по счёту стикеров.
+  invest: (t) => `${G.briefBody}${G.briefHandle}${grp(A.nudge(t, 0.8, -0.8, 0.06, 0.36), G.briefGrowth)}`,
 };
 
 // Подписи — для превью-листа и админки «Эмодзи».
@@ -652,7 +661,7 @@ const LABELS = {
   warn: 'Внимание', refund: 'Возврат', manual: 'Ручная проверка', invoice: 'Счёт', sending: 'Чек в пути', usdt: 'USDT',
   cb: 'CryptoBot', xr: 'xRocket', shield: 'Защита', lock: 'Приватность', rates: 'Курс', history: 'История',
   support: 'Поддержка', fast: 'Быстро', pause: 'Пауза', ban: 'Бан', alarm: 'Тревога', live: 'На связи',
-  robot: 'Юзербот', vault: 'Резерв', flood: 'Лимит Telegram', kill: 'Стоп-кран', maint: 'Обслуживание',
+  robot: 'Юзербот', vault: 'Резерв', invest: 'Инвестиции', flood: 'Лимит Telegram', kill: 'Стоп-кран', maint: 'Обслуживание',
   broadcast: 'Рассылка', limit: 'Лимиты', confetti: 'Первый обмен', step_done: 'Шаг: готов', step_now: 'Шаг: сейчас',
   step_todo: 'Шаг: впереди', dot_ok: 'Хорошо', dot_work: 'В работе', dot_wait: 'Ждём', dot_act: 'Нужен человек',
   dot_closed: 'Закрыто', prog_25: 'Прогресс 25 %', prog_50: 'Прогресс 50 %', prog_75: 'Прогресс 75 %',

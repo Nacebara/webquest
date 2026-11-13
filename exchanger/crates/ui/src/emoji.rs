@@ -400,6 +400,7 @@ pub fn fallback_char(name: &str) -> &'static str {
         "queue" => "📋",
         "invoice" => "🧾",
         "vault" => "🏦",
+        "invest" => "💼",
         "robot" => "🤖",
         "dash" => "🎛",
         "chart" => "📊",
