@@ -1,0 +1,44 @@
+<style>
+:root{color-scheme:light dark;--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--at:var(--tg-theme-button-text-color,#fff);--ln:light-dark(#d9dfe5,#36434f);--bg:var(--tg-theme-bg-color,#fff)}
+body{margin:0;padding:10px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+button{all:unset;box-sizing:border-box;cursor:pointer;text-align:center}
+small{display:block;font-size:.76em;color:var(--h)}
+.sg{display:flex;background:var(--t);border-radius:10px;padding:3px;gap:3px;margin-bottom:10px}
+.sg button{flex:1;padding:6px 4px;border-radius:8px;font-size:.84em;color:var(--h)}
+.sg .on{background:var(--bg);color:var(--tg-theme-text-color);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.am{font-size:1.6em;font-weight:700;line-height:1.2}
+#tr{position:relative;height:36px;margin:6px 13px 0;touch-action:pan-y}
+#tr:before{content:"";position:absolute;left:0;right:0;top:16px;height:4px;border-radius:2px;background:var(--ln)}
+#fl{position:absolute;left:0;top:16px;height:4px;border-radius:2px;background:var(--a)}
+#th{position:absolute;top:5px;width:26px;height:26px;margin-left:-13px;border-radius:50%;background:light-dark(#fff,#eef2f6);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.sc{display:flex;justify-content:space-between;margin:0 6px;font-size:.72em;color:var(--h)}
+#go{display:block;width:100%;margin-top:10px;padding:10px;border-radius:10px;background:var(--a);color:var(--at);font-weight:600;font-size:.92em}
+#go[disabled]{background:var(--t);color:var(--h)}
+.nt{margin:8px 0 0;font-size:.76em;color:var(--h);text-align:center}
+</style>
+<div class=sg id=sg></div>
+<small>Вывести</small><div class=am id=am></div>
+<div id=tr><div id=fl></div><div id=th></div></div>
+<div class=sc><span id=s0></span><span id=s1></span></div>
+<button id=go></button>
+<p class=nt id=nt></p>
+<script>
+const W=window.TelegramWidget||{},H=W.HapticFeedback,$=s=>document.getElementById(s),WL=['CryptoBot','xRocket'];
+let D=null,i=-1,w=0,R=null,busy=0;
+function load(){try{D=JSON.parse(W.chatData)}catch(e){}if(!D)return;if(i<0)i=Math.floor((D.s.length-1)/2);
+ $('sg').innerHTML=WL.map((x,j)=>'<button data-j='+j+'>'+(j?'🚀 ':'🔷 ')+x+'</button>').join('');
+ $('s0').textContent=D.s[0];$('s1').textContent=D.s[D.s.length-1]+' (всё)';$('nt').textContent=D.note;draw()}
+function draw(){if(!D)return;const p=i/(D.s.length-1)*100;
+ [...$('sg').children].forEach((b,j)=>b.className=j==w?'on':'');
+ $('am').textContent=D.s[i]+' USDT';$('fl').style.width=p+'%';$('th').style.left=p+'%';
+ const b=$('go');b.disabled=busy;b.textContent=busy?'Отправляю…':'Вывести '+D.s[i]+' в '+WL[w]}
+function at(e){const k=Math.max(0,Math.min(D.s.length-1,Math.round((e.clientX-R.left)/R.width*(D.s.length-1))));if(k!=i){i=k;H?.selectionChanged();draw()}}
+const tr=$('tr');
+tr.onpointerdown=e=>{if(!D)return;R=tr.getBoundingClientRect();tr.setPointerCapture(e.pointerId);at(e)};
+tr.onpointermove=e=>{if(R&&tr.hasPointerCapture(e.pointerId))at(e)};
+tr.onpointerup=tr.onpointercancel=()=>R=null;
+$('sg').onclick=e=>{const j=e.target.closest('button')?.dataset.j;if(j!=null){w=+j;draw()}};
+$('go').onclick=()=>{if(!D||busy||!W.request)return;busy=1;draw();
+ W.request('wd:'+w+':'+i).then(()=>{busy=0;$('go').disabled=true;$('go').textContent='Подтвердите вывод в сообщении ниже ↓'},()=>{busy=0;draw();$('nt').textContent='Бот не ответил — нажмите ещё раз'})};
+W.onEvent?.('chatDataChanged',load);load();
+</script>

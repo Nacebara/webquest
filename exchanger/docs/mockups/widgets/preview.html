@@ -262,6 +262,85 @@ table.sz { max-width: 820px; }
   </section>
 
   <section class="block">
+    <h2>Инвест-панель<small>13 ноября · на приёмку</small></h2>
+    <p class="lead">Экраны инвестора есть в боте, но в утверждённых макетах их не было — их надо было показать вместе со всеми. Ниже — клиент и пульт целиком: карточками в стиле бота, денежные сообщения — обычным текстом, виджеты — где они правда помогают. Пример в «Как это работает» — уже по вашему решению П4: доля от <b>прибыли</b> (комиссии минус потери), а не от выручки. Значок 💼 нарисую в нашем наборе премиум-эмодзи.</p>
+    <div class="demo rec" data-w="inv_home">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge">Рекомендую · Б</span>
+        <h3>«Инвестиции» · виджет</h3>
+        <p>Сколько в обороте, рост за 24 ч, график баланса за месяц, что можно вывести и что ещё в блокировке. Внизу — ваш процент и <b>отсчёт до следующего часового начисления</b>, идёт сам.</p>
+        <ul><li class="plus">Инвестор заходит часто — видит, что деньги работают, без лишних слов.</li><li class="plus">Цифры обновляет бот после каждого начисления, без нового сообщения.</li><li class="minus">В старом Telegram — только подпись и кнопки.</li></ul>
+      </div>
+    </div>
+    <div class="demo" data-w="inv_home_rich">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Вариант · А</span>
+        <h3>«Инвестиции» · карточка</h3>
+        <p>То же карточкой, как остальные экраны бота: цифры таблицей, последние движения с «забрать чек». Видна в любом Telegram.</p>
+      </div>
+    </div>
+    <div class="demo" data-w="inv_deposit">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Новое</span>
+        <h3>Пополнить</h3>
+        <p>Как квитанция обмена: что прислать и команда для чека — синей кнопкой, копируется нажатием. Если инвестор прислал чек не из режима «Пополнить» — бот <b>спрашивает</b>: «В инвестиции или обменять?» (план, пункт 5.3), а не решает сам.</p>
+        <div class="k">Переключите: «Пополнить» → «Чек вне режима» → «Зачислено».</div>
+      </div>
+    </div>
+    <div class="demo rec" data-w="inv_withdraw">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge">Рекомендую</span>
+        <h3>Вывести · виджет</h3>
+        <p>Кошелёк — переключателем, сумма — ползунком до «всё доступное» (как калькулятор «Курса», который вы утвердили). Сейчас сумму надо вписать текстом.</p>
+        <ul><li class="plus">Нельзя ошибиться суммой: больше доступного ползунок не даст.</li><li class="plus">«Вывести» не выводит сразу — бот присылает подтверждение отдельным сообщением.</li></ul>
+      </div>
+    </div>
+    <div class="demo" data-w="inv_status">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Новое</span>
+        <h3>Статусы вывода</h3>
+        <p>Денежные сообщения — обычным текстом, как в обмене: ждёт владельца → чек готов (зелёная «Забрать чек») или отказ с причиной и «деньги остаются в обороте».</p>
+      </div>
+    </div>
+    <div class="demo" data-w="inv_howto">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Новое · П4</span>
+        <h3>Как это работает</h3>
+        <p>Пример по шагам уже по новой модели: комиссии минус потери = прибыль сервиса; ваша доля капитала × ваш процент = вам. День с убытком не начисляет ничего. Остальное — раскрывающимися разделами.</p>
+        <div class="k">Точный состав «потерь» — таблицей вам до кода (план, пункт 5.1).</div>
+      </div>
+    </div>
+    <div class="demo" data-w="inv_calc">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Новое · виджет</span>
+        <h3>«Если бы вы вложили»</h3>
+        <p>Ползунок суммы — и сколько она принесла бы за последние 30 дней по <b>фактической</b> прибыли сервиса. Не обещание, а история — честнее, чем прогноз.</p>
+      </div>
+    </div>
+    <div class="demo" data-w="ops_inv_list">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Пульт</span>
+        <h3>Инвесторы</h3>
+        <p>Все инвесторы таблицей: доля, сколько в обороте; номер нажимается — карточка. Заявки на вывод, которые ждут решения, — кнопками сверху.</p>
+      </div>
+    </div>
+    <div class="demo" data-w="ops_inv_card">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Пульт</span>
+        <h3>Карточка инвестора</h3>
+        <p>Условия (доля, блокировка, автовывод), цифры и последние движения. Условия и доступ — кнопками, с «было → стало».</p>
+      </div>
+    </div>
+    <div class="demo" data-w="ops_inv_approve">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Пульт</span>
+        <h3>Вывод на решение</h3>
+        <p>Тревога владельцу: кто, сколько, куда и почему не автоматически. «Одобрить» — бот сам создаёт чек; «Отклонить» — спросит причину для инвестора.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
     <h2>Старый Telegram<small>запасной вид</small></h2>
     <p class="lead">Приложение без виджетов показывает «не поддерживается» и подпись. Подпись и кнопки сами по себе достаточны: клиент видит итог и может забрать деньги.</p>
     <div class="demo" data-w="fallback"><div><div class="phones"></div></div><div class="notes"><h3>Что останется</h3><ul><li class="plus">Строка итога — в подписи.</li><li class="plus">«Забрать» и все кнопки — под сообщением.</li><li class="minus">Шаги, детали и ползунок — только в свежем Telegram.</li></ul></div></div>
@@ -296,7 +375,7 @@ const EMOJI = JSON.parse(document.getElementById('emoji-data').textContent);
 const SIZE = JSON.parse(document.getElementById('w-size').textContent);
 const AN = JSON.parse(document.getElementById('w-an').textContent);
 const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const FB = { process: '🔄', sending: '📤', wait: '⏳', done: '✅', manual: '🛠', rates: '📈', alarm: '🚨', dot_ok: '🟢', dot_wait: '🟡', robot: '🤖', chart: '📊', take: '⬇', swap: '🔁', support: '💬', help: '❓', back: '‹', queue: '📋', invoice: '🧾', alert: '❗', vault: '🏦', home: '☰', plug: '🔌', plus: '+', export: '⤓', fire: '🔥', flame: '🔥', cb: '🔷', xr: '🚀', warn: '⚠️', scale: '⚖', close: '✕', refund: '↩', history: '🕘', refresh: '⟳', journal: '📒', pause: '⏸', megaphone: '📣', shield: '🛡', emoji: '🙂', coin: '🪙', limit: '⛔', key: '🔑' };
+const FB = { invest: '💼', down: '⬇️', process: '🔄', sending: '📤', wait: '⏳', done: '✅', manual: '🛠', rates: '📈', alarm: '🚨', dot_ok: '🟢', dot_wait: '🟡', robot: '🤖', chart: '📊', take: '⬇', swap: '🔁', support: '💬', help: '❓', back: '‹', queue: '📋', invoice: '🧾', alert: '❗', vault: '🏦', home: '☰', plug: '🔌', plus: '+', export: '⤓', fire: '🔥', flame: '🔥', cb: '🔷', xr: '🚀', warn: '⚠️', scale: '⚖', close: '✕', refund: '↩', history: '🕘', refresh: '⟳', journal: '📒', pause: '⏸', megaphone: '📣', shield: '🛡', emoji: '🙂', coin: '🪙', limit: '⛔', key: '🔑' };
 const THEME = {
   light: '--tg-theme-bg-color:#fff;--tg-theme-text-color:#000;--tg-theme-hint-color:#707579;--tg-theme-link-color:#3390ec;--tg-theme-button-color:#3390ec;--tg-theme-button-text-color:#fff;--tg-theme-secondary-bg-color:#f1f3f6;--tg-theme-accent-text-color:#3390ec;--tg-theme-subtitle-text-color:#707579;--tg-theme-destructive-text-color:#e53935;--tg-theme-section-separator-color:#e7e9ec;color-scheme:light!important',
   dark: '--tg-theme-bg-color:#182533;--tg-theme-text-color:#f5f5f5;--tg-theme-hint-color:#7f91a4;--tg-theme-link-color:#6ab3f3;--tg-theme-button-color:#5288c1;--tg-theme-button-text-color:#fff;--tg-theme-secondary-bg-color:#22303f;--tg-theme-accent-text-color:#6ab3f3;--tg-theme-subtitle-text-color:#7f91a4;--tg-theme-destructive-text-color:#ef5350;--tg-theme-section-separator-color:#2b3a4a;color-scheme:dark!important',
@@ -379,12 +458,15 @@ function phone(name, theme, st, opts = {}) {
   ph.render = (s) => {
     chat.innerHTML = (meta.user ? `<div class="out">${meta.user}</div>` : '') +
       (s.pre || []).map((p) => `<div class="bub"><div class="rich">${fmt(p.rich)}</div><span class="time txt">${hhmm()}</span></div><div class="kb">${keyboard(p.keys || [])}</div>`).join('') +
-      `<div class="bub main">${s.below ? '' : '<div class="cap"></div>'}${opts.fallback ? '<div class="unsup">Это сообщение не поддерживается вашей версией Telegram. Обновите приложение.</div>' : '<iframe title="виджет"></iframe>'}${s.below ? '<div class="cap below"></div>' : (opts.fallback ? '<div style="height:22px"></div>' : '')}<span class="time${s.below ? ' txt' : ''}">${hhmm()}</span></div><div class="kb main"></div>`;
+      (s.rich
+        ? `<div class="bub main"><div class="rich">${fmt(s.rich)}</div><span class="time txt">${hhmm()}</span></div><div class="kb main"></div>`
+        : `<div class="bub main">${s.below ? '' : '<div class="cap"></div>'}${opts.fallback ? '<div class="unsup">Это сообщение не поддерживается вашей версией Telegram. Обновите приложение.</div>' : '<iframe title="виджет"></iframe>'}${s.below ? '<div class="cap below"></div>' : (opts.fallback ? '<div style="height:22px"></div>' : '')}<span class="time${s.below ? ' txt' : ''}">${hhmm()}</span></div><div class="kb main"></div>`);
     ph.setChrome(s);
     requestAnimationFrame(() => mountAll(chat));
   };
   ph.setChrome = (s) => {
-    chat.querySelector('.bub.main .cap').innerHTML = fmt(s.caption);
+    const cap = chat.querySelector('.bub.main .cap');
+    if (cap) cap.innerHTML = fmt(s.caption || '');
     chat.querySelector('.kb.main').innerHTML = keyboard(s.keys);
     requestAnimationFrame(() => mountAll(chat));
   };
@@ -399,12 +481,13 @@ function phone(name, theme, st, opts = {}) {
     clearInterval(ph.fitT); ph.fitT = setInterval(fit, 250);
   };
   ph.render(st);
-  if (!opts.fallback) ph.mountWidget(st);
+  if (!opts.fallback && !st.rich) ph.mountWidget(st);
   // Смена состояния: если меняется набор сообщений (pre, подпись снизу, «бот молчит»), окно собирается заново.
   ph.show = (s) => {
-    const rebuild = !!s.silent !== !!ph.st.silent || JSON.stringify(s.pre || null) !== JSON.stringify(ph.st.pre || null) || !!s.below !== !!ph.st.below;
+    const rebuild = !!s.silent !== !!ph.st.silent || JSON.stringify(s.pre || null) !== JSON.stringify(ph.st.pre || null) || !!s.below !== !!ph.st.below || !!s.rich || !!ph.st.rich;
     ph.st = s;
-    if (rebuild) { ph.render(s); ph.mountWidget(s); return; }
+    if (rebuild) { ph.render(s); if (!s.rich) ph.mountWidget(s); return; }
+    if (!ph.ctx) { ph.render(s); return; }
     ph.ctx.st = s; ph.setChrome(s); ph.tw._set(s.data);
   };
   return ph;
@@ -462,7 +545,7 @@ af.addEventListener('click', (e) => { const b = e.target.closest('button'); if (
 drawAn('');
 
 // ── таблица размеров ──
-const names = { order_a: 'Живая заявка (и карточка заявки)', calc_b: 'Живая квитанция', calc_a: 'Калькулятор «Посчитать»', invoice: 'Живой счёт', promo: 'Рассылка «Выгодно»', dash: 'Живой пульт', accounts: 'Аккаунты', reserves: 'Резервы', process: 'Ход процесса', code: 'Ввод кода', queue: 'Очередь разбора', value: 'Изменить значение', rebalance: 'Ребалансировка', withdraw: 'Вывод прибыли', maint: 'Обслуживание', system: 'Система' };
+const names = { order_a: 'Живая заявка (и карточка заявки)', calc_b: 'Живая квитанция', calc_a: 'Калькулятор «Посчитать»', invoice: 'Живой счёт', promo: 'Рассылка «Выгодно»', dash: 'Живой пульт', accounts: 'Аккаунты', reserves: 'Резервы', process: 'Ход процесса', code: 'Ввод кода', inv_home: 'Инвестиции', inv_withdraw: 'Вывод инвестора', inv_calc: 'Если бы вы вложили', queue: 'Очередь разбора', value: 'Изменить значение', rebalance: 'Ребалансировка', withdraw: 'Вывод прибыли', maint: 'Обслуживание', system: 'Система' };
 const bar = (v, m) => `<span class="meter"><i style="width:${Math.min(100, v / m * 100).toFixed(0)}%"></i></span>`;
 document.getElementById('sz').innerHTML = '<tr><th>Виджет</th><th>Код</th><th>Сжатый (лимит 4096)</th><th>Данные (лимит 1024)</th></tr>' +
   Object.keys(names).filter((k) => SIZE[k]).map((k) => { const s = SIZE[k]; return `<tr><td>${names[k]}</td><td>${(s.html / 1024).toFixed(1)} КБ</td><td>${s.zip} Б ${bar(s.zip, 4096)}</td><td>${s.data} Б ${bar(s.data, 1024)}</td></tr>`; }).join('');

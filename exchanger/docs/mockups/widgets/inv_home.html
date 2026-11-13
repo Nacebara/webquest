@@ -1,0 +1,39 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--ln:light-dark(#e1e6eb,#2f3c49);--tx:var(--tg-theme-text-color,#000)}
+body{margin:0;padding:8px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+small{display:block;font-size:.76em;color:var(--h)}
+.bl{display:flex;align-items:baseline;gap:10px}
+.bl b{font-size:1.75em;line-height:1.15}
+.bl em{font-style:normal;font-size:.9em;font-weight:600;color:var(--ok)}
+svg{display:block;width:100%;height:46px;margin:6px 0 2px}
+path{fill:none;stroke:var(--ok);stroke-width:2}
+path+path{stroke:none;fill:var(--ok);fill-opacity:.12}
+.ax{display:flex;justify-content:space-between;font-size:.68em;color:var(--h)}
+.tl{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.tl div{background:var(--t);border-radius:10px;padding:6px 9px}
+.tl b{display:block;font-size:1.02em}
+.tl span{font-size:.72em;color:var(--h)}
+.ac{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.84em;color:var(--h)}
+.ac i{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:p 2s infinite}
+.ac b{color:var(--tx);font-weight:500}
+@keyframes p{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+<small>В обороте</small>
+<div class=bl><b id=bal></b><em id=d24></em></div>
+<svg viewBox="0 0 300 46" preserveAspectRatio="none" id=ch></svg>
+<div class=ax><span id=a0></span><span>сегодня</span></div>
+<div class=tl><div><small>Можно вывести</small><b id=wd></b></div><div><small>Свежие пополнения</small><b id=lk></b><span id=lkd></span></div></div>
+<div class=ac><i></i><span>Ваш процент — <b id=sh></b> прибыли · начисление через <b id=nx></b></span></div>
+<script>
+const W=window.TelegramWidget||{},$=s=>document.getElementById(s);
+let D=null,sk=0;
+const mm=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+function draw(){let x=null;try{x=JSON.parse(W.chatData)}catch(e){}if(!x)return;D=x;sk=Date.now()/1e3-(x.n||Date.now()/1e3);
+ $('bal').textContent=D.bal+' USDT';$('d24').textContent='+'+D.p24+' за 24 ч';
+ const v=D.s,n=v.length-1,mx=Math.max(...v),mn=Math.min(...v),pt=v.map((y,j)=>(j/n*300).toFixed(1)+','+(42-(y-mn)/((mx-mn)||1)*36).toFixed(1));
+ $('ch').innerHTML='<path d="M'+pt.join('L')+'"/><path d="M0,46L'+pt.join('L')+'L300,46Z"/>';
+ $('a0').textContent=n+1+' дней назад';$('wd').textContent=D.wd;$('lk').textContent=D.lk;$('lkd').textContent=D.lkd;$('sh').textContent=D.sh;tick()}
+function tick(){if(!D)return;let left=D.nx-(Date.now()/1e3-sk);if(left<0)left+=3600;$('nx').textContent=mm(left)}
+W.onEvent?.('chatDataChanged',draw);draw();setInterval(tick,1e3);
+</script>

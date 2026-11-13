@@ -1,0 +1,39 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--ln:light-dark(#d9dfe5,#36434f)}
+body{margin:0;padding:10px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+small{display:block;font-size:.76em;color:var(--h)}
+.bx{background:var(--t);border-radius:14px;padding:9px 12px}
+.rw{display:flex;justify-content:space-between;align-items:flex-end}
+.rw b{font-size:1.35em}.g{color:var(--ok)}
+.rw+.rw{border-top:1px solid var(--ln);margin-top:8px;padding-top:8px}
+#tr{position:relative;height:36px;margin:8px 13px 0;touch-action:pan-y}
+#tr:before{content:"";position:absolute;left:0;right:0;top:16px;height:4px;border-radius:2px;background:var(--ln)}
+#fl{position:absolute;left:0;top:16px;height:4px;border-radius:2px;background:var(--a)}
+#th{position:absolute;top:5px;width:26px;height:26px;margin-left:-13px;border-radius:50%;background:light-dark(#fff,#eef2f6);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.sc{display:flex;justify-content:space-between;margin:0 6px;font-size:.72em;color:var(--h)}
+.nt{margin:8px 2px 0;font-size:.78em;color:var(--h)}
+</style>
+<div class=bx>
+<div class=rw><div><small>Если бы вы внесли</small><b id=in></b></div><div style="text-align:right"><small>за 30 дней получили бы</small><b id=out class=g></b></div></div>
+<div class=rw><small id=day></small><small id=pct></small></div>
+</div>
+<div id=tr><div id=fl></div><div id=th></div></div>
+<div class=sc><span id=s0></span><span id=s1></span></div>
+<p class=nt id=nt></p>
+<script>
+const W=window.TelegramWidget||{},H=W.HapticFeedback,$=s=>document.getElementById(s);
+let D=null,i=-1,R=null;
+function load(){try{D=JSON.parse(W.chatData)}catch(e){}if(!D)return;if(i<0)i=Math.max(0,D.a.indexOf(1000));draw()}
+function draw(){if(!D)return;const n=D.a.length,p=i/(n-1)*100;
+ $('in').textContent=String(D.a[i]).replace(/\B(?=(\d{3})+(?!\d))/g,' ')+' USDT';
+ $('out').textContent='+'+D.m[i]+' USDT';$('day').textContent='в среднем '+D.d[i]+' в день';$('pct').textContent='≈ '+D.y+' за месяц';
+ $('fl').style.width=p+'%';$('th').style.left=p+'%';
+ $('s0').textContent=D.a[0];$('s1').textContent=String(D.a[n-1]).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+ $('nt').textContent='По итогам последних 30 дней: прибыль сервиса '+D.pr+' USDT (комиссии минус потери), ваш процент — '+D.sh+'. Это не обещание: нет обменов — нет и прибыли.'}
+function at(e){const k=Math.max(0,Math.min(D.a.length-1,Math.round((e.clientX-R.left)/R.width*(D.a.length-1))));if(k!=i){i=k;H?.selectionChanged();draw()}}
+const tr=$('tr');
+tr.onpointerdown=e=>{if(!D)return;R=tr.getBoundingClientRect();tr.setPointerCapture(e.pointerId);at(e)};
+tr.onpointermove=e=>{if(R&&tr.hasPointerCapture(e.pointerId))at(e)};
+tr.onpointerup=tr.onpointercancel=()=>R=null;
+W.onEvent?.('chatDataChanged',load);load();
+</script>

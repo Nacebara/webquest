@@ -32,17 +32,17 @@ def main():
     emoji_dir, out = sys.argv[1], sys.argv[2]
     with open(os.path.join(HERE, "samples.json"), encoding="utf-8") as f:
         samples = json.load(f)
-    demos = {k: v for k, v in samples.items() if isinstance(v, dict) and "w" in v}
+    demos = {k: v for k, v in samples.items() if isinstance(v, dict) and ("w" in v or "states" in v)}
     states = {k: demos[v.get("same", k)]["states"] for k, v in demos.items()}
     src, sizes, bad = {}, {}, []
-    for name in sorted({v["w"] for v in demos.values()}):
+    for name in sorted({v["w"] for v in demos.values() if v.get("w")}):
         with open(os.path.join(HERE, f"{name}.html"), encoding="utf-8") as f:
             html = f.read()
         raw = html.encode("utf-8")
         packed = len(zlib.compress(raw, 9))
         data = max(
             len(json.dumps(live(s.get(k, {})), ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
-            for d, v in demos.items() if v["w"] == name for s in states[d] for k in ("data", "answer")
+            for d, v in demos.items() if v.get("w") == name for s in states[d] for k in ("data", "answer")
         )
         src[name] = html
         sizes[name] = {"html": len(raw), "zip": packed, "data": data}
