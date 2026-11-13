@@ -592,9 +592,13 @@ impl Engine {
         )
         .await?;
         let m = storage::invest::get(&mut tx, move_id, false).await?;
-        // Пополнение, чья активация осталась без ответа, держало кошелёк на паузе (Ю-2).
+        // Пополнение, чья активация осталась без ответа (Ю-2), или вывод, чья сумма чека осталась
+        // без ответа (шаг 1.2), держали кошелёк на паузе.
         let unanswered = open_op
-            .filter(|o| o.kind == OpKind::ActivateCheck && o.status == OpStatus::Unknown)
+            .filter(|o| {
+                o.status == OpStatus::Unknown
+                    && matches!(o.kind, OpKind::ActivateCheck | OpKind::CreatePayoutCheck)
+            })
             .map(|o| o.platform);
         if let Some(platform) = unanswered {
             storage::directions::clear_auto_pause_reason(
@@ -848,6 +852,7 @@ impl Engine {
             Ok(o) => o,
             Err(e) => return self.release(op, &e).await,
         };
+        let outcome_holds_chat = outcome.holds_chat();
         match outcome {
             IssueOutcome::Issued { check, .. } => self.invest_issued(op, move_id, &check).await,
             IssueOutcome::InsufficientFunds => {
@@ -891,6 +896,10 @@ impl Engine {
             IssueOutcome::Unknown { detail } => {
                 {
                     let mut conn = self.pool.acquire().await?;
+                    // Сумма чека без ответа: чат кошелька занят (шаг 1.2).
+                    if outcome_holds_chat {
+                        Self::pause_unanswered(&mut conn, op.platform).await?;
+                    }
                     match storage::operations::finish(
                         &mut conn,
                         op.id,

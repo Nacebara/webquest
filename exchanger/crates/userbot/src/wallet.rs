@@ -76,6 +76,22 @@ pub enum IssueOutcome {
     Unknown { detail: String },
 }
 
+/// Сумма чека CryptoBot осталась без ответа (или ответов на неё два): чек мог создать сама сумма,
+/// а его поздний экран — новое сообщение. Чат кошелька занят, пока экран не придёт или заявку не
+/// разберёт человек (аудит 11.11.2026, шаг 1.2 — как активация без ответа в Ю-2).
+pub const CHAT_HELD_NO_REPLY: &str = "no reply to the check amount: the wallet chat is held";
+/// Два ответа на одну сумму чека CryptoBot: в окно попал поздний экран прошлой операции.
+pub const CHAT_HELD_TWO_REPLIES: &str = "two replies to one check amount: the wallet chat is held";
+
+impl IssueOutcome {
+    /// Исход неясен, и чат кошелька занят этой суммой ([`CHAT_HELD_NO_REPLY`],
+    /// [`CHAT_HELD_TWO_REPLIES`]): приём и выплаты через кошелёк — на паузу.
+    pub fn holds_chat(&self) -> bool {
+        matches!(self, IssueOutcome::Unknown { detail }
+            if detail == CHAT_HELD_NO_REPLY || detail == CHAT_HELD_TWO_REPLIES)
+    }
+}
+
 /// Чужой счёт, открытый без оплаты.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InvoiceInfo {

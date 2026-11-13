@@ -65,13 +65,18 @@ pub(crate) struct Sent {
     pub earlier_call: bool,
 }
 
-/// Команда, ответ на которую несёт деньги: `/start <код чека>`. Её поздний ответ нельзя отдать
-/// следующей заявке, поэтому по времени чат после неё не освобождается.
+/// Команда, ответ на которую несёт деньги: `/start <код чека>` и сумма чека CryptoBot (на
+/// мультичек не хватает — чек создаёт сама сумма, экран чека приходит новым сообщением). Её
+/// поздний ответ нельзя отдать следующей операции, поэтому по времени чат после неё не
+/// освобождается (аудит 11.11.2026: Ю-2 — активация, шаг 1.2 — экран чека).
 fn carries_money(platform: domain::Platform, text: &str) -> bool {
-    text.strip_prefix("/start ").is_some_and(|param| {
+    let activation = text.strip_prefix("/start ").is_some_and(|param| {
         parsers::links::classify_start_param(platform, param)
             == Some(parsers::links::LinkKind::Check)
-    })
+    });
+    let check_amount =
+        platform == domain::Platform::CryptoBot && text.trim().parse::<domain::Decimal>().is_ok();
+    activation || check_amount
 }
 
 pub(crate) struct Conv<'a, T: Transport> {
@@ -271,8 +276,11 @@ impl<'a, T: Transport> Conv<'a, T> {
                 .map(|j| &msgs[j])
                 .filter(|p| MENU_COMMANDS.contains(&p.text.as_str()))
                 .map(|p| p.id);
+            // Только xRocket: CryptoBot отвечает на сумму новым сообщением, а правка его меню
+            // (подсказка «Пришлите сумму») ответом на сумму не бывает (шаг 1.2).
             let edited_screen = |m: &RawMessage| {
-                !m.out
+                platform == domain::Platform::XRocket
+                    && !m.out
                     && m.id < last.id
                     && menu_cmd.is_some_and(|p| m.id > p)
                     && m.edit_date.is_some_and(|d| d >= last.date)
@@ -295,7 +303,7 @@ impl<'a, T: Transport> Conv<'a, T> {
                     account = self.w.gate.label(),
                     ?chat,
                     command = last.id,
-                    "check activation has no reply: the chat stays blocked until a human clears it"
+                    "money command has no reply: the chat stays blocked until a human clears it"
                 );
                 return Err(BotError::ChatBlocked);
             }

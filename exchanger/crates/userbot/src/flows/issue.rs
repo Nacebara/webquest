@@ -26,11 +26,16 @@ use parsers::screens::{
     SKIP_BUTTON,
 };
 
+use tokio::time::Instant;
+
 use super::conv::{Conv, SendError};
 use super::gate::Pace;
 use super::{UserbotWallet, rid, typed_amount};
 use crate::transport::{ButtonKind, Chat, RawMessage, Transport, TransportError};
-use crate::wallet::{BotError, IssueMethod, IssueOutcome, IssuedCheck, OpTag};
+use crate::wallet::{
+    BotError, CHAT_HELD_NO_REPLY, CHAT_HELD_TWO_REPLIES, IssueMethod, IssueOutcome, IssuedCheck,
+    OpTag,
+};
 
 const MARKER_PREFIX: &str = "🏷 exch ";
 
@@ -387,9 +392,44 @@ async fn menu<T: Transport>(
         })
         .await;
     let Some(reply) = reply else {
+        // CryptoBot: чек мог создать сама сумма, и его поздний экран — новое сообщение. Чат занят,
+        // пока экран не придёт или заявку не разберёт человек (шаг 1.2, как активация в Ю-2).
         conv.quarantine(chat);
+        if platform == Platform::CryptoBot {
+            conv.unanswered(chat, amount_id);
+            return Ok(unknown(CHAT_HELD_NO_REPLY));
+        }
         return Ok(unknown("no reply to the check amount"));
     };
+    // Одна сумма — один ответ. Второй ответ в том же окне значит, что сюда попал поздний экран
+    // прошлой операции (шаг 1.2): чей чек чей, решает человек. Проверяем при повторе (сумма уже
+    // стояла в истории) и после того, как чат открыл человек (тогда ждём: ответы после молчания
+    // бота приходят пачкой).
+    if sent.located || conv.after_ack(chat) {
+        let until = if conv.after_ack(chat) {
+            conv.late_deadline()
+        } else {
+            Instant::now()
+        };
+        let first = reply.id;
+        let second = conv
+            .wait_screen(chat, cmd_id, amount_id, mark, until, sent.located, |m| {
+                m.id != first && creation(platform, m) != CheckCreationReply::Unknown
+            })
+            .await;
+        if second.is_some() {
+            tracing::error!(
+                amount = amount_id,
+                "two replies to one check amount: outcome is ambiguous"
+            );
+            conv.quarantine(chat);
+            if platform == Platform::CryptoBot {
+                conv.unanswered(chat, amount_id);
+                return Ok(unknown(CHAT_HELD_TWO_REPLIES));
+            }
+            return Ok(unknown("two replies to one check amount"));
+        }
+    }
     match creation(platform, &reply) {
         // CryptoBot: на мультичек хватает — «Пропустить ›» создаёт чек на одну активацию.
         CheckCreationReply::AskActivations => {
@@ -449,12 +489,17 @@ async fn finish<T: Transport>(
         }
     }
     let deadline = conv.deadline();
+    // Экран чека после финального нажатия — правка того же сообщения (CryptoBot: «Пришлите
+    // количество активаций…», xRocket: экран подтверждения). Новое сообщение с чеком — не наш
+    // ответ: это поздний экран прошлой операции (шаг 1.2).
+    let screen_id = screen.id;
     let reply = conv
         .wait_screen(chat, cmd_id, amount_id, mark, deadline, false, |m| {
-            matches!(
-                creation(platform, m),
-                CheckCreationReply::Created(_) | CheckCreationReply::InsufficientFunds
-            )
+            m.id == screen_id
+                && matches!(
+                    creation(platform, m),
+                    CheckCreationReply::Created(_) | CheckCreationReply::InsufficientFunds
+                )
         })
         .await;
     Ok(match reply {
@@ -504,15 +549,34 @@ async fn find_with<T: Transport>(
     // НАШЕ сообщение из того же окна попытки: команда меню (xRocket правит экран, пришедший на
     // `/cheques`) или сумма (CryptoBot отвечает на неё новым сообщением). Поздний экран чека
     // другой операции так не попадёт в чужое окно.
-    let ours_before = |m: &RawMessage, from: i32, until: i32| {
+    let own_before = |m: &RawMessage| {
         bot.iter()
             .filter(|o| o.out && o.id < m.id)
             .map(|o| o.id)
             .max()
-            .is_some_and(|o| o > from && o < until)
+    };
+    let ours_before = |m: &RawMessage, from: i32, until: i32| {
+        own_before(m).is_some_and(|o| o > from && o < until)
     };
     let mut found: Vec<IssuedCheck> = Vec::new();
     for &(from, until) in &windows {
+        // На одно наше сообщение — один экран меню. Два разных ответа на одну сумму значат, что
+        // в окно попал поздний экран прошлой операции (шаг 1.2): чей чек чей, решает человек.
+        let mut answered: Vec<i32> = Vec::new();
+        for m in bot.iter().filter(|m| {
+            !m.out
+                && m.id > from
+                && m.id < until
+                && ours_before(m, from, until)
+                && creation(platform, m) != CheckCreationReply::Unknown
+        }) {
+            let Some(own) = own_before(m) else { continue };
+            if answered.contains(&own) {
+                tracing::error!(op = %tag.key, message = own, "two menu replies to one message of the operation: outcome is ambiguous");
+                return Ok(None);
+            }
+            answered.push(own);
+        }
         for m in bot
             .iter()
             .filter(|m| !m.out && m.id > from && m.id < until && ours_before(m, from, until))

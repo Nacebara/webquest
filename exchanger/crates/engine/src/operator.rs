@@ -294,16 +294,31 @@ impl Engine {
         let staff_id = staff.tg_user_id;
         // Активация без ответа держит кошелёк на паузе, а чат — занятым (аудит 11.11.2026,
         // Ю-2). Решение, которое закрывает её исход, снимает и то и другое.
+        // Неясная денежная команда держала чат кошелька и кошелёк на паузе (Ю-2, шаг 1.2):
+        // активация — решение о приходе; чек выплаты или возврата — решение о выплате.
         let unanswered_intake = ops
             .iter()
-            .find(|o| o.kind == OpKind::ActivateCheck && o.status == OpStatus::Unknown)
-            .map(|o| o.platform)
-            .filter(|_| {
-                matches!(
-                    req.decision,
-                    OperatorDecision::ConfirmIntake { .. } | OperatorDecision::CloseWithoutPayout
-                )
-            });
+            .find(|o| {
+                o.status == OpStatus::Unknown
+                    && match o.kind {
+                        OpKind::ActivateCheck => matches!(
+                            req.decision,
+                            OperatorDecision::ConfirmIntake { .. }
+                                | OperatorDecision::CloseWithoutPayout
+                        ),
+                        OpKind::CreatePayoutCheck
+                        | OpKind::CreateRefundCheck
+                        | OpKind::CreateExcessCheck => matches!(
+                            req.decision,
+                            OperatorDecision::RetryPayout { .. }
+                                | OperatorDecision::Refund { .. }
+                                | OperatorDecision::CloseAsPaid { .. }
+                                | OperatorDecision::CloseWithoutPayout
+                        ),
+                        _ => false,
+                    }
+            })
+            .map(|o| o.platform);
 
         let updated = match &req.decision {
             OperatorDecision::ConfirmIntake { amount } => {

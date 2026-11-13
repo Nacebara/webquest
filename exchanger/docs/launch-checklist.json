@@ -7,7 +7,7 @@
       "milestone": 0,
       "criterion": "fmt, clippy без предупреждений, все тесты, sqlx prepare --check, CI — зелёные на коммите запуска",
       "status": "done",
-      "evidence": "10–11.11.2026, коммит 692211e: 601 тест, 0 упало; CI № 94 зелёный. Перепроверяется на коммите запуска; 11.11.2026 после шага 1.1: 605 тестов, 0 упало; после шага 1.4: 606; после шага 3.1: 607; после шага 1.3: 611; 13.11.2026 после шага 1.5: 627; с экранами 1.5: 630"
+      "evidence": "10–11.11.2026, коммит 692211e: 601 тест, 0 упало; CI № 94 зелёный. Перепроверяется на коммите запуска; 11.11.2026 после шага 1.1: 605 тестов, 0 упало; после шага 1.4: 606; после шага 3.1: 607; после шага 1.3: 611; 13.11.2026 после шага 1.5: 627; с экранами 1.5: 630; после шага 1.2: 634"
     },
     {
       "id": "yu-2",
@@ -20,8 +20,8 @@
       "id": "yu-2-check",
       "milestone": 1,
       "criterion": "Поздний экран созданного чека не становится результатом другой операции (Ю-2)",
-      "status": "todo",
-      "evidence": ""
+      "status": "done",
+      "evidence": "13.11.2026, шаг 1.2: сумма чека CryptoBot без ответа держит чат (conv::carries_money) и ставит кошелёк на паузу (IssueOutcome::holds_chat → UNANSWERED_PAUSE); два ответа на одну сумму — неясно (issue::menu и сверка find_with); финальный экран — только правка того же сообщения. Тесты: userbot flows unanswered_check_amount_keeps_the_chat_until_its_screen_arrives, late_check_screen_after_a_human_cleared_the_chat_is_ambiguous_not_misattributed; engine admin unanswered_check_amount_pauses_the_wallet_until_a_human_decides, late_check_screen_found_by_reconciliation_lifts_the_pause. Вживую не проверено"
     },
     {
       "id": "m-1",

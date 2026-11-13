@@ -865,3 +865,132 @@ async fn unanswered_activation_pauses_the_wallet_until_the_order_is_resolved(poo
     assert_eq!(e.order(order_a.id).await.0.state, OrderState::Completed);
     e.assert_books_match().await;
 }
+
+/// Шаг 1.2 (аудит 11.11.2026). Сумма чека выплаты CryptoBot осталась без ответа: чек мог создать
+/// сама сумма, а его поздний экран — новое сообщение — достался бы следующей выплате. Кошелёк
+/// сразу на паузе: новые заявки через CryptoBot не принимаются. Человек проверил: чека нет,
+/// «выплатить снова» — пауза снята, чат открыт, выплата прошла ровно одним чеком.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn unanswered_check_amount_pauses_the_wallet_until_a_human_decides(pool: PgPool) {
+    let e = env(pool).await;
+    let a = e.world.client_check(XR, usdt(dec!(100))).unwrap();
+    let order_a = accepted(e.submit(&a).await);
+    // Активация на xRocket, метка операции, «/checks» — с ответом; сумма чека CryptoBot — без.
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::DelayReply(std::time::Duration::ZERO),
+        3,
+    );
+    e.world.inject(e.ub, Call::SendText, Fault::NoReply, 1);
+    e.drain().await;
+    let payout = e
+        .ops(order_a.id)
+        .await
+        .into_iter()
+        .find(|o| o.kind == domain::fsm::OpKind::CreatePayoutCheck)
+        .expect("операция выплаты");
+    assert_eq!(payout.status, OpStatus::Unknown, "{payout:?}");
+    // Через CryptoBot сейчас нельзя ни принять чек, ни выплатить.
+    let b = e.world.client_check(CB, usdt(dec!(7))).unwrap();
+    let refused = e.submit(&b).await;
+    assert!(
+        matches!(refused, engine::Submitted::Rejected { .. }),
+        "{refused:?}"
+    );
+    let paused: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT code, pause_reason FROM directions WHERE auto_paused ORDER BY code")
+            .fetch_all(&e.pool)
+            .await
+            .unwrap();
+    assert_eq!(paused.len(), 4, "{paused:?}");
+    assert!(
+        paused
+            .iter()
+            .all(|(_, r)| r.as_deref() == Some(engine::UNANSWERED_PAUSE)),
+        "{paused:?}"
+    );
+
+    // Человек проверил историю чата: чек не создан. «Выплатить снова» — пауза снята.
+    let admin = staff(&e.pool, 20, Role::Admin).await;
+    e.engine
+        .operator_decide(request(
+            order_a.id,
+            OperatorDecision::RetryPayout {
+                previous_failed: true,
+            },
+            &admin,
+        ))
+        .await
+        .unwrap();
+    let still_paused: i64 = sqlx::query_scalar("SELECT count(*) FROM directions WHERE auto_paused")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    assert_eq!(still_paused, 0);
+    e.drain().await;
+    assert_eq!(e.order(order_a.id).await.0.state, OrderState::Completed);
+    assert_eq!(
+        e.world.checks_created_by(e.ub).len(),
+        1,
+        "ровно один чек выплаты"
+    );
+    e.assert_books_match().await;
+}
+
+/// Шаг 1.2: экран чека на сумму без ответа пришёл сам — сверка находит чек, выплата закрыта, а
+/// пауза кошелька снята без человека (неясных денежных команд не осталось).
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn late_check_screen_found_by_reconciliation_lifts_the_pause(pool: PgPool) {
+    let e = env(pool).await;
+    // На мультичек не хватает: чек создаёт сама сумма, экран придёт новым сообщением.
+    e.world
+        .set_balance(e.ub, CB, Asset::Usdt, dec!(150))
+        .unwrap();
+    let a = e.world.client_check(XR, usdt(dec!(100))).unwrap();
+    let order_a = accepted(e.submit(&a).await);
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::DelayReply(std::time::Duration::ZERO),
+        3,
+    );
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::DelayReply(std::time::Duration::from_secs(2)),
+        1,
+    );
+    // История чата на время сбоя недоступна: сверка не решает сразу, заявка ждёт её (как в
+    // `payout_timeout_is_reconciled_to_exactly_one_check`).
+    e.world.inject(
+        e.ub,
+        Call::History,
+        Fault::DelayReply(std::time::Duration::ZERO),
+        2,
+    );
+    e.world.inject(e.ub, Call::History, Fault::Disconnected, 3);
+    e.drain().await;
+    assert_eq!(e.order(order_a.id).await.0.state, OrderState::PayoutPending);
+    let paused: i64 = sqlx::query_scalar("SELECT count(*) FROM directions WHERE auto_paused")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    assert_eq!(paused, 4, "чат занят суммой без ответа");
+    assert_eq!(
+        e.world.checks_created_by(e.ub).len(),
+        1,
+        "чек создан, экрана ещё нет"
+    );
+
+    tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
+    e.world.clear_faults(e.ub);
+    e.engine.resolve_unknown().await.unwrap();
+    assert_eq!(e.order(order_a.id).await.0.state, OrderState::Completed);
+    let paused: i64 = sqlx::query_scalar("SELECT count(*) FROM directions WHERE auto_paused")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    assert_eq!(paused, 0, "чек нашёлся — пауза снята сама");
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
+}

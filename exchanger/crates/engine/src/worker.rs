@@ -533,8 +533,9 @@ impl Engine {
         conn: &mut PgConnection,
         platform: Platform,
     ) -> Result<(), EngineError> {
+        let mut paused = 0;
         for side in [Side::Source, Side::Target] {
-            storage::directions::auto_pause_platform(
+            paused += storage::directions::auto_pause_platform(
                 &mut *conn,
                 platform,
                 side,
@@ -542,10 +543,36 @@ impl Engine {
             )
             .await?;
         }
-        tracing::error!(
-            platform = platform.db_name(),
-            "check activation has no reply: the wallet is paused until a human resolves it"
-        );
+        if paused > 0 {
+            tracing::error!(
+                platform = platform.db_name(),
+                "money command has no reply: the wallet is paused until a human resolves it"
+            );
+        }
+        Ok(())
+    }
+
+    /// Неясных денежных команд по кошельку не осталось (поздний ответ нашёлся сам): пауза
+    /// «без ответа» снята. Если чат всё ещё занят, первая же такая операция поставит её снова.
+    pub(crate) async fn clear_unanswered_if_settled(
+        conn: &mut PgConnection,
+        platform: Platform,
+    ) -> Result<(), EngineError> {
+        let left: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM operations WHERE platform = $1 AND status = 'unknown' \
+               AND kind IN ('activate_check', 'create_payout_check', 'create_refund_check', 'create_excess_check')",
+        )
+        .bind(platform.db_name())
+        .fetch_one(&mut *conn)
+        .await?;
+        if left == 0 {
+            storage::directions::clear_auto_pause_reason(
+                &mut *conn,
+                platform,
+                crate::UNANSWERED_PAUSE,
+            )
+            .await?;
+        }
         Ok(())
     }
 
@@ -630,6 +657,12 @@ impl Engine {
             Ok(outcome) => outcome,
             Err(e) => return self.release(op, &e).await,
         };
+        // Сумма чека без ответа: чат кошелька занят, приём и выплаты через него — на паузу
+        // сразу, как при активации без ответа (шаг 1.2).
+        if outcome.holds_chat() {
+            let mut conn = self.pool.acquire().await?;
+            Self::pause_unanswered(&mut conn, op.platform).await?;
+        }
         match outcome {
             IssueOutcome::Issued { check, method } => {
                 self.confirm_issue(op, &check, &format!("{method:?}")).await
@@ -662,16 +695,33 @@ impl Engine {
         }
     }
 
-    /// Чек создан: итог операции, переход и проводка.
+    /// Чек создан: итог операции, переход и проводка. Если исход был неясен, а чек нашёлся,
+    /// пауза «без ответа» снимается, когда неясных денежных команд по кошельку не осталось.
     async fn confirm_issue(
         &self,
         op: &OperationRow,
         check: &IssuedCheck,
         method: &str,
     ) -> Result<(), EngineError> {
-        if op.kind == OpKind::CreateExcessCheck {
-            return self.confirm_excess(op, check, method).await;
+        let was_unknown = op.status == OpStatus::Unknown;
+        let done = if op.kind == OpKind::CreateExcessCheck {
+            self.confirm_excess(op, check, method).await
+        } else {
+            self.confirm_payout(op, check, method).await
+        };
+        if done.is_ok() && was_unknown {
+            let mut conn = self.pool.acquire().await?;
+            Self::clear_unanswered_if_settled(&mut conn, op.platform).await?;
         }
+        done
+    }
+
+    async fn confirm_payout(
+        &self,
+        op: &OperationRow,
+        check: &IssuedCheck,
+        method: &str,
+    ) -> Result<(), EngineError> {
         let event = match op.kind {
             OpKind::CreateRefundCheck => Event::RefundConfirmed,
             _ => Event::PayoutConfirmed,

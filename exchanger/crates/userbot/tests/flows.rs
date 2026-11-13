@@ -1558,3 +1558,115 @@ async fn retried_issue_after_another_operation_keeps_the_checks_apart() {
     assert_eq!(found1.param, first.param);
     assert_eq!(found2.param, second.param);
 }
+
+// ============================== поздний экран чека (аудит 11.11.2026, шаг 1.2) ====================
+
+/// CryptoBot: на мультичек не хватает — чек создаёт сама сумма, экран чека приходит новым
+/// сообщением. Кошелёк молчал на сумму выплаты A полчаса. Пока сумма A без ответа, выплата B той
+/// же суммы в чат не уходит — ни сразу, ни через `unanswered_block`: поздний экран чека A стал бы
+/// результатом B. Экран пришёл — A находит свой чек, B создаёт свой.
+#[tokio::test(start_paused = true)]
+async fn unanswered_check_amount_keeps_the_chat_until_its_screen_arrives() {
+    let e = env();
+    let wallet = e.wallet(CB);
+    e.fund(CB, dec!(70));
+    e.transport
+        .fault_on_text("40", Fault::DelayReply(Duration::from_secs(1800)));
+    let ta = tag("ord-1-payout-1");
+    let out = wallet.issue_check(&usdt(dec!(40)), &ta).await.unwrap();
+    assert!(matches!(out, IssueOutcome::Unknown { .. }), "{out:?}");
+    assert_eq!(
+        e.world.checks_created_by(e.ub).len(),
+        1,
+        "чек A создан, экрана ещё нет"
+    );
+    // Владелец пополнил кошелёк — на B хватает.
+    e.fund(CB, dec!(100));
+
+    let tb = tag("ord-2-payout-1");
+    assert!(matches!(
+        wallet.issue_check(&usdt(dec!(40)), &tb).await,
+        Err(BotError::Unavailable(_))
+    ));
+    tokio::time::advance(FlowConfig::default().unanswered_block).await;
+    let blocked = wallet.issue_check(&usdt(dec!(40)), &tb).await;
+    assert!(
+        matches!(blocked, Err(BotError::ChatBlocked)),
+        "B must not be sent while A's amount has no reply: {blocked:?}"
+    );
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
+
+    // Экран чека A пришёл: чат чист без участия человека.
+    tokio::time::advance(Duration::from_secs(1300)).await;
+    // Задача симулятора публикует поздний экран — даём ей ход.
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    let IssueOutcome::Issued { check: a, .. } =
+        wallet.issue_check(&usdt(dec!(40)), &ta).await.unwrap()
+    else {
+        panic!("A finds its check")
+    };
+    let IssueOutcome::Issued { check: b, .. } =
+        wallet.issue_check(&usdt(dec!(40)), &tb).await.unwrap()
+    else {
+        panic!("B issues its own check")
+    };
+    assert_ne!(a.param, b.param);
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 2);
+}
+
+/// Человек открыл чат, хотя экрана на сумму A так и не было, и B ушла. Поздний экран чека A
+/// пришёл уже после суммы B: два ответа на одну сумму — исход B неясен, и ни B, ни A не получают
+/// чужой чек — ни сразу, ни при сверке по истории.
+#[tokio::test(start_paused = true)]
+async fn late_check_screen_after_a_human_cleared_the_chat_is_ambiguous_not_misattributed() {
+    let t0 = tokio::time::Instant::now();
+    let e = env();
+    let wallet = e.wallet(CB);
+    e.fund(CB, dec!(70));
+    e.transport
+        .fault_on_text("40", Fault::DelayReply(Duration::from_secs(3600)));
+    let ta = tag("ord-1-payout-1");
+    let out = wallet.issue_check(&usdt(dec!(40)), &ta).await.unwrap();
+    assert!(matches!(out, IssueOutcome::Unknown { .. }), "{out:?}");
+    e.fund(CB, dec!(100));
+    let tb = tag("ord-2-payout-1");
+    tokio::time::advance(FlowConfig::default().unanswered_block).await;
+    assert!(matches!(
+        wallet.issue_check(&usdt(dec!(40)), &tb).await,
+        Err(BotError::ChatBlocked)
+    ));
+
+    // Незадолго до позднего экрана A человек разобрал заявку A и открыл чат; ответ на сумму B
+    // кошелёк задержит — экран A придёт между суммой B и её ответом.
+    tokio::time::advance((t0 + Duration::from_secs(3592)) - tokio::time::Instant::now()).await;
+    wallet.acknowledge_unanswered().await;
+    e.transport
+        .fault_on_text("40", Fault::DelayReply(Duration::from_secs(15)));
+    let out = wallet.issue_check(&usdt(dec!(40)), &tb).await.unwrap();
+    assert!(
+        matches!(out, IssueOutcome::Unknown { .. }),
+        "B must not adopt A's check: {out:?}"
+    );
+
+    tokio::time::advance(Duration::from_secs(120)).await;
+    let retry_b = wallet.issue_check(&usdt(dec!(40)), &tb).await.unwrap();
+    assert!(
+        matches!(retry_b, IssueOutcome::Unknown { .. }),
+        "reconciliation must not give A's check to B: {retry_b:?}"
+    );
+    let found_b = wallet
+        .find_issued_check(&usdt(dec!(40)), &tb)
+        .await
+        .unwrap();
+    assert!(found_b.is_none(), "{found_b:?}");
+    let retry_a = wallet.issue_check(&usdt(dec!(40)), &ta).await.unwrap();
+    assert!(
+        matches!(retry_a, IssueOutcome::Unknown { .. }),
+        "A's screen is outside A's window: a human decides: {retry_a:?}"
+    );
+    assert_eq!(
+        e.world.checks_created_by(e.ub).len(),
+        1,
+        "only A's check exists; B never got to «Skip»"
+    );
+}
