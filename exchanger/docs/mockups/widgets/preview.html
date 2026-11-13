@@ -9,25 +9,17 @@
 <style>
 :root {
   --bg: #F2F4F7; --surface: #FFFFFF; --fg: #131A2A; --muted: #5E6D7F; --line: #DCE2EA;
-  --accent: #0F9463; --chip: #E6EBF1; --warn: #B86E00;
+  --accent: #0F9463; --chip: #E6EBF1; --warn: #B86E00; --rec: #E7F6EE; --rec-fg: #0B7A4F;
   --display: "Unbounded", "Onest", system-ui, sans-serif;
   --body: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --tg-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --bg: #0A0F17; --surface: #111925; --fg: #E7ECF3; --muted: #8E9BAD; --line: #1E2938; --accent: #2BC48A; --chip: #18222F; --warn: #F2A93B; }
+  :root:not([data-theme="light"]) { --bg: #0A0F17; --surface: #111925; --fg: #E7ECF3; --muted: #8E9BAD; --line: #1E2938; --accent: #2BC48A; --chip: #18222F; --warn: #F2A93B; --rec: #12301F; --rec-fg: #6FE0A6; }
 }
-:root[data-theme="dark"] { --bg: #0A0F17; --surface: #111925; --fg: #E7ECF3; --muted: #8E9BAD; --line: #1E2938; --accent: #2BC48A; --chip: #18222F; --warn: #F2A93B; }
-.ph[data-tg="light"] {
-  --tg-bg: #CFDDE7; --tg-head: #FFFFFF; --tg-head-fg: #0F1419; --tg-head-mut: #7D8B99;
-  --tg-in: #FFFFFF; --tg-out: #E3F7D2; --tg-fg: #0F1419; --tg-mut: #7D8B99; --tg-link: #1B7FCC;
-  --tg-btn: rgba(32,58,84,.34); --tg-input: #FFFFFF;
-}
-.ph[data-tg="dark"] {
-  --tg-bg: #0E1621; --tg-head: #17212B; --tg-head-fg: #F5F5F5; --tg-head-mut: #7F91A4;
-  --tg-in: #182533; --tg-out: #2B5278; --tg-fg: #F5F5F5; --tg-mut: #7F91A4; --tg-link: #6AB3F3;
-  --tg-btn: rgba(255,255,255,.09); --tg-input: #17212B;
-}
+:root[data-theme="dark"] { --bg: #0A0F17; --surface: #111925; --fg: #E7ECF3; --muted: #8E9BAD; --line: #1E2938; --accent: #2BC48A; --chip: #18222F; --warn: #F2A93B; --rec: #12301F; --rec-fg: #6FE0A6; }
+.ph[data-tg="light"] { --tg-bg: #CFDDE7; --tg-head: #FFFFFF; --tg-head-fg: #0F1419; --tg-head-mut: #7D8B99; --tg-in: #FFFFFF; --tg-out: #E3F7D2; --tg-fg: #0F1419; --tg-mut: #7D8B99; --tg-link: #1B7FCC; --tg-btn: rgba(32,58,84,.34); --tg-line: rgba(15,20,25,.10); --tg-code: #B5473A; }
+.ph[data-tg="dark"] { --tg-bg: #0E1621; --tg-head: #17212B; --tg-head-fg: #F5F5F5; --tg-head-mut: #7F91A4; --tg-in: #182533; --tg-out: #2B5278; --tg-fg: #F5F5F5; --tg-mut: #7F91A4; --tg-link: #6AB3F3; --tg-btn: rgba(255,255,255,.09); --tg-line: rgba(255,255,255,.10); --tg-code: #F0A58A; }
 * { box-sizing: border-box; }
 html { background: var(--bg); }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body); }
@@ -36,32 +28,40 @@ h1 { font: 700 44px/1.1 var(--display); letter-spacing: -0.02em; margin: 0 0 12p
 h2 { font: 700 26px/1.2 var(--display); margin: 0 0 6px; }
 h2 small { font: 500 13px var(--body); color: var(--muted); margin-left: 10px; letter-spacing: .02em; }
 h3 { font: 600 19px/1.3 var(--body); margin: 0 0 6px; }
-.lead { color: var(--muted); max-width: 820px; margin: 0; }
+.lead { color: var(--muted); max-width: 840px; margin: 0; }
 .tag { display: inline-block; font: 600 12px/1 var(--body); padding: 6px 10px; border-radius: 999px; background: #FFF1D6; color: #8A5300; margin-bottom: 14px; }
-:root[data-theme="dark"] .tag { background: #3A2F1C; color: #F2C27A; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tag { background: #3A2F1C; color: #F2C27A; } }
 .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 22px 0 8px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
 .bar .spacer { flex: 1; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface); }
 .seg button { font: 500 13px var(--body); color: var(--muted); background: none; border: 0; padding: 8px 14px; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
-.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 22px 0 0; }
-.fact { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; font-size: 14px; color: var(--muted); }
-.fact b { display: block; color: var(--fg); font-size: 15px; margin-bottom: 2px; }
-section.block { margin-top: 48px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; font-size: 14.5px; color: var(--muted); }
+.card h3 { color: var(--fg); font-size: 16px; }
+.card b { color: var(--fg); }
+.card ul, .card ol { padding-left: 18px; margin: 6px 0 0; }
+.card li { margin: 4px 0; }
+.mark { display: inline-block; font: 700 12px/1 var(--body); padding: 4px 8px; border-radius: 6px; margin-right: 6px; }
+.m-yes { background: var(--rec); color: var(--rec-fg); } .m-no { background: var(--chip); color: var(--muted); } .m-mid { background: #FFF1D6; color: #8A5300; }
+section.block { margin-top: 52px; }
 .demo { display: grid; grid-template-columns: auto minmax(260px, 1fr); gap: 24px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: 20px; margin-top: 18px; }
+.demo.rec { border: 2px solid var(--accent); }
 @media (max-width: 1100px) { .demo { grid-template-columns: 1fr; } }
 .phones { display: flex; flex-wrap: wrap; gap: 14px; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.chips:empty { display: none; }
 .chips button { font: 500 13px var(--body); border: 1px solid var(--line); background: var(--bg); color: var(--fg); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
 .chips button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .chips .play { background: var(--accent); border-color: var(--accent); color: #fff; }
+.notes p { margin: 0; font-size: 14.5px; color: var(--muted); }
 .notes ul { margin: 8px 0 0; padding-left: 18px; font-size: 14.5px; color: var(--muted); }
 .notes li { margin: 4px 0; }
 .notes li.plus::marker { content: "+  "; color: var(--accent); font-weight: 700; }
 .notes li.minus::marker { content: "−  "; color: var(--warn); font-weight: 700; }
 .notes .k { font-size: 12.5px; color: var(--muted); margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
 .notes .k b { color: var(--fg); font-weight: 600; }
+.badge { display: inline-block; font: 700 11px/1 var(--body); letter-spacing: .04em; text-transform: uppercase; padding: 5px 8px; border-radius: 6px; background: var(--rec); color: var(--rec-fg); margin-bottom: 8px; }
+.badge.v { background: var(--chip); color: var(--muted); }
 .ph { width: 360px; max-width: 100%; border-radius: 22px; overflow: hidden; background: var(--tg-bg); font-family: var(--tg-font); color: var(--tg-fg); box-shadow: 0 1px 0 var(--line), 0 10px 30px rgba(15,25,40,.10); }
 .ph-head { display: flex; align-items: center; gap: 10px; background: var(--tg-head); padding: 9px 12px; color: var(--tg-head-fg); }
 .ph-head .bk { color: var(--tg-link); font-size: 26px; line-height: 1; width: 14px; }
@@ -73,10 +73,23 @@ section.block { margin-top: 48px; }
 .ph-chat { padding: 10px 8px 12px; min-height: 120px; }
 .out { margin: 0 0 8px auto; width: fit-content; max-width: 80%; background: var(--tg-out); border-radius: 14px 14px 4px 14px; padding: 6px 10px; font-size: 15px; }
 .bub { position: relative; width: 330px; max-width: 100%; background: var(--tg-in); border-radius: 14px 14px 14px 4px; overflow: hidden; }
+.bub + .kb + .bub, .kb + .bub { margin-top: 8px; }
 .cap { padding: 8px 12px 2px; font-size: 15px; line-height: 1.35; white-space: pre-line; }
+.cap.below { padding: 4px 12px 22px; }
 .bub iframe { display: block; width: 100%; border: 0; height: 120px; background: transparent; }
 .time { position: absolute; right: 8px; bottom: 6px; font-size: 11.5px; color: #fff; background: rgba(0,0,0,.32); padding: 1px 7px; border-radius: 9px; }
+.time.txt { background: none; color: var(--tg-mut); }
+.rich { padding: 8px 12px 24px; font-size: 14.5px; line-height: 1.4; }
+.rich h3 { font: 600 16px/1.3 var(--tg-font); margin: 0 0 6px; }
+.rich table { width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: 13.5px; }
+.rich th { text-align: left; font-weight: 400; color: var(--tg-mut); font-size: 12px; padding: 3px 4px; }
+.rich td { padding: 5px 4px; border-top: 1px solid var(--tg-line); }
+.rich .r { text-align: right; white-space: nowrap; }
+.rich p { margin: 6px 0; }
+.rich code { font-family: ui-monospace, monospace; color: var(--tg-code); }
+.rich footer { color: var(--tg-mut); font-size: 13px; }
 .kb { width: 330px; max-width: 100%; margin-top: 4px; display: grid; gap: 4px; }
+.kb:empty { display: none; }
 .kb .row { display: flex; gap: 4px; }
 .kb .key { flex: 1; min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px; border-radius: 10px; background: var(--tg-btn); color: #fff; font-size: 14.5px; font-weight: 500; text-align: center; }
 .kb .key.primary { background: #3A86F0; } .kb .key.success { background: #2FA34F; } .kb .key.danger { background: #E0483F; }
@@ -85,25 +98,23 @@ section.block { margin-top: 48px; }
 .unsup { margin: 6px 12px 2px; padding: 10px 12px; border-radius: 10px; background: rgba(127,140,155,.16); color: var(--tg-mut); font-size: 14px; font-style: italic; }
 .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: rgba(20,24,30,.92); color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9; max-width: 90vw; }
 .toast.on { opacity: 1; }
-table.sz { border-collapse: collapse; width: 100%; max-width: 760px; margin-top: 12px; font-size: 14.5px; background: var(--surface); border-radius: 14px; overflow: hidden; }
-.sz th, .sz td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
-.sz th { font-weight: 600; color: var(--muted); font-size: 13px; }
+table.sz, table.an { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 14.5px; background: var(--surface); border-radius: 14px; overflow: hidden; }
+table.sz { max-width: 820px; }
+.sz th, .sz td, .an th, .an td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; vertical-align: top; }
+.sz th, .an th { font-weight: 600; color: var(--muted); font-size: 13px; }
+.an td:first-child { white-space: nowrap; color: var(--fg); }
+.an td:last-child { color: var(--muted); }
+.an tr.grp td { background: var(--chip); color: var(--fg); font-weight: 600; font-size: 13px; }
 .meter { display: inline-block; vertical-align: middle; width: 90px; height: 6px; border-radius: 3px; background: var(--chip); margin-left: 8px; overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--accent); }
-.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 16px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; font-size: 14.5px; color: var(--muted); }
-.card h3 { color: var(--fg); }
-.card ol, .card ul { padding-left: 18px; margin: 6px 0 0; }
-.card li { margin: 5px 0; }
-.card b { color: var(--fg); }
-@media (max-width: 520px) { .page { padding: 20px 16px 48px; } h1 { font-size: 32px; } .demo { padding: 12px; } }
+@media (max-width: 520px) { .page { padding: 20px 16px 48px; } h1 { font-size: 32px; } .demo { padding: 12px; } .an td:first-child { white-space: normal; } }
 </style>
 </head>
 <body>
 <div class="page">
-  <span class="tag">Предложение · не утверждено</span>
+  <span class="tag">Предложение · раунд 2 · 13 ноября</span>
   <h1>Виджеты exch</h1>
-  <p class="lead">9 ноября Telegram выпустил Bot API 10.4: бот может прислать <b>виджет</b> — живой блок прямо внутри сообщения. Рисунок, анимация, ползунок, таймер; бот меняет цифры в уже отправленном сообщении, не присылая новое. Ниже — где виджеты сделают exch лучше и как это будет выглядеть. Каждый виджет на странице — настоящий код, который бот отправит как есть.</p>
+  <p class="lead">Виджет — живой блок внутри сообщения (Bot API 10.4). Здесь — варианты по вашим замечаниям и разбор всех экранов макета. Каждый виджет — настоящий код, который бот отправит как есть; в каждом примере светлая и тёмная тема Telegram рядом. Всё нажимается: ползунки, «Детали», «⇅», «Сверить сейчас», клавиатура кода.</p>
   <div class="bar">
     <span class="seg" role="group" aria-label="Тема страницы">
       <button type="button" data-theme-btn="auto" aria-pressed="true">Как у системы</button>
@@ -111,139 +122,230 @@ table.sz { border-collapse: collapse; width: 100%; max-width: 760px; margin-top:
       <button type="button" data-theme-btn="light" aria-pressed="false">Светлая</button>
     </span>
     <span class="spacer"></span>
-    <span style="font-size:13px;color:var(--muted)">В каждом примере — светлая и тёмная тема Telegram рядом</span>
+    <span style="font-size:13px;color:var(--muted)">Зелёная рамка — что рекомендую</span>
   </div>
-  <div class="facts">
-    <div class="fact"><b>Только личный чат с ботом</b>Так в бою сейчас. Клиент пишет exch в личку, пульт — отдельный бот в личке персонала: оба подходят.</div>
-    <div class="fact"><b>Премиум-эмодзи — вокруг</b>Внутри виджета их нет. Они остаются в подписи над виджетом и на кнопках под ним — как в макетах.</div>
-    <div class="fact"><b>Старый Telegram</b>Покажет «сообщение не поддерживается» и подпись. Поэтому главное всегда в подписи и на кнопках.</div>
-    <div class="fact"><b>Безопасно по устройству</b>Внутри нет интернета и чужого кода; деньги считает бот, а виджет только показывает.</div>
+  <div class="cols">
+    <div class="card"><h3>Ваши решения 13 ноября</h3><ul>
+      <li><span class="mark m-yes">да</span>«Живая заявка» — внедряем; выбрать вариант ниже</li>
+      <li><span class="mark m-mid">ещё раз</span>Калькулятор — проще, таблица курсов остаётся, показать выгодный курс</li>
+      <li><span class="mark m-yes">да</span>«Живой пульт» и «Аккаунты» — значки проще</li>
+      <li><span class="mark m-no">нет</span>Статистика — остаётся картинкой</li>
+    </ul></div>
+    <div class="card"><h3>Что нового на странице</h3><ul>
+      <li>3 варианта «Живой заявки» — «Детали» внутри, без отдельной кнопки</li>
+      <li>3 варианта «Курса» с таблицей и выгодным курсом</li>
+      <li>Значки аккаунтов — тонкое кольцо с номером или точка</li>
+      <li>5 новых мест: живой счёт, рассылка «Выгодно», резервы, ход процесса, ввод кода</li>
+      <li>Таблица по всем экранам макета</li>
+    </ul></div>
+    <div class="card"><h3>«Одно окно» сохраняется</h3>Виджет нельзя получить правкой обычного сообщения. Где экран внутри навигации становится виджетом, бот <b>заменяет окно</b>: удаляет прошлое сообщение и присылает виджет на его место; «Назад» — так же обратно. Заявка, счёт и /dash и сейчас приходят новыми сообщениями — там ничего не меняется.</div>
   </div>
 
   <section class="block">
-    <h2>Клиент<small>2 виджета</small></h2>
-    <p class="lead">Там, где клиент ждёт или прикидывает сумму. Денежные ответы и ошибки остаются обычными сообщениями.</p>
-    <div class="demo" data-w="order">
+    <h2>Живая заявка<small>3 варианта</small></h2>
+    <p class="lead">Подпись над виджетом — та же строка B1 с нашим эмодзи. Во всех вариантах «Детали» раскрываются нажатием прямо в виджете — кнопки «Детали» под сообщением больше нет; запомнится, раскрыты они или нет. «▶ Проиграть» показывает весь путь за 5 секунд.</p>
+    <div class="demo rec" data-w="order_a">
       <div><div class="chips"></div><div class="phones"></div></div>
-      <div class="notes">
-        <h3>Живая заявка</h3>
-        <p style="margin:0;font-size:14.5px;color:var(--muted)">Ответ на присланный чек. Вместо строки, которая меняется, — путь денег по шагам, секундомер и детали сразу. Подпись над виджетом — та же строка B1 с нашим эмодзи; бот правит её вместе с виджетом.</p>
+      <div class="notes"><span class="badge">Рекомендую</span>
+        <h3>А · Полоса</h3>
+        <p>Четыре отрезка — четыре шага. Под ними одна строка: где деньги и секундомер. Сумма уже в подписи — виджет её не повторяет.</p>
         <ul>
-          <li class="plus">Клиент видит, на каком шаге деньги, и что бот не завис: секунды идут на его телефоне.</li>
-          <li class="plus">«Долго» и «вручную» — спокойная жёлтая отметка на нужном шаге и фраза «деньги у меня».</li>
-          <li class="plus">Номер заявки копируется нажатием — удобно писать в поддержку.</li>
-          <li class="plus">«Детали» больше не нужны отдельной кнопкой: комиссия и номер всегда на виду.</li>
-          <li class="minus">Сообщение с виджетом нельзя переслать. Квитанцию «переслать другу» так не сделать — её оставляем обычной.</li>
-          <li class="minus">Меняет утверждённый вид B1 — только с вашего согласия.</li>
+          <li class="plus">Самый низкий: около 60 точек высоты вместе с «Детали ▾».</li>
+          <li class="plus">Ничего не дублирует: подпись — что происходит, полоса — как далеко.</li>
+          <li class="plus">«Долго» и «вручную» — жёлтый отрезок и строка «деньги у меня».</li>
+          <li class="minus">Названий шагов не видно, только «3 из 4» и что сейчас.</li>
         </ul>
-        <div class="k">Обновляет: бот на каждом шаге (<b>editMessageWidgetData</b>, без нового сообщения). Кнопка «Забрать» — обычная зелёная под виджетом.</div>
       </div>
     </div>
-    <div class="demo" data-w="calc">
+    <div class="demo" data-w="order_b">
       <div><div class="chips"></div><div class="phones"></div></div>
-      <div class="notes">
-        <h3>Сколько получу</h3>
-        <p style="margin:0;font-size:14.5px;color:var(--muted)">Ответ на «📈 Курс». Ползунок по суммам, переключатель направления, итог крупно и команда для чека — копируется нажатием.</p>
+      <div class="notes"><span class="badge v">Вариант</span>
+        <h3>Б · Кольцо</h3>
+        <p>Кольцо заполняется по шагам, внутри идут секунды; в конце — зелёная галочка. Рядом крупно сумма к получению.</p>
         <ul>
-          <li class="plus">Ответ на главный вопрос клиента до того, как он пришлёт чек.</li>
-          <li class="plus">Числа считает бот по тем же формулам, что и обмен (ступени, минимальная комиссия, личные условия) — виджет только показывает готовую таблицу.</li>
-          <li class="plus">Лимит новичка виден на шкале: суммы выше — серые, с объяснением.</li>
-          <li class="plus">Курс сменился — бот обновит цифры в уже открытом сообщении.</li>
-          <li class="minus">Ввести свою сумму с клавиатуры нельзя (в виджетах нет полей ввода) — только точки шкалы. Точную сумму бот покажет, когда придёт чек.</li>
+          <li class="plus">Сумма и ход видны одним взглядом.</li>
+          <li class="plus">Кольцо — привычный «загрузочный» знак, понятен без слов.</li>
+          <li class="minus">Сумма повторяет подпись.</li>
         </ul>
-        <div class="k">Обновляет: бот при смене курса. Запросов к боту нет.</div>
+      </div>
+    </div>
+    <div class="demo" data-w="order_c">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Вариант</span>
+        <h3>В · Шаги</h3>
+        <p>Прошлый вариант, только проще: путь денег одной строкой вместо двух плиток, четыре шага с названиями, детали видны сразу.</p>
+        <ul>
+          <li class="plus">Все шаги подписаны — видно, что будет дальше.</li>
+          <li class="plus">Детали не надо раскрывать.</li>
+          <li class="minus">Самый высокий из трёх.</li>
+        </ul>
       </div>
     </div>
   </section>
 
   <section class="block">
-    <h2>Пульт<small>3 виджета</small></h2>
-    <p class="lead">Отдельный служебный бот в личке персонала. Здесь виджеты дают больше всего: живые цифры, тревоги и сторож, который сам замечает, что бот перестал отвечать.</p>
+    <h2>Курс и калькулятор<small>3 варианта</small></h2>
+    <p class="lead">Ползунок «Отдаёте → Получите» сохранён и стал удобнее: сумма крупно, большая ручка, на шкале видно «🔥 выгодно до 300» и лимит новичка, одна главная кнопка — скопировать команду ровно на эту сумму. Числа считает бот по тем же формулам, что и обмен; виджет только показывает. Переключите «Обычный / Выгодный / Новичок».</p>
+    <div class="demo rec" data-w="calc_b">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge">Рекомендую</span>
+        <h3>Б · Живая квитанция</h3>
+        <p>Вместо «Пришлите чек»: та же квитанция, что вы утвердили 8 ноября, но пример «100.00» двигается — клиент ставит свою сумму и копирует команду на неё.</p>
+        <ul>
+          <li class="plus">Калькулятор появляется ровно тогда, когда клиент собирается создать чек — ни одного лишнего шага.</li>
+          <li class="plus">Таблица «Курс и лимиты» не меняется вовсе.</li>
+          <li class="plus">Выгодный курс — огонёк в квитанции и оранжевый участок шкалы; выше 300 сумма считается по обычной ставке.</li>
+          <li class="plus">Лимит новичка: суммы выше — серые, кнопка объясняет почему.</li>
+        </ul>
+        <div class="k">Вместе с ним советую в «Курсе» кнопку <b>«Посчитать»</b> (вариант А) — она открывает этот же калькулятор.</div>
+      </div>
+    </div>
+    <div class="demo" data-w="calc_a">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Вариант</span>
+        <h3>А · Таблица и кнопка «Посчитать»</h3>
+        <p>«Курс и лимиты» — ваша карточка без изменений. Под ней новая кнопка «Посчитать»; калькулятор приходит отдельным виджетом. Кнопка ⇅ меняет направление.</p>
+        <ul>
+          <li class="plus">Таблица на своём месте, калькулятор — для тех, кому нужен.</li>
+          <li class="plus">Как в обменниках: «Отдаёте / Получите» и ⇅ между ними.</li>
+          <li class="minus">Один лишний шаг: открыть калькулятор кнопкой.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="demo" data-w="calc_c">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Вариант</span>
+        <h3>В · Всё в одном</h3>
+        <p>Таблица курсов сама становится переключателем: нажали строку — ползунок считает это направление. Счета — в той же таблице, серым.</p>
+        <ul>
+          <li class="plus">Один экран на всё: курсы, лимиты, выгодный курс и расчёт.</li>
+          <li class="minus">Таблица внутри виджета — без премиум-эмодзи; в старом Telegram её не видно (останется подпись).</li>
+          <li class="minus">Самый высокий экран.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Ещё для клиента<small>2 новых</small></h2>
+    <div class="demo" data-w="invoice">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Новое</span>
+        <h3>Живой счёт</h3>
+        <p>То же, что «Живая заявка», но для оплаты счёта: шаги, квитанция и отсчёт «цена держится ещё 14:32». Цена истекла — виджет сам говорит «чек не присылайте».</p>
+        <ul>
+          <li class="plus">Не хватает — жёлтый шаг и «дошлите 1.25 или верну 50.00».</li>
+          <li class="plus">Кнопка с командой и суммой остаётся под сообщением, как в утверждённой квитанции.</li>
+        </ul>
+        <div class="k">Вид полосы — как у выбранного варианта «Живой заявки».</div>
+      </div>
+    </div>
+    <div class="demo" data-w="promo">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Новое</span>
+        <h3>Рассылка «Выгодно»</h3>
+        <p>Общий виджет: одно сообщение-образец у тысячи клиентов. Бот меняет его состояние один раз — и все разосланные сообщения показывают «закончилось».</p>
+        <ul>
+          <li class="plus">Решает настоящую проблему: старая рассылка в чате больше не обещает курс, которого уже нет.</li>
+          <li class="plus">Подпись под виджетом — то, что придёт в уведомлении.</li>
+          <li class="minus">Подпись правится только по одному сообщению — поэтому «закончилось» пишет виджет, а не подпись.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Пульт<small>принятое и 3 новых</small></h2>
     <div class="demo" data-w="dash">
       <div><div class="chips"></div><div class="phones"></div></div>
-      <div class="notes">
+      <div class="notes"><span class="badge">Принято</span>
         <h3>Живой пульт · /dash</h3>
-        <p style="margin:0;font-size:14.5px;color:var(--muted)">Главный экран «вариант А» — те же строки и порядок, но живой: резервы шкалами от цели, оборот за 12 часов маленькими графиками, время сверки идёт само.</p>
-        <ul>
-          <li class="plus">Пока экран открыт, виджет сам спрашивает у бота свежие цифры каждые 10 секунд — бот не правит сообщение раз в минуту.</li>
-          <li class="plus"><b>Сторож на вашем телефоне:</b> бот не ответил дважды — сверху жёлтая полоса «Бот не отвечает», внизу — на какое время цифры. Карточка так не умеет: она молча показывает старое.</li>
-          <li class="plus">Расхождение резерва — красным «леджер / реально» прямо на шкале.</li>
-          <li class="minus">Персоналу нужен свежий Telegram (на старом — только подпись и кнопки).</li>
-        </ul>
-        <div class="k">Обновляет: виджет спрашивает сам (фоновые запросы, только пока виден) + бот при событии. Кнопки — как в макете.</div>
+        <p>Без изменений. Пока экран открыт, виджет сам спрашивает свежие цифры; бот не ответил дважды — «Бот не отвечает».</p>
       </div>
     </div>
-    <div class="demo" data-w="accounts">
+    <div class="demo rec" data-w="accounts">
       <div><div class="chips"></div><div class="phones"></div></div>
-      <div class="notes">
-        <h3>Аккаунты юзерботов</h3>
-        <p style="margin:0;font-size:14.5px;color:var(--muted)">Каждый аккаунт карточкой: на связи, пауза или вход сброшен. Пауза FLOOD — кольцо с обратным отсчётом, которое идёт само.</p>
+      <div class="notes"><span class="badge">Принято · значки новые</span>
+        <h3>Аккаунты</h3>
+        <p>Вместо робота — тонкое кольцо цвета статуса с номером. При паузе FLOOD само кольцо убывает как таймер. Второй вариант — просто точка. Добавил балансы и итог «Резерв», как в утверждённом макете «Аккаунты».</p>
         <ul>
-          <li class="plus">Видно, когда аккаунт вернётся, без вопросов «а сколько ждать?».</li>
-          <li class="plus">Полоса нагрузки — сколько действий за час из безопасного предела: заранее видно, что аккаунт близок к FLOOD.</li>
-          <li class="plus">«Вход сброшен» — красная карточка и синяя кнопка «войти» под виджетом.</li>
+          <li class="plus">Кольцо: статус, номер и отсчёт паузы в одном знаке.</li>
+          <li class="plus">Точка: ещё проще, отсчёт — словами «ещё 2:31».</li>
         </ul>
-        <div class="k">Обновляет: бот при смене состояния аккаунта; отсчёт идёт на телефоне.</div>
       </div>
     </div>
-    <div class="demo" data-w="stats">
+    <div class="demo" data-w="reserves">
       <div><div class="chips"></div><div class="phones"></div></div>
-      <div class="notes">
-        <h3>Статистика</h3>
-        <p style="margin:0;font-size:14.5px;color:var(--muted)">День по часам, неделя и месяц по дням. Нажатие на столбик — сумма за этот час или день.</p>
+      <div class="notes"><span class="badge v">Новое</span>
+        <h3>Резервы и сверка</h3>
+        <p>Шкала на каждый кошелёк с отметками порога и цели, леджер, в полёте, удержано. «Сверить сейчас» — нажали, бот сверил, ответ появился здесь же.</p>
         <ul>
-          <li class="plus">Графики без картинок: чёткие в любой теме, переключаются мгновенно, без запросов к боту.</li>
-          <li class="plus">Итоги и сравнение с прошлым периодом — сверху, как в карточке «Статистика».</li>
-          <li class="minus">Данных помещается немного (1 КБ): день, неделя и месяц одного показателя — оборота.</li>
+          <li class="plus">Отсчёт до следующей сверки идёт сам.</li>
+          <li class="plus">Расхождение — красным «леджер / реально» и красная точка внизу.</li>
         </ul>
-        <div class="k">Обновляет: бот раз в час или по кнопке.</div>
+      </div>
+    </div>
+    <div class="demo" data-w="process">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Новое · один на пять экранов</span>
+        <h3>Ход процесса</h3>
+        <p>Один виджет для всего долгого: самопроверка, рассылка, замена аккаунта, проверка нового аккаунта, загрузка эмодзи. Кольцо, шаги, время и «ещё ≈ 35 с».</p>
+        <ul>
+          <li class="plus">В макете «Идёт отправка» уже просили «кольцо вместо шкалы» — виджет делает его плавным, а секунды идут без правок сообщения.</li>
+          <li class="plus">Пауза Telegram — жёлтая строка с отсчётом.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="demo" data-w="code">
+      <div><div class="chips"></div><div class="phones"></div></div>
+      <div class="notes"><span class="badge v">Новое</span>
+        <h3>Ввод кода</h3>
+        <p>Шаг 2 из 4 при подключении аккаунта. Сейчас каждая цифра — отдельное нажатие кнопки и правка сообщения; здесь цифры набираются мгновенно, а код уходит боту одним запросом.</p>
+        <ul>
+          <li class="plus">Не теряются цифры при плохой связи; код успевают ввести, пока он действует.</li>
+          <li class="plus">Код идёт запросом, а не сообщением — Telegram его не сбросит (как и сейчас).</li>
+          <li class="minus">Нужен свежий Telegram у того, кто подключает аккаунт.</li>
+        </ul>
+        <div class="k">Попробуйте: наберите 5 цифр и «Готово».</div>
       </div>
     </div>
   </section>
 
   <section class="block">
     <h2>Старый Telegram<small>запасной вид</small></h2>
-    <p class="lead">Приложение без виджетов показывает «не поддерживается» и подпись. Поэтому подпись и кнопки сами по себе достаточны: клиент видит итог и может забрать деньги, владелец — что решать.</p>
-    <div class="demo" data-w="fallback">
-      <div><div class="phones"></div></div>
-      <div class="notes">
-        <h3>Что останется</h3>
-        <ul>
-          <li class="plus">Строка итога с суммой — в подписи.</li>
-          <li class="plus">Зелёная «Забрать» и все кнопки пульта — под сообщением, как сейчас.</li>
-          <li class="minus">Шаги, детали и графики не видны — только в свежем Telegram.</li>
-        </ul>
-        <div class="k">Текст заглушки рисует сам Telegram; здесь — примерно.</div>
-      </div>
-    </div>
+    <p class="lead">Приложение без виджетов показывает «не поддерживается» и подпись. Подпись и кнопки сами по себе достаточны: клиент видит итог и может забрать деньги.</p>
+    <div class="demo" data-w="fallback"><div><div class="phones"></div></div><div class="notes"><h3>Что останется</h3><ul><li class="plus">Строка итога — в подписи.</li><li class="plus">«Забрать» и все кнопки — под сообщением.</li><li class="minus">Шаги, детали и ползунок — только в свежем Telegram.</li></ul></div></div>
   </section>
 
   <section class="block">
-    <h2>Где виджеты не ставлю</h2>
-    <div class="cols">
-      <div class="card"><h3>Ошибки и «где деньги»</h3>Правило: каждая ошибка говорит, где деньги клиента и что делать. Это должно читаться в любом Telegram и в уведомлении — обычное сообщение.</div>
-      <div class="card"><h3>Подтверждения необратимого</h3>«Закрыть без выплаты», «Оплатить вручную» — остаются одноразовой кнопкой, проверенной тестами. Виджет здесь ничего не добавляет к безопасности.</div>
-      <div class="card"><h3>Тревоги персоналу</h3>Тревога должна прийти уведомлением с текстом. У виджета в уведомлении видна только подпись — значит, тревога остаётся текстом.</div>
-      <div class="card"><h3>Квитанция «Пришлите чек»</h3>Её вы утвердили 8 ноября; копирование команды уже есть. Виджет нельзя переслать — квитанцию оставляю как есть.</div>
-    </div>
+    <h2>Все экраны макета<small id="an-count"></small></h2>
+    <p class="lead">Каждый экран клиента и пульта из утверждённых макетов: нужен ли ему виджет и почему. «Позже» — полезно, но после запуска или по желанию.</p>
+    <div class="chips" id="an-filter" style="margin-top:14px"></div>
+    <table class="an" id="an"></table>
   </section>
 
   <section class="block">
-    <h2>Цена и порядок</h2>
+    <h2>Объём и порядок</h2>
     <div class="cols">
-      <div class="card"><h3>Что сделать в коде</h3><ul>
-        <li>Бот: отправка виджета, правка его данных, ответ на запросы виджета (4 метода и 1 вид события Bot API 10.4).</li>
-        <li>Пульт: «Предпросмотр экранов» присылает и виджеты.</li>
-        <li>Тесты: снимок HTML каждого виджета, проверка лимитов (32 КБ / 4 КБ / 1 КБ данных), сценарии на поддельном Bot API.</li>
-        <li>Живая проверка на тестовом боте: светлая и тёмная тема, телефон и компьютер.</li>
-      </ul><p style="margin:10px 0 0">Оценка: пульт (3 виджета) — 2–3 дня; клиент (2 виджета) — 2 дня.</p></div>
-      <div class="card"><h3>Когда</h3><p style="margin:0">По вашему решению 11 ноября сначала — всё, что касается денег и работы без присмотра (веха 1–2). Виджеты — это вид, поэтому предлагаю их после денежных вех: пульт — вместе с вехой 7 (экраны пульта), клиент — после запуска, когда вы посмотрите живую заявку на своём телефоне.</p></div>
+      <div class="card"><h3>Что и сколько</h3><ul>
+        <li><b>Основа</b> — отправка виджета, правка данных, ответ на запросы, «Предпросмотр» с виджетами, проверка лимитов в тестах · M</li>
+        <li><b>Живая заявка</b> · M · <b>Калькулятор</b> · M · <b>Живой счёт</b> · M</li>
+        <li><b>Рассылка «Выгодно»</b> · S</li>
+        <li><b>Живой пульт</b> · M · <b>Аккаунты</b> · S · <b>Резервы</b> · S</li>
+        <li><b>Ход процесса</b> · S · <b>Ввод кода</b> · S</li>
+      </ul><p style="margin:8px 0 0">S — до 2 часов, M — до дня, как в аудите.</p></div>
+      <div class="card"><h3>Когда — предложение</h3><ul>
+        <li>Деньги — по плану первыми (вехи 1–3), как вы решили 11 ноября.</li>
+        <li>Основа, «Живая заявка», калькулятор, живой счёт — в вехе 6 «Клиент».</li>
+        <li>«Живой пульт», «Аккаунты», «Резервы», «Ход процесса» для самопроверки — в вехе 7 «Пульт».</li>
+        <li>Рассылка «Выгодно» — в вехе 6, если успеваем, иначе сразу после запуска; «Ввод кода» — вместе с подключением аккаунтов из пульта (после запуска).</li>
+      </ul></div>
     </div>
   </section>
 
   <section class="block">
     <h2>Проверка лимитов Telegram</h2>
-    <p class="lead">Сервер Telegram принимает виджет до 32 КБ кода, до 4 КБ после сжатия и до 1 КБ данных. Цифры посчитаны сборщиком так же, как считает сервер.</p>
+    <p class="lead">Сервер принимает виджет до 32 КБ кода, до 4 КБ после сжатия и до 1 КБ данных. Посчитано сборщиком так же, как считает сервер.</p>
     <table class="sz" id="sz"></table>
   </section>
 </div>
@@ -253,6 +355,7 @@ table.sz { border-collapse: collapse; width: 100%; max-width: 760px; margin-top:
 <script type="application/json" id="w-data">/*SAMPLES*/</script>
 <script type="application/json" id="emoji-data">/*EMOJI*/</script>
 <script type="application/json" id="w-size">/*SIZES*/</script>
+<script type="application/json" id="w-an">/*ANALYSIS*/</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie_light.min.js"></script>
 <script>
 'use strict';
@@ -260,14 +363,16 @@ const SRC = JSON.parse(document.getElementById('w-src').textContent);
 const DATA = JSON.parse(document.getElementById('w-data').textContent);
 const EMOJI = JSON.parse(document.getElementById('emoji-data').textContent);
 const SIZE = JSON.parse(document.getElementById('w-size').textContent);
+const AN = JSON.parse(document.getElementById('w-an').textContent);
 const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const FB = { process: '🔄', sending: '📤', wait: '⏳', done: '✅', manual: '🛠', rates: '📈', alarm: '🚨', dot_ok: '🟢', robot: '🤖', chart: '📊', take: '⬇', swap: '🔁', support: '💬', help: '❓', back: '‹', queue: '📋', invoice: '🧾', alert: '❗', vault: '🏦', home: '☰', plug: '🔌', plus: '+', export: '⤓' };
+const FB = { process: '🔄', sending: '📤', wait: '⏳', done: '✅', manual: '🛠', rates: '📈', alarm: '🚨', dot_ok: '🟢', dot_wait: '🟡', robot: '🤖', chart: '📊', take: '⬇', swap: '🔁', support: '💬', help: '❓', back: '‹', queue: '📋', invoice: '🧾', alert: '❗', vault: '🏦', home: '☰', plug: '🔌', plus: '+', export: '⤓', fire: '🔥', flame: '🔥', cb: '🔷', xr: '🚀', warn: '⚠️', scale: '⚖', close: '✕', refund: '↩', history: '🕘', refresh: '⟳', journal: '📒', pause: '⏸', megaphone: '📣', shield: '🛡', emoji: '🙂', coin: '🪙', limit: '⛔', key: '🔑' };
 const THEME = {
   light: '--tg-theme-bg-color:#fff;--tg-theme-text-color:#000;--tg-theme-hint-color:#707579;--tg-theme-link-color:#3390ec;--tg-theme-button-color:#3390ec;--tg-theme-button-text-color:#fff;--tg-theme-secondary-bg-color:#f1f3f6;--tg-theme-accent-text-color:#3390ec;--tg-theme-subtitle-text-color:#707579;--tg-theme-destructive-text-color:#e53935;--tg-theme-section-separator-color:#e7e9ec;color-scheme:light!important',
   dark: '--tg-theme-bg-color:#182533;--tg-theme-text-color:#f5f5f5;--tg-theme-hint-color:#7f91a4;--tg-theme-link-color:#6ab3f3;--tg-theme-button-color:#5288c1;--tg-theme-button-text-color:#fff;--tg-theme-secondary-bg-color:#22303f;--tg-theme-accent-text-color:#6ab3f3;--tg-theme-subtitle-text-color:#7f91a4;--tg-theme-destructive-text-color:#ef5350;--tg-theme-section-separator-color:#2b3a4a;color-scheme:dark!important',
 };
 // Стили Telegram по умолчанию (приблизительно, по разделу «Native look» руководства).
-const TGCSS = 'html{background:var(--tg-theme-bg-color);font:15px/1.32 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--tg-theme-text-color);-webkit-text-size-adjust:none;--tg-content-safe-area-inset-bottom:20px;--tg-content-safe-area-corner-right:52px}body{margin:8px 12px;padding-bottom:20px;background:transparent;overflow:hidden}p{margin:.4em 0}button{font:inherit}';
+const TGCSS = 'html{background:var(--tg-theme-bg-color);font:15px/1.32 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--tg-theme-text-color);-webkit-text-size-adjust:none;--tg-content-safe-area-inset-bottom:26px;--tg-content-safe-area-corner-right:52px}body{margin:8px 12px;padding-bottom:26px;background:transparent;overflow:hidden}p{margin:.4em 0}button{font:inherit}';
+const NOBAND = 'html{--tg-content-safe-area-inset-bottom:0px;--tg-content-safe-area-corner-right:0px}';
 
 // ── эмодзи ──
 function recolor(o, c) {
@@ -296,9 +401,12 @@ function live(v) {
   return v;
 }
 function hhmm() { const d = new Date(); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); }
-
 let toastT = 0;
 function toast(t) { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2200); }
+
+const demoOf = (name) => DATA[name];
+const statesOf = (name) => DATA[DATA[name].same || name].states;
+const metaOf = (name) => DATA[DATA[name].same || name];
 
 // ── заменитель TelegramWidget (как в руководстве, раздел «A first look in a browser») ──
 window.__tw = {};
@@ -312,46 +420,60 @@ function makeTW(theme, ctx) {
     HapticFeedback: { impactOccurred() { return this; }, notificationOccurred() { return this; }, selectionChanged() { return this; } },
     onEvent: (t, h) => { (ev[t] ||= []).push(h); }, offEvent() {}, ready() {}, setResizeAnchor() {}, watchPublicData() {}, unwatchPublicData() {},
     openLink: (u) => toast('Откроет ссылку: ' + u), openTelegramLink: (u) => toast('Откроет в Telegram: ' + u), copyText: (t) => toast('Скопировано: ' + t),
-    request: () => ctx.st.silent
-      ? new Promise((_, rej) => setTimeout(() => { const e = new Error('TIMEOUT'); e.name = 'WidgetRequestError'; e.code = 'TIMEOUT'; rej(e); }, 150))
-      : Promise.resolve({ result: JSON.stringify(live(ctx.st.data)) }),
+    request: (d) => {
+      if (ctx.st.silent) return new Promise((_, rej) => setTimeout(() => { const e = new Error('TIMEOUT'); e.name = 'WidgetRequestError'; e.code = 'TIMEOUT'; rej(e); }, 150));
+      if (d.startsWith('code:')) return new Promise((res) => setTimeout(() => res({ result: 'ok' }), 700));
+      return new Promise((res) => setTimeout(() => res({ result: JSON.stringify(live(ctx.st.answer || ctx.st.data)) }), d === 'rec' ? 900 : 60));
+    },
     _fire: (t) => (ev[t] || []).forEach((h) => h()),
-    _set: (d) => { tw.chatData = JSON.stringify(live(d)); (ev.chatDataChanged || []).forEach((h) => h()); },
+    _set: (d) => { tw.chatData = JSON.stringify(live(d)); (ev.chatDataChanged || []).forEach((h) => h()); (ev.publicDataChanged || []).forEach((h) => h()); },
   };
   return tw;
 }
 
 // ── телефон ──
 function keyboard(rows) {
-  return rows.map((r) => `<div class="row">${r.map(([style, icon, text]) => `<div class="key ${style}">${ce(icon, true)}${text}</div>`).join('')}</div>`).join('');
+  return rows.map((r) => `<div class="row">${r.map(([style, icon, text]) => `<div class="key ${style}">${icon ? ce(icon, true) : ''}${text}</div>`).join('')}</div>`).join('');
 }
 function phone(name, theme, st, opts = {}) {
-  const w = DATA[name];
-  const ops = w.bot.includes('пульт');
+  const meta = metaOf(name);
+  const ops = meta.bot.includes('пульт');
   const el = document.createElement('div');
   el.className = 'ph'; el.dataset.tg = theme;
-  el.innerHTML = `<div class="ph-head"><span class="bk">‹</span><span class="av${ops ? ' ops' : ''}">${ops ? ce('robot') : ce('swap')}</span><div><b>${w.bot}</b><small>${ops ? 'служебный бот' : 'бот'}</small></div><span class="th">${theme === 'dark' ? 'тёмная' : 'светлая'}</span></div>
-    <div class="ph-chat"><div class="out">${w.user}</div><div class="bub"><div class="cap"></div>${opts.fallback ? '<div class="unsup">Это сообщение не поддерживается вашей версией Telegram. Обновите приложение.</div><div style="height:22px"></div>' : '<iframe title="виджет" loading="eager"></iframe>'}<span class="time">${hhmm()}</span></div><div class="kb"></div></div>`;
+  el.innerHTML = `<div class="ph-head"><span class="bk">‹</span><span class="av${ops ? ' ops' : ''}">${ops ? ce('robot') : ce('swap')}</span><div><b>${meta.bot}</b><small>${ops ? 'служебный бот' : 'бот'}</small></div><span class="th">${theme === 'dark' ? 'тёмная' : 'светлая'}</span></div><div class="ph-chat"></div>`;
+  const chat = el.querySelector('.ph-chat');
   const ph = { el, name, theme, st, tw: null };
-  ph.setChrome = (s) => {
-    const cap = el.querySelector('.cap'); cap.innerHTML = fmt(s.caption);
-    const kb = el.querySelector('.kb'); kb.innerHTML = keyboard(s.keys);
-    // красить линейные эмодзи можно только после вставки в страницу: до неё цвет текста неизвестен
-    requestAnimationFrame(() => { mountAll(cap); mountAll(kb); });
+  ph.render = (s) => {
+    chat.innerHTML = (meta.user ? `<div class="out">${meta.user}</div>` : '') +
+      (s.pre || []).map((p) => `<div class="bub"><div class="rich">${fmt(p.rich)}</div><span class="time txt">${hhmm()}</span></div><div class="kb">${keyboard(p.keys || [])}</div>`).join('') +
+      `<div class="bub main">${s.below ? '' : '<div class="cap"></div>'}${opts.fallback ? '<div class="unsup">Это сообщение не поддерживается вашей версией Telegram. Обновите приложение.</div>' : '<iframe title="виджет"></iframe>'}${s.below ? '<div class="cap below"></div>' : (opts.fallback ? '<div style="height:22px"></div>' : '')}<span class="time${s.below ? ' txt' : ''}">${hhmm()}</span></div><div class="kb main"></div>`;
+    ph.setChrome(s);
+    requestAnimationFrame(() => mountAll(chat));
   };
-  ph.setChrome(st);
-  if (!opts.fallback) {
+  ph.setChrome = (s) => {
+    chat.querySelector('.bub.main .cap').innerHTML = fmt(s.caption);
+    chat.querySelector('.kb.main').innerHTML = keyboard(s.keys);
+    requestAnimationFrame(() => mountAll(chat));
+  };
+  ph.mountWidget = (s) => {
+    const fr = chat.querySelector('iframe'); if (!fr) return;
     const id = 'w' + (++twSeq);
-    const ctx = { st };
-    ph.ctx = ctx;
-    ph.tw = window.__tw[id] = makeTW(theme, ctx);
-    const fr = el.querySelector('iframe');
-    fr.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>:root{${THEME[theme]}}${TGCSS}</style><script>window.TelegramWidget=parent.__tw['${id}'];<\/script></head><body>${SRC[name]}</body></html>`;
-    const fit = () => { try { const d = fr.contentDocument; if (d && d.documentElement) { const h = Math.min(600, Math.max(50, d.documentElement.scrollHeight)); if (Math.abs(fr.offsetHeight - h) > 1) fr.style.height = h + 'px'; } } catch (e) {} };
-    fr.addEventListener('load', () => { fit(); if (st.silent) setTimeout(() => ph.tw._fire('activated'), 400); });
-    setInterval(fit, 250);
-  }
-  ph.show = (s) => { ph.st = s; if (ph.ctx) ph.ctx.st = s; ph.setChrome(s); if (ph.tw) ph.tw._set(s.data); };
+    ph.ctx = { st: s };
+    ph.tw = window.__tw[id] = makeTW(theme, ph.ctx);
+    fr.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>:root{${THEME[theme]}}${TGCSS}${s.below ? NOBAND : ''}</style><script>window.TelegramWidget=parent.__tw['${id}'];<\/script></head><body>${SRC[demoOf(name).w]}</body></html>`;
+    const fit = () => { try { const d = fr.contentDocument; if (d && d.documentElement) { const b = d.body, cs = getComputedStyle(b); const h = Math.min(600, Math.max(50, Math.ceil(b.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom)))); if (Math.abs(fr.offsetHeight - h) > 1) fr.style.height = h + 'px'; } } catch (e) {} };
+    fr.addEventListener('load', () => { fit(); if (s.silent) setTimeout(() => ph.tw._fire('activated'), 400); });
+    clearInterval(ph.fitT); ph.fitT = setInterval(fit, 250);
+  };
+  ph.render(st);
+  if (!opts.fallback) ph.mountWidget(st);
+  // Смена состояния: если меняется набор сообщений (pre, подпись снизу, «бот молчит»), окно собирается заново.
+  ph.show = (s) => {
+    const rebuild = !!s.silent !== !!ph.st.silent || JSON.stringify(s.pre || null) !== JSON.stringify(ph.st.pre || null) || !!s.below !== !!ph.st.below;
+    ph.st = s;
+    if (rebuild) { ph.render(s); ph.mountWidget(s); return; }
+    ph.ctx.st = s; ph.setChrome(s); ph.tw._set(s.data);
+  };
   return ph;
 }
 
@@ -359,51 +481,58 @@ function demo(box) {
   const name = box.dataset.w;
   const phones = box.querySelector('.phones');
   if (name === 'fallback') {
-    const o = DATA.order.states.find((s) => s.id === 'done');
-    const d = DATA.dash.states.find((s) => s.id === 'day');
-    phones.append(phone('order', 'light', o, { fallback: true }).el, phone('dash', 'dark', d, { fallback: true }).el);
+    phones.append(phone('order_a', 'light', statesOf('order_a').find((s) => s.id === 'done'), { fallback: true }).el, phone('calc_b', 'dark', statesOf('calc_b')[1], { fallback: true }).el);
     return;
   }
-  const states = DATA[name].states;
+  const states = statesOf(name);
   const list = [phone(name, 'light', states[0]), phone(name, 'dark', states[0])];
   list.forEach((p) => phones.append(p.el));
   const chips = box.querySelector('.chips');
-  if (states.length > 1 || name === 'order') {
-    const pick = (s) => { list.forEach((p) => p.show(s)); chips.querySelectorAll('[data-s]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.s === s.id)); };
-    chips.innerHTML = states.map((s, i) => `<button type="button" data-s="${s.id}" aria-pressed="${i === 0}">${s.name}</button>`).join('');
-    chips.addEventListener('click', (e) => {
-      const b = e.target.closest('button'); if (!b) return;
-      if (b.dataset.play) { play(); return; }
-      const s = states.find((x) => x.id === b.dataset.s);
-      if (s.silent) { list.forEach((p) => { p.el.replaceWith((p.next = phone(name, p.theme, s)).el); }); list.forEach((p, i) => { list[i] = p.next; }); chips.querySelectorAll('[data-s]').forEach((x) => x.setAttribute('aria-pressed', x === b)); return; }
-      if (list.some((p) => p.st.silent)) { list.forEach((p, i) => { const n = phone(name, p.theme, s); p.el.replaceWith(n.el); list[i] = n; }); chips.querySelectorAll('[data-s]').forEach((x) => x.setAttribute('aria-pressed', x === b)); return; }
-      pick(s);
-    });
-    if (name === 'order') {
-      chips.insertAdjacentHTML('beforeend', '<button type="button" class="play" data-play="1">▶ Проиграть</button>');
-      let timers = [];
-      const play = () => {
-        timers.forEach(clearTimeout); timers = [];
-        const t0 = now();
-        const seq = [['check', 0], ['send', 2200], ['done', 5200]];
-        seq.forEach(([id, at]) => timers.push(setTimeout(() => {
-          const s = JSON.parse(JSON.stringify(states.find((x) => x.id === id)));
-          s.data.t0 = t0; s.data.t1 = id === 'done' ? now() : 0;
-          pick(s);
-        }, at)));
-      };
-      window.__play = play;
-    }
+  if (!chips) return;
+  const pick = (s) => { list.forEach((p) => p.show(s)); chips.querySelectorAll('[data-s]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.s === s.id)); };
+  if (states.length > 1) chips.innerHTML = states.map((s, i) => `<button type="button" data-s="${s.id}" aria-pressed="${i === 0}">${s.name}</button>`).join('');
+  let timers = [];
+  if (name.startsWith('order')) {
+    chips.insertAdjacentHTML('beforeend', '<button type="button" class="play" data-play="1">▶ Проиграть</button>');
   }
-  function play() { window.__play && window.__play(); }
+  const play = () => {
+    timers.forEach(clearTimeout); timers = [];
+    const t0 = now();
+    [['check', 0], ['send', 1800], ['done', 4600]].forEach(([id, at]) => timers.push(setTimeout(() => {
+      const s = JSON.parse(JSON.stringify(states.find((x) => x.id === id)));
+      s.data.t0 = t0; s.data.t1 = id === 'done' ? now() : 0;
+      pick(s);
+    }, at)));
+  };
+  chips.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.play) { play(); return; }
+    pick(states.find((x) => x.id === b.dataset.s));
+  });
 }
 document.querySelectorAll('.demo').forEach(demo);
 
+// ── разбор экранов ──
+const V = { 'да': 'm-yes', 'позже': 'm-mid', 'нет': 'm-no' };
+const total = AN.groups.reduce((n, g) => n + g.rows.length, 0);
+const cnt = (v) => AN.groups.reduce((n, g) => n + g.rows.filter((r) => r[1] === v).length, 0);
+document.getElementById('an-count').textContent = `${total} строк · да ${cnt('да')} · позже ${cnt('позже')} · нет ${cnt('нет')}`;
+function drawAn(f) {
+  document.getElementById('an').innerHTML = '<tr><th>Экран</th><th>Виджет</th><th>Почему</th></tr>' + AN.groups.map((g) => {
+    const rows = g.rows.filter((r) => !f || r[1] === f);
+    return rows.length ? `<tr class="grp"><td colspan="3">${g.g}</td></tr>` + rows.map((r) => `<tr><td>${r[0]}</td><td><span class="mark ${V[r[1]]}">${r[1]}</span></td><td>${r[2]}</td></tr>`).join('') : '';
+  }).join('');
+}
+const af = document.getElementById('an-filter');
+af.innerHTML = [['', 'Все'], ['да', 'Да'], ['позже', 'Позже'], ['нет', 'Нет']].map(([v, t], i) => `<button type="button" data-f="${v}" aria-pressed="${i === 0}">${t}</button>`).join('');
+af.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; af.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); drawAn(b.dataset.f); });
+drawAn('');
+
 // ── таблица размеров ──
-const names = { order: 'Живая заявка', calc: 'Сколько получу', dash: 'Живой пульт', accounts: 'Аккаунты', stats: 'Статистика' };
+const names = { order_a: 'Живая заявка · А', order_b: 'Живая заявка · Б', order_c: 'Живая заявка · В', calc_a: 'Калькулятор · А', calc_b: 'Калькулятор · Б', calc_c: 'Калькулятор · В', invoice: 'Живой счёт', promo: 'Рассылка «Выгодно»', dash: 'Живой пульт', accounts: 'Аккаунты', reserves: 'Резервы', process: 'Ход процесса', code: 'Ввод кода' };
 const bar = (v, m) => `<span class="meter"><i style="width:${Math.min(100, v / m * 100).toFixed(0)}%"></i></span>`;
 document.getElementById('sz').innerHTML = '<tr><th>Виджет</th><th>Код</th><th>Сжатый (лимит 4096)</th><th>Данные (лимит 1024)</th></tr>' +
-  Object.entries(SIZE).map(([k, s]) => `<tr><td>${names[k]}</td><td>${(s.html / 1024).toFixed(1)} КБ</td><td>${s.zip} Б ${bar(s.zip, 4096)}</td><td>${s.data} Б ${bar(s.data, 1024)}</td></tr>`).join('');
+  Object.keys(names).filter((k) => SIZE[k]).map((k) => { const s = SIZE[k]; return `<tr><td>${names[k]}</td><td>${(s.html / 1024).toFixed(1)} КБ</td><td>${s.zip} Б ${bar(s.zip, 4096)}</td><td>${s.data} Б ${bar(s.data, 1024)}</td></tr>`; }).join('');
 
 // ── тема страницы ──
 document.querySelectorAll('[data-theme-btn]').forEach((b) => b.addEventListener('click', () => {

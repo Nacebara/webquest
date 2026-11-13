@@ -1,0 +1,55 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--wa:light-dark(#d98200,#f2a93b);--h:var(--tg-theme-hint-color,#8a96a3);--a:var(--tg-theme-button-color,#3390ec);--ln:light-dark(#dde3e9,#33414f);--tx:var(--tg-theme-text-color,#000)}
+body{margin:0;padding:10px 12px max(8px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+.r{display:flex;align-items:center;gap:12px}
+svg{flex:none;width:52px;height:52px}
+circle{fill:none;stroke-width:4}
+.b{stroke:var(--ln)}
+#pv{stroke:var(--a);stroke-linecap:round;stroke-dasharray:125.7;transition:stroke-dashoffset .7s,stroke .4s}
+.s #pv{stroke:var(--wa)}.f #pv{stroke:var(--ok)}
+.n #pv{animation:p 1.6s ease-in-out infinite}
+@keyframes p{50%{stroke-width:5.5}}
+text{fill:var(--tx);font-size:12px;font-weight:600;text-anchor:middle}
+.f text{fill:var(--ok);font-size:20px}
+.m{min-width:0}
+.m b{display:block;font-size:1.3em;line-height:1.25;white-space:nowrap}
+.m b small{font-size:.62em;font-weight:500;color:var(--h)}
+.m span{font-size:.86em;color:var(--h)}
+.s .m span{color:var(--wa)}.f .m span{color:var(--ok)}
+#dt{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:.88em;max-height:0;overflow:hidden;transition:max-height .3s,margin .3s}
+#dt.on{max-height:130px;margin-top:10px}
+#dt span{color:var(--h)}#dt b{font-weight:500;text-align:right}
+button{all:unset;cursor:pointer;color:var(--tg-theme-link-color,#3390ec)}
+button:active{opacity:.6}
+#tg{display:inline-block;margin-top:8px;font-size:.86em;padding:2px 0}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<div class=r id=r><svg viewBox="0 0 48 48"><circle class=b cx=24 cy=24 r=20 /><circle id=pv cx=24 cy=24 r=20 transform="rotate(-90 24 24)"/><text id=rt x=24 y=28></text></svg>
+<div class=m><b id=am></b><span id=sl></span></div></div>
+<div id=dt><span>Отдали</span><b id=di></b><span>Комиссия</span><b id=df></b><span>Заявка</span><b><button id=id></button></b></div>
+<button id=tg>Детали ▾</button>
+<script>
+const W=window.TelegramWidget||{},$=s=>document.getElementById(s),E={CryptoBot:'🔷',xRocket:'🚀'};
+let D=null,tk=0,op=0;
+const pl=(n,f)=>{n%=100;const m=n%10;return f[n>10&&n<20?2:m==1?0:m>1&&m<5?1:2]};
+const du=s=>s<60?s+' '+pl(s,['секунду','секунды','секунд']):Math.floor(s/60)+' мин '+s%60+' с';
+const now=()=>Math.floor(Date.now()/1e3);
+function tick(){if(!D)return;const t=Math.max(0,(D.t1||now())-D.t0);
+ if(D.st=='done'){$('rt').textContent='✓';$('rt').setAttribute('y',31);$('sl').textContent='Готово за '+du(t)}
+ else{$('rt').textContent=Math.floor(t/60)+':'+String(t%60).padStart(2,'0');$('rt').setAttribute('y',28)}}
+function draw(){let x=null;try{x=JSON.parse(W.chatData)}catch(e){}
+ const was=D&&D.st;D=x;if(!D)return;const st=D.st,k={check:1,send:3,slow:3,done:4,manual:(D.k|0)+1}[st]??1;
+ $('r').className='r '+(st=='done'?'f':st=='slow'||st=='manual'?'s':'n');
+ $('pv').style.strokeDashoffset=125.7*(1-k/4);
+ $('am').innerHTML=D.out+' USDT <small>→ '+E[D.dst]+' '+D.dst+'</small>';
+ $('sl').textContent={check:'Проверяю чек · 1 из 4',send:'Создаю чек · 3 из 4',slow:'Дольше обычного — деньги у меня',manual:'Проверяю вручную · до 15 минут'}[st]||'';
+ $('di').textContent=D.in+' '+D.src;$('df').textContent=D.fee+' · '+D.pct;$('id').textContent=D.id+' ⧉';
+ tick();clearInterval(tk);if(!D.t1)tk=setInterval(tick,1e3);
+ if(st=='done'&&was&&was!='done')W.HapticFeedback?.notificationOccurred('success')}
+function fold(v){op=v;$('dt').className=op?'on':'';$('tg').textContent=op?'Скрыть ▴':'Детали ▾';try{localStorage.setItem('o',op?'1':'')}catch(e){}}
+$('tg').onclick=()=>fold(!op);
+$('id').onclick=()=>D&&W.copyText?.(D.id);
+W.onEvent?.('chatDataChanged',draw);
+try{op=!!localStorage.getItem('o')}catch(e){}
+fold(op);draw();
+</script>

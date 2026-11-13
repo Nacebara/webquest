@@ -1,0 +1,47 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--wa:light-dark(#d98200,#f2a93b);--bd:light-dark(#e0453a,#ff6b5e);--h:var(--tg-theme-hint-color,#8a96a3);--a:var(--tg-theme-button-color,#3390ec);--ln:light-dark(#e1e6eb,#2f3c49);--tx:var(--tg-theme-text-color,#000)}
+body{margin:0;padding:8px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+.w+.w{margin-top:12px}
+.hd{display:flex;justify-content:space-between;align-items:baseline}
+.hd b{font-size:1.1em}
+.g{position:relative;height:8px;margin:6px 0 4px;border-radius:4px;background:var(--ln)}
+.g s{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--ok);transition:width .6s}
+.g s.a{background:var(--wa)}.g s.r{background:var(--bd)}
+.g i{position:absolute;top:-3px;bottom:-3px;width:2px;border-radius:1px;background:var(--tx)}
+.g i.q{background:var(--wa)}
+.d{font-size:.8em;color:var(--h)}
+.d b{font-weight:500;color:var(--tx)}
+.x{color:var(--bd)!important;font-weight:600}
+.lg{display:flex;gap:12px;margin-top:10px;font-size:.74em;color:var(--h)}
+.lg i{display:inline-block;width:2px;height:10px;margin-right:4px;vertical-align:-1px;background:var(--tx)}
+.lg i.q{background:var(--wa)}
+.nt{margin:10px 0 0;padding:6px 10px;border-radius:8px;font-size:.84em;background:light-dark(#fff5e5,#3a2f1c)}
+.ft{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;font-size:.8em;color:var(--h);padding-right:var(--tg-content-safe-area-corner-right,0px)}
+.ft i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:5px}
+.ft i.r{background:var(--bd)}
+button{all:unset;cursor:pointer;color:var(--tg-theme-link-color,#3390ec);font-weight:500;white-space:nowrap}
+button[disabled]{color:var(--h)}
+</style>
+<div id=w></div>
+<div class=lg><span><i></i>цель</span><span><i class=q></i>порог</span></div>
+<p class=nt id=nt hidden></p>
+<div class=ft><span id=ft></span><button id=rc>Сверить сейчас</button></div>
+<script>
+const W=window.TelegramWidget||{},$=s=>document.getElementById(s),H=W.HapticFeedback;
+let D=null,got=0,busy=0;
+const mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+const ago=s=>s<60?'только что':Math.floor(s/60)+' мин назад';
+function draw(){if(!D)return;let bad=0;
+ $('w').innerHTML=D.w.map(r=>{const[n,lg,re,fl,hd,v,tg,th,lv]=r,mx=tg*1.6,df=lg!=re;if(df)bad=1;
+  return '<div class=w><div class=hd><span>'+n+'</span><b'+(df?' class=x':'')+'>'+re+'</b></div><div class=g><s class="'+(df?'r':['','a','r'][lv|0])+'" style="width:'+Math.min(100,v/mx*100).toFixed(1)+'%"></s><i class=q style="left:'+(th/mx*100).toFixed(1)+'%"></i><i style="left:'+(tg/mx*100).toFixed(1)+'%"></i></div><div class=d>'+(df?'<span class=x>леджер '+lg+' · реально '+re+'</span>':'леджер <b>'+lg+'</b> ✓')+' · в полёте <b>'+fl+'</b> · удержано <b>'+hd+'</b></div></div>'}).join('');
+ $('nt').hidden=!D.m;$('nt').textContent=D.m||'';foot(bad)}
+function foot(bad){if(!D)return;const age=Math.floor((Date.now()-got)/1e3),last=D.u-D.s+age,next=Math.max(0,D.nx-D.u-age);
+ bad=bad||D.w.some(r=>r[1]!=r[2]);
+ $('ft').innerHTML=busy?'Сверяю балансы…':'<i class="'+(bad?'r':'')+'"></i>Сверка '+ago(last)+' · '+(bad?'расхождение':'расхождений нет')+' · следующая через '+mm(next)}
+function set(x){if(!x)return;D=x;got=Date.now();draw()}
+$('rc').onclick=()=>{if(busy||!W.request)return;busy=1;$('rc').disabled=true;foot();
+ W.request('rec').then(a=>{busy=0;$('rc').disabled=false;try{set(JSON.parse(a.result))}catch(e){foot()}H?.notificationOccurred('success')},e=>{busy=0;$('rc').disabled=false;$('ft').textContent='Бот не ответил — попробуйте ещё раз'})};
+W.onEvent?.('chatDataChanged',()=>{try{set(JSON.parse(W.chatData))}catch(e){}});
+try{set(JSON.parse(W.chatData))}catch(e){}
+setInterval(()=>foot(),1e3);
+</script>

@@ -1,0 +1,34 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--bd:light-dark(#e0453a,#ff6b5e);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--at:var(--tg-theme-button-text-color,#fff);--ln:light-dark(#d9dfe5,#36434f);--tx:var(--tg-theme-text-color,#000)}
+body{margin:0;padding:10px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px))}
+.dt{display:flex;justify-content:center;gap:12px;margin:2px 0 12px}
+.dt i{width:12px;height:12px;border-radius:50%;border:2px solid var(--ln);transition:background .15s,border-color .15s}
+.dt i.on{background:var(--tx);border-color:var(--tx)}
+.ok .dt i{background:var(--ok);border-color:var(--ok)}
+.er .dt i{border-color:var(--bd);animation:sh .3s}
+@keyframes sh{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;touch-action:none}
+button{all:unset;box-sizing:border-box;cursor:pointer;text-align:center;height:44px;line-height:44px;border-radius:10px;background:var(--t);font-size:1.25em;font-weight:500;user-select:none}
+button:active{filter:brightness(.9)}
+#go{background:var(--a);color:var(--at);font-size:.95em;font-weight:600}
+#go[disabled]{background:var(--t);color:var(--h)}
+.ms{margin:10px 0 0;text-align:center;font-size:.84em;color:var(--h);min-height:1.2em}
+.ok .ms{color:var(--ok)}.er .ms{color:var(--bd)}
+</style>
+<div id=o><div class=dt id=dt></div>
+<div class=kp id=kp></div>
+<p class=ms id=ms></p></div>
+<script>
+const W=window.TelegramWidget||{},H=W.HapticFeedback,$=s=>document.getElementById(s);
+let D={n:5},v='',busy=0;
+try{D=JSON.parse(W.chatData)||D}catch(e){}
+$('kp').innerHTML=[1,2,3,4,5,6,7,8,9,'⌫',0,'Готово'].map(k=>'<button '+(k=='Готово'?'id=go':'')+' data-k="'+k+'">'+k+'</button>').join('');
+function draw(m,cl){$('dt').innerHTML=Array.from({length:D.n},(_,j)=>'<i class="'+(j<v.length?'on':'')+'"></i>').join('');
+ $('go').disabled=v.length<D.n||busy;$('o').className=cl||'';$('ms').textContent=m||'Цифры не видны никому и не попадают в чат'}
+$('kp').onclick=e=>{const b=e.target.closest('button');if(!b||busy)return;const k=b.dataset.k;
+ if(k=='Готово'){if(v.length<D.n||!W.request)return;busy=1;draw('Проверяю код…');
+  W.request('code:'+v).then(a=>{busy=0;if(a.result=='ok'){H?.notificationOccurred('success');draw('Код принят — дальше облачный пароль','ok')}else{v='';H?.notificationOccurred('error');draw(a.result||'Код не подошёл — введите ещё раз','er')}},()=>{busy=0;draw('Бот не ответил — нажмите «Готово» ещё раз','er')});return}
+ H?.impactOccurred('light');if(k=='⌫')v=v.slice(0,-1);else if(v.length<D.n)v+=k;draw()};
+W.onEvent?.('chatDataChanged',()=>{try{D=JSON.parse(W.chatData)||D}catch(e){}v='';draw()});
+draw();
+</script>

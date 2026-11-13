@@ -1,0 +1,63 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--fi:light-dark(#e8590c,#ff8a3d);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--at:var(--tg-theme-button-text-color,#fff);--ln:light-dark(#d9dfe5,#36434f);--bg:var(--tg-theme-bg-color,#fff)}
+body{margin:0;padding:10px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+button{all:unset;box-sizing:border-box;cursor:pointer;text-align:center}
+.bx{position:relative;background:var(--t);border-radius:14px}
+.rw{display:flex;justify-content:space-between;align-items:flex-end;padding:9px 12px}
+.rw+.rw{border-top:1px solid var(--ln)}
+.rw small{display:block;color:var(--h);font-size:.76em}
+.rw b{font-size:1.35em;line-height:1.2}
+.rw span{font-size:.86em;padding-bottom:2px}
+.g{color:var(--ok)}
+#sw{position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:var(--bg);border:1px solid var(--ln);color:var(--a);font-size:15px;line-height:28px}
+#sw:active{transform:rotate(180deg);transition:transform .2s}
+#tr{position:relative;height:36px;margin:8px 13px 0;touch-action:pan-y}
+#tr:before{content:"";position:absolute;left:0;right:0;top:16px;height:4px;border-radius:2px;background:var(--ln)}
+#pz{position:absolute;left:0;top:16px;height:4px;border-radius:2px;background:light-dark(#ffd8bf,#5a3420)}
+#lk{position:absolute;right:0;top:13px;height:10px;border-radius:5px;border:1px dashed var(--h);box-sizing:border-box}
+#fl{position:absolute;left:0;top:16px;height:4px;border-radius:2px;background:var(--a)}
+#th{position:absolute;top:5px;width:26px;height:26px;margin-left:-13px;border-radius:50%;background:light-dark(#fff,#eef2f6);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.sc{display:flex;justify-content:space-between;margin:0 6px;font-size:.72em;color:var(--h)}
+#pl{color:var(--fi)}
+.fe{margin:8px 2px;font-size:.84em;color:var(--h);text-align:center}
+.fe b{color:var(--fi);font-weight:600}
+#cp{display:block;width:100%;padding:10px;border-radius:10px;background:var(--a);color:var(--at);font-weight:600;font-size:.92em}
+#cp:active{filter:brightness(.92)}
+#cp[disabled]{background:var(--t);color:var(--h)}
+</style>
+<div class=bx>
+<div class=rw><div><small>Отдаёте</small><b id=gv></b></div><span id=wf></span></div>
+<div class=rw><div><small>Получите</small><b id=gt class=g></b></div><span id=wt></span></div>
+<button id=sw aria-label="Поменять направление">⇅</button>
+</div>
+<div id=tr><div id=pz></div><div id=lk></div><div id=fl></div><div id=th></div></div>
+<div class=sc><span id=s0></span><span id=pl></span><span id=s1></span></div>
+<div class=fe id=fe></div>
+<button id=cp></button>
+<script>
+const W=window.TelegramWidget||{},H=W.HapticFeedback,$=s=>document.getElementById(s),E={CryptoBot:'🔷',xRocket:'🚀'};
+let D=null,d=0,i=-1,R=null,cpT=0;
+const c=s=>Math.round(parseFloat(s)*100),m=v=>(v/100).toFixed(2);
+const cmd=(w,a)=>w=='CryptoBot'?'@send '+a+'usdt':'@xrocket '+a;
+const pos=j=>j/(D.a.length-1)*100;
+function load(){try{D=JSON.parse(W.chatData)}catch(e){}if(!D)return;if(i<0){i=Math.max(0,D.a.indexOf(100));d=D.f|0}draw()}
+function draw(){if(!D)return;const r=D.d[d],a=D.a[i],lk=a>D.l,pr=r[4]&&a<=r[4],rate=pr?r[2]:r[4]?r[3]:r[2];
+ $('gv').textContent=a+' USDT';$('wf').textContent=E[r[0]]+' '+r[0];$('wt').textContent=E[r[1]]+' '+r[1];
+ $('gt').textContent=lk?'—':r[5][i]+' USDT';
+ $('fe').innerHTML=lk?'Первые обмены — до '+D.l+' USDT, потом до '+D.a[D.a.length-1]:'Комиссия '+m(c(a)-c(r[5][i]))+' · '+(pr?'<b>🔥 '+r[2]+'</b> <s>'+r[3]+'</s>':rate+(r[4]?' · выгодно до '+r[4]+' USDT':''));
+ const p=pos(i);$('fl').style.width=p+'%';$('th').style.left=p+'%';
+ const zi=r[4]?D.a.filter(v=>v<=r[4]).length-1:-1,li=D.a.findIndex(v=>v>D.l);
+ $('pz').style.width=zi>0?Math.min(pos(zi),li>=0?pos(li-.5):100)+'%':'0';$('pl').textContent=zi>0?'🔥 выгодно до '+r[4]:'';
+ $('lk').hidden=li<0;if(li>=0)$('lk').style.left=pos(li-.5)+'%';
+ $('s0').textContent=D.a[0];$('s1').textContent=D.a[D.a.length-1];
+ const b=$('cp');b.disabled=lk;if(!cpT)b.textContent=lk?'Пока до '+D.l+' USDT':'Скопировать  '+cmd(r[0],a)}
+function at(e){const k=Math.max(0,Math.min(D.a.length-1,Math.round((e.clientX-R.left)/R.width*(D.a.length-1))));if(k!=i){i=k;H?.selectionChanged();draw()}}
+const tr=$('tr');
+tr.onpointerdown=e=>{if(!D)return;R=tr.getBoundingClientRect();tr.setPointerCapture(e.pointerId);at(e)};
+tr.onpointermove=e=>{if(R&&tr.hasPointerCapture(e.pointerId))at(e)};
+tr.onpointerup=tr.onpointercancel=()=>R=null;
+$('sw').onclick=()=>{if(!D||D.d.length<2)return;d=1-d;H?.impactOccurred('light');draw()};
+$('cp').onclick=()=>{if(!D||$('cp').disabled)return;const r=D.d[d];W.copyText?.(cmd(r[0],D.a[i]));$('cp').textContent='Скопировано — вставьте в любой чат';clearTimeout(cpT);cpT=setTimeout(()=>{cpT=0;draw()},2500)};
+W.onEvent?.('chatDataChanged',load);
+load();
+</script>

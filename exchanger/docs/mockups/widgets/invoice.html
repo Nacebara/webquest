@@ -1,0 +1,44 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--wa:light-dark(#d98200,#f2a93b);--bd:light-dark(#e0453a,#ff6b5e);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--ln:light-dark(#dde3e9,#33414f);--tx:var(--tg-theme-text-color,#000)}
+body{margin:0;padding:10px 12px max(8px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+.br{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.br i{position:relative;height:6px;border-radius:3px;background:var(--ln);overflow:hidden}
+.br i.d{background:var(--ok)}
+.br i.n{background:light-dark(#d3e5fb,#294560)}
+.br i.n:after{content:"";position:absolute;top:0;bottom:0;left:0;width:45%;border-radius:3px;background:var(--a);animation:m 1.3s ease-in-out infinite}
+.br i.s{background:var(--wa)}
+@keyframes m{from{transform:translateX(-100%)}to{transform:translateX(230%)}}
+.pr{margin-top:10px;background:var(--t);border-radius:10px;padding:7px 12px;font:.88em/1.55 ui-monospace,monospace}
+.r{display:flex;justify-content:space-between;gap:8px}
+hr{border:0;border-top:1px solid var(--ln);margin:3px 0}
+.r.t b{font-size:1.08em}
+.r.w b{color:var(--wa)}.r.o b{color:var(--ok)}
+.ln{margin-top:8px;font-size:.86em;color:var(--h)}
+.ln.w{color:var(--wa)}.ln.x{color:var(--bd)}.ln.o{color:var(--ok)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+<div class=br id=br><i></i><i></i><i></i><i></i></div>
+<div class=pr id=pr></div>
+<div class=ln id=ln></div>
+<script>
+const W=window.TelegramWidget||{},$=s=>document.getElementById(s);
+let D=null;
+const now=()=>Math.floor(Date.now()/1e3);
+const mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+const pl=(n,f)=>{n%=100;const m=n%10;return f[n>10&&n<20?2:m==1?0:m>1&&m<5?1:2]};
+const R=(a,b,c)=>'<div class="r '+(c||'')+'"><span>'+a+'</span><b>'+b+'</b></div>';
+function draw(){let x=null;try{x=JSON.parse(W.chatData)}catch(e){}D=x;if(!D)return;const st=D.st;
+ const k={wait:1,short:1,pay:2,paid:4}[st];
+ [...$('br').children].forEach((b,j)=>b.className=j<k?'d':j==k?(st=='short'?'s':'n'):'');
+ $('pr').innerHTML=st=='short'?R('К оплате',D.tot)+R('Пришло',D.got)+'<hr>'+R('Не хватает',D.rest,'t w')
+  :st=='paid'?R('Счёт '+D.w,D.inv)+R('Получено',D.tot)+'<hr>'+R('Комиссия '+D.pct,D.fee,'t o')
+  :R('Счёт '+D.w,D.inv)+R('Комиссия '+D.pct,D.fee)+'<hr>'+R('Чек '+D.p,D.tot,'t');
+ tick()}
+function tick(){if(!D)return;const l=$('ln'),st=D.st,left=D.exp-now();
+ if(st=='paid'){const t=D.t1-D.t0;l.className='ln o';l.textContent='Оплачен за '+t+' '+pl(t,['секунду','секунды','секунд']);return}
+ if(st=='pay'){l.className='ln';l.textContent='Оплачиваю счёт '+D.w+'…';return}
+ if(left<=0){l.className='ln x';l.textContent='Цена истекла — пришлите ссылку на счёт ещё раз. Чек не присылайте.';return}
+ l.className='ln'+(left<120?' w':'');l.textContent=(st=='short'?'Дошлите '+D.rest+' или верну '+D.got+' · ':'')+'Цена держится ещё '+mm(left)}
+W.onEvent?.('chatDataChanged',draw);
+draw();setInterval(tick,1e3);
+</script>

@@ -1,0 +1,30 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--fi:light-dark(#e8590c,#ff8a3d);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--tx:var(--tg-theme-text-color,#000)}
+body{margin:0;padding:10px 12px 10px;font-variant-numeric:tabular-nums}
+.hd{display:flex;justify-content:space-between;align-items:center;font-size:.9em}
+.pl{font-size:.8em;font-weight:600;padding:2px 9px;border-radius:9px;background:light-dark(#e3f5ea,#1d3a2a);color:var(--ok);white-space:nowrap}
+.pl:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px;animation:p 1.6s infinite}
+@keyframes p{50%{opacity:.25}}
+.off .pl{background:var(--t);color:var(--h)}.off .pl:before{background:var(--h);animation:none}
+.rt{margin:6px 0 2px;display:flex;align-items:baseline;gap:10px}
+.rt b{font-size:2em;line-height:1.1;color:var(--fi)}
+.rt s{color:var(--h);font-size:1.05em}
+.off .rt b{color:var(--tx);font-size:1.5em}
+.sb{font-size:.86em;color:var(--h)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+<div id=o><div class=hd><span id=dr></span><span class=pl id=pl></span></div>
+<div class=rt><b id=rb></b><s id=ro></s></div><div class=sb id=sb></div></div>
+<script>
+const W=window.TelegramWidget||{},$=s=>document.getElementById(s);
+const hm=t=>{const d=new Date(t*1e3);return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')};
+let rv=-1;
+function draw(){let D=null;try{D=JSON.parse(W.publicData||W.chatData)}catch(e){}if(!D||(D.v|0)<rv)return;rv=D.v|0;
+ $('o').className=D.on?'':'off';$('dr').textContent=D.f+' → '+D.t;
+ $('pl').textContent=D.on?'действует':'закончилось';
+ $('rb').textContent=D.on?D.r:D.o;$('ro').textContent=D.on?D.o:'';
+ $('sb').textContent=D.on?'на чек до '+D.up+' USDT · с '+hm(D.a):'Выгодный курс закончился в '+hm(D.e)+'. Сейчас обычная ставка.'}
+W.watchPublicData?.();
+W.onEvent?.('publicDataChanged',draw);W.onEvent?.('chatDataChanged',draw);
+draw();
+</script>

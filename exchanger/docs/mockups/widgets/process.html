@@ -1,0 +1,55 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--wa:light-dark(#d98200,#f2a93b);--bd:light-dark(#e0453a,#ff6b5e);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--ln:light-dark(#e1e6eb,#2f3c49);--tx:var(--tg-theme-text-color,#000)}
+body{margin:0;padding:10px 12px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+.top{display:flex;align-items:center;gap:12px}
+svg.rg{flex:none;width:54px;height:54px}
+.rg circle{fill:none;stroke-width:4}
+.rg .k{stroke:var(--ln)}
+#pv{stroke:var(--a);stroke-linecap:round;stroke-dasharray:131.9;transition:stroke-dashoffset .8s}
+.fin #pv{stroke:var(--ok)}.bad #pv{stroke:var(--bd)}
+.rg text{fill:var(--tx);font-size:12px;font-weight:600;text-anchor:middle}
+.fin .rg text{fill:var(--ok);font-size:18px}
+.top b{display:block;font-size:1.15em}
+.top span{font-size:.84em;color:var(--h)}
+ul{list-style:none;margin:10px 0 0;padding:0;font-size:.88em}
+li{display:flex;align-items:center;gap:8px;padding:3px 0}
+li i{flex:none;width:14px;height:14px;border-radius:50%;border:1.5px solid var(--ln);box-sizing:border-box;font:700 9px/11px sans-serif;text-align:center;color:#fff;font-style:normal}
+li.d i{background:var(--ok);border-color:var(--ok)}
+li.e i{background:var(--bd);border-color:var(--bd)}
+li.n{font-weight:600}
+li.n i{border-color:var(--a);border-top-color:transparent;animation:sp 1s linear infinite}
+li.t{color:var(--h)}
+@keyframes sp{to{transform:rotate(360deg)}}
+.cn{display:flex;gap:6px;margin-top:10px}
+.cn div{flex:1;background:var(--t);border-radius:9px;padding:5px 8px}
+.cn small{display:block;font-size:.7em;color:var(--h)}
+.cn b{font-size:.98em}
+.wn{margin:10px 0 0;font-size:.84em;color:var(--wa)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<div id=o><div class=top><svg class=rg viewBox="0 0 48 48"><circle class=k cx=24 cy=24 r=21 /><circle id=pv cx=24 cy=24 r=21 transform="rotate(-90 24 24)"/><text id=pc x=24 y=28></text></svg><div><b id=hd></b><span id=sb></span></div></div>
+<ul id=st></ul><div class=cn id=cn></div><p class=wn id=wn hidden></p></div>
+<script>
+const W=window.TelegramWidget||{},$=s=>document.getElementById(s);
+let D=null,sk=0,was=0;
+const now=()=>Date.now()/1e3-sk;
+const mm=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const nf=v=>String(v).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+function draw(){if(!D)return;const s=D.s||[],fin=!!D.t1,bad=s.some(x=>x[1]==3);
+ const [a,b]=D.p||[s.filter(x=>x[1]==2).length,s.length],f=b?a/b:0;
+ $('o').className=fin?(bad?'bad':'fin'):'';
+ $('pv').style.strokeDashoffset=131.9*(1-(fin&&!bad?1:f));
+ $('pc').textContent=fin?(bad?'!':'✓'):Math.floor(f*100)+'%';$('pc').setAttribute('y',fin?31:28);
+ $('hd').textContent=D.p?nf(a)+' из '+nf(b)+' '+(D.n||''):a+' из '+b+' '+(D.n||'');
+ tick();
+ $('st').innerHTML=s.map(x=>'<li class='+['t','n','d','e'][x[1]]+'><i>'+(x[1]==2?'✓':x[1]==3?'!':'')+'</i>'+x[0]+'</li>').join('');
+ $('cn').innerHTML=(D.c||[]).map(x=>'<div><small>'+x[0]+'</small><b>'+x[1]+'</b></div>').join('');$('cn').hidden=!D.c;
+ if(fin&&!was)W.HapticFeedback?.notificationOccurred(bad?'error':'success');was=fin}
+function tick(){if(!D)return;const t=(D.t1||now())-D.t0;
+ $('sb').textContent=D.t1?'готово за '+mm(t):'идёт '+mm(t)+(D.eta?' · ещё ≈ '+mm(D.eta-now()):'');
+ const w=$('wn');w.hidden=!D.w||D.w[1]<=now();if(D.w)w.textContent='⏸ '+D.w[0]+' · ещё '+mm(D.w[1]-now())}
+function set(x){if(!x)return;D=x;if(x.n0)sk=Date.now()/1e3-x.n0;draw()}
+W.onEvent?.('chatDataChanged',()=>{try{set(JSON.parse(W.chatData))}catch(e){}});
+try{set(JSON.parse(W.chatData))}catch(e){}
+setInterval(tick,1e3);
+</script>
