@@ -14,6 +14,11 @@ pub async fn connect_and_migrate(url: &str) -> anyhow::Result<storage::PgPool> {
             tracing::info!("database created");
         }
         Ok(true) => {}
+        // Сервер ещё не отвечает: повторить с начала, иначе при подъёме сервера между проверкой и
+        // подключением база не будет создана (гонку нашёл тест шага 2.3).
+        Err(e) if crate::startup::transient_db(&e) => {
+            return Err(anyhow::Error::new(e).context("cannot reach PostgreSQL"));
+        }
         Err(e) => tracing::debug!(error = %e, "cannot check whether the database exists"),
     }
     let pool = storage::connect(url)
@@ -22,6 +27,21 @@ pub async fn connect_and_migrate(url: &str) -> anyhow::Result<storage::PgPool> {
     storage::migrate(&pool).await.context("migrations failed")?;
     tracing::info!("migrations applied");
     Ok(pool)
+}
+
+/// [`connect_and_migrate`] для запуска без присмотра (шаг 2.3): база ещё не поднялась после
+/// перезагрузки — ждать до `limit`; неверный пароль или адрес — сразу ошибка.
+pub async fn connect_and_migrate_waiting(
+    url: &str,
+    limit: std::time::Duration,
+) -> anyhow::Result<storage::PgPool> {
+    crate::startup::retry(
+        "PostgreSQL",
+        limit,
+        || connect_and_migrate(url),
+        crate::startup::transient_db_chain,
+    )
+    .await
 }
 
 /// Состояние базы для проверки: ничего не создаёт и не меняет.

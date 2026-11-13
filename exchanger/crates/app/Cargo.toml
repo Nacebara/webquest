@@ -51,7 +51,7 @@ userbot = { path = "../userbot", features = ["sim"] }
 
 [dev-dependencies]
 rust_decimal_macros.workspace = true
-tokio ={ workspace = true, features = ["test-util"] }
+tokio = { workspace = true, features = ["test-util", "net"] }
 userbot = { path = "../userbot", features = ["sim"] }
 
 [lints]

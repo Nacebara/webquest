@@ -76,7 +76,14 @@ pub async fn connect_userbots(
     }
     let mut out = Vec::new();
     for (label, (userbot_id, platforms)) in accounts {
-        let transport = connect_account(pool, tg, &label).await?;
+        // После перезагрузки сеть поднимается не сразу: ждать её, но не «вход сброшен» (шаг 2.3).
+        let transport = crate::startup::retry(
+            "Telegram",
+            crate::startup::WAIT_LIMIT,
+            || connect_account(pool, tg, &label),
+            crate::startup::transient_telegram,
+        )
+        .await?;
         log.register(
             &label,
             AccountIds {

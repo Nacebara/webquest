@@ -184,6 +184,8 @@ fn main() -> ExitCode {
             Command::Setup
         });
     let code = start(command, &paths, has_env, bare);
+    // Служба и планировщик запускают `exch run` (с командой), поэтому паузы у них нет; а если
+    // запустили без команды, но не в живом окне — пауза не ждёт.
     if bare && code != ExitCode::SUCCESS {
         app::prompt::pause();
     }
@@ -487,7 +489,12 @@ async fn selftest(amount: domain::Decimal) -> anyhow::Result<()> {
 
 async fn run() -> anyhow::Result<()> {
     let cfg = load_config()?;
-    let pool = connect_and_migrate(&cfg).await?;
+    // Без присмотра: после перезагрузки база поднимается десятки секунд — ждём (шаг 2.3).
+    let pool = app::db::connect_and_migrate_waiting(
+        cfg.database_url.expose_secret(),
+        app::startup::WAIT_LIMIT,
+    )
+    .await?;
 
     let cancel = CancellationToken::new();
     let mut tasks: JoinSet<Result<(), supervisor::GaveUp>> = JoinSet::new();
