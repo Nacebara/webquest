@@ -1,0 +1,14 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&between)
+---
+--- rich
+
+--- html
+🚨 <b>CryptoBot: меньше на <code>10.00</code></b>
+Ожидалось 1 000.00 · реально 990.00 · ub-1
+Учтены неясные операции: выплата <code>F6A7B8C9D0</code> (19.70), возврат <code>11AA22BB33</code> (50.00): баланс не сходится ни с одним их исходом.
+Выплаты в CryptoBot на паузе. Это вы выводили?
+--- keyboard
+[{"text":"👍 Да, это я","callback_data":"a:cap:2"}]
+[{"text":"🔎 Нет, разбираться","style":"danger","callback_data":"a:iq:2"}]

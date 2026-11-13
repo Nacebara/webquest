@@ -1,0 +1,12 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&screen)
+---
+--- rich
+
+--- html
+🚨 <b>Сверка CryptoBot не проходит 1 ч 15 мин</b>
+С <tg-time unix="1793872800" format="t">13:00</tg-time> недостачу на кошельке не видно. Идёт самопроверка — сверка возобновится после неё.
+--- keyboard
+[{"text":"📋 Разбор","style":"primary","callback_data":"a:q"},{"text":"🔁 Сверить снова","callback_data":"a:rc"}]
+[{"text":"👍 Принял","callback_data":"a:ack:4"}]

@@ -7,7 +7,7 @@
       "milestone": 0,
       "criterion": "fmt, clippy без предупреждений, все тесты, sqlx prepare --check, CI — зелёные на коммите запуска",
       "status": "done",
-      "evidence": "10–11.11.2026, коммит 692211e: 601 тест, 0 упало; CI № 94 зелёный. Перепроверяется на коммите запуска; 11.11.2026 после шага 1.1: 605 тестов, 0 упало; после шага 1.4: 606; после шага 3.1: 607; после шага 1.3: 611; 13.11.2026 после шага 1.5: 627"
+      "evidence": "10–11.11.2026, коммит 692211e: 601 тест, 0 упало; CI № 94 зелёный. Перепроверяется на коммите запуска; 11.11.2026 после шага 1.1: 605 тестов, 0 упало; после шага 1.4: 606; после шага 3.1: 607; после шага 1.3: 611; 13.11.2026 после шага 1.5: 627; с экранами 1.5: 630"
     },
     {
       "id": "yu-2",
@@ -42,7 +42,7 @@
       "milestone": 1,
       "criterion": "Сверка балансов работает и при висящей неясной операции; тревога, если сверка не проходит (М-6)",
       "status": "done",
-      "evidence": "13.11.2026, шаг 1.5: сверка считает варианты неясных операций (domain::reconcile::judge, 12 тестов, из них 4 proptest по 5 000 случаев); движок — crates/engine/tests/reconcile.rs: missing_money_is_caught_while_a_payout_is_unknown (недостача 12.00 при неясной выплате — пауза и CRITICAL за один цикл), unknown_payout_that_went_through_matches_its_variant (сбой «выполнил и вернул таймаут»), an_operation_in_progress_still_skips_the_wallet, a_stalled_reconciliation_raises_an_alert_and_clears. Экраны тревоги «сверка не проходит» и подсказки в карточке заявки — на приёмке владельца; вживую не проверено"
+      "evidence": "13.11.2026, шаг 1.5: сверка считает варианты неясных операций (domain::reconcile::judge, 12 тестов, из них 4 proptest по 5 000 случаев); движок — crates/engine/tests/reconcile.rs: missing_money_is_caught_while_a_payout_is_unknown (недостача 12.00 при неясной выплате — пауза и CRITICAL за один цикл), unknown_payout_that_went_through_matches_its_variant (сбой «выполнил и вернул таймаут»), an_operation_in_progress_still_skips_the_wallet, a_stalled_reconciliation_raises_an_alert_and_clears. Экраны (утверждены владельцем картинкой 13.11): «Сверка не проходит», «Ожидалось · учтена неясная выплата» в тревоге о недостаче, подсказка в карточке заявки — снимки crates/ops/tests/snapshots (7 новых), сквозной тест ops_bot::order_card_shows_what_reconciliation_says_about_an_unknown_payout, есть в «Предпросмотре»; вживую в Telegram не проверено"
     },
     {
       "id": "m-5",

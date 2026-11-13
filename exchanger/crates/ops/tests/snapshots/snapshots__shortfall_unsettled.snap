@@ -1,0 +1,14 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&short)
+---
+--- rich
+
+--- html
+🚨 <b>xRocket: меньше на <code>12.00</code></b>
+Ожидалось 902.50 · реально 890.50 · ub-1
+Учтена неясная выплата <code>K7M2Q9XR4T</code> (97.50): даже если она прошла, денег не хватает.
+Выплаты в xRocket на паузе. Это вы выводили?
+--- keyboard
+[{"text":"👍 Да, это я","callback_data":"a:cap:1"}]
+[{"text":"🔎 Нет, разбираться","style":"danger","callback_data":"a:iq:1"}]

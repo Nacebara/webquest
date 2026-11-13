@@ -1141,6 +1141,43 @@ async fn shortfall_asks_the_owner_and_investigation_keeps_payouts_paused(pool: P
 /// Решение владельца 8 ноября: номер в таблице — кнопка в тексте (callback, как в гаранте),
 /// карточка открывается в том же сообщении; длинный список — страницами «1 / 2»; внизу
 /// карточки — «‹ Заявки» обратно на ту же страницу.
+/// Шаг 1.5 (утверждено 13.11): выплата неясна («выполнил и вернул таймаут»), сверка по балансу
+/// видит, что она прошла, — карточка заявки в пульте подсказывает это оператору.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn order_card_shows_what_reconciliation_says_about_an_unknown_payout(pool: PgPool) {
+    use userbot::sim::{Call, Fault};
+    let o = ops(pool).await;
+    let url = o.world.client_check(CB, usdt(dec!(100))).unwrap();
+    let link = parsers::links::parse_url(&url).unwrap();
+    let order = accepted(o.engine.submit_check(common::CLIENT, &link).await.unwrap());
+    o.world.inject(
+        o.ub,
+        Call::CheckPress,
+        Fault::DelayReply(Duration::from_millis(700)),
+        1,
+    );
+    o.world
+        .inject(o.ub, Call::History, Fault::DelayReply(Duration::ZERO), 2);
+    o.world.inject(o.ub, Call::History, Fault::Disconnected, 3);
+    o.drain().await;
+    tokio::time::sleep(Duration::from_millis(800)).await;
+    o.world.clear_faults(o.ub);
+    let r = o.engine.reconcile_balances().await.unwrap();
+    assert!(
+        r.iter()
+            .all(|x| x.verdict == engine::reconcile::Verdict::Ok),
+        "{r:?}"
+    );
+    let menu = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    let orders = o.press(OWNER, &menu, "Заявки", "Заявки · 1").await;
+    let card = o.follow(OWNER, &orders, &order.public_id, "Заявка").await;
+    let text = card.text();
+    assert!(
+        text.contains("по балансу xRocket выплата") && text.contains("прошла"),
+        "{text}"
+    );
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn table_rows_open_cards_in_the_same_window_and_lists_have_pages(pool: PgPool) {
     let o = ops(pool).await;

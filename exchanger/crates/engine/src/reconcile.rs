@@ -157,6 +157,47 @@ fn usdt_delta(kind: &str, amount: Option<Decimal>, asset: Option<&str>) -> Optio
     }
 }
 
+/// Операции в полёте по кошельку для событий пульта (не больше пяти): заявка и её публичный
+/// номер, вид, статус, сумма. `only_unknown` — только операции с неясным исходом.
+async fn ops_brief(
+    conn: &mut sqlx::PgConnection,
+    wallet: i16,
+    only_unknown: bool,
+) -> Result<Vec<serde_json::Value>, EngineError> {
+    type Brief = (
+        i64,
+        Option<i64>,
+        Option<String>,
+        String,
+        String,
+        Option<Decimal>,
+    );
+    let rows: Vec<Brief> = sqlx::query_as(
+        "SELECT op.id, op.order_id, o.public_id, op.kind, op.status, op.amount FROM operations op \
+           LEFT JOIN orders o ON o.id = op.order_id \
+          WHERE op.wallet_account_id = $1 AND op.status IN ('dispatched', 'unknown') \
+            AND (NOT $2 OR op.status = 'unknown') \
+          ORDER BY op.id LIMIT 5",
+    )
+    .bind(wallet)
+    .bind(only_unknown)
+    .fetch_all(conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, order, public, kind, status, amount)| {
+            json!({
+                "id": id,
+                "order_id": order,
+                "public": public,
+                "kind": kind,
+                "status": status,
+                "amount": amount.map(|a| a.normalize().to_string()),
+            })
+        })
+        .collect())
+}
+
 /// Операция в полёте: id, вид, статус, сумма, актив.
 type OpRow = (i64, String, String, Option<Decimal>, Option<String>);
 
@@ -314,6 +355,18 @@ impl Engine {
                 (Verdict::Warn | Verdict::Pause, Some(a), Some(j)) => {
                     // Сравнивали с ближайшим вариантом неясных операций; без них это леджер.
                     let reference = j.reference;
+                    let lowest = expected
+                        + pending
+                            .deltas()
+                            .unwrap_or_default()
+                            .iter()
+                            .map(|(_, d)| (*d).min(Decimal::ZERO))
+                            .sum::<Decimal>();
+                    let unsettled_brief = if unsettled_ids.is_empty() {
+                        Vec::new()
+                    } else {
+                        ops_brief(&mut tx, wallet, true).await?
+                    };
                     if verdict == Verdict::Pause {
                         let reason = format!(
                             "сверка: в кошельке {a} USDT, ожидалось {reference} — не хватает {}",
@@ -347,7 +400,9 @@ impl Engine {
                                 "diff": (a - reference).normalize().to_string(),
                                 "paused": verdict == Verdict::Pause,
                                 "account": account,
-                                "unsettled": unsettled_ids,
+                                "unsettled": unsettled_brief,
+                                // Меньше любого исхода неясных операций: не хватает при любом.
+                                "below_all": a < lowest,
                             }),
                         },
                     )
@@ -409,12 +464,7 @@ impl Engine {
         if minutes < stall_minutes {
             return Ok(());
         }
-        let ops: Vec<(i64, Option<i64>, String, String)> = sqlx::query_as(
-            "SELECT id, order_id, kind, status FROM operations WHERE wallet_account_id = $1 AND status IN ('dispatched', 'unknown') ORDER BY id LIMIT 5",
-        )
-        .bind(wallet)
-        .fetch_all(&mut *conn)
-        .await?;
+        let ops = ops_brief(&mut *conn, wallet, false).await?;
         tracing::error!(
             platform = platform.db_name(),
             minutes,
@@ -433,9 +483,7 @@ impl Engine {
                     "since": since.to_rfc3339(),
                     "minutes": minutes,
                     "reason": why,
-                    "ops": ops.iter().map(|(id, order, kind, status)| json!({
-                        "id": id, "order_id": order, "kind": kind, "status": status,
-                    })).collect::<Vec<_>>(),
+                    "ops": ops,
                 }),
             },
         )

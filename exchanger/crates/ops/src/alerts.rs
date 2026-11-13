@@ -204,6 +204,7 @@ impl Inner {
                 btn(t.t("alert.b_ack"), &Cb::Ack(a.id)),
             ]),
             "balance_mismatch" => mismatch_screen(t, p, a.id),
+            "reconcile_stalled" => stalled_screen(t, p, a.id),
             "balance_unreadable" => {
                 let name = p["platform"]
                     .as_str()
@@ -341,21 +342,38 @@ pub fn mismatch_screen(t: &crate::Texts, p: &serde_json::Value, id: i64) -> Scre
         String::new()
     };
     let short = diff < domain::Decimal::ZERO;
-    let text = t.f(
-        if short {
-            "alert.balance_short"
-        } else {
-            "alert.balance_extra"
-        },
-        &[
-            ("name", &name),
-            ("amount", &crate::dash::amount(diff.abs())),
-            ("expected", &crate::dash::amount(num("expected"))),
-            ("actual", &crate::dash::amount(num("actual"))),
-            ("account", &account),
-            ("paused", &paused),
-        ],
-    );
+    let args: [(&str, &dyn std::fmt::Display); 6] = [
+        ("name", &name),
+        ("amount", &crate::dash::amount(diff.abs())),
+        ("expected", &crate::dash::amount(num("expected"))),
+        ("actual", &crate::dash::amount(num("actual"))),
+        ("account", &account),
+        ("paused", &paused),
+    ];
+    let text = match p["unsettled"].as_array().filter(|a| !a.is_empty()) {
+        None => t.f(
+            if short {
+                "alert.balance_short"
+            } else {
+                "alert.balance_extra"
+            },
+            &args,
+        ),
+        // Сверка учла операции с неясным исходом (шаг 1.5): «Ожидалось» — их вариант.
+        Some(ops) => {
+            let line = unsettled_line(t, ops, short, p["below_all"].as_bool() == Some(true));
+            let mut all: Vec<(&str, &dyn std::fmt::Display)> = args.to_vec();
+            all.push(("unsettled", &line));
+            t.f(
+                if short {
+                    "alert.balance_short_unsettled"
+                } else {
+                    "alert.balance_extra_unsettled"
+                },
+                &all,
+            )
+        }
+    };
     let no = btn(t.t("alert.b_no"), &Cb::Investigate(id));
     Screen::new(text)
         .row(vec![btn(t.t("alert.b_yes"), &Cb::Capital(id))])
@@ -364,4 +382,152 @@ pub fn mismatch_screen(t: &crate::Texts, p: &serde_json::Value, id: i64) -> Scre
         } else {
             no
         }])
+}
+
+/// Название операции в тексте события: `prefix` — `op` («выплата») или `opc` («чек выплаты»).
+fn op_noun(t: &crate::Texts, prefix: &str, kind: &str) -> String {
+    let key = format!("alert.{prefix}_{kind}");
+    if t.has(&key) {
+        t.t(&key)
+    } else {
+        t.t(&format!("alert.{prefix}_other"))
+    }
+}
+
+/// Строка «Учтена неясная выплата K7M2… (97.50): …» под тревогой о недостаче.
+fn unsettled_line(t: &crate::Texts, ops: &[Value], short: bool, below_all: bool) -> String {
+    let one = |o: &Value| {
+        t.f(
+            "alert.unsettled_op",
+            &[
+                ("what", &op_noun(t, "op", &s(o, "kind"))),
+                ("public", &esc(&s(o, "public"))),
+                (
+                    "sum",
+                    &o["amount"]
+                        .as_str()
+                        .and_then(|a| a.parse().ok())
+                        .map_or_else(|| "—".to_owned(), crate::dash::amount),
+                ),
+            ],
+        )
+    };
+    if let [o] = ops
+        && short
+        && below_all
+        && s(o, "kind") == "create_payout_check"
+    {
+        // Текст макета: одна неясная выплата, денег меньше обоих исходов.
+        let op = format!(
+            "<code>{}</code> ({})",
+            esc(&s(o, "public")),
+            o["amount"]
+                .as_str()
+                .and_then(|a| a.parse().ok())
+                .map_or_else(|| "—".to_owned(), crate::dash::amount)
+        );
+        return t.f("alert.unsettled_payout_short", &[("op", &op)]);
+    }
+    let list = ops.iter().map(one).collect::<Vec<_>>().join(", ");
+    let head = t.f(
+        if ops.len() == 1 {
+            "alert.unsettled_one"
+        } else {
+            "alert.unsettled_many"
+        },
+        &[("op", &list)],
+    );
+    let tail = t.t(match (short, below_all) {
+        (true, true) => "alert.unsettled_short_all",
+        (true, false) => "alert.unsettled_short_between",
+        (false, _) => "alert.unsettled_extra",
+    });
+    format!("{head}{tail}")
+}
+
+/// «Сверка не проходит» (шаг 1.5): сверка кошелька пропускается дольше порога; какие заявки её
+/// держат. Кнопки — «Разбор», «Сверить снова», «Принял».
+pub fn stalled_screen(t: &crate::Texts, p: &Value, id: i64) -> Screen {
+    let name = p["platform"]
+        .as_str()
+        .and_then(domain::Platform::from_db_name)
+        .map_or_else(
+            || esc(p["platform"].as_str().unwrap_or_default()),
+            |x| t.t(&format!("names.{}", x.db_name())),
+        );
+    let m = p["minutes"].as_i64().unwrap_or_default();
+    let minutes = if m < 60 {
+        t.f("alert.minutes", &[("n", &m)])
+    } else {
+        t.f(
+            "alert.hours",
+            &[("h", &(m / 60)), ("m", &format!("{:02}", m % 60))],
+        )
+    };
+    let since = p["since"]
+        .as_str()
+        .and_then(|v| chrono::DateTime::parse_from_rfc3339(v).ok())
+        .map_or_else(
+            || "—".to_owned(),
+            |at| crate::dash::hhmm(at.with_timezone(&chrono::Utc)),
+        );
+    let ops = p["ops"].as_array().cloned().unwrap_or_default();
+    let reason = s(p, "reason");
+    let mut why = if reason == "selftest" {
+        t.t("alert.stalled_selftest")
+    } else if reason == "too_many" {
+        t.t("alert.stalled_too_many")
+    } else if ops.len() == 1 {
+        t.t("alert.stalled_hold_one")
+    } else {
+        t.t("alert.stalled_hold_many")
+    };
+    if reason != "selftest" && !ops.is_empty() {
+        for o in &ops {
+            let state = t.t(if s(o, "status") == "dispatched" {
+                "alert.stalled_in_progress"
+            } else if o["amount"].is_null() {
+                "alert.stalled_no_amount"
+            } else {
+                "alert.stalled_unknown"
+            });
+            let what = op_noun(t, "opc", &s(o, "kind"));
+            why.push('\n');
+            why.push_str(&match o["public"].as_str() {
+                Some(public) => t.f(
+                    "alert.stalled_op",
+                    &[("public", &esc(public)), ("what", &what), ("state", &state)],
+                ),
+                None => t.f(
+                    "alert.stalled_op_no_order",
+                    &[
+                        ("id", &o["id"].as_i64().unwrap_or_default()),
+                        ("what", &what),
+                        ("state", &state),
+                    ],
+                ),
+            });
+        }
+        why.push('\n');
+        why.push_str(&t.t(if ops.len() == 1 {
+            "alert.stalled_end_one"
+        } else {
+            "alert.stalled_end_many"
+        }));
+    }
+    let text = t.f(
+        "alert.reconcile_stalled",
+        &[
+            ("name", &name),
+            ("minutes", &minutes),
+            ("since", &since),
+            ("why", &why),
+        ],
+    );
+    Screen::new(text)
+        .row(vec![
+            btn(t.t("alert.b_queue"), &Cb::Queue).style(botapi::ButtonStyle::Primary),
+            btn(t.t("alert.b_recheck"), &Cb::Reconcile),
+        ])
+        .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
 }

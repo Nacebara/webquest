@@ -287,7 +287,11 @@ async fn missing_money_is_caught_while_a_payout_is_unknown(pool: PgPool) {
         "сравнение — с вариантом «выплата прошла»"
     );
     assert_eq!(a.payload["ledger"], "1000");
-    assert_eq!(a.payload["unsettled"], serde_json::json!([payout.id]));
+    let u = &a.payload["unsettled"][0];
+    assert_eq!(u["id"], payout.id);
+    assert_eq!(u["kind"], "create_payout_check");
+    assert_eq!(u["amount"], "97.5");
+    assert!(u["public"].as_str().is_some_and(|p| !p.is_empty()));
     drop(conn);
 
     // Выплата на деле не прошла, денег столько же, сколько по леджеру.
@@ -362,6 +366,8 @@ async fn a_stalled_reconciliation_raises_an_alert_and_clears(pool: PgPool) {
     assert!(a.payload["minutes"].as_i64().unwrap() >= 40);
     assert_eq!(a.payload["ops"][0]["id"], payout.id);
     assert_eq!(a.payload["ops"][0]["order_id"], payout.order_id.unwrap());
+    assert_eq!(a.payload["ops"][0]["status"], "dispatched");
+    assert!(a.payload["ops"][0]["public"].is_string());
     // Операция снова «неясная» с известной суммой — сверка проходит по вариантам.
     sqlx::query("UPDATE operations SET status = 'unknown' WHERE id = $1")
         .bind(payout.id)

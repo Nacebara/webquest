@@ -85,3 +85,70 @@ fn queue_and_order_card() {
         insta::assert_snapshot!(name, dump(&card));
     }
 }
+
+/// Шаг 1.5 (утверждено владельцем 13.11): подсказка сверки в карточке заявки — «прошла»,
+/// «не прошла», «не понять».
+#[test]
+fn order_card_reconcile_hint() {
+    let t = Texts::builtin().unwrap();
+    let links = ops::Links::default();
+    for (done, name) in [
+        (Some(true), "order_card_hint_done"),
+        (Some(false), "order_card_hint_not"),
+        (None, "order_card_hint_unclear"),
+    ] {
+        let mut v = ops::sample_order();
+        v.reconcile = Some(ops::ReconcileHint {
+            at: ops::sample_now(),
+            platform: domain::Platform::XRocket,
+            kind: "create_payout_check".into(),
+            done,
+        });
+        let card = Look::plain().screen(&v.screen(
+            &t,
+            storage::staff::Role::Owner,
+            ops::sample_now(),
+            &links,
+        ));
+        insta::assert_snapshot!(name, dump(&card));
+    }
+}
+
+/// Шаг 1.5: тревога о недостаче, когда сверка учла неясную выплату, и «сверка не проходит».
+#[test]
+fn reconcile_alerts_with_unsettled_operations() {
+    let t = Texts::builtin().unwrap();
+    // Макет: одна неясная выплата 97.50, денег меньше обоих исходов.
+    let payload = serde_json::json!({
+        "platform": "xrocket", "expected": "902.5", "ledger": "1000", "actual": "890.5",
+        "diff": "-12", "paused": true, "account": "ub-1", "below_all": true,
+        "unsettled": [{"id": 7, "order_id": 1, "public": "K7M2Q9XR4T", "kind": "create_payout_check", "status": "unknown", "amount": "97.5"}],
+    });
+    let short = Look::plain().screen(&ops::mismatch_screen(&t, &payload, 1));
+    insta::assert_snapshot!("shortfall_unsettled", dump(&short));
+    // Две неясные операции, баланс между исходами.
+    let payload = serde_json::json!({
+        "platform": "cryptobot", "expected": "1000", "ledger": "1000", "actual": "990",
+        "diff": "-10", "paused": true, "account": "ub-1", "below_all": false,
+        "unsettled": [
+            {"id": 8, "order_id": 2, "public": "F6A7B8C9D0", "kind": "create_payout_check", "status": "unknown", "amount": "19.7"},
+            {"id": 9, "order_id": 3, "public": "11AA22BB33", "kind": "create_refund_check", "status": "unknown", "amount": "50"},
+        ],
+    });
+    let between = Look::plain().screen(&ops::mismatch_screen(&t, &payload, 2));
+    insta::assert_snapshot!("shortfall_unsettled_between", dump(&between));
+
+    let stalled = serde_json::json!({
+        "platform": "xrocket", "since": "2026-11-05T10:40:00+00:00", "minutes": 35,
+        "reason": "in_progress",
+        "ops": [{"id": 7, "order_id": 1, "public": "K7M2Q9XR4T", "kind": "create_payout_check", "status": "dispatched", "amount": "97.5"}],
+    });
+    let screen = Look::plain().screen(&ops::stalled_screen(&t, &stalled, 3));
+    insta::assert_snapshot!("reconcile_stalled", dump(&screen));
+    let selftest = serde_json::json!({
+        "platform": "cryptobot", "since": "2026-11-05T10:00:00+00:00", "minutes": 75,
+        "reason": "selftest", "ops": [],
+    });
+    let screen = Look::plain().screen(&ops::stalled_screen(&t, &selftest, 4));
+    insta::assert_snapshot!("reconcile_stalled_selftest", dump(&screen));
+}

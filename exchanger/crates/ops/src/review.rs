@@ -121,6 +121,41 @@ impl QueueData {
     }
 }
 
+/// Что последняя сверка говорит о неясной операции заявки (шаг 1.5, утверждено 13.11).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReconcileHint {
+    pub at: DateTime<Utc>,
+    /// Кошелёк операции.
+    pub platform: Platform,
+    /// Вид операции (`create_payout_check` …).
+    pub kind: String,
+    /// `Some(true)` — по балансу прошла, `Some(false)` — не прошла, `None` — не понять.
+    pub done: Option<bool>,
+}
+
+impl ReconcileHint {
+    fn line(&self, t: &Texts) -> String {
+        let group = match self.kind.as_str() {
+            "create_refund_check" | "create_excess_check" => "refund",
+            "pay_invoice" => "invoice",
+            "activate_check" => "intake",
+            _ => "payout",
+        };
+        let key = match self.done {
+            Some(true) => format!("order.hint_done_{group}"),
+            Some(false) => format!("order.hint_not_{group}"),
+            None => "order.hint_unclear".to_owned(),
+        };
+        t.f(
+            &key,
+            &[
+                ("time", &crate::dash::hhmm(self.at)),
+                ("wallet", &wallet(self.platform)),
+            ],
+        )
+    }
+}
+
 /// Карточка заявки: данные из базы ([`Inner::order_view`]) или из макета ([`sample_order`]).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrderView {
@@ -134,6 +169,8 @@ pub struct OrderView {
     pub entries: Vec<(Decimal, String)>,
     /// Удержано под заявку: сумма и кошелёк.
     pub held: Option<(Decimal, Platform)>,
+    /// Подсказка сверки по неясной операции заявки.
+    pub reconcile: Option<ReconcileHint>,
 }
 
 fn wallet(p: Platform) -> &'static str {
@@ -239,8 +276,14 @@ impl OrderView {
             rows.push((t.t("order.r_reason"), esc(r)));
         }
 
-        let mut rich = format!("<h3>{title}</h3><p>{head}</p><table compact>");
+        let mut rich = format!("<h3>{title}</h3><p>{head}</p>");
         let mut plain = format!("<b>{title}</b>\n{head}\n");
+        if let Some(h) = &self.reconcile {
+            let line = h.line(t);
+            rich.push_str(&format!("<blockquote>{line}</blockquote>"));
+            plain.push_str(&format!("{line}\n"));
+        }
+        rich.push_str("<table compact>");
         for (k, v) in &rows {
             rich.push_str(&format!(
                 "<tr><td>{k}</td><td align=\"right\">{v}</td></tr>"
@@ -525,6 +568,7 @@ pub fn sample_order() -> OrderView {
             (Decimal::from(-100), "client:51234567".into()),
         ],
         held: Some((Decimal::new(9750, 2), Platform::XRocket)),
+        reconcile: None,
     }
 }
 
@@ -619,6 +663,26 @@ impl Inner {
             ),
             None => None,
         };
+        // Последняя сверка, учитывавшая неясную операцию заявки (шаг 1.5).
+        // Время сверки, операции «прошли» по балансу, операция, её вид и кошелёк.
+        type HintRow = (DateTime<Utc>, Option<Vec<i64>>, i64, String, String);
+        let hint: Option<HintRow> = sqlx::query_as(
+            "SELECT r.at, r.matched_ops, op.id, op.kind, op.platform FROM operations op \
+               JOIN reconciliations r ON op.id = ANY(r.unsettled_ops) AND r.verdict = 'ok' \
+              WHERE op.order_id = $1 AND op.status = 'unknown' \
+              ORDER BY r.at DESC LIMIT 1",
+        )
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let reconcile = hint.and_then(|(at, matched, op, kind, platform)| {
+            Some(ReconcileHint {
+                at,
+                platform: Platform::from_db_name(&platform)?,
+                kind,
+                done: matched.map(|m| m.contains(&op)),
+            })
+        });
         Ok(Some(OrderView {
             card,
             completed,
@@ -626,6 +690,7 @@ impl Inner {
             taken_by,
             entries,
             held,
+            reconcile,
         }))
     }
 

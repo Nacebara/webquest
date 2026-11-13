@@ -22,7 +22,7 @@
 
 mod actions;
 mod alerts;
-pub use alerts::mismatch_screen;
+pub use alerts::{mismatch_screen, stalled_screen};
 mod cb;
 pub mod chart;
 mod dash;
@@ -56,7 +56,9 @@ pub use dash::{DashData, sample_dash};
 pub use look::Look;
 pub use nav::Links;
 pub use reserves::{ReservesData, sample_reserves};
-pub use review::{OrderView, QueueData, QueueRow, sample_now, sample_order, sample_queue};
+pub use review::{
+    OrderView, QueueData, QueueRow, ReconcileHint, sample_now, sample_order, sample_queue,
+};
 pub use texts::Texts;
 pub use views::{MenuCounts, menu_screen};
 

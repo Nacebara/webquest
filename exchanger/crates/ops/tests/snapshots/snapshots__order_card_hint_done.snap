@@ -1,0 +1,79 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&card)
+---
+--- rich
+<h3>Заявка <code>K7M2Q9XR4T</code>
+</h3>
+<p>🔎 <b>Ручной разбор</b> · 6 мин · CB → xR · ub-1</p>
+<blockquote>🟢 Сверка <tg-time unix="1793877036" format="t">14:10</tg-time>: по балансу xRocket выплата <b>прошла</b> — чек, скорее всего, создан. Найдите его в истории кошелька и нажмите «Выплачено».</blockquote>
+<table compact>
+<tr>
+<td>Клиент</td>
+<td align="right">
+<tg-button type="callback_data" style="link" data="a:u:51234567">51234567</tg-button> · 23 обмена</td>
+</tr>
+<tr>
+<td>Принято</td>
+<td align="right">100.00 CryptoBot</td>
+</tr>
+<tr>
+<td>К выплате</td>
+<td align="right">97.50 xRocket</td>
+</tr>
+<tr>
+<td>Комиссия</td>
+<td align="right">2.50 · 2.5 %</td>
+</tr>
+</table>
+<details open>
+<summary>Ход · 4</summary>
+<ul>
+<li>✅ 14:04:02 · чек принят</li>
+<li>✅ 14:04:03 · резерв удержан</li>
+<li>🔴 14:04:04 · чек xRocket: нет ответа 30 с</li>
+<li>🔎 14:04:36 · сверка: чек не найден</li>
+</ul>
+</details>
+<details>
+<summary>Операции · 2</summary>
+<pre>ord-…-intake-1   done
+ord-…-payout     failed</pre>
+</details>
+<details>
+<summary>Ответ кошелька</summary>
+<pre>xRocket v3, 14:04:04 — нет ответа</pre>
+</details>
+<details>
+<summary>Проводки · 2</summary>
+<pre>+100.00  wallet:cb:ub-1
+−100.00  client:51234567
+удержано 97.50 в xRocket</pre>
+</details>
+--- html
+<b>Заявка <code>K7M2Q9XR4T</code></b>
+🔎 <b>Ручной разбор</b> · 6 мин · CB → xR · ub-1
+🟢 Сверка <tg-time unix="1793877036" format="t">14:10</tg-time>: по балансу xRocket выплата <b>прошла</b> — чек, скорее всего, создан. Найдите его в истории кошелька и нажмите «Выплачено».
+Клиент: 51234567 · 23 обмена
+Принято: 100.00 CryptoBot
+К выплате: 97.50 xRocket
+Комиссия: 2.50 · 2.5 %
+<blockquote expandable><b>Ход · 4</b>
+✅ 14:04:02 · чек принят
+✅ 14:04:03 · резерв удержан
+🔴 14:04:04 · чек xRocket: нет ответа 30 с
+🔎 14:04:36 · сверка: чек не найден</blockquote>
+<blockquote expandable><b>Операции · 2</b>
+<code>ord-…-intake-1   done
+ord-…-payout     failed</code></blockquote>
+<blockquote expandable><b>Ответ кошелька</b>
+xRocket v3, 14:04:04 — нет ответа</blockquote>
+<blockquote expandable><b>Проводки · 2</b>
++100.00  wallet:cb:ub-1
+−100.00  client:51234567
+удержано 97.50 в xRocket</blockquote>
+--- keyboard
+[{"text":"✋ Взять","style":"primary","callback_data":"a:ot:15"},{"text":"💬 Написать","callback_data":"a:sq:51234567"}]
+[{"text":"🔄 Повторить выплату","callback_data":"a:od:15:rp"}]
+[{"text":"↩️ Вернуть","callback_data":"a:od:15:rf"},{"text":"✅ Выплачено","callback_data":"a:od:15:cp"}]
+[{"text":"🗑 Закрыть без выплаты","style":"danger","callback_data":"a:od:15:cl"}]

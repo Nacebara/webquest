@@ -182,6 +182,53 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
         &crate::Links::default(),
     );
     send_card(api, chat, &look.screen(&card)).await;
+    // Шаг 1.5 (утверждено 13.11): сверка при неясной выплате — подсказка в карточке,
+    // недостача «с учётом неясной выплаты», «Сверка не проходит».
+    let _ = api
+        .send_message(
+            &SendMessage::html(
+                chat,
+                "<b>Пульт · Сверка при неясной выплате</b> (данные макета)",
+            )
+            .silent(),
+        )
+        .await;
+    let mut hinted = crate::sample_order();
+    hinted.reconcile = Some(crate::ReconcileHint {
+        at: crate::sample_now(),
+        platform: domain::Platform::XRocket,
+        kind: "create_payout_check".into(),
+        done: Some(true),
+    });
+    let card = hinted.screen(
+        &texts,
+        storage::staff::Role::Owner,
+        crate::sample_now(),
+        &crate::Links::default(),
+    );
+    send_card(api, chat, &look.screen(&card)).await;
+    let payload = serde_json::json!({
+        "platform": "xrocket", "expected": "902.5", "ledger": "1000", "actual": "890.5",
+        "diff": "-12", "paused": true, "account": "ub-1", "below_all": true,
+        "unsettled": [{"id": 7, "public": "K7M2Q9XR4T", "kind": "create_payout_check", "status": "unknown", "amount": "97.5"}],
+    });
+    send_card(
+        api,
+        chat,
+        &look.screen(&crate::mismatch_screen(&texts, &payload, 0)),
+    )
+    .await;
+    let payload = serde_json::json!({
+        "platform": "xrocket", "since": (chrono::Utc::now() - chrono::Duration::minutes(35)).to_rfc3339(),
+        "minutes": 35, "reason": "in_progress",
+        "ops": [{"id": 7, "public": "K7M2Q9XR4T", "kind": "create_payout_check", "status": "dispatched", "amount": "97.5"}],
+    });
+    send_card(
+        api,
+        chat,
+        &look.screen(&crate::stalled_screen(&texts, &payload, 0)),
+    )
+    .await;
     // Пульт: «Статистика» на данных макета — плитки и график одной картинкой.
     let _ = api
         .send_message(
