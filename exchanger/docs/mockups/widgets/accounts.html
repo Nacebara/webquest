@@ -1,0 +1,36 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--wa:light-dark(#d98200,#f2a93b);--bd:light-dark(#e0453a,#ff6b5e);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--ln:light-dark(#d5dbe1,#3a4756)}
+body{margin:0;padding:8px 10px max(10px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+.c{display:grid;grid-template-columns:38px 1fr auto;gap:2px 10px;align-items:center;background:var(--t);border-radius:12px;padding:8px 10px;margin-bottom:6px;border-left:3px solid var(--ok)}
+.c.f{border-color:var(--wa)}.c.o{border-color:var(--bd)}
+.av{grid-row:span 2;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:20px;background:light-dark(#dfe7ef,#2b3949)}
+.n{font-weight:600}.n small{font-weight:400;color:var(--h);font-size:.8em;margin-left:4px}
+.s{grid-column:2/4;font-size:.8em;color:var(--h)}
+.st{font-size:.78em;font-weight:600;padding:2px 8px;border-radius:9px;color:#fff;background:var(--ok);white-space:nowrap}
+.f .st{background:var(--wa)}.o .st{background:var(--bd)}
+.ld{grid-column:2/4;height:4px;border-radius:2px;background:var(--ln);margin-top:3px}
+.ld s{display:block;height:100%;border-radius:2px;background:var(--a)}
+.rg{grid-row:span 2;width:44px;height:44px}
+.rg circle{fill:none;stroke-width:4}
+.rg .b{stroke:var(--ln)}.rg .v{stroke:var(--wa);stroke-linecap:round;transition:stroke-dashoffset 1s linear}
+.rg text{fill:var(--tg-theme-text-color);font-size:11px;font-weight:600;text-anchor:middle}
+.ft{font-size:.76em;color:var(--h);margin:4px 2px 0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<div id=l></div><div class=ft id=ft></div>
+<script>
+const W=window.TelegramWidget||{},$=s=>document.getElementById(s),C=2*Math.PI*18;
+let D=null,sk=0;
+const mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+function card(a){const[nm,wl,s,txt]=a;
+ if(s==1){const left=Math.max(0,a[4]-(Date.now()/1e3-sk)),fr=left/a[5];
+  return '<div class="c f"><div class=av>🤖</div><div class=n>'+nm+'<small>'+wl+'</small></div><svg class=rg viewBox="0 0 44 44"><circle class=b cx=22 cy=22 r=18 /><circle class=v cx=22 cy=22 r=18 transform="rotate(-90 22 22)" stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-fr)).toFixed(1)+'"/><text x=22 y=26>'+mm(Math.ceil(left))+'</text></svg><div class=s>'+(left>0?'Пауза: '+txt+'. Остальные аккаунты работают.':'Пауза кончилась — проверяю связь')+'</div></div>'}
+ return '<div class="c'+(s==2?' o':'')+'"><div class=av>🤖</div><div class=n>'+nm+'<small>'+wl+'</small></div><span class=st>'+(s==2?'вход сброшен':'на связи')+'</span><div class=s>'+txt+'</div>'+(s==0?'<div class=ld><s style="width:'+Math.min(100,a[4]/a[5]*100)+'%"></s></div>':'')+'</div>'}
+function draw(){if(!D)return;$('l').innerHTML=D.a.map(card).join('');
+ const ok=D.a.filter(a=>a[2]==0).length;$('ft').textContent='На связи '+ok+' из '+D.a.length+' · полоса — действия за час из допустимых'}
+function set(x){if(!x)return;D=x;sk=Date.now()/1e3-(x.n||Date.now()/1e3);draw()}
+W.onEvent?.('chatDataChanged',()=>{try{set(JSON.parse(W.chatData))}catch(e){}});
+try{set(JSON.parse(W.chatData))}catch(e){}
+setInterval(()=>{if(D&&D.a.some(a=>a[2]==1))draw()},1e3);
+if(W.request&&W.chatType=='private')W.request('acc').then(a=>{try{set(JSON.parse(a.result))}catch(e){}},()=>{});
+</script>

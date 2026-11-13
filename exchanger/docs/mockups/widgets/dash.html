@@ -1,0 +1,62 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--wa:light-dark(#d98200,#f2a93b);--bd:light-dark(#e0453a,#ff6b5e);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--ln:light-dark(#d5dbe1,#3a4756)}
+body{margin:0;padding:8px 12px max(12px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+.bn{margin:0 0 8px;padding:7px 10px;border-radius:10px;font-size:.86em;font-weight:600;color:#fff;background:var(--bd)}
+.bn.w{background:var(--wa)}
+.q{display:grid;grid-template-columns:14px 1fr auto;gap:6px 8px;align-items:baseline;font-size:.92em}
+.q i{width:10px;height:10px;border-radius:50%;background:var(--wa);align-self:center}
+.q i.r{background:var(--bd);box-shadow:0 0 0 0 var(--bd);animation:p 2s infinite}
+@keyframes p{70%{box-shadow:0 0 0 6px transparent}}
+.q b{font-weight:600}.q small{color:var(--h);font-size:.8em;font-weight:400}
+.ok{font-size:.92em;margin:2px 0}.ok b{color:var(--ok)}
+.k{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}
+.k div{background:var(--t);border-radius:10px;padding:6px 8px 4px}
+.k small{display:block;color:var(--h);font-size:.72em}
+.k b{display:block;font-size:1.05em;line-height:1.3}
+.k em{font-style:normal;font-size:.72em;color:var(--ok)}.k em.m{color:var(--bd)}
+.k svg{display:block;width:100%;height:18px;margin-top:2px}
+.k path{fill:none;stroke:var(--a);stroke-width:1.5}
+.k path+path{stroke:none;fill:var(--a);fill-opacity:.13}
+.w{margin:2px 0 8px}
+.w div{display:flex;justify-content:space-between;font-size:.88em}
+.w small{color:var(--h)}
+.g{position:relative;height:6px;margin-top:4px;border-radius:3px;background:var(--ln)}
+.g s{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ok);transition:width .6s}
+.g s.a{background:var(--wa)}.g s.r{background:var(--bd)}
+.g u{position:absolute;top:-3px;bottom:-3px;left:66.6%;width:2px;background:var(--tg-theme-text-color);opacity:.5}
+.x{color:var(--bd);font-weight:600}
+.ft{display:flex;align-items:center;gap:6px;font-size:.78em;color:var(--h);padding-right:var(--tg-content-safe-area-corner-right,40px)}
+.ft i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+.ft i.w{background:var(--wa)}.ft i.r{background:var(--bd)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<div id=bn class=bn hidden></div>
+<div id=q></div>
+<div class=k id=k></div>
+<div id=w></div>
+<div class=ft><i id=fi></i><span id=ft></span></div>
+<script>
+const W=window.TelegramWidget||{},$=s=>document.getElementById(s);
+let D=null,got=0,off=0,miss=0;
+const ago=s=>s<60?'только что':s<3600?Math.floor(s/60)+' мин назад':Math.floor(s/3600)+' ч назад';
+function sp(v){const n=v.length-1,mx=Math.max(...v,1),pt=v.map((y,j)=>(j/n*100).toFixed(1)+','+(17-y/mx*15).toFixed(1));return '<svg viewBox="0 0 100 18" preserveAspectRatio="none"><path d="M'+pt.join('L')+'"/><path d="M0,18L'+pt.join('L')+'L100,18Z"/></svg>'}
+function set(x){if(!x)return;D=x;got=Date.now();draw()}
+function draw(){if(!D)return;
+ $('q').innerHTML=D.r.length?D.r.map(r=>'<i class="'+(r[0]==1?'r':'')+'"></i><span>'+r[1]+'</span><span><b>'+r[2]+'</b> <small>'+r[3]+'</small></span>').join(''):'<p class=ok><b>●</b> Решать нечего. Выплаты идут, аккаунты на связи.</p>';
+ $('q').className=D.r.length?'q':'';
+ $('k').innerHTML=D.k.map(k=>'<div><small>'+k[0]+'</small><b>'+k[1]+'</b><em class="'+(k[2]<0?'m':'')+'">'+(k[2]<0?'▼ ':'▲ ')+Math.abs(k[2])+' %</em>'+sp(k[3])+'</div>').join('');
+ $('w').innerHTML=D.w.map(w=>{const[n,a,p,l,re]=w,c=['','a','r'][l|0];
+  return '<div class=w><div><span>'+n+'</span>'+(re?'<span><small>леджер</small> '+a+' · <small>реально</small> <span class=x>'+re+'</span></span>':'<span>'+a+' <small>· '+p+' % от цели</small></span>')+'</div><div class=g><s class="'+(re?'r':c)+'" style="width:'+Math.min(p,150)/1.5+'%"></s><u></u></div></div>'}).join('');
+ foot()}
+function foot(){if(!D)return;const age=Math.floor((Date.now()-got)/1e3),rc=D.u-D.s+age,f=$('fi'),t=$('ft'),bn=$('bn');
+ let txt=D.f+' · сверка '+ago(rc);f.className=D.x?'r':rc>900?'w':'';
+ if(off||age>180){const d=new Date(D.u*1e3);f.className='r';txt='Нет связи с ботом · данные на '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')}
+ t.textContent=txt;
+ bn.hidden=!(D.x||off);bn.className=off&&!D.x?'bn w':'bn';bn.textContent=D.x||'Бот не отвечает — цифры ниже могут быть старыми'}
+function pull(){if(!W.request||W.chatType!='private'||!W.isActive)return;
+ W.request('dash').then(a=>{miss=0;off=0;try{set(JSON.parse(a.result))}catch(e){}},e=>{if(e.code!='BUSY'&&e.code!='RATE_LIMITED'&&++miss>1){off=1;foot()}})}
+W.onEvent?.('chatDataChanged',()=>{try{set(JSON.parse(W.chatData))}catch(e){}});
+W.onEvent?.('activated',pull);
+try{set(JSON.parse(W.chatData))}catch(e){}
+pull();setInterval(pull,1e4);setInterval(foot,15e3);
+</script>

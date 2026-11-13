@@ -1,0 +1,41 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--bd:light-dark(#e0453a,#ff6b5e);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--ln:light-dark(#d5dbe1,#3a4756);--bg:var(--tg-theme-bg-color,#fff)}
+body{margin:0;padding:10px 12px max(12px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+button{all:unset;box-sizing:border-box;cursor:pointer;text-align:center}
+.sg{display:flex;background:var(--t);border-radius:10px;padding:3px;gap:3px}
+.sg button{flex:1;padding:5px;border-radius:8px;font-size:.82em;color:var(--h)}
+.sg .on{background:var(--bg);color:var(--tg-theme-text-color);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.k{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0 6px}
+.k small{display:block;color:var(--h);font-size:.72em}
+.k b{font-size:1.08em}
+.k em{font-style:normal;font-size:.72em;color:var(--ok);margin-left:3px}.k em.m{color:var(--bd)}
+.tp{height:18px;font-size:.8em;text-align:center;color:var(--h)}.tp b{color:var(--tg-theme-text-color)}
+svg{display:block;width:100%;height:110px;touch-action:pan-y}
+rect{fill:var(--a);fill-opacity:.35;transition:fill-opacity .2s}
+rect.on{fill-opacity:1}
+line{stroke:var(--ln);stroke-dasharray:3 3}
+.ax{display:flex;justify-content:space-between;font-size:.68em;color:var(--h);margin-top:2px;padding-right:var(--tg-content-safe-area-corner-right,0px)}
+</style>
+<div class=sg id=sg></div>
+<div class=k id=k></div>
+<div class=tp id=tp></div>
+<svg id=ch viewBox="0 0 300 110" preserveAspectRatio="none"></svg>
+<div class=ax id=ax></div>
+<script>
+const W=window.TelegramWidget||{},H=W.HapticFeedback,$=s=>document.getElementById(s),DW=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+let D=null,p=0,sel=-1;
+const nf=v=>String(v).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+function lab(P,j){return P[1]=='h'?String(j).padStart(2,'0')+':00':P[1]=='w'?DW[(P[2]+j)%7]:(j+1)+' число'}
+function draw(){if(!D)return;const P=D.p[p],v=P[3],n=v.length,mx=Math.max(...v,1),bw=300/n;
+ [...$('sg').children].forEach((b,j)=>b.className=j==p?'on':'');
+ $('k').innerHTML=[['Обменов',P[4]],['Оборот',P[5]],['Прибыль',P[6]]].map((x,j)=>'<div><small>'+x[0]+'</small><b>'+x[1]+'</b>'+(j==2?'<em class="'+(P[7]<0?'m':'')+'">'+(P[7]<0?'▼':'▲')+Math.abs(P[7])+'%</em>':'')+'</div>').join('');
+ $('ch').innerHTML='<line x1=0 x2=300 y1=4 y2=4 /><line x1=0 x2=300 y1=55 y2=55 />'+v.map((y,j)=>{const h=Math.max(2,y/mx*104);return '<rect data-j='+j+' class="'+(j==sel?'on':'')+'" x='+(j*bw+bw*.15).toFixed(1)+' y='+(110-h).toFixed(1)+' width='+(bw*.7).toFixed(1)+' height='+h.toFixed(1)+' rx=2 />'}).join('');
+ const t=P[1]=='h'?[0,6,12,18,23]:P[1]=='w'?[0,1,2,3,4,5,6]:[0,9,19,n-1];
+ $('ax').innerHTML=t.map(j=>'<span>'+(P[1]=='h'?String(j).padStart(2,'0'):P[1]=='w'?DW[(P[2]+j)%7]:j+1)+'</span>').join('');
+ $('tp').innerHTML=sel<0?'Оборот, USDT · нажмите на столбик':lab(P,sel)+' · <b>'+nf(v[sel])+' USDT</b>'}
+function load(){try{D=JSON.parse(W.chatData)}catch(e){}if(!D)return;$('sg').innerHTML=D.p.map((P,j)=>'<button data-j='+j+'>'+P[0]+'</button>').join('');draw()}
+$('sg').onclick=e=>{const j=e.target.closest('button')?.dataset.j;if(j!=null){p=+j;sel=-1;draw()}};
+$('ch').onclick=e=>{const r=$('ch').getBoundingClientRect(),n=D.p[p][3].length,j=Math.floor((e.clientX-r.left)/r.width*n);if(j>=0&&j<n){sel=j==sel?-1:j;H?.selectionChanged();draw()}};
+W.onEvent?.('chatDataChanged',load);
+load();
+</script>

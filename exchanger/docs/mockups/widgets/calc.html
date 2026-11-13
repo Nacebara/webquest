@@ -1,0 +1,65 @@
+<style>
+:root{color-scheme:light dark;--ok:light-dark(#1f9d55,#3fca74);--h:var(--tg-theme-hint-color,#8a96a3);--t:var(--tg-theme-secondary-bg-color,#eef1f4);--a:var(--tg-theme-button-color,#3390ec);--at:var(--tg-theme-button-text-color,#fff);--ln:light-dark(#d5dbe1,#3a4756);--bg:var(--tg-theme-bg-color,#fff)}
+body{margin:0;padding:10px 12px max(12px,var(--tg-content-safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+button{all:unset;box-sizing:border-box;cursor:pointer;text-align:center}
+.sg{display:flex;background:var(--t);border-radius:10px;padding:3px;gap:3px}
+.sg button{flex:1;padding:6px 4px;border-radius:8px;font-size:.8em;color:var(--h);white-space:nowrap}
+.sg .on{background:var(--bg);color:var(--tg-theme-text-color);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.rs{display:flex;align-items:flex-end;justify-content:space-between;margin:12px 2px 4px}
+.rs small{display:block;color:var(--h);font-size:.76em}
+.rs b{font-size:1.45em;line-height:1.2}
+.rs .r{text-align:right}.rs .r b{color:var(--ok)}
+.rs i{font-style:normal;color:var(--h);padding:0 6px 6px}
+.wl{display:flex;justify-content:space-between;font-size:.8em;margin:0 2px}
+#tr{position:relative;height:34px;margin:6px 6px 0;touch-action:pan-y;cursor:pointer}
+#tr:before{content:"";position:absolute;left:0;right:0;top:15px;height:4px;border-radius:2px;background:var(--ln)}
+#lk{position:absolute;right:0;top:12px;height:10px;border-radius:5px;background:light-dark(#e9edf1,#2a3542);border:1px dashed var(--h);box-sizing:border-box}
+#fl{position:absolute;left:0;top:15px;height:4px;border-radius:2px;background:var(--a);transition:width .15s}
+#th{position:absolute;top:6px;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:light-dark(#fff,#eef2f6);box-shadow:0 1px 4px rgba(0,0,0,.3);transition:left .15s}
+.tk{display:flex;justify-content:space-between;margin:0 -4px;font-size:.7em;color:var(--h)}
+.tk button{width:30px;padding:2px 0}.tk .on{color:var(--tg-theme-text-color);font-weight:700}.tk .x{color:light-dark(#b9c1ca,#4d5b6b)}
+.fe{display:flex;justify-content:space-between;margin:10px 2px 8px;font-size:.84em;color:var(--h)}
+.fe b{color:var(--tg-theme-text-color);font-weight:500}
+#cp{display:block;width:100%;padding:10px;border-radius:10px;background:var(--a);color:var(--at);font-weight:600;font-size:.92em}
+#cp:active{filter:brightness(.92)}
+#cp[disabled]{background:var(--t);color:var(--h)}
+.ft{margin-top:8px;font-size:.76em;color:var(--h)}
+</style>
+<div class=sg id=sg></div>
+<div class=rs><div><small>Отдаёте</small><b id=gv>—</b></div><i>→</i><div class=r><small>Получите</small><b id=gt>—</b></div></div>
+<div class=wl><span id=wf></span><span id=wt></span></div>
+<div id=tr><div id=lk></div><div id=fl></div><div id=th></div></div>
+<div class=tk id=tk></div>
+<div class=fe><span>Комиссия <b id=fe>—</b></span><span id=pc></span></div>
+<button id=cp></button>
+<div class=ft id=ft></div>
+<script>
+const W=window.TelegramWidget||{},H=W.HapticFeedback,$=s=>document.getElementById(s),E={CryptoBot:'🔷',xRocket:'🚀'};
+let D=null,d=0,i=0,R=null;
+const c=s=>Math.round(parseFloat(s)*100),m=v=>(v/100).toFixed(2);
+const cmd=(w,a)=>w=='CryptoBot'?'@send '+a+'usdt':'@xrocket '+a;
+function load(){let x=null;try{x=JSON.parse(W.chatData)}catch(e){}if(!x)return;D=x;if(i==0)i=Math.min(D.a.indexOf(100)>=0?D.a.indexOf(100):0,D.a.length-1);
+ $('sg').innerHTML=D.d.map((r,j)=>'<button data-j='+j+'>'+r[0]+' → '+r[1]+'</button>').join('');
+ $('tk').innerHTML=D.a.map((a,j)=>'<button data-k='+j+'>'+a+'</button>').join('');
+ $('ft').textContent='Курс на '+D.u+' · точную сумму покажу, когда пришлёте чек';draw()}
+function draw(){if(!D)return;const r=D.d[d],a=D.a[i],n=D.a.length,x=a>D.l;
+ [...$('sg').children].forEach((b,j)=>b.className=j==d?'on':'');
+ [...$('tk').children].forEach((b,j)=>b.className=(j==i?'on':'')+(D.a[j]>D.l?' x':''));
+ const p=i/(n-1)*100,li=D.a.findIndex(v=>v>D.l);
+ $('fl').style.width=p+'%';$('th').style.left=p+'%';
+ $('lk').hidden=li<0;if(li>=0){$('lk').style.left=((li-.5)/(n-1)*100)+'%'}
+ $('gv').textContent=a+' USDT';$('gt').textContent=x?'—':r[3][i]+' USDT';
+ $('wf').textContent=E[r[0]]+' чек '+r[0];$('wt').textContent='чек '+r[1]+' '+E[r[1]];
+ $('fe').textContent=x?'—':m(c(a)-c(r[3][i]));$('pc').textContent='ставка '+r[2];
+ const b=$('cp');b.disabled=x;b.textContent=x?'Первые обмены — до '+D.l+' USDT':'Скопировать  '+cmd(r[0],a)}
+function at(e){const k=Math.max(0,Math.min(D.a.length-1,Math.round((e.clientX-R.left)/R.width*(D.a.length-1))));if(k!=i){i=k;H?.selectionChanged();draw()}}
+const tr=$('tr');
+tr.onpointerdown=e=>{if(!D)return;R=tr.getBoundingClientRect();tr.setPointerCapture(e.pointerId);at(e)};
+tr.onpointermove=e=>{if(R&&tr.hasPointerCapture(e.pointerId))at(e)};
+tr.onpointerup=tr.onpointercancel=()=>R=null;
+$('sg').onclick=e=>{const j=e.target.closest('button')?.dataset.j;if(j!=null){d=+j;draw()}};
+$('tk').onclick=e=>{const k=e.target.closest('button')?.dataset.k;if(k!=null){i=+k;H?.selectionChanged();draw()}};
+$('cp').onclick=()=>{if($('cp').disabled)return;const r=D.d[d];W.copyText?.(cmd(r[0],D.a[i]));$('cp').textContent='Скопировано — вставьте в любой чат и отправьте';setTimeout(draw,2500)};
+W.onEvent?.('chatDataChanged',load);
+load();
+</script>
