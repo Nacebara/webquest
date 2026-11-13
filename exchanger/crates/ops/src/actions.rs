@@ -383,6 +383,14 @@ fn refusal_text(inner: &Inner, r: &Refusal) -> String {
         Refusal::IntakeAlreadyPosted => t.t("refusal.intake_posted"),
         Refusal::NoIntakeOperation => t.t("refusal.no_intake"),
         Refusal::BadAmount => t.t("refusal.bad_amount"),
+        Refusal::NotMeasured => t.t("refusal.not_measured"),
+        Refusal::OverWalletExcess { amount, room } => t.f(
+            "refusal.over_excess",
+            &[
+                ("amount", &usdt(*amount)),
+                ("room", &usdt((*room).max(Decimal::ZERO))),
+            ],
+        ),
         Refusal::NoSettleAttempt => t.t("refusal.no_attempt"),
         Refusal::CheckAlreadyUsed => t.t("refusal.check_used"),
         Refusal::Changed => t.t("refusal.changed"),

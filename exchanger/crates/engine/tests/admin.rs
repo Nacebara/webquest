@@ -994,3 +994,112 @@ async fn late_check_screen_found_by_reconciliation_lifts_the_pause(pool: PgPool)
     assert_eq!(paused, 0, "чек нашёлся — пауза снята сама");
     assert_eq!(e.world.checks_created_by(e.ub).len(), 1);
 }
+
+/// Активация чека без ответа, приход подтверждает человек (М-5, шаг 1.6).
+async fn silent_intake(e: &common::Env, amount: Decimal) -> i64 {
+    let url = e.world.client_check(XR, usdt(amount)).unwrap();
+    let order = accepted(e.submit(&url).await);
+    e.world.inject(e.ub, Call::SendText, Fault::NoReply, 1);
+    e.drain().await;
+    assert_eq!(e.order(order.id).await.0.state, OrderState::ManualReview);
+    order.id
+}
+
+fn confirm(id: i64, amount: Decimal, who: &StaffMember) -> OperatorRequest<'_> {
+    request(id, OperatorDecision::ConfirmIntake { amount }, who)
+}
+
+/// М-5: «Деньги пришли» на 300 вместо 3 движок не проводит — ни у админа, ни у владельца:
+/// столько в кошельке сверх леджера нет. Замер делает само решение: неотвеченная активация
+/// держала чат кошелька, и прочитать баланс раньше было нельзя.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn confirmed_intake_cannot_exceed_what_the_wallet_really_holds(pool: PgPool) {
+    let e = env(pool).await;
+    let id = silent_intake(&e, dec!(3)).await;
+    let admin = staff(&e.pool, 20, Role::Admin).await;
+    let owner = staff(&e.pool, 1, Role::Owner).await;
+    for who in [&admin, &owner] {
+        assert_eq!(
+            refused(e.engine.operator_decide(confirm(id, dec!(300), who)).await),
+            Refusal::OverWalletExcess {
+                amount: dec!(300),
+                room: dec!(3)
+            }
+        );
+    }
+    // Сверка без вердикта (сумма активации неизвестна), но баланс замерен.
+    let (read, verdict, diff): (bool, String, Decimal) = sqlx::query_as(
+        "SELECT r.balance_read, r.verdict, r.diff FROM reconciliations r \
+           JOIN wallet_accounts w ON w.id = r.wallet_account_id \
+          WHERE w.platform = 'xrocket' ORDER BY r.id DESC LIMIT 1",
+    )
+    .fetch_one(&e.pool)
+    .await
+    .unwrap();
+    assert!(read);
+    assert_eq!(verdict, "skipped_inflight");
+    assert_eq!(diff, dec!(3));
+    let posted: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM ledger_transactions WHERE order_id = $1")
+            .bind(id)
+            .fetch_one(&e.pool)
+            .await
+            .unwrap();
+    assert_eq!(posted, 0, "отказ ничего не провёл");
+
+    e.engine
+        .operator_decide(confirm(id, dec!(3), &admin))
+        .await
+        .unwrap();
+    assert_eq!(e.order(id).await.1.intake_amount, Some(dec!(3)));
+    e.assert_books_match().await;
+}
+
+/// М-5: сумма больше потолка сотрудника — только владелец, даже если деньги в кошельке есть.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn confirmed_intake_above_the_staff_ceiling_needs_the_owner(pool: PgPool) {
+    let e = env(pool).await;
+    let id = silent_intake(&e, dec!(280)).await;
+    let mut admin = staff(&e.pool, 20, Role::Admin).await;
+    admin.max_manual_payout = Some(dec!(100));
+    let owner = staff(&e.pool, 1, Role::Owner).await;
+    assert_eq!(
+        refused(
+            e.engine
+                .operator_decide(confirm(id, dec!(280), &admin))
+                .await
+        ),
+        Refusal::OverManualLimit {
+            amount: dec!(280),
+            limit: dec!(100)
+        }
+    );
+    e.engine
+        .operator_decide(confirm(id, dec!(280), &owner))
+        .await
+        .unwrap();
+    assert_eq!(e.order(id).await.1.intake_amount, Some(dec!(280)));
+    e.assert_books_match().await;
+}
+
+/// М-5: замер до активации не в счёт — в нём этих денег ещё не было; баланс не прочитался —
+/// не зачислено ничего, пока замер не удастся.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn without_a_reading_after_the_activation_nothing_is_credited(pool: PgPool) {
+    let e = env(pool).await;
+    e.engine.reconcile_balances().await.unwrap();
+    let id = silent_intake(&e, dec!(5)).await;
+    let admin = staff(&e.pool, 20, Role::Admin).await;
+    e.world.inject(e.ub, Call::SendText, Fault::Disconnected, 8);
+    assert_eq!(
+        refused(e.engine.operator_decide(confirm(id, dec!(5), &admin)).await),
+        Refusal::NotMeasured
+    );
+    e.world.clear_faults(e.ub);
+    e.engine
+        .operator_decide(confirm(id, dec!(5), &admin))
+        .await
+        .unwrap();
+    assert_eq!(e.order(id).await.1.intake_amount, Some(dec!(5)));
+    e.assert_books_match().await;
+}

@@ -275,15 +275,16 @@ impl Engine {
                 .map_or(Decimal::ZERO, |b| b.ledger_balance);
             let pending = unsettled(&mut conn, wallet).await?;
             let selftest = self.selftest_running.load(Ordering::SeqCst);
-            // Замер имеет смысл, если деньги не в пути и каждый вариант неясных операций известен.
-            let measurable = |p: &Unsettled, selftest: bool| {
-                !selftest
-                    && !p.busy
-                    && p.deltas().is_some_and(|d| {
-                        d.iter().filter(|(_, x)| !x.is_zero()).count() <= MAX_UNSETTLED
-                    })
+            // Баланс читать имеет смысл, если деньги не в пути. Вердикт — если ещё и каждый
+            // вариант неясных операций известен. Активация с неизвестной суммой вердикт не даёт,
+            // но замер нужен: по нему движок ограничивает «Деньги пришли» (М-5, шаг 1.6).
+            let readable = |p: &Unsettled, selftest: bool| !selftest && !p.busy;
+            let measurable = |p: &Unsettled| {
+                p.deltas().is_some_and(|d| {
+                    d.iter().filter(|(_, x)| !x.is_zero()).count() <= MAX_UNSETTLED
+                })
             };
-            let skip = !measurable(&pending, selftest);
+            let skip = !readable(&pending, selftest);
             drop(conn);
             let actual = if skip {
                 None
@@ -311,10 +312,11 @@ impl Engine {
             let mut tx = self.pool.begin().await?;
             // Пока читали баланс, могла начаться или решиться операция: такой замер не считаем.
             let now_pending = unsettled(&mut tx, wallet).await?;
-            let raced = !measurable(&now_pending, self.selftest_running.load(Ordering::SeqCst))
+            let raced = !readable(&now_pending, self.selftest_running.load(Ordering::SeqCst))
                 || now_pending.ids() != pending.ids();
+            let balance_read = actual.is_some() && !raced;
             let judgement = match actual {
-                Some(a) if !raced => pending
+                Some(a) if balance_read && measurable(&pending) => pending
                     .deltas()
                     .and_then(|d| judge(expected, &d, a, warn, pause)),
                 _ => None,
@@ -331,15 +333,16 @@ impl Engine {
             let matched = judgement.as_ref().and_then(|j| j.matched.clone());
             if let Some(v) = verdict.as_db_str() {
                 sqlx::query(
-                    "INSERT INTO reconciliations (wallet_account_id, asset, source, expected, actual, inflight_ops, verdict, unsettled_ops, matched_ops) VALUES ($1, 'USDT', 'userbot', $2, $3, $4, $5, $6, $7)",
+                    "INSERT INTO reconciliations (wallet_account_id, asset, source, expected, actual, inflight_ops, verdict, unsettled_ops, matched_ops, balance_read) VALUES ($1, 'USDT', 'userbot', $2, $3, $4, $5, $6, $7, $8)",
                 )
                 .bind(wallet)
                 .bind(expected)
-                .bind(actual.unwrap_or(expected))
+                .bind(actual.filter(|_| balance_read).unwrap_or(expected))
                 .bind(i32::try_from(unsettled_ids.len()).unwrap_or(i32::MAX))
                 .bind(v)
                 .bind(&unsettled_ids)
                 .bind(&matched)
+                .bind(balance_read)
                 .execute(&mut *tx)
                 .await?;
             }

@@ -118,6 +118,12 @@ pub enum Refusal {
     NoIntakeOperation,
     #[error("bad amount")]
     BadAmount,
+    /// «Деньги пришли»: после отправки активации кошелёк ещё не сверяли — сначала сверка.
+    #[error("the wallet was not measured after the activation: reconcile it first")]
+    NotMeasured,
+    /// «Деньги пришли» больше излишка кошелька по последней сверке (М-5): столько не пришло.
+    #[error("amount {amount} is above the wallet excess {room} at the last reconciliation")]
+    OverWalletExcess { amount: Decimal, room: Decimal },
     #[error("no payout attempt to close: use retry instead")]
     NoSettleAttempt,
     #[error("this check already settles another operation")]
@@ -210,6 +216,62 @@ fn check_limit(staff: &StaffMember, amount: Decimal) -> Result<(), Refusal> {
     }
 }
 
+/// Сколько можно зачислить «Деньгами пришли» по активации `op` (М-5, шаг 1.6): излишек
+/// кошелька по последнему замеру после отправки активации (реальный баланс минус леджер) за
+/// вычетом приходов, проведённых после замера по активациям, отправленным до него, — эти деньги
+/// уже лежали в замеренном балансе (поздний ответ кошелька или прежнее «Деньги пришли»).
+/// Активация, отправленная после замера, в нём не учтена и ничего не вычитает.
+///
+/// Чего правило не ловит: две неясные активации на одном кошельке делят общий излишек, и
+/// сотрудник может приписать сумму не той заявке. Больше реально пришедшего в сумме всё равно
+/// не зачислить.
+async fn intake_room(
+    conn: &mut PgConnection,
+    op: &OperationRow,
+    asset: Asset,
+) -> Result<Decimal, OperatorError> {
+    let (wallet, at, excess) = reading_after(conn, op, asset)
+        .await?
+        .ok_or(Refusal::NotMeasured)?;
+    let posted: Option<Decimal> = sqlx::query_scalar(
+        "SELECT sum(e.amount) FROM ledger_entries e \
+           JOIN ledger_accounts a ON a.id = e.account_id \
+           JOIN ledger_transactions t ON t.id = e.tx_id \
+           JOIN operations o ON o.id = t.operation_id \
+          WHERE a.wallet_account_id = $1 AND a.asset = $2 AND t.created_at >= $3 \
+            AND o.kind = 'activate_check' AND o.dispatched_at <= $3",
+    )
+    .bind(wallet)
+    .bind(asset.code())
+    .bind(at)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(excess - posted.unwrap_or_default())
+}
+
+/// Последний настоящий замер кошелька активации `op`, сделанный после её отправки:
+/// (кошелёк, когда, реальный баланс минус леджер).
+async fn reading_after(
+    conn: &mut PgConnection,
+    op: &OperationRow,
+    asset: Asset,
+) -> Result<Option<(i16, chrono::DateTime<chrono::Utc>, Decimal)>, OperatorError> {
+    let (Some(wallet), Some(sent)) = (op.wallet_account_id, op.dispatched_at) else {
+        return Ok(None);
+    };
+    let last: Option<(chrono::DateTime<chrono::Utc>, Decimal)> = sqlx::query_as(
+        "SELECT at, actual - expected FROM reconciliations \
+          WHERE wallet_account_id = $1 AND asset = $2 AND balance_read AND at > $3 \
+          ORDER BY at DESC, id DESC LIMIT 1",
+    )
+    .bind(wallet)
+    .bind(asset.code())
+    .bind(sent)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(last.map(|(at, excess)| (wallet, at, excess)))
+}
+
 /// Удержание под выплату на кошельке выплаты: есть подходящее — оставить; на другом кошельке
 /// (после неудачного возврата) или меньше нужного — заменить.
 async fn ensure_target_hold(
@@ -255,6 +317,51 @@ fn snapshot(order: &OrderRow, d: &storage::orders::OrderDetails) -> Value {
 
 impl Engine {
     /// Решение сотрудника по заявке на ручном разборе. Отказ ([`Refusal`]) ничего не меняет.
+    /// «Деньги пришли» (М-5, шаг 1.6): зачислить можно только то, что замерено в кошельке после
+    /// активации. Замера нет — значит, чат кошелька ещё держит неотвеченная активация, и баланс
+    /// не прочитать. Человек уже разбирает заявку: чат освобождается (поздний ответ ловит окно
+    /// следующей активации — два ответа, исход неясен), кошелёк остаётся на паузе, пока исход
+    /// активации не решён, и сверка читает баланс. Предварительные проверки — до освобождения:
+    /// отказ по сумме или потолку чат не трогает.
+    async fn measure_before_intake(
+        &self,
+        order_id: i64,
+        staff: &StaffMember,
+        amount: Decimal,
+    ) -> Result<(), OperatorError> {
+        if amount <= Decimal::ZERO || amount.scale() > 18 {
+            return Err(Refusal::BadAmount.into());
+        }
+        check_limit(staff, amount)?;
+        let mut conn = self.pool.acquire().await?;
+        let order = storage::orders::get(&mut conn, order_id, false).await?;
+        if order.state != OrderState::ManualReview
+            || storage::ledger::order_has(&mut conn, order_id, TxKind::Intake).await?
+        {
+            return Ok(());
+        }
+        let ops = storage::operations::for_order(&mut conn, order_id).await?;
+        let Some(op) = ops
+            .iter()
+            .rev()
+            .find(|o| o.kind == OpKind::ActivateCheck && o.status == OpStatus::Unknown)
+        else {
+            return Ok(());
+        };
+        if reading_after(&mut conn, op, order.asset).await?.is_some() {
+            return Ok(());
+        }
+        drop(conn);
+        tracing::info!(
+            order = order_id,
+            platform = op.platform.db_name(),
+            "confirm intake: releasing the wallet chat to measure the balance"
+        );
+        self.unanswered_resolved(op.platform).await;
+        self.reconcile_balances().await?;
+        Ok(())
+    }
+
     pub async fn operator_decide(
         &self,
         req: OperatorRequest<'_>,
@@ -269,6 +376,10 @@ impl Engine {
         let reason = req.reason.trim();
         if reason.chars().count() < 3 {
             return Err(Refusal::ReasonTooShort.into());
+        }
+        if let OperatorDecision::ConfirmIntake { amount } = &req.decision {
+            self.measure_before_intake(req.order_id, staff, *amount)
+                .await?;
         }
         let mut tx = self.pool.begin().await?;
         let order = storage::orders::get(&mut tx, req.order_id, true).await?;
@@ -333,6 +444,17 @@ impl Engine {
                     .rev()
                     .find(|o| o.kind == OpKind::ActivateCheck && o.status == OpStatus::Unknown)
                     .ok_or(Refusal::NoIntakeOperation)?;
+                // Зачислить можно только то, что реально лежит в кошельке, и не больше потолка
+                // сотрудника (М-5): «300 вместо 3» отклоняется здесь, каким бы путём ни пришло.
+                check_limit(staff, *amount)?;
+                let room = intake_room(&mut tx, op, order.asset).await?;
+                if *amount > room {
+                    return Err(Refusal::OverWalletExcess {
+                        amount: *amount,
+                        room,
+                    }
+                    .into());
+                }
                 storage::operations::resolve_by_staff(
                     &mut tx,
                     op.id,
