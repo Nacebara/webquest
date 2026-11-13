@@ -179,7 +179,20 @@ impl ClientBot {
                 terms_cache: Mutex::new(None),
                 locks: locks::KeyedLocks::default(),
                 memory: Mutex::new(Memory::default()),
+                poll_beat: std::sync::atomic::AtomicI64::new(0),
             }),
+        }
+    }
+
+    /// Когда Telegram последний раз ответил на опрос обновлений; `None` — ещё ни разу.
+    pub fn last_poll(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        match self
+            .inner
+            .poll_beat
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            0 => None,
+            t => chrono::DateTime::from_timestamp(t, 0),
         }
     }
 
@@ -275,6 +288,9 @@ pub(crate) struct Inner {
     terms_cache: Mutex<Option<(Instant, terms::TermsSnapshot)>>,
     locks: locks::KeyedLocks,
     memory: Mutex<Memory>,
+    /// Последний удачный ответ getUpdates (секунды Unix, 0 — ещё ни разу): по нему внешний пинг
+    /// понимает, что опрос Telegram жив (шаг 2.5).
+    poll_beat: std::sync::atomic::AtomicI64,
 }
 
 impl Inner {

@@ -146,6 +146,9 @@ pub struct Engine {
     invest_updates: broadcast::Sender<invest::InvestUpdate>,
     /// Идёт самопроверка: сверка балансов молчит.
     selftest_running: std::sync::atomic::AtomicBool,
+    /// Когда цикл движка последний раз прошёл круг (секунды Unix, 0 — ещё ни разу): по нему
+    /// внешний пинг понимает, что движок жив (шаг 2.5).
+    beat: std::sync::atomic::AtomicI64,
 }
 
 impl std::fmt::Debug for Engine {
@@ -168,6 +171,7 @@ impl Engine {
             updates,
             invest_updates,
             selftest_running: std::sync::atomic::AtomicBool::new(false),
+            beat: std::sync::atomic::AtomicI64::new(0),
         }
     }
 
@@ -245,6 +249,14 @@ impl Engine {
     ///
     /// Второй процесс с тем же `DATABASE_URL` получит [`EngineError::AnotherInstance`]: два
     /// движка приняли бы живые операции друг друга за прерванные.
+    /// Когда цикл движка последний раз прошёл круг; `None` — ещё ни разу.
+    pub fn last_beat(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        match self.beat.load(std::sync::atomic::Ordering::Relaxed) {
+            0 => None,
+            t => chrono::DateTime::from_timestamp(t, 0),
+        }
+    }
+
     pub async fn run(
         &self,
         cancel: tokio_util::sync::CancellationToken,
@@ -283,6 +295,10 @@ impl Engine {
         accrual.tick().await;
         loop {
             while self.process_due().await? > 0 {}
+            self.beat.store(
+                chrono::Utc::now().timestamp(),
+                std::sync::atomic::Ordering::Relaxed,
+            );
             tokio::select! {
                 () = cancel.cancelled() => break,
                 _ = tick.tick() => {}

@@ -2,7 +2,6 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::time::Duration;
 
 use anyhow::Context as _;
 use clap::{Parser, Subcommand};
@@ -498,15 +497,8 @@ async fn run() -> anyhow::Result<()> {
 
     let cancel = CancellationToken::new();
     let mut tasks: JoinSet<Result<(), supervisor::GaveUp>> = JoinSet::new();
-    {
-        let pool = pool.clone();
-        tasks.spawn(supervise(
-            "heartbeat",
-            cancel.clone(),
-            RestartPolicy::default(),
-            move |token| heartbeat(pool.clone(), token),
-        ));
-    }
+    // Что должно быть живо, чтобы пинговать наружу (шаг 2.5): движок и опрос Telegram.
+    let mut probes: Vec<app::health::Probe> = Vec::new();
 
     // Юзерботы и движок: без них процесс только держит пульс и миграции.
     match TelegramSettings::from_config(&cfg) {
@@ -528,6 +520,12 @@ async fn run() -> anyhow::Result<()> {
                 engine.ensure_ledger_accounts().await?;
                 {
                     let engine = engine.clone();
+                    probes.push(app::health::Probe::new("engine", move || {
+                        engine.last_beat()
+                    }));
+                }
+                {
+                    let engine = engine.clone();
                     tasks.spawn(supervise(
                         "engine",
                         cancel.clone(),
@@ -545,11 +543,45 @@ async fn run() -> anyhow::Result<()> {
                         tracing::warn!("CLIENT_BOT_TOKEN is not set: the client bot is not started")
                     }
                     Some(token) => {
-                        spawn_bot(&mut tasks, &cancel, &pool, engine, &cfg, token, None).await?;
+                        let bot = spawn_bot(&mut tasks, &cancel, &pool, engine, &cfg, token, None)
+                            .await?;
+                        probes.push(app::health::Probe::new("telegram polling", move || {
+                            bot.last_poll()
+                        }));
                     }
                 }
             }
         }
+    }
+
+    let pinger = match cfg.healthcheck_url.as_deref() {
+        Some(url) => Some(app::telegram::pinger(url)?),
+        None => {
+            tracing::warn!(
+                "HEALTHCHECK_URL is not set: nobody outside will notice if exch stops working"
+            );
+            None
+        }
+    };
+    {
+        let pool = pool.clone();
+        // Проверки и пинг — одни на все перезапуски задачи.
+        let probes = Arc::new(probes);
+        let pinger = pinger.map(Arc::new);
+        tasks.spawn(supervise(
+            "heartbeat",
+            cancel.clone(),
+            RestartPolicy::default(),
+            move |token| {
+                app::health::run(
+                    pool.clone(),
+                    pinger.clone(),
+                    probes.clone(),
+                    app::health::EVERY,
+                    token,
+                )
+            },
+        ));
     }
 
     wait(tasks, cancel).await
@@ -565,7 +597,7 @@ async fn spawn_bot(
     cfg: &Config,
     token: secrecy::SecretString,
     demo: Option<&app::demo::DemoWorld>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<tgbot::ClientBot> {
     // Один бот: админ-панель — внутри клиентского (решение владельца).
     let panel = app::runtime::ops_bot(pool, token.clone(), engine.clone(), cfg.owner_tg_id)?;
     {
@@ -592,16 +624,19 @@ async fn spawn_bot(
     };
     let bot = app::runtime::client_bot(pool, token, engine, cfg.support_contact.clone(), emoji)?
         .with_hook(hook);
-    tasks.spawn(supervise(
-        "client-bot",
-        cancel.clone(),
-        RestartPolicy::default(),
-        move |token| {
-            let bot = bot.clone();
-            async move { bot.run(token).await.map_err(anyhow::Error::from) }
-        },
-    ));
-    Ok(())
+    {
+        let bot = bot.clone();
+        tasks.spawn(supervise(
+            "client-bot",
+            cancel.clone(),
+            RestartPolicy::default(),
+            move |token| {
+                let bot = bot.clone();
+                async move { bot.run(token).await.map_err(anyhow::Error::from) }
+            },
+        ));
+    }
+    Ok(bot)
 }
 
 /// `exch demo`: тот же бот и пульт, кошельки — симулятор, база — `<база>_demo`.
@@ -699,20 +734,4 @@ async fn wait(
     }
     tracing::info!("stopped");
     outcome
-}
-
-/// Пульс процесса: раз в минуту проверяет БД. Пинг healthchecks.io добавится вместе с
-/// HTTP-клиентом в M2 (SPEC §10.1, задача `heartbeat`).
-async fn heartbeat(pool: storage::PgPool, cancel: CancellationToken) -> anyhow::Result<()> {
-    let mut tick = tokio::time::interval(Duration::from_secs(60));
-    loop {
-        tokio::select! {
-            () = cancel.cancelled() => return Ok(()),
-            _ = tick.tick() => {
-                let mut conn = pool.acquire().await.context("heartbeat: no database connection")?;
-                let balances = storage::ledger::wallet_balances(&mut conn).await?;
-                tracing::info!(wallets = balances.len(), "alive");
-            }
-        }
-    }
 }

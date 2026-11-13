@@ -19,7 +19,7 @@ mod client;
 #[cfg(feature = "client")]
 pub use client::{
     BotApi, BotApiBuilder, DEFAULT_BASE_URL, DEFAULT_CONNECT_TIMEOUT, DEFAULT_TIMEOUT,
-    LONG_POLL_GRACE,
+    LONG_POLL_GRACE, Pinger,
 };
 pub use error::{Error, TransportKind};
 pub use keyboard::{

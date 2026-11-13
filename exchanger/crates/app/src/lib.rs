@@ -17,6 +17,7 @@ pub mod config;
 pub mod db;
 pub mod demo;
 pub mod emoji;
+pub mod health;
 pub mod listen;
 pub mod login;
 pub mod project;

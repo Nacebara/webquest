@@ -125,20 +125,7 @@ impl BotApiBuilder {
             ));
         }
 
-        let mut builder = reqwest::Client::builder()
-            .tls_backend_preconfigured(tls_config(&self.extra_roots)?)
-            .connect_timeout(self.connect_timeout)
-            .user_agent(concat!("exch-botapi/", env!("CARGO_PKG_VERSION")));
-        builder = match &self.proxy {
-            Some(url) => builder.proxy(
-                reqwest::Proxy::all(url.expose_secret())
-                    .map_err(|_| Error::Config("invalid proxy URL".into()))?,
-            ),
-            None => builder.no_proxy(),
-        };
-        let http = builder
-            .build()
-            .map_err(|e| Error::Config(format!("cannot build HTTP client: {}", e.without_url())))?;
+        let http = http_client(&self)?;
 
         Ok(BotApi {
             http,
@@ -147,6 +134,102 @@ impl BotApiBuilder {
             timeout: self.timeout,
         })
     }
+}
+
+/// Пинг внешнего сервиса «я жив» (healthchecks.io и подобные, шаг 2.5 плана): GET на адрес
+/// раз в минуту, тот же TLS и прокси, что у Bot API. Адрес — секрет (по нему кто угодно может
+/// «пинговать» за бота) и в ошибки не попадает.
+pub struct Pinger {
+    http: reqwest::Client,
+    url: SecretString,
+    timeout: Duration,
+}
+
+impl fmt::Debug for Pinger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Pinger")
+            .field("url", &"[REDACTED]")
+            .finish()
+    }
+}
+
+impl Pinger {
+    /// `proxy` и `ca_pem` — как у [`BotApiBuilder::proxy`] и [`BotApiBuilder::add_root_pem`].
+    pub fn new(
+        url: SecretString,
+        proxy: Option<SecretString>,
+        ca_pem: Option<&[u8]>,
+    ) -> Result<Self, Error> {
+        let u = url.expose_secret();
+        if !(u.starts_with("https://") || u.starts_with("http://")) {
+            return Err(Error::Config(
+                "health check URL must start with http:// or https://".into(),
+            ));
+        }
+        let mut builder = BotApi::builder(SecretString::from("1:pinger"));
+        if let Some(proxy) = proxy {
+            builder = builder.proxy(proxy);
+        }
+        if let Some(pem) = ca_pem {
+            builder = builder.add_root_pem(pem)?;
+        }
+        let http = http_client(&builder)?;
+        Ok(Self {
+            http,
+            url,
+            timeout: Duration::from_secs(10),
+        })
+    }
+
+    /// Один пинг. Ответ не 2xx или нет связи — ошибка (без адреса в тексте).
+    pub async fn ping(&self) -> Result<(), Error> {
+        let method = "health check";
+        let response = self
+            .http
+            .get(self.url.expose_secret())
+            .timeout(self.timeout)
+            .send()
+            .await
+            .map_err(|e| Error::Transport {
+                method: method.into(),
+                kind: if e.is_connect() {
+                    TransportKind::Connect
+                } else if e.is_timeout() {
+                    TransportKind::Timeout
+                } else {
+                    TransportKind::Other
+                },
+                detail: e.without_url().to_string(),
+            })?;
+        let status = response.status();
+        if status.is_success() {
+            Ok(())
+        } else {
+            Err(Error::Decode {
+                method: method.into(),
+                status: status.as_u16(),
+                detail: "health check service answered with an error".into(),
+            })
+        }
+    }
+}
+
+/// HTTP-клиент с настройками сборщика: TLS (Mozilla + свои корни), прокси, таймаут соединения.
+fn http_client(b: &BotApiBuilder) -> Result<reqwest::Client, Error> {
+    let mut builder = reqwest::Client::builder()
+        .tls_backend_preconfigured(tls_config(&b.extra_roots)?)
+        .connect_timeout(b.connect_timeout)
+        .user_agent(concat!("exch-botapi/", env!("CARGO_PKG_VERSION")));
+    builder = match &b.proxy {
+        Some(url) => builder.proxy(
+            reqwest::Proxy::all(url.expose_secret())
+                .map_err(|_| Error::Config("invalid proxy URL".into()))?,
+        ),
+        None => builder.no_proxy(),
+    };
+    builder
+        .build()
+        .map_err(|e| Error::Config(format!("cannot build HTTP client: {}", e.without_url())))
 }
 
 /// rustls на ring, корни — встроенный набор Mozilla (webpki-roots) и явно добавленные.

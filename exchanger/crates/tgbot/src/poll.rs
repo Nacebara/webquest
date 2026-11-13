@@ -35,6 +35,10 @@ pub(crate) async fn run(inner: Arc<Inner>, cancel: CancellationToken) {
         match result {
             Ok(updates) => {
                 backoff = Duration::from_secs(1);
+                inner.poll_beat.store(
+                    chrono::Utc::now().timestamp(),
+                    std::sync::atomic::Ordering::Relaxed,
+                );
                 if let Some(max) = updates.iter().map(|u| u.update_id).max() {
                     last = Some(last.map_or(max, |l| l.max(max)));
                 }

@@ -144,6 +144,29 @@ pub fn bot_api_with(
     builder.build().context("cannot build the Bot API client")
 }
 
+/// Пинг-сервис «я жив» (`HEALTHCHECK_URL`, шаг 2.5) — с теми же прокси и корнем, что Bot API.
+pub fn pinger(url: &str) -> anyhow::Result<botapi::Pinger> {
+    use anyhow::Context as _;
+    let get = |k: &str| {
+        std::env::var(k)
+            .ok()
+            .map(|v| v.trim().to_owned())
+            .filter(|v| !v.is_empty())
+    };
+    let pem = match get("TELEGRAM_CA_FILE") {
+        Some(path) => Some(
+            std::fs::read(&path).with_context(|| format!("cannot read TELEGRAM_CA_FILE {path}"))?,
+        ),
+        None => None,
+    };
+    botapi::Pinger::new(
+        secrecy::SecretString::from(url.to_owned()),
+        get("TELEGRAM_PROXY").map(secrecy::SecretString::from),
+        pem.as_deref(),
+    )
+    .context("HEALTHCHECK_URL")
+}
+
 /// То же из переменных окружения процесса.
 pub fn bot_api(token: secrecy::SecretString) -> anyhow::Result<botapi::BotApi> {
     bot_api_with(token, |k| std::env::var(k).ok())
