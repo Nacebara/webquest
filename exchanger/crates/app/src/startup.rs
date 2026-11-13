@@ -93,6 +93,57 @@ pub fn transient_telegram(e: &anyhow::Error) -> bool {
     }) || transient_db_chain(e)
 }
 
+/// Временный ли сбой работающей задачи (шаг 2.4, находка Н-4): база недоступна, нет связи с
+/// Telegram, Telegram перегружен (429, 5xx). Такие сбои супервизор не считает к «сдаться» —
+/// ждёт, пока база и сеть вернутся. Ошибка в данных, отказ Telegram по существу, паника — не
+/// временные.
+pub fn transient(e: &anyhow::Error) -> bool {
+    fn storage(e: &storage::StorageError) -> bool {
+        matches!(e, storage::StorageError::Db(e) if transient_db(e))
+    }
+    fn engine(e: &engine::EngineError) -> bool {
+        match e {
+            engine::EngineError::Db(e) => transient_db(e),
+            engine::EngineError::Storage(e) => storage(e),
+            _ => false,
+        }
+    }
+    fn api(e: &botapi::Error) -> bool {
+        matches!(
+            e,
+            botapi::Error::Transport { .. } | botapi::Error::Decode { .. }
+        ) || e.is_flood()
+            || e.error_code().is_some_and(|c| c >= 500)
+    }
+    e.chain().any(|c| {
+        c.downcast_ref::<sqlx::Error>().is_some_and(transient_db)
+            || c.downcast_ref::<storage::StorageError>()
+                .is_some_and(storage)
+            || c.downcast_ref::<engine::EngineError>().is_some_and(engine)
+            || c.downcast_ref::<botapi::Error>().is_some_and(api)
+            || c.downcast_ref::<tgbot::TgBotError>()
+                .is_some_and(|e| match e {
+                    tgbot::TgBotError::Db(e) => transient_db(e),
+                    tgbot::TgBotError::Storage(e) => storage(e),
+                    tgbot::TgBotError::Engine(e) => engine(e),
+                    tgbot::TgBotError::Api(e) => api(e),
+                })
+            || c.downcast_ref::<ops::OpsError>().is_some_and(|e| match e {
+                ops::OpsError::Db(e) => transient_db(e),
+                ops::OpsError::Storage(e) => storage(e),
+                ops::OpsError::Engine(e) => engine(e),
+                ops::OpsError::Api(e) => api(e),
+                _ => false,
+            })
+            || c.downcast_ref::<mtproto::ConnectError>().is_some_and(|c| {
+                matches!(
+                    c,
+                    mtproto::ConnectError::Timeout(_) | mtproto::ConnectError::Network { .. }
+                )
+            })
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -158,6 +209,35 @@ mod tests {
         let waited = started.elapsed();
         assert!(waited <= WAIT_LIMIT, "{waited:?}");
         assert!(waited >= WAIT_LIMIT - MAX_PAUSE, "{waited:?}");
+    }
+
+    #[test]
+    fn database_and_network_failures_of_a_running_task_are_temporary() {
+        let db = || sqlx::Error::Io(std::io::Error::from(std::io::ErrorKind::ConnectionReset));
+        let engine = anyhow::Error::from(engine::EngineError::Db(db()));
+        assert!(transient(&engine));
+        let storage = anyhow::Error::from(engine::EngineError::Storage(storage::StorageError::Db(
+            sqlx::Error::PoolTimedOut,
+        )));
+        assert!(transient(&storage));
+        let bot = anyhow::Error::from(tgbot::TgBotError::Api(botapi::Error::Transport {
+            method: "getUpdates".into(),
+            kind: botapi::TransportKind::Connect,
+            detail: "connection refused".into(),
+        }));
+        assert!(transient(&bot));
+        let ops = anyhow::Error::from(ops::OpsError::Db(db())).context("ops bot");
+        assert!(transient(&ops));
+        // Ошибка в данных и отказ Telegram по существу — не временные.
+        let invariant = anyhow::Error::from(engine::EngineError::Invariant("x".into()));
+        assert!(!transient(&invariant));
+        let rejected = anyhow::Error::from(botapi::Error::Api {
+            method: "sendMessage".into(),
+            error_code: 400,
+            description: "Bad Request".into(),
+            parameters: Default::default(),
+        });
+        assert!(!transient(&rejected));
     }
 
     #[test]

@@ -1,6 +1,10 @@
 //! Супервизор задач (SPEC §10.1): упавшая задача перезапускается с backoff;
 //! больше 5 перезапусков за 10 минут — супервизор сдаётся, процесс выходит с кодом 1,
-//! Docker перезапускает контейнер, рекавери доводит заявки.
+//! служба Windows перезапускает его, рекавери доводит заявки.
+//!
+//! Сбой базы или сети ([`crate::startup::transient`]) к «сдаться» не считается (находка Н-4,
+//! шаг 2.4): минута без PostgreSQL не должна выключать exch до прихода человека. Такая задача
+//! перезапускается с паузой 1, 2, 4 … 60 с, пока база и сеть не вернутся.
 
 use std::collections::VecDeque;
 use std::future::Future;
@@ -95,13 +99,41 @@ where
     Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
 {
     let mut tracker = RestartTracker::new(policy);
+    // Подряд идущие временные сбои (база, сеть): пауза растёт, к «сдаться» не считаются.
+    let mut transient_streak = 0u32;
     loop {
         if cancel.is_cancelled() {
             return Ok(());
         }
+        let started = Instant::now();
         let outcome = tokio::spawn(make(cancel.child_token())).await;
         if cancel.is_cancelled() {
             return Ok(());
+        }
+        // Задача проработала дольше самой длинной паузы — прежние сбои закончились.
+        if started.elapsed() >= policy.max_backoff {
+            transient_streak = 0;
+        }
+        if let Ok(Err(e)) = &outcome
+            && crate::startup::transient(e)
+        {
+            let after = policy
+                .min_backoff
+                .saturating_mul(1u32 << transient_streak.min(16))
+                .min(policy.max_backoff);
+            transient_streak = transient_streak.saturating_add(1);
+            tracing::error!(
+                task = name,
+                error = %e,
+                failures = transient_streak,
+                delay_ms = after.as_millis() as u64,
+                "task failed: the database or the network is unavailable; waiting, not giving up"
+            );
+            tokio::select! {
+                () = tokio::time::sleep(after) => {}
+                () = cancel.cancelled() => return Ok(()),
+            }
+            continue;
         }
         match &outcome {
             Ok(Ok(())) => tracing::error!(task = name, "task exited without cancellation"),
@@ -191,6 +223,56 @@ mod tests {
                 after: Duration::from_secs(1)
             }
         );
+    }
+
+    /// Шаг 2.4 (Н-4): минута без базы — задача падает снова и снова, супервизор не сдаётся;
+    /// база вернулась — задача работает.
+    #[tokio::test(start_paused = true)]
+    async fn a_minute_without_the_database_does_not_stop_the_process() {
+        let runs = Arc::new(AtomicUsize::new(0));
+        let up = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let cancel = CancellationToken::new();
+        let start = Instant::now();
+        let handle = {
+            let runs = runs.clone();
+            let up = up.clone();
+            let cancel = cancel.clone();
+            tokio::spawn(supervise(
+                "engine",
+                cancel,
+                RestartPolicy::default(),
+                move |token| {
+                    let runs = runs.clone();
+                    let up = up.clone();
+                    async move {
+                        runs.fetch_add(1, Ordering::SeqCst);
+                        if start.elapsed() < Duration::from_secs(60) {
+                            return Err(anyhow::Error::from(engine::EngineError::Db(
+                                sqlx::Error::PoolTimedOut,
+                            )));
+                        }
+                        up.store(true, Ordering::SeqCst);
+                        token.cancelled().await;
+                        Ok(())
+                    }
+                },
+            ))
+        };
+        tokio::time::sleep(Duration::from_secs(150)).await;
+        assert!(
+            !handle.is_finished(),
+            "supervisor gave up on a database outage"
+        );
+        assert!(
+            up.load(Ordering::SeqCst),
+            "task works again after the database came back"
+        );
+        assert!(
+            runs.load(Ordering::SeqCst) > 5,
+            "more failures than the give-up limit"
+        );
+        cancel.cancel();
+        assert!(handle.await.unwrap().is_ok());
     }
 
     #[tokio::test(start_paused = true)]
