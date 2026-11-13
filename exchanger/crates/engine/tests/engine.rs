@@ -813,3 +813,117 @@ async fn menu_flood_wait_before_the_amount_does_not_need_a_human(pool: PgPool) {
     assert_eq!(paused, 0, "выплаты не встали на паузу");
     e.assert_books_match().await;
 }
+
+/// М-4 (шаг 1.7): чек активирован, а база падает на переходе заявки. Сколько пришло — уже
+/// записано в операции; заявка доводится сама, кошелёк второй раз не спрашивают.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn database_failure_right_after_activation_keeps_the_amount_and_finishes_itself(
+    pool: PgPool,
+) {
+    let e = env(pool).await;
+    // Сбой связи с базой на первых четырёх проводках: три попытки сразу и ещё одна потом.
+    sqlx::raw_sql(
+        "CREATE SEQUENCE zz_outage;
+         CREATE FUNCTION zz_outage() RETURNS trigger LANGUAGE plpgsql AS $$
+         BEGIN
+           IF nextval('zz_outage') <= 4 THEN
+             RAISE EXCEPTION 'injected outage' USING ERRCODE = '08006';
+           END IF;
+           RETURN NEW;
+         END $$;
+         CREATE TRIGGER zz_outage BEFORE INSERT ON ledger_transactions
+           FOR EACH ROW EXECUTE FUNCTION zz_outage();",
+    )
+    .execute(&e.pool)
+    .await
+    .unwrap();
+    let url = e.world.client_check(XR, usdt(dec!(30))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    e.drain().await;
+    let id = order.id;
+    assert_eq!(
+        e.order(id).await.0.state,
+        OrderState::IntakePending,
+        "заявка ждёт, а не ушла человеку"
+    );
+    let (status, saved): (String, Option<serde_json::Value>) = sqlx::query_as(
+        "SELECT status, request -> 'activated' FROM operations WHERE order_id = $1 AND kind = 'activate_check'",
+    )
+    .bind(id)
+    .fetch_one(&e.pool)
+    .await
+    .unwrap();
+    assert_eq!(status, "pending");
+    let saved = saved.expect("сколько пришло — записано в операции");
+    assert!(saved.to_string().contains("30"), "{saved}");
+
+    sqlx::query("UPDATE operations SET next_attempt_at = now() WHERE order_id = $1")
+        .bind(id)
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    e.drain().await;
+    let (o, d) = e.order(id).await;
+    assert_eq!(o.state, OrderState::Completed);
+    assert_eq!(d.intake_amount, Some(dec!(30)));
+    let activations = e
+        .world
+        .messages(e.ub, userbot::Chat::WalletBot(XR))
+        .iter()
+        .filter(|m| m.out && m.text.starts_with("/start"))
+        .count();
+    assert_eq!(activations, 1, "кошелёк второй раз не спрашивали");
+    e.assert_books_match().await;
+}
+
+/// М-4 (шаг 1.7): итог активации записан, а процесс упал, не доведя заявку (операция осталась
+/// `dispatched`). После перезапуска заявка доводится по записанному итогу, без повторной
+/// активации — повтор сказал бы «чек уже активирован», и заявка ушла бы человеку.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn saved_activation_result_finishes_the_order_after_a_restart(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(XR, usdt(dec!(12))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    let id = order.id;
+    // Как будто воркер взял операцию, кошелёк ответил «пришло 12», итог записан — и процесс упал.
+    let op = {
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::operations::claim_due(&mut conn, 1)
+            .await
+            .unwrap()
+            .pop()
+            .unwrap()
+    };
+    let tag = userbot::OpTag {
+        key: op.idempotency_key.clone(),
+        random_id: op.random_id,
+    };
+    let outcome = e.wallets[&XR]
+        .activate_check(op.start_param.as_deref().unwrap(), &tag)
+        .await
+        .unwrap();
+    assert!(matches!(outcome, userbot::ActivationOutcome::Received(_)));
+    {
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::operations::save_activation(
+            &mut conn,
+            op.id,
+            &serde_json::to_value(&outcome).unwrap(),
+        )
+        .await
+        .unwrap();
+    }
+    e.engine.recover().await.unwrap();
+    e.drain().await;
+    let (o, d) = e.order(id).await;
+    assert_eq!(o.state, OrderState::Completed);
+    assert_eq!(d.intake_amount, Some(dec!(12)));
+    let activations = e
+        .world
+        .messages(e.ub, userbot::Chat::WalletBot(XR))
+        .iter()
+        .filter(|m| m.out && m.text.starts_with("/start"))
+        .count();
+    assert_eq!(activations, 1, "кошелёк второй раз не спрашивали");
+    e.assert_books_match().await;
+}

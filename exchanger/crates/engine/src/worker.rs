@@ -87,6 +87,88 @@ pub(crate) fn older_than(op: &OperationRow, age: std::time::Duration) -> bool {
     op.dispatched_at.is_some_and(|t| Utc::now() - t >= age)
 }
 
+/// Сколько раз пробовать запись в базу после действия в кошельке (М-4, шаг 1.7).
+const DB_RETRIES: u32 = 3;
+/// Через сколько снова взять операцию, если база так и не ответила.
+const DB_FAILURE_BACKOFF: std::time::Duration = std::time::Duration::from_secs(10);
+
+fn db_backoff(attempt: u32) -> std::time::Duration {
+    std::time::Duration::from_millis(250 * 4u64.pow(attempt))
+}
+
+/// Сбой базы, после которого имеет смысл повторить: связь, перезапуск сервера, нехватка
+/// ресурсов, конфликт сериализации. Ошибки данных и нарушения правил — не повторяются.
+pub(crate) fn transient_db(e: &EngineError) -> bool {
+    let sql = match e {
+        EngineError::Db(e) | EngineError::Storage(StorageError::Db(e)) => e,
+        _ => return false,
+    };
+    match sql {
+        sqlx::Error::Io(_)
+        | sqlx::Error::PoolTimedOut
+        | sqlx::Error::PoolClosed
+        | sqlx::Error::WorkerCrashed => true,
+        sqlx::Error::Database(db) => db.code().is_some_and(|c| {
+            c.starts_with("08")
+                || c.starts_with("53")
+                || c.starts_with("57P")
+                || c == "40001"
+                || c == "40P01"
+        }),
+        _ => false,
+    }
+}
+
+impl Engine {
+    /// Записанный итог активации заявки ([`storage::operations::save_activation`]).
+    async fn saved_activation(
+        &self,
+        op: &OperationRow,
+    ) -> Result<Option<ActivationOutcome>, EngineError> {
+        let mut conn = self.pool.acquire().await?;
+        let Some(v) = storage::operations::saved_activation(&mut conn, op.id).await? else {
+            return Ok(None);
+        };
+        serde_json::from_value(v)
+            .map(Some)
+            .map_err(|e| EngineError::Invariant(format!("saved activation of {}: {e}", op.id)))
+    }
+
+    /// Сбой базы после активации: операцию — в очередь; записанный итог применится без
+    /// обращения к кошельку. `false` — попытки кончились, отдать человеку. База не отвечает и
+    /// на это — операция остаётся `dispatched` для прохода «зависших».
+    async fn retry_after_db_failure(&self, op: &OperationRow, e: &EngineError) -> bool {
+        let at = Utc::now() + chrono::Duration::from_std(DB_FAILURE_BACKOFF).unwrap_or_default();
+        let note = format!("сбой базы: {e}");
+        let r = async {
+            let mut conn = self.pool.acquire().await?;
+            // Итог записан — кошелёк больше не спрашиваем, попытка не считается. Не записан —
+            // повтор спросит кошелёк, и «чек уже активирован» на повторе уйдёт человеку.
+            if storage::operations::saved_activation(&mut conn, op.id)
+                .await?
+                .is_some()
+            {
+                storage::operations::release(&mut conn, op.id, at, &note).await?;
+                Ok::<bool, EngineError>(true)
+            } else {
+                Ok(storage::operations::retry(&mut conn, op.id, at, &note).await?)
+            }
+        }
+        .await;
+        match r {
+            Ok(true) => {
+                tracing::warn!(op = op.id, error = %e, "database failure after the activation: the operation will be finished later");
+                true
+            }
+            Ok(false) => false,
+            Err(again) => {
+                tracing::error!(op = op.id, error = %again, "database is still down: the operation stays for the stale sweep");
+                true
+            }
+        }
+    }
+}
+
 impl Engine {
     /// Брать созревшие операции по одной — непосредственно перед действием — и выполнять.
     /// Не больше `batch` за вызов. Возвращает число взятых.
@@ -101,6 +183,12 @@ impl Engine {
             let Some(op) = op else { break };
             done += 1;
             if let Err(e) = self.execute(&op).await {
+                if op.kind == OpKind::ActivateCheck
+                    && transient_db(&e)
+                    && self.retry_after_db_failure(&op, &e).await
+                {
+                    continue;
+                }
                 tracing::error!(op = op.id, key = %op.idempotency_key, error = %e, "operation handling failed");
                 self.park(&op, &format!("ошибка движка: {e}")).await;
             }
@@ -160,6 +248,15 @@ impl Engine {
         let tag = tag(op);
         match op.kind {
             OpKind::ActivateCheck => {
+                if op.invest_move_id.is_none()
+                    && let Some(saved) = self.saved_activation(op).await?
+                {
+                    tracing::warn!(
+                        op = op.id,
+                        "activation result was saved before a database failure: applying it without asking the wallet again"
+                    );
+                    return self.conclude_activation(op, saved, false).await;
+                }
                 let param = op.start_param.as_deref().ok_or_else(|| {
                     EngineError::Invariant(format!("operation {} has no check", op.id))
                 })?;
@@ -348,8 +445,79 @@ impl Engine {
             }
         }
 
+        self.conclude_activation(op, outcome, repeated_loss).await
+    }
+
+    /// Итог активации — в заявку. Ответ кошелька сначала записывается в операцию отдельно
+    /// (М-4, шаг 1.7), переход и проводки — одной транзакцией; сбой базы — повтор транзакции.
+    /// Не вышло и так — ошибка наверх: операция встанет в очередь и применит записанный итог.
+    async fn conclude_activation(
+        &self,
+        op: &OperationRow,
+        outcome: ActivationOutcome,
+        repeated_loss: bool,
+    ) -> Result<(), EngineError> {
+        if !matches!(outcome, ActivationOutcome::Unknown { .. }) {
+            let value = serde_json::to_value(&outcome)
+                .map_err(|e| EngineError::Invariant(format!("activation outcome: {e}")))?;
+            let mut saved = false;
+            for attempt in 0..DB_RETRIES {
+                let r = async {
+                    let mut conn = self.pool.acquire().await?;
+                    storage::operations::save_activation(&mut conn, op.id, &value).await?;
+                    Ok::<(), EngineError>(())
+                }
+                .await;
+                match r {
+                    Ok(()) => {
+                        saved = true;
+                        break;
+                    }
+                    Err(e) => {
+                        tracing::warn!(op = op.id, attempt, error = %e, "cannot save the activation result yet");
+                        tokio::time::sleep(db_backoff(attempt)).await;
+                    }
+                }
+            }
+            if !saved {
+                tracing::error!(op = op.id, outcome = %value, "activation result is not saved: the database is down");
+            }
+        }
+        let mut attempt = 0;
+        loop {
+            match self
+                .apply_activation(op, outcome.clone(), repeated_loss)
+                .await
+            {
+                Err(e) if transient_db(&e) && attempt + 1 < DB_RETRIES => {
+                    tracing::warn!(op = op.id, attempt, error = %e, "database failure while applying an activation, retrying");
+                    tokio::time::sleep(db_backoff(attempt)).await;
+                    attempt += 1;
+                }
+                r => return r,
+            }
+        }
+    }
+
+    async fn apply_activation(
+        &self,
+        op: &OperationRow,
+        outcome: ActivationOutcome,
+        repeated_loss: bool,
+    ) -> Result<(), EngineError> {
         let mut tx = self.pool.begin().await?;
         let order = self.locked_order(&mut tx, op).await?;
+        // Прошлая транзакция могла закоммититься, хотя ответ о коммите потерялся: итог уже в
+        // заявке, второй раз его не применять.
+        let status: Option<String> =
+            sqlx::query_scalar("SELECT status FROM operations WHERE id = $1 FOR UPDATE")
+                .bind(op.id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        if !matches!(status.as_deref(), Some("dispatched" | "unknown")) {
+            tracing::info!(op = op.id, ?status, "activation result is already applied");
+            return Ok(());
+        }
         if order.state != OrderState::IntakePending {
             return Err(EngineError::Invariant(format!(
                 "activation result for order {} in {:?}",
@@ -1176,6 +1344,12 @@ impl Engine {
     async fn recover_one(&self, op: &OperationRow) -> Result<(), EngineError> {
         match op.kind {
             OpKind::ActivateCheck => {
+                // Итог активации записан до сбоя (М-4): применить его, кошелёк не спрашивать.
+                if op.invest_move_id.is_none()
+                    && let Some(saved) = self.saved_activation(op).await?
+                {
+                    return self.conclude_activation(op, saved, false).await;
+                }
                 let retried = {
                     let mut conn = self.pool.acquire().await?;
                     storage::operations::retry(&mut conn, op.id, Utc::now(), "restart").await?

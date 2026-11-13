@@ -537,6 +537,42 @@ pub async fn release(
     }
 }
 
+/// Итог активации от кошелька — сразу и отдельно от перехода заявки (М-4, шаг 1.7): сбой базы
+/// на переходе не должен потерять, сколько пришло. Повтор операции применяет записанный итог, не
+/// спрашивая кошелёк снова. Пишется в `request` (`activated`): итог операции (`response`)
+/// перезаписывает передача человеку.
+pub async fn save_activation(
+    conn: &mut PgConnection,
+    id: i64,
+    outcome: &Value,
+) -> Result<(), StorageError> {
+    sqlx::query!(
+        r#"
+        UPDATE operations SET request = request || jsonb_build_object('activated', $2::jsonb)
+         WHERE id = $1 AND kind = 'activate_check' AND status = 'dispatched'
+        "#,
+        id,
+        outcome,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// Записанный итог активации ([`save_activation`]), если он есть.
+pub async fn saved_activation(
+    conn: &mut PgConnection,
+    id: i64,
+) -> Result<Option<Value>, StorageError> {
+    Ok(sqlx::query_scalar!(
+        r#"SELECT request -> 'activated' AS "activated" FROM operations WHERE id = $1"#,
+        id,
+    )
+    .fetch_optional(conn)
+    .await?
+    .flatten())
+}
+
 /// Повторить операцию с безопасным повтором (`activate_check`) на `at`; попытка считается.
 /// `false` — попытки кончились, операция осталась как была.
 pub async fn retry(
