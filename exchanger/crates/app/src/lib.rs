@@ -19,6 +19,7 @@ pub mod demo;
 pub mod emoji;
 pub mod health;
 pub mod listen;
+pub mod logfile;
 pub mod login;
 pub mod project;
 pub mod prompt;

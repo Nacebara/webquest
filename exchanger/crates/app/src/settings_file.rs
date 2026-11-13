@@ -32,6 +32,10 @@ struct Owner {
 struct Log {
     format: Option<String>,
     level: Option<String>,
+    /// Папка журналов (шаг 2.6); `off` — не писать в файл.
+    dir: Option<String>,
+    /// Сколько дней хранить журналы.
+    keep_days: Option<u32>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -53,6 +57,8 @@ pub fn parse(text: &str) -> Result<HashMap<&'static str, String>, String> {
     put("SUPPORT_CONTACT", f.owner.support);
     put("LOG_FORMAT", f.log.format);
     put("RUST_LOG", f.log.level);
+    put("LOG_DIR", f.log.dir);
+    put("LOG_KEEP_DAYS", f.log.keep_days.map(|d| d.to_string()));
     put("HEALTHCHECK_URL", f.health.url);
     Ok(out)
 }

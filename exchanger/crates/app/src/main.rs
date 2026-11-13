@@ -220,7 +220,22 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
         Ok(v) if !v.trim().is_empty() => v.trim().eq_ignore_ascii_case("text"),
         _ => std::io::IsTerminal::is_terminal(&std::io::stderr()),
     };
-    init_tracing(human, text);
+    // Журнал в файл — у долгой работы (`run`, `demo`): под службой окна нет (шаг 2.6).
+    let file_log = match command {
+        Command::Run | Command::Demo { .. } => match log_file(&paths.dir) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("Журнал в файл не пишется: {e}");
+                None
+            }
+        },
+        _ => None,
+    };
+    let log_dir = file_log.as_ref().map(|f| f.dir().to_path_buf());
+    init_tracing(human, text, file_log);
+    if let Some(dir) = log_dir {
+        tracing::info!(dir = %dir.display(), "log files: one per day (UTC)");
+    }
 
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -277,25 +292,68 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
     }
 }
 
-fn init_tracing(human: bool, text: bool) {
-    if human || text {
-        let default = if human { "warn" } else { "info" };
-        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default));
-        tracing_subscriber::fmt()
+/// Папка и срок журналов из `LOG_DIR` (по умолчанию `logs` в папке проекта; `off` — без файла)
+/// и `LOG_KEEP_DAYS` (по умолчанию 14).
+fn log_file(project: &std::path::Path) -> anyhow::Result<Option<app::logfile::DailyFile>> {
+    let dir = std::env::var("LOG_DIR")
+        .ok()
+        .map(|v| v.trim().to_owned())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "logs".to_owned());
+    if dir.eq_ignore_ascii_case("off") {
+        return Ok(None);
+    }
+    let keep = match std::env::var("LOG_KEEP_DAYS") {
+        Ok(v) if !v.trim().is_empty() => v
+            .trim()
+            .parse::<usize>()
+            .with_context(|| format!("LOG_KEEP_DAYS must be a number of days, got {v:?}"))?,
+        _ => 14,
+    };
+    let path = std::path::Path::new(&dir);
+    let path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        project.join(path)
+    };
+    let file = app::logfile::DailyFile::new(&path, keep)
+        .with_context(|| format!("cannot create the log folder {}", path.display()))?;
+    Ok(Some(file))
+}
+
+fn init_tracing(human: bool, text: bool, file: Option<app::logfile::DailyFile>) {
+    use tracing_subscriber::Layer as _;
+    use tracing_subscriber::layer::SubscriberExt as _;
+    use tracing_subscriber::util::SubscriberInitExt as _;
+    let default = if human { "warn" } else { "info" };
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default));
+    let console = if human || text {
+        tracing_subscriber::fmt::layer()
             .compact()
             // Старая консоль Windows (cmd) показывает цветовые коды как мусор.
             .with_ansi(!cfg!(windows))
             .with_target(false)
-            .with_env_filter(filter)
             .with_writer(std::io::stderr)
-            .init();
-        return;
-    }
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::fmt()
-        .json()
-        .with_env_filter(filter)
-        .with_current_span(true)
+            .boxed()
+    } else {
+        tracing_subscriber::fmt::layer()
+            .json()
+            .with_current_span(true)
+            .with_writer(std::io::stderr)
+            .boxed()
+    };
+    // В файл — те же события обычным текстом с полями заявок и операций (для человека).
+    let file = file.map(|f| {
+        tracing_subscriber::fmt::layer()
+            .compact()
+            .with_ansi(false)
+            .with_writer(f)
+            .boxed()
+    });
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(console)
+        .with(file)
         .init();
 }
 
