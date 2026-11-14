@@ -82,7 +82,21 @@ pub(crate) async fn process(
         {
             return rate_limited(inner, chat, user, wait).await;
         }
-        return submit_invoice(inner, chat, user, link).await;
+        // Счёт открывает юзербот — это секунды, а при занятом или молчащем кошельке и дольше.
+        // В фоне: опрос Telegram не ждёт, остальным клиентам бот отвечает сразу (шаг 2.9, Н-7).
+        // Лимит заявок считается сразу, иначе пачка ссылок прошла бы проверку до первой записи.
+        inner.limiter.record_order(user, Instant::now());
+        let task_inner = inner.clone();
+        let link = link.clone();
+        inner.spawn_background(async move {
+            let Ok(_slot) = task_inner.invoice_slots.clone().acquire_owned().await else {
+                return;
+            };
+            if let Err(e) = submit_invoice(&task_inner, chat, user, &link).await {
+                tracing::warn!(user, error = %e, "invoice handling failed");
+            }
+        });
+        return Ok(());
     }
     // Ни чека, ни счёта: объяснить самую содержательную ошибку (мульти-чек xRocket, подделку),
     // а не первую попавшуюся («не чек» у ссылки на кошелёк без кода).
@@ -145,8 +159,8 @@ async fn submit_invoice(
     link: &WalletLink,
 ) -> Result<(), TgBotError> {
     // Каждая ссылка на счёт — действие юзербота (он открывает счёт): считается в лимите заявок
-    // и при отказе, иначе потоком неподходящих счетов можно занять аккаунт кошелька.
-    inner.limiter.record_order(user, Instant::now());
+    // и при отказе (это делает вызывающий), иначе потоком неподходящих счетов можно занять
+    // аккаунт кошелька.
     let submitted = match inner.engine.submit_invoice(user, link).await {
         Ok(submitted) => submitted,
         Err(e) => {

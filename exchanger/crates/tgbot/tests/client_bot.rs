@@ -158,6 +158,23 @@ impl FakeTelegram {
         self.state.lock().unwrap()
     }
 
+    /// Другой клиент пишет боту текст.
+    fn user_writes(&self, user: i64, text: &str) {
+        let mut s = self.lock();
+        let id = s.next_update;
+        s.next_update += 1;
+        s.updates.push(json!({
+            "update_id": id,
+            "message": {
+                "message_id": id,
+                "date": 0,
+                "chat": { "id": user, "type": "private", "first_name": "Other" },
+                "from": { "id": user, "is_bot": false, "first_name": "Other", "language_code": "ru" },
+                "text": text,
+            }
+        }));
+    }
+
     /// Клиент пишет боту текст.
     fn client_writes(&self, text: &str) {
         let mut s = self.lock();
@@ -436,6 +453,10 @@ fn fast() -> FlowConfig {
 }
 
 async fn env(pool: PgPool) -> Env {
+    env_with(pool, fast()).await
+}
+
+async fn env_with(pool: PgPool, flow: FlowConfig) -> Env {
     let world = SimWorld::new();
     let ub = world.add_account("exch_ub");
     let client = world.add_account("client");
@@ -507,7 +528,7 @@ async fn env(pool: PgPool) -> Env {
     let mut wallets: HashMap<Platform, Arc<dyn WalletBot>> = HashMap::new();
     for platform in [CB, XR] {
         let w = Arc::new(
-            UserbotWallet::new(platform, transport.clone(), gate.clone()).with_config(fast()),
+            UserbotWallet::new(platform, transport.clone(), gate.clone()).with_config(flow.clone()),
         );
         wallets.insert(platform, w.clone() as Arc<dyn WalletBot>);
         engine = engine.with_wallet(w);
@@ -1595,6 +1616,65 @@ async fn a_second_instance_of_the_bot_raises_a_critical_alert(pool: PgPool) {
     e.fake
         .wait_for("an answer after the conflict", |c| {
             c.method == "sendMessage" && c.chat() == Some(CLIENT)
+        })
+        .await;
+    bot.stop().await;
+}
+
+/// Шаг 2.9 (Н-7): кошелёк долго молчит по счёту одного клиента — бот всё это время отвечает
+/// другим: счёт открывается в фоне, опрос Telegram его не ждёт. Котировка первому приходит,
+/// когда кошелёк ответил.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_slow_invoice_does_not_stop_the_bot_for_other_clients(pool: PgPool) {
+    // Кошелёк ждём до 10 с, как в жизни (там — 20 с).
+    let e = env_with(
+        pool,
+        FlowConfig {
+            reply_timeout: Duration::from_secs(10),
+            ..fast()
+        },
+    )
+    .await;
+    let bot = e.start_bot();
+    let shop = e.world.add_account("shop");
+    let inv = e
+        .world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))).by(shop))
+        .unwrap();
+    // Кошелёк отвечает на просмотр счёта через 3 с.
+    e.world.inject(
+        e.ub,
+        userbot::sim::Call::SendText,
+        userbot::sim::Fault::DelayReply(Duration::from_secs(3)),
+        1,
+    );
+    e.fake.client_writes(&inv.url);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let other = 222;
+    let started = std::time::Instant::now();
+    e.fake.user_writes(other, "привет");
+    e.fake
+        .wait_for("an answer to the other client", |c| {
+            c.method == "sendMessage" && c.chat() == Some(other)
+        })
+        .await;
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "the other client waited {:?} for the slow invoice",
+        started.elapsed()
+    );
+    assert!(
+        !e.fake
+            .calls()
+            .iter()
+            .any(|c| c.chat() == Some(CLIENT) && c.contains("Скопируйте, чтобы создать чек")),
+        "the invoice is still being opened"
+    );
+    e.fake
+        .wait_for("the quote after the wallet answered", |c| {
+            matches!(c.method.as_str(), "sendMessage" | "sendRichMessage")
+                && c.chat() == Some(CLIENT)
+                && c.contains("10.30")
         })
         .await;
     bot.stop().await;

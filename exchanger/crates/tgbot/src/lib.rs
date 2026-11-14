@@ -181,6 +181,8 @@ impl ClientBot {
                 memory: Mutex::new(Memory::default()),
                 poll_beat: std::sync::atomic::AtomicI64::new(0),
                 poll_attempt: std::sync::atomic::AtomicI64::new(0),
+                background: Mutex::new(tokio::task::JoinSet::new()),
+                invoice_slots: Arc::new(tokio::sync::Semaphore::new(INVOICE_SLOTS)),
             }),
         }
     }
@@ -232,7 +234,8 @@ impl ClientBot {
         let investors = tokio::spawn(invest::listen(inner.clone(), invest_updates, stop.clone()));
         let reload = tokio::spawn(emoji::watch(inner.clone(), stop.clone()));
         let broadcast = tokio::spawn(promo::run(inner.clone(), stop.clone()));
-        poll::run(inner, cancel).await;
+        poll::run(inner.clone(), cancel).await;
+        inner.finish_background().await;
         stop.cancel();
         let _ = broadcast.await;
         let _ = reload.await;
@@ -241,6 +244,38 @@ impl ClientBot {
             tracing::error!(error = %e, "order message listener crashed");
         }
         Ok(())
+    }
+}
+
+/// Сколько счетов юзербот открывает одновременно в фоне.
+const INVOICE_SLOTS: usize = 4;
+
+impl Inner {
+    /// Запустить работу в фоне: опрос Telegram её не ждёт (шаг 2.9, находка Н-7). При остановке
+    /// бот дожидается её до `shutdown_grace`.
+    pub(crate) fn spawn_background(
+        &self,
+        task: impl std::future::Future<Output = ()> + Send + 'static,
+    ) {
+        if let Ok(mut set) = self.background.lock() {
+            // Закончившиеся задачи — убрать, чтобы набор не рос.
+            while set.try_join_next().is_some() {}
+            set.spawn(task);
+        }
+    }
+
+    async fn finish_background(&self) {
+        let mut set = match self.background.lock() {
+            Ok(mut s) => std::mem::take(&mut *s),
+            Err(_) => return,
+        };
+        let wait = async { while set.join_next().await.is_some() {} };
+        if tokio::time::timeout(self.cfg.shutdown_grace, wait)
+            .await
+            .is_err()
+        {
+            tracing::warn!("background invoice checks did not finish before the stop");
+        }
     }
 }
 
@@ -308,6 +343,10 @@ pub(crate) struct Inner {
     /// Последний круг опроса — удачный или нет (секунды Unix): по нему сторож зависания видит,
     /// что опрос не завис, а пережидает сеть (шаг 2.7).
     poll_attempt: std::sync::atomic::AtomicI64,
+    /// Счета, которые юзербот открывает в фоне (шаг 2.9): опрос Telegram их не ждёт.
+    background: Mutex<tokio::task::JoinSet<()>>,
+    /// Сколько счетов открывается одновременно: остальные ждут своей очереди.
+    invoice_slots: Arc<tokio::sync::Semaphore>,
 }
 
 impl Inner {
