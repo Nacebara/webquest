@@ -298,12 +298,13 @@ impl Ui {
     }
 
     /// «Оплачиваю счёт CryptoBot» — шаг, как «Отправляю» у обмена.
-    pub fn invoice_paying(&self, q: &InvoiceQuote) -> Screen {
+    /// «Оплачиваю счёт». Оплата затянулась — строка «Дольше обычного» (макет B1; шаг 6.3, Д8).
+    pub fn invoice_paying(&self, q: &InvoiceQuote, slow: bool) -> Screen {
         let body = self.fill(
             &self.texts.invoice.paying,
             &[("inv_wallet", &self.wallet(q.order.direction.target()))],
         );
-        self.plain(body, Keyboard::None)
+        self.plain(self.with_slow(body, slow), Keyboard::None)
     }
 
     /// После чека, который кошелёк не принял: что случилось и что заявка ждёт дальше.

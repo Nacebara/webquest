@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO client_prefs (user_id, support_order, support_since) VALUES ($1, $2, now())\n        ON CONFLICT (user_id) DO UPDATE SET support_order = EXCLUDED.support_order,\n                                            support_since = EXCLUDED.support_since,\n                                            updated_at = now()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "159cfae7c763aeb576071584f6bb132242884034132ea620cf3ed8b36a074e4e"
+}

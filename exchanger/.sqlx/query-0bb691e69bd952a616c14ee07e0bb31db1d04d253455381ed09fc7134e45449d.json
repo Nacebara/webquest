@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT user_id, support_order, support_since AS \"since!\" FROM client_prefs\n            WHERE support_since IS NOT NULL AND support_since > $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "client_prefs",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "support_order",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "client_prefs",
+            "name": "support_order"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "since!",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "client_prefs",
+            "name": "support_since"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "0bb691e69bd952a616c14ee07e0bb31db1d04d253455381ed09fc7134e45449d"
+}

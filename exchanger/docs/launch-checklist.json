@@ -223,8 +223,8 @@
       "id": "k-3-4",
       "milestone": 6,
       "criterion": "Нет кнопок-заглушек; сроки и строки ожидания как в макете; диалог поддержки переживает перезапуск (К-3, К-4)",
-      "status": "todo",
-      "evidence": ""
+      "status": "done",
+      "evidence": "14.11, тест: «Сообщить, когда заработает» убрана (у паузы — [Обменять] [Курс], как в макете); ручная проверка — «обычно до 15 минут» (было 30); шаг дольше 2 минут — «Проверяю вручную», 20 секунд — «Дольше обычного», и для оплаты счёта (от начала оплаты); «Поддержка» и «Простой вид» — в базе (client_prefs, миграция 0007), переживают перезапуск. Тесты: tgbot orders a_step_longer_than_two_minutes_says_manual_review, a_slow_invoice_payment_reassures_then_says_manual_review, client_bot support_and_plain_view_survive_a_restart."
     },
     {
       "id": "client-audit-ui",

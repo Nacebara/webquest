@@ -1789,3 +1789,53 @@ async fn a_late_result_comes_as_a_new_message(pool: PgPool) {
         "сообщение заявки и итог — ровно два"
     );
 }
+
+/// Шаг 6.3 (К-4): «Поддержка» и «Простой вид» переживают перезапуск бота — состояние в базе.
+/// Раньше после перезапуска вопрос клиента получал подсказку «Пришлите чек…», а карточки снова
+/// шли красивым видом.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn support_and_plain_view_survive_a_restart(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot_with(true);
+    e.fake.client_writes("/terms");
+    e.fake
+        .wait_for("rich terms", |c| {
+            c.method == "sendRichMessage" && c.contains("\"plain\"")
+        })
+        .await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let message = e.fake.lock().next_message;
+    e.fake.client_presses(message, "plain");
+    e.fake
+        .wait_for("plain edit", |c| {
+            c.method == "editMessageText" && c.message_id() == Some(message)
+        })
+        .await;
+    e.fake.client_presses(message, "support");
+    e.fake
+        .wait_for("support screen", |c| c.contains("Напишите вопрос"))
+        .await;
+    bot.stop().await;
+
+    // Перезапуск: новая память, та же база.
+    let bot = e.start_bot_with(true);
+    e.fake.client_writes("чек не пришёл уже 10 минут");
+    let answer = e
+        .fake
+        .wait_for("support answer", |c| {
+            c.method == "sendMessage" && c.contains("передать вопрос")
+        })
+        .await;
+    assert!(!answer.contains("Пришлите чек"), "{}", answer.body);
+    e.fake.client_writes("/terms");
+    let terms = e
+        .fake
+        .wait_for("terms after restart", |c| {
+            (c.method == "sendMessage" || c.method == "sendRichMessage")
+                && c.contains("Курс")
+                && c.contains("\"rich\"")
+        })
+        .await;
+    assert_eq!(terms.method, "sendMessage", "простой вид после перезапуска");
+    bot.stop().await;
+}

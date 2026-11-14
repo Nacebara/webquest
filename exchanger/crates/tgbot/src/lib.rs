@@ -75,7 +75,8 @@ pub struct ClientBotConfig {
     pub support_contact: Option<String>,
     /// `@username` аккаунта, к которому можно привязать чек (экран условий, ошибка E05).
     pub bind_username: Option<String>,
-    /// За сколько оператор обещает разобрать заявку на ручной проверке (SPEC §7: 30 мин).
+    /// За сколько оператор обещает разобрать заявку на ручной проверке: «Обычно до 15 минут»
+    /// (утверждённый макет «Ручная проверка»; шаг 6.3, К-4; раньше было 30 по SPEC §7).
     pub manual_review_sla: Duration,
     /// Сообщения заявок, закончившихся за это время, сверяются с состоянием после рестарта.
     pub resync_window: Duration,
@@ -107,7 +108,7 @@ impl Default for ClientBotConfig {
             poll_timeout_secs: 30,
             support_contact: None,
             bind_username: None,
-            manual_review_sla: Duration::from_secs(30 * 60),
+            manual_review_sla: Duration::from_secs(15 * 60),
             resync_window: Duration::from_secs(24 * 3600),
             sweep_interval: Duration::from_secs(5 * 60),
             reserve_safety: Decimal::ZERO,
@@ -279,7 +280,8 @@ impl Inner {
     }
 }
 
-/// Что бот помнит в памяти между обновлениями (не переживает рестарт — и не должно).
+/// Что бот помнит в памяти между обновлениями. Не переживает рестарт — кроме «Простого вида» и
+/// ожидания вопроса в поддержку: они ещё и в базе (`client_prefs`, шаг 6.3) и читаются при запуске.
 #[derive(Default)]
 pub(crate) struct Memory {
     /// Клиенты, которые попросили простой вид вместо rich.
@@ -373,7 +375,61 @@ impl Inner {
     }
 
     /// Имя бота (для `/cmd@bot`) и меню команд. Сбой не мешает работать.
+    /// «Простой вид» и «Поддержка нажата» — из базы в память (шаг 6.3, К-4).
+    async fn load_client_prefs(&self) {
+        let since =
+            chrono::Utc::now() - chrono::Duration::from_std(SUPPORT_WAIT).unwrap_or_default();
+        let saved = match self.pool.acquire().await {
+            Ok(mut conn) => storage::client_prefs::load(&mut conn, since).await,
+            Err(e) => Err(e.into()),
+        };
+        let saved = match saved {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(error = %e, "client preferences not loaded");
+                return;
+            }
+        };
+        let now = chrono::Utc::now();
+        self.memory(|m| {
+            m.plain_view.extend(saved.plain_view.iter().copied());
+            for (user, order, at) in &saved.support_waits {
+                let age = (now - *at).to_std().unwrap_or_default();
+                let since = Instant::now().checked_sub(age).unwrap_or_else(Instant::now);
+                m.support_wait.insert(*user, (order.clone(), since));
+            }
+        });
+    }
+
+    /// Записать «Простой вид» в базу. Не записалось — не беда: в памяти он есть.
+    pub(crate) async fn save_plain_view(&self, user: i64, plain: bool) {
+        let saved = match self.pool.acquire().await {
+            Ok(mut conn) => storage::client_prefs::set_plain_view(&mut conn, user, plain).await,
+            Err(e) => Err(e.into()),
+        };
+        if let Err(e) = saved {
+            tracing::warn!(error = %e, "plain view not saved");
+        }
+    }
+
+    /// Записать ожидание вопроса в поддержку (`Some`) или снять его (`None`).
+    pub(crate) async fn save_support_wait(&self, user: i64, wait: Option<Option<String>>) {
+        let saved = match self.pool.acquire().await {
+            Ok(mut conn) => match &wait {
+                Some(order) => {
+                    storage::client_prefs::set_support_wait(&mut conn, user, order.as_deref()).await
+                }
+                None => storage::client_prefs::clear_support_wait(&mut conn, user).await,
+            },
+            Err(e) => Err(e.into()),
+        };
+        if let Err(e) = saved {
+            tracing::warn!(error = %e, "support wait not saved");
+        }
+    }
+
     async fn startup(&self) {
+        self.load_client_prefs().await;
         match self.api.bot().get_me().await {
             Ok(me) => {
                 if let Some(name) = me.username {

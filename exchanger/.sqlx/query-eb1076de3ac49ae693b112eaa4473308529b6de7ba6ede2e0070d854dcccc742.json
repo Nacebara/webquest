@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO client_prefs (user_id, plain_view) VALUES ($1, $2)\n        ON CONFLICT (user_id) DO UPDATE SET plain_view = EXCLUDED.plain_view, updated_at = now()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "eb1076de3ac49ae693b112eaa4473308529b6de7ba6ede2e0070d854dcccc742"
+}

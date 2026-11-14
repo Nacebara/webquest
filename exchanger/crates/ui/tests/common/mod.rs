@@ -559,7 +559,10 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
             "invoice_underpaid",
             ui.invoice_underpaid(&quote(None, false), &usdt(dec!(8)), &usdt(dec!(2.3))),
         ),
-        ("invoice_paying", ui.invoice_paying(&quote(None, false))),
+        (
+            "invoice_paying",
+            ui.invoice_paying(&quote(None, false), false),
+        ),
         (
             "invoice_paid",
             ui.invoice_paid(&quote(None, false), None, None, at(12, 40)),

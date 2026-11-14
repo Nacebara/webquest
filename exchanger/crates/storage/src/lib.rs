@@ -14,6 +14,7 @@ pub mod admin;
 pub mod alerts;
 pub mod audit;
 pub mod client;
+pub mod client_prefs;
 pub mod directions;
 pub mod error;
 pub mod holds;

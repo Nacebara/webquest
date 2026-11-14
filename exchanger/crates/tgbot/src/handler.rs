@@ -338,11 +338,14 @@ impl Inner {
             }
             MenuAction::History => self.history(chat, user, 0).await,
             MenuAction::Support => {
-                self.memory(|m| {
+                let order = self.memory(|m| {
                     m.support_wait
                         .entry(user)
-                        .or_insert((None, std::time::Instant::now()));
+                        .or_insert((None, std::time::Instant::now()))
+                        .0
+                        .clone()
                 });
+                self.save_support_wait(user, Some(order)).await;
                 self.reply(
                     chat,
                     &self.ui().support(self.cfg.support_contact.as_deref()),
@@ -530,6 +533,9 @@ async fn message_update(
                 .filter(|(_, since)| since.elapsed() < crate::SUPPORT_WAIT)
                 .map(|(order, _)| order)
         });
+        if waiting.is_some() {
+            inner.save_support_wait(from.id, None).await;
+        }
         if let Some(order) = waiting
             && !text.trim().is_empty()
         {
@@ -626,6 +632,7 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
                 m.support_wait
                     .insert(user, (order.clone(), std::time::Instant::now()))
             });
+            inner.save_support_wait(user, Some(order.clone())).await;
             inner.menu(chat, user, MenuAction::Support).await
         }
         Callback::Cancel(None) => {
@@ -698,6 +705,9 @@ async fn switch_view(
         };
         message.and_then(|msg| m.rich_sent.get(&(chat, msg.message_id)).cloned())
     });
+    inner
+        .save_plain_view(user, matches!(view, View::Plain))
+        .await;
     let (Some(screen), Some(message)) = (screen, message) else {
         return Ok(());
     };

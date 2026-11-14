@@ -62,6 +62,10 @@ pub(crate) struct RenderCfg<'a> {
 /// Через сколько секунд от начала заявки шаг считается долгим (макет B1: 20 секунд).
 pub(crate) const SLOW_AFTER: std::time::Duration = std::time::Duration::from_secs(20);
 
+/// Через сколько от начала заявки незаконченный шаг показывается «Проверяю вручную» (макет
+/// «Дольше обычного»: «через 2 минуты — "проверяю вручную"»; шаг 6.3, К-4).
+pub(crate) const MANUAL_AFTER: std::time::Duration = std::time::Duration::from_secs(2 * 60);
+
 /// Итог позже этого после отправки сообщения заявки — новым сообщением (правило макета:
 /// «если прошло больше минуты — итог новым сообщением, чтобы пришло уведомление»; шаг 6.1).
 pub(crate) const LATE_AFTER: std::time::Duration = std::time::Duration::from_secs(60);
@@ -242,7 +246,18 @@ fn render_invoice(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Extra)
             }
             None => ui.invoice_quote(&q, cfg.now),
         }),
-        OrderState::Received | OrderState::InvoicePayPending => Some(ui.invoice_paying(&q)),
+        // Оплата счёта: время — от начала оплаты (чек клиента пришёл), а не от заявки: до чека
+        // счёт мог ждать клиента много минут. Через 20 секунд — «Дольше обычного», через 2 минуты
+        // — «Проверяю вручную» (шаг 6.3, Д8).
+        OrderState::Received | OrderState::InvoicePayPending => {
+            let paying = cfg.now - view.state_since;
+            if paying >= chrono::Duration::from_std(MANUAL_AFTER).unwrap_or_default() {
+                Some(ui.manual_review(&q.order, got.as_ref(), cfg.sla.num_minutes()))
+            } else {
+                let slow = paying >= chrono::Duration::from_std(SLOW_AFTER).unwrap_or_default();
+                Some(ui.invoice_paying(&q, slow))
+            }
+        }
         OrderState::Completed => {
             let excess = got
                 .map(|g| g.amount() - q.to_pay.amount())
@@ -283,6 +298,20 @@ pub(crate) fn render(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Ext
     let slow =
         cfg.now - view.created_at >= chrono::Duration::from_std(SLOW_AFTER).unwrap_or_default();
     let intake = money(view, view.intake_amount);
+    let manual =
+        cfg.now - view.created_at >= chrono::Duration::from_std(MANUAL_AFTER).unwrap_or_default();
+    if manual
+        && matches!(
+            view.state,
+            OrderState::New
+                | OrderState::IntakePending
+                | OrderState::IntakeUnknown
+                | OrderState::Received
+                | OrderState::PayoutPending
+        )
+    {
+        return ui.manual_review(&order, intake.as_ref(), cfg.sla.num_minutes());
+    }
     match view.state {
         OrderState::New | OrderState::IntakePending | OrderState::IntakeUnknown => {
             ui.order_checking(&order, intake.as_ref(), slow)
@@ -557,6 +586,16 @@ pub(crate) async fn ensure_message(
             {
                 Ok(Edited::Done | Edited::NotModified) => {
                     inner.remember_rendered(&view, digest);
+                    // Оплата счёта началась: «Дольше обычного» и «Проверяю вручную» — по таймеру
+                    // от начала оплаты (у обмена таймеры ставит первое сообщение заявки).
+                    if view.direction.flow() == Flow::InvoicePayment
+                        && matches!(
+                            view.state,
+                            OrderState::Received | OrderState::InvoicePayPending
+                        )
+                    {
+                        schedule_refreshes(inner, order_id);
+                    }
                     tracing::debug!(
                         order = order_id,
                         state = view.state.as_db_str(),
@@ -585,18 +624,27 @@ pub(crate) async fn ensure_message(
             inner
                 .send_progress(&view, view.user_id, &screen, digest)
                 .await?;
-            // Шаг затянется — то же сообщение получит «Дольше обычного» (макет B1).
+            // Шаг затянется — то же сообщение получит «Дольше обычного», а через 2 минуты —
+            // «Проверяю вручную» (макет B1, «Дольше обычного»).
             if !view.state.is_terminal() {
-                let inner = inner.clone();
-                tokio::spawn(async move {
-                    tokio::time::sleep(SLOW_AFTER + std::time::Duration::from_secs(1)).await;
-                    if let Err(e) = refresh(inner, order_id).await {
-                        tracing::debug!(order = order_id, error = %e, "slow-step refresh failed");
-                    }
-                });
+                schedule_refreshes(inner, order_id);
             }
             Ok(())
         }
+    }
+}
+
+/// Перерисовать сообщение заявки через [`SLOW_AFTER`] и [`MANUAL_AFTER`]: шаг мог затянуться.
+/// Лишняя перерисовка ничего не меняет — одинаковый экран не правится.
+fn schedule_refreshes(inner: &Arc<Inner>, order_id: i64) {
+    for after in [SLOW_AFTER, MANUAL_AFTER] {
+        let inner = inner.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(after + std::time::Duration::from_secs(1)).await;
+            if let Err(e) = refresh(inner, order_id).await {
+                tracing::debug!(order = order_id, error = %e, "slow-step refresh failed");
+            }
+        });
     }
 }
 
@@ -848,10 +896,14 @@ mod tests {
         );
         assert!(html(&screen).contains("Жду чек"), "{}", screen.html);
 
+        // Оплата только началась (через 2 минуты — «Проверяю вручную», тест ниже).
         let paying = render(
             &ui,
             &cfg(),
-            &invoice_view(OrderState::InvoicePayPending),
+            &OrderView {
+                state_since: Utc::now(),
+                ..invoice_view(OrderState::InvoicePayPending)
+            },
             &extra,
         );
         assert!(html(&paying).contains("Оплачиваю счёт"), "{}", paying.html);
@@ -883,7 +935,7 @@ mod tests {
 
     fn cfg() -> RenderCfg<'static> {
         RenderCfg {
-            sla: chrono::Duration::minutes(30),
+            sla: chrono::Duration::minutes(15),
             bind_username: None,
             details: false,
             now: Utc::now(),
@@ -1023,6 +1075,76 @@ mod tests {
         assert!(html(&screen).contains("1.50 USDT"), "{}", screen.html);
     }
 
+    /// Шаг 6.3 (К-4, макет «Дольше обычного»): через 20 секунд — строка-успокоение, через
+    /// 2 минуты — «Проверяю вручную»; срок — «Обычно до 15 минут».
+    #[test]
+    fn a_step_longer_than_two_minutes_says_manual_review() {
+        let ui = ui();
+        let v = view(OrderState::PayoutPending);
+        let at = |secs| RenderCfg {
+            sla: chrono::Duration::from_std(crate::ClientBotConfig::default().manual_review_sla)
+                .unwrap(),
+            bind_username: None,
+            details: false,
+            now: v.created_at + chrono::Duration::seconds(secs),
+        };
+        let early = render(&ui, &at(10), &v, &Extra::default());
+        assert!(html(&early).contains("Отправляю"), "{}", early.html);
+        assert!(!html(&early).contains("Дольше обычного"), "{}", early.html);
+        let slow = render(&ui, &at(30), &v, &Extra::default());
+        assert!(html(&slow).contains("Дольше обычного"), "{}", slow.html);
+        let manual = render(&ui, &at(130), &v, &Extra::default());
+        assert!(
+            html(&manual).contains("Проверяю вручную"),
+            "{}",
+            manual.html
+        );
+        assert!(html(&manual).contains("100.00 USDT"), "{}", manual.html);
+        assert!(
+            html(&manual).contains("Обычно до 15 минут"),
+            "{}",
+            manual.html
+        );
+        // Неясный приём — тот же экран, без суммы.
+        let mut unknown = view(OrderState::IntakeUnknown);
+        unknown.intake_amount = None;
+        let u = render(&ui, &at(130), &unknown, &Extra::default());
+        assert!(html(&u).contains("Проверяю вручную"), "{}", u.html);
+        // Итог — не «вручную», сколько бы ни прошло.
+        let done = render(
+            &ui,
+            &at(600),
+            &view(OrderState::Completed),
+            &Extra::default(),
+        );
+        assert!(!html(&done).contains("Проверяю вручную"), "{}", done.html);
+    }
+
+    /// Шаг 6.3 (Д8): оплата счёта — «Дольше обычного» через 20 секунд и «Проверяю вручную»
+    /// через 2 минуты от начала оплаты.
+    #[test]
+    fn a_slow_invoice_payment_reassures_then_says_manual_review() {
+        let ui = ui();
+        let mut v = invoice_view(OrderState::InvoicePayPending);
+        v.intake_amount = Some(dec!(10.30));
+        let at = |secs| RenderCfg {
+            sla: chrono::Duration::minutes(15),
+            bind_username: None,
+            details: false,
+            now: v.state_since + chrono::Duration::seconds(secs),
+        };
+        let early = render(&ui, &at(5), &v, &Extra::default());
+        assert!(!html(&early).contains("Дольше обычного"), "{}", early.html);
+        let slow = render(&ui, &at(30), &v, &Extra::default());
+        assert!(html(&slow).contains("Дольше обычного"), "{}", slow.html);
+        let manual = render(&ui, &at(130), &v, &Extra::default());
+        assert!(
+            html(&manual).contains("Проверяю вручную"),
+            "{}",
+            manual.html
+        );
+    }
+
     #[test]
     fn manual_review_promises_sla_and_says_where_money_is() {
         let ui = ui();
@@ -1033,9 +1155,9 @@ mod tests {
             &Extra::default(),
         );
         assert!(html(&known).contains("100.00 USDT"), "{}", known.html);
-        // Макет B1: «Обычно до 30 минут» — срок из настройки, без часов на циферблате.
+        // Макет «Ручная проверка»: «Обычно до 15 минут» — срок из настройки (шаг 6.3).
         assert!(
-            html(&known).contains("Обычно до 30 минут"),
+            html(&known).contains("Обычно до 15 минут"),
             "{}",
             known.html
         );

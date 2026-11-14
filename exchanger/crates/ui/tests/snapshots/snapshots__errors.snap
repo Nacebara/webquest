@@ -218,7 +218,6 @@ expression: errors.trim_end()
 ⏸ <b>CryptoBot → xRocket на паузе</b>
 Чек не открывал — деньги в нём. Нажмите кнопку — напишу, когда заработает.
 --- keyboard: inline
-[{"callback_data":"notify:cb_to_xr_check","text":"🔔 Сообщить, когда заработает"}]
 [{"callback_data":"exchange","text":"💱 Обменять"},{"callback_data":"terms","text":"📈 Курс"}]
 
 ### premium
@@ -226,7 +225,6 @@ expression: errors.trim_end()
 <tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> <b>CryptoBot → xRocket на паузе</b>
 Чек не открывал — деньги в нём. Нажмите кнопку — напишу, когда заработает.
 --- keyboard: inline
-[{"callback_data":"notify:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000018","text":"Сообщить, когда заработает"}]
 [{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","text":"Обменять"},{"callback_data":"terms","icon_custom_emoji_id":"5368000000000000015","text":"Курс"}]
 
 ## paused_until
@@ -235,7 +233,6 @@ expression: errors.trim_end()
 ⏸ <b>xRocket → CryptoBot на паузе</b>
 Чек не открывал — деньги в нём. Пришлите его после <tg-time unix="1791381600" format="t">17:00 МСК</tg-time>.
 --- keyboard: inline
-[{"callback_data":"notify:xr_to_cb_check","text":"🔔 Сообщить, когда заработает"}]
 [{"callback_data":"exchange","text":"💱 Обменять"},{"callback_data":"terms","text":"📈 Курс"}]
 
 ### premium
@@ -243,7 +240,6 @@ expression: errors.trim_end()
 <tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> <b>xRocket → CryptoBot на паузе</b>
 Чек не открывал — деньги в нём. Пришлите его после <tg-time unix="1791381600" format="t">17:00 МСК</tg-time>.
 --- keyboard: inline
-[{"callback_data":"notify:xr_to_cb_check","icon_custom_emoji_id":"5368000000000000018","text":"Сообщить, когда заработает"}]
 [{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","text":"Обменять"},{"callback_data":"terms","icon_custom_emoji_id":"5368000000000000015","text":"Курс"}]
 
 ## no_reserve

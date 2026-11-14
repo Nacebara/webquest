@@ -219,26 +219,16 @@ impl Ui {
                     ),
                     None => self.fill(&e.paused, &[("direction", &name)]),
                 };
-                // Макет «Лимит и пауза»: что можно сейчас — [Обменять] [Курс].
-                let keyboard = Keyboard::inline_rows(vec![
-                    vec![self.cb_button(
-                        Some(Emoji::Bell),
-                        &b.notify,
-                        &Callback::Notify(*direction),
-                    )],
-                    vec![
-                        self.cb_button(
-                            Some(Emoji::Exchange),
-                            &self.texts.menu.exchange,
-                            &Callback::Exchange,
-                        ),
-                        self.cb_button(
-                            Some(Emoji::Rates),
-                            &self.texts.menu.rates,
-                            &Callback::Terms,
-                        ),
-                    ],
-                ]);
+                // Макет «Лимит и пауза»: что можно сейчас — [Обменять] [Курс]. «Сообщить, когда
+                // заработает» убрана (шаг 6.3, К-3): подписки нет, кнопка ничего не делала.
+                let keyboard = Keyboard::inline_rows(vec![vec![
+                    self.cb_button(
+                        Some(Emoji::Exchange),
+                        &self.texts.menu.exchange,
+                        &Callback::Exchange,
+                    ),
+                    self.cb_button(Some(Emoji::Rates), &self.texts.menu.rates, &Callback::Terms),
+                ]]);
                 (body, keyboard)
             }
             UiError::NoReserve { max } => (
