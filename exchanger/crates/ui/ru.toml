@@ -86,6 +86,8 @@ howto = "Как создать чек"
 instruction = "Инструкция"
 refund_amount = "Вернуть {amount}"
 another_invoice = "Ещё счёт"
+# Под отказом по счёту (макет «Счёт не подошёл», принят 13–14.11).
+other_invoice = "Другой счёт"
 cancel = "Отмена"
 back = "Назад"
 copy_order = "Номер заявки"

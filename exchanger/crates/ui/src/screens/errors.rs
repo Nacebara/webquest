@@ -8,11 +8,22 @@ use crate::fmt::TimeFormat;
 use crate::html::{Frag, clip};
 use crate::model::{InvoiceProblem, InvoiceRefusal, UiError};
 use crate::screen::{Keyboard, Screen};
-use domain::Decimal;
+use domain::{Decimal, Direction};
 
 /// Сколько символов чужого текста (имя бота, причина бана) показываем.
 const FOREIGN_MAX_CHARS: usize = 64;
 const REASON_MAX_CHARS: usize = 200;
+
+/// Кнопка под ошибкой.
+#[derive(Debug, Clone, Copy)]
+enum ErrKey {
+    HowTo,
+    Support,
+    Rates,
+    History,
+    PayInvoice,
+    OtherInvoice,
+}
 
 impl Ui {
     fn invoice_problem(&self, problem: InvoiceProblem) -> &str {
@@ -48,7 +59,44 @@ impl Ui {
         }
     }
 
-    /// Экран ошибки или отказа. Обычный HTML: это часть денежного потока.
+    /// Кнопки под ошибками (шаг 6.2, макет принят 14.11): следующий шаг по смыслу. Подписи —
+    /// как в утверждённых макетах («Как создать чек», «Курс», «История», «Оплатить счёт»).
+    fn err_keys(&self, keys: &[ErrKey]) -> Keyboard {
+        let b = &self.texts.buttons;
+        let m = &self.texts.menu;
+        let row = keys
+            .iter()
+            .map(|k| match k {
+                ErrKey::HowTo => self.cb_button(
+                    Some(Emoji::Help),
+                    &b.howto,
+                    &Callback::HowTo(Direction::CbToXrCheck),
+                ),
+                ErrKey::Support => {
+                    self.cb_button(Some(Emoji::Support), &b.support, &Callback::Support(None))
+                }
+                ErrKey::Rates => self.cb_button(Some(Emoji::Rates), &m.rates, &Callback::Terms),
+                ErrKey::History => self.cb_button(
+                    Some(Emoji::History),
+                    &m.history,
+                    &Callback::History { page: 0 },
+                ),
+                ErrKey::PayInvoice => {
+                    self.cb_button(Some(Emoji::Invoice), &m.pay_invoice, &Callback::PayInvoice)
+                }
+                ErrKey::OtherInvoice => self.cb_button(
+                    Some(Emoji::Invoice),
+                    &b.other_invoice,
+                    &Callback::PayInvoice,
+                ),
+            })
+            .collect();
+        Keyboard::inline_rows(vec![row])
+    }
+
+    /// Экран ошибки или отказа. Обычный HTML: это часть денежного потока. Под каждой — кнопка
+    /// по смыслу; без кнопки — только те, где остаётся подождать: обслуживание (так в
+    /// утверждённом макете), «слишком много заявок», «ещё проверяю прошлый чек».
     pub fn error(&self, error: &UiError) -> Screen {
         let e = &self.texts.errors;
         let b = &self.texts.buttons;
@@ -61,16 +109,19 @@ impl Ui {
                         ("xr", &Frag::code("t.me/xrocket?start=t_…")),
                     ],
                 ),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::HowTo, ErrKey::Support]),
             ),
             UiError::ForeignBot { bot } => (
                 self.fill(
                     &e.foreign_bot,
                     &[("bot", &Frag::code(&clip(bot, FOREIGN_MAX_CHARS)))],
                 ),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::HowTo, ErrKey::Support]),
             ),
-            UiError::Testnet => (self.fill(&e.testnet, &[]), Keyboard::None),
+            UiError::Testnet => (
+                self.fill(&e.testnet, &[]),
+                self.err_keys(&[ErrKey::HowTo, ErrKey::Support]),
+            ),
             UiError::AlreadyActivated => (
                 self.fill(&e.already_activated, &[]),
                 Keyboard::inline_rows(vec![vec![self.cb_button(
@@ -79,7 +130,10 @@ impl Ui {
                     &Callback::Support(None),
                 )]]),
             ),
-            UiError::NotFound => (self.fill(&e.not_found, &[]), Keyboard::None),
+            UiError::NotFound => (
+                self.fill(&e.not_found, &[]),
+                self.err_keys(&[ErrKey::HowTo, ErrKey::Support]),
+            ),
             UiError::NotForUs { bind_username } => {
                 let name = bind_username
                     .as_deref()
@@ -92,12 +146,24 @@ impl Ui {
                     ),
                     None => self.fill(&e.not_for_us, &[]),
                 };
-                (body, Keyboard::None)
+                (body, self.err_keys(&[ErrKey::HowTo]))
             }
-            UiError::PremiumOnly => (self.fill(&e.premium_only, &[]), Keyboard::None),
-            UiError::NeedsSubscription => (self.fill(&e.subscription, &[]), Keyboard::None),
-            UiError::Captcha => (self.fill(&e.captcha, &[]), Keyboard::None),
-            UiError::PasswordProtected => (self.fill(&e.password, &[]), Keyboard::None),
+            UiError::PremiumOnly => (
+                self.fill(&e.premium_only, &[]),
+                self.err_keys(&[ErrKey::HowTo, ErrKey::Support]),
+            ),
+            UiError::NeedsSubscription => (
+                self.fill(&e.subscription, &[]),
+                self.err_keys(&[ErrKey::HowTo, ErrKey::Support]),
+            ),
+            UiError::Captcha => (
+                self.fill(&e.captcha, &[]),
+                self.err_keys(&[ErrKey::HowTo, ErrKey::Support]),
+            ),
+            UiError::PasswordProtected => (
+                self.fill(&e.password, &[]),
+                self.err_keys(&[ErrKey::HowTo, ErrKey::Support]),
+            ),
             UiError::MultiCheck => {
                 // Макет: «Пришлите обычный: @xrocket 100» и та же команда на кнопке-копии.
                 let cmd = super::inline_command(domain::Platform::XRocket, Decimal::ONE_HUNDRED);
@@ -106,7 +172,11 @@ impl Ui {
                     Keyboard::inline_rows(vec![vec![self.copy_button(&cmd, &cmd)]]),
                 )
             }
-            UiError::CheckUsed => (self.fill(&e.check_used, &[]), Keyboard::None),
+            // «Если вы сами уже меняли этот чек — итог в сообщении той заявки» → «История».
+            UiError::CheckUsed => (
+                self.fill(&e.check_used, &[]),
+                self.err_keys(&[ErrKey::History]),
+            ),
             UiError::BelowMinimum {
                 amount_in,
                 min,
@@ -120,7 +190,7 @@ impl Ui {
                         ("src", &self.wallet(*source)),
                     ],
                 ),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::Rates]),
             ),
             UiError::AboveMaximum {
                 amount_in,
@@ -135,7 +205,7 @@ impl Ui {
                         ("src", &self.wallet(*source)),
                     ],
                 ),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::Rates]),
             ),
             UiError::DirectionPaused { direction, until } => {
                 let name = self.direction_name(*direction);
@@ -173,7 +243,7 @@ impl Ui {
             }
             UiError::NoReserve { max } => (
                 self.fill(&e.no_reserve, &[("max", &self.money(max))]),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::Rates]),
             ),
             UiError::Maintenance { until } => {
                 let body = match until {
@@ -185,7 +255,11 @@ impl Ui {
                 };
                 (body, Keyboard::None)
             }
-            UiError::DailyLimit => (self.fill(&e.daily_limit, &[]), Keyboard::None),
+            // Владелец 14.11, вариант А: с кнопкой «Курс» — не тупик.
+            UiError::DailyLimit => (
+                self.fill(&e.daily_limit, &[]),
+                self.err_keys(&[ErrKey::Rates]),
+            ),
             UiError::RateLimited { retry_after_secs } => (
                 self.fill(
                     &e.rate_limited,
@@ -205,7 +279,7 @@ impl Ui {
                     ),
                     None => self.fill(&e.banned, &[("reason", &reason)]),
                 };
-                (body, Keyboard::None)
+                (body, self.err_keys(&[ErrKey::Support]))
             }
             UiError::Duplicate { order } => {
                 let keyboard = if crate::callback::order_id_ok(order) {
@@ -215,7 +289,7 @@ impl Ui {
                         &Callback::Order(order.clone()),
                     )]])
                 } else {
-                    Keyboard::None
+                    self.err_keys(&[ErrKey::History])
                 };
                 (
                     self.fill(&e.duplicate, &[("order", &self.order_id(&clip(order, 32)))]),
@@ -227,7 +301,7 @@ impl Ui {
                     &e.invoice_unsuitable,
                     &[("why", &self.fill(self.invoice_problem(*problem), &[]))],
                 ),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::OtherInvoice, ErrKey::Support]),
             ),
             UiError::PayoutDelayed { order, payout } => (
                 self.fill(
@@ -248,29 +322,29 @@ impl Ui {
                         ("src", &self.wallet(*source)),
                     ],
                 ),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::Support]),
             ),
             UiError::InvoicePaidElsewhere { to_pay, source } => (
                 self.fill(
                     &e.invoice_paid_elsewhere,
                     &[("x", &self.money(to_pay)), ("src", &self.wallet(*source))],
                 ),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::Support]),
             ),
             UiError::RateMoved { to_pay, source } => (
                 self.fill(
                     &e.rate_moved,
                     &[("x", &self.money(to_pay)), ("src", &self.wallet(*source))],
                 ),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::PayInvoice]),
             ),
             UiError::InvoiceInWork { order } => (
                 self.fill(&e.invoice_in_work, &[("order", &self.order_id(order))]),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::History]),
             ),
             UiError::InvoicePending { order } => (
                 self.fill(&e.invoice_pending, &[("order", &self.order_id(order))]),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::History]),
             ),
             UiError::InvoiceCheckBusy => (self.fill(&e.invoice_check_busy, &[]), Keyboard::None),
             UiError::InvoiceRefused(InvoiceRefusal::Paused) => (
@@ -289,10 +363,16 @@ impl Ui {
                     &e.invoice_refused,
                     &[("why", &self.invoice_refusal(refusal))],
                 ),
-                Keyboard::None,
+                self.err_keys(&[ErrKey::OtherInvoice, ErrKey::Support]),
             ),
-            UiError::QuoteExpired => (self.fill(&e.quote_expired, &[]), Keyboard::None),
-            UiError::Internal => (self.fill(&e.internal, &[]), Keyboard::None),
+            UiError::QuoteExpired => (
+                self.fill(&e.quote_expired, &[]),
+                self.err_keys(&[ErrKey::PayInvoice]),
+            ),
+            UiError::Internal => (
+                self.fill(&e.internal, &[]),
+                self.err_keys(&[ErrKey::Support]),
+            ),
         };
         self.plain(body, keyboard)
     }

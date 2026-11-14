@@ -164,6 +164,7 @@ pub struct ButtonTexts {
     pub cb_to_xr: String,
     pub xr_to_cb: String,
     pub howto: String,
+    pub other_invoice: String,
     pub cancel: String,
     pub back: String,
     pub copy_order: String,
