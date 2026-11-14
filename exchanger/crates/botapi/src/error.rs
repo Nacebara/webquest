@@ -83,6 +83,14 @@ impl Error {
         }
     }
 
+    /// Telegram не разрешает этому боту виджеты (`INPUT_MEDIA_WIDGET_NOT_ALLOWED`; вживую
+    /// 14.11.2026 на @fexchbot — даже на виджет из одной строки). Тогда экран показывается
+    /// обычной карточкой: подпись и кнопки виджета достаточны и без него.
+    pub fn widget_not_allowed(&self) -> bool {
+        self.description()
+            .is_some_and(|d| d.contains("WIDGET_NOT_ALLOWED"))
+    }
+
     /// Сколько ждать перед повтором (429 Too Many Requests). Клиент сам не ждёт: решает
     /// вызывающий (очередь отправки с лимитом на чат).
     pub fn retry_after(&self) -> Option<Duration> {

@@ -419,6 +419,10 @@ impl tgbot::UpdateHook for DemoHook {
                 ops::preview::send_panel_preview(&self.api, &self.look, m.chat.id).await;
                 return true;
             }
+            if text == "/preview_widgets" {
+                ops::preview::send_widget_preview(&self.api, &self.look, m.chat.id).await;
+                return true;
+            }
             if text == "/preview" {
                 self.preview(m.chat.id).await;
                 return true;

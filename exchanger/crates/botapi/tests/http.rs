@@ -454,5 +454,22 @@ async fn replacing_a_window_sends_first_and_deletes_after() {
         .replace_message(501, 89, api.send_widget(&SendWidget::new(501, "w")))
         .await;
     assert!(failed.is_err());
+    assert!(!failed.unwrap_err().widget_not_allowed());
     assert_eq!(server.await.unwrap().len(), 1, "старое окно не удалено");
+}
+
+/// Вживую 14.11: Telegram отвечает `INPUT_MEDIA_WIDGET_NOT_ALLOWED`, если виджеты боту не
+/// разрешены, — это узнаваемо, и экран показывается карточкой.
+#[tokio::test]
+async fn widgets_not_allowed_is_recognised() {
+    let (base, _server) = serve(vec![status(
+        400,
+        r#"{"ok":false,"error_code":400,"description":"Bad Request: INPUT_MEDIA_WIDGET_NOT_ALLOWED"}"#,
+    )])
+    .await;
+    let e = client(&base)
+        .send_widget(&SendWidget::new(501, "<div>проба</div>"))
+        .await
+        .unwrap_err();
+    assert!(e.widget_not_allowed(), "{e}");
 }

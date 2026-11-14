@@ -4,7 +4,8 @@
 
 use std::time::Duration;
 
-use botapi::{BotApi, SendMessage};
+use botapi::{BotApi, SendMessage, SendWidget};
+use ui::widgets::WidgetKind;
 
 use crate::Look;
 
@@ -13,6 +14,207 @@ use crate::Look;
 pub async fn send_preview(api: &BotApi, look: &Look, chat: i64) {
     send_client_preview(api, look, chat, None).await;
     send_panel_preview(api, look, chat).await;
+    send_widget_preview(api, look, chat).await;
+}
+
+/// Данные макетов виджетов, принятых владельцем 13–14 ноября: подпись, кнопки и состояние.
+const WIDGET_SAMPLES: &str = include_str!("../../../docs/mockups/widgets/samples.json");
+
+/// Виджет на данных макета — для «Предпросмотра» (шаг 6.7).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct WidgetSample {
+    pub kind: WidgetKind,
+    /// Подпись с токенами пульта `{e:…}` / `{m:…}`.
+    pub caption: String,
+    /// Кнопки: стиль, значок (`c:wait` — цветной), подпись.
+    pub keys: Vec<Vec<(String, String, String)>>,
+    /// Состояние `chat_data` (JSON).
+    pub data: String,
+}
+
+/// Токены макетов (`{cb}` — цветной значок, `{-shield}` — линейный) → токены пульта.
+fn mockup_tokens(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 16);
+    let mut rest = s;
+    while let Some(i) = rest.find('{') {
+        out.push_str(&rest[..i]);
+        let tail = &rest[i + 1..];
+        let (mono, name_from) = match tail.strip_prefix('-') {
+            Some(t) => (true, t),
+            None => (false, tail),
+        };
+        let end = name_from
+            .find(|c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'))
+            .unwrap_or(name_from.len());
+        if end > 0 && name_from[end..].starts_with('}') {
+            out.push_str(if mono { "{m:" } else { "{e:" });
+            out.push_str(&name_from[..end]);
+            out.push('}');
+            rest = &name_from[end + 1..];
+        } else {
+            out.push('{');
+            rest = tail;
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// «@-120» в макете — время относительно «сейчас» → unix-время `now − 120`.
+fn live(v: &serde_json::Value, now: i64) -> serde_json::Value {
+    use serde_json::Value;
+    match v {
+        Value::String(s) => {
+            let shift = s
+                .strip_prefix('@')
+                .filter(|t| t.len() > 1 && (t.starts_with('+') || t.starts_with('-')))
+                .and_then(|t| t.parse::<i64>().ok());
+            match shift {
+                Some(d) => Value::from(now + d),
+                None => v.clone(),
+            }
+        }
+        Value::Array(a) => Value::Array(a.iter().map(|x| live(x, now)).collect()),
+        Value::Object(o) => {
+            Value::Object(o.iter().map(|(k, x)| (k.clone(), live(x, now))).collect())
+        }
+        other => other.clone(),
+    }
+}
+
+/// Первый вид каждого утверждённого виджета из макетов — по порядку [`WidgetKind::ALL`].
+pub(crate) fn widget_samples(now: i64) -> Vec<WidgetSample> {
+    let Ok(serde_json::Value::Object(demos)) = serde_json::from_str(WIDGET_SAMPLES) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for kind in WidgetKind::ALL {
+        let state = demos.values().find_map(|d| {
+            (d.get("w").and_then(|w| w.as_str()) == Some(kind.name()))
+                .then(|| d.get("states").and_then(|s| s.as_array()))
+                .flatten()
+                .and_then(|states| states.iter().find(|s| s.get("rich").is_none()))
+        });
+        let Some(state) = state else { continue };
+        let keys = state
+            .get("keys")
+            .and_then(|k| k.as_array())
+            .map(|rows| {
+                rows.iter()
+                    .filter_map(|r| r.as_array())
+                    .map(|r| {
+                        r.iter()
+                            .filter_map(|b| b.as_array())
+                            .map(|b| {
+                                let f = |i: usize| {
+                                    b.get(i).and_then(|x| x.as_str()).unwrap_or("").to_owned()
+                                };
+                                (f(0), f(1), mockup_tokens(&f(2)))
+                            })
+                            .collect()
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        out.push(WidgetSample {
+            kind,
+            caption: mockup_tokens(state.get("caption").and_then(|c| c.as_str()).unwrap_or("")),
+            keys,
+            data: state
+                .get("data")
+                .map(|d| live(d, now).to_string())
+                .unwrap_or_default(),
+        });
+    }
+    out
+}
+
+impl WidgetSample {
+    /// Сообщение-виджет: «N/всего · название» и подпись макета, кнопки — примеры
+    /// ([`crate::Cb::Sample`]), значки — из набора.
+    pub(crate) fn request(&self, look: &Look, chat: i64, n: usize, total: usize) -> SendWidget {
+        let data = crate::Cb::Sample.encode();
+        let rows: Vec<Vec<botapi::InlineKeyboardButton>> = self
+            .keys
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|(style, icon, text)| {
+                        let label = match icon.strip_prefix("c:") {
+                            Some(c) => format!("{{e:{c}}} {text}"),
+                            None if icon.is_empty() => text.clone(),
+                            None => format!("{{m:{icon}}} {text}"),
+                        };
+                        let mut b = botapi::InlineKeyboardButton::callback(label, data.clone());
+                        b.style = match style.as_str() {
+                            "primary" => Some(botapi::ButtonStyle::Primary),
+                            "success" => Some(botapi::ButtonStyle::Success),
+                            "danger" => Some(botapi::ButtonStyle::Danger),
+                            _ => None,
+                        };
+                        look.button(b)
+                    })
+                    .collect()
+            })
+            .collect();
+        let caption = format!(
+            "<i>{n}/{total} · {}</i>\n{}",
+            ui::html::esc(self.kind.title()),
+            look.text(&self.caption)
+        );
+        let mut req = SendWidget::new(chat, self.kind.html())
+            .caption_html(caption)
+            .allow_queries()
+            .silent();
+        if !self.data.is_empty() {
+            req = req.chat_data(self.data.clone());
+        }
+        if !rows.is_empty() {
+            req = req.reply_markup(botapi::InlineKeyboardMarkup::new(rows));
+        }
+        req
+    }
+}
+
+/// Виджеты на данных макетов (шаг 6.7): каждый утверждённый виджет настоящим сообщением —
+/// посмотреть в своём Telegram, светлая и тёмная тема, телефон и компьютер.
+pub async fn send_widget_preview(api: &BotApi, look: &Look, chat: i64) {
+    let samples = widget_samples(chrono::Utc::now().timestamp());
+    let total = samples.len();
+    let _ = api
+        .send_message(
+            &SendMessage::html(chat, format!("<b>Виджеты</b> · данные макетов · {total}")).silent(),
+        )
+        .await;
+    for (i, sample) in samples.iter().enumerate() {
+        let req = sample.request(look, chat, i + 1, total);
+        if let Err(e) = api.send_widget(&req).await {
+            tracing::warn!(widget = sample.kind.name(), error = %e, "widget preview not sent");
+            if e.widget_not_allowed() {
+                // Остальные не пройдут тоже: одно сообщение вместо девятнадцати.
+                let _ = api
+                    .send_message(&SendMessage::html(
+                        chat,
+                        "⚠️ Telegram пока не разрешает этому боту виджеты \
+                         (<code>INPUT_MEDIA_WIDGET_NOT_ALLOWED</code>). Экраны работают и без них: \
+                         подпись и кнопки — те же.",
+                    ))
+                    .await;
+                return;
+            }
+            let _ = api
+                .send_message(&SendMessage::html(
+                    chat,
+                    format!(
+                        "⚠️ Telegram не принял виджет «{}»: {}",
+                        ui::html::esc(sample.kind.title()),
+                        ui::html::esc(&e.to_string())
+                    ),
+                ))
+                .await;
+        }
+        tokio::time::sleep(Duration::from_millis(350)).await;
+    }
 }
 
 /// Экраны клиента, у которых в названии есть `only` (без учёта регистра; `None` — все):
@@ -369,6 +571,61 @@ async fn send_card(api: &BotApi, chat: i64, screen: &crate::Screen) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Шаг 6.7: «Предпросмотр» присылает каждый утверждённый виджет на данных макета; подпись
+    /// и состояние — в лимитах Telegram, значки — токенами набора, кнопки — только примеры.
+    #[test]
+    fn preview_sends_every_widget_within_limits() {
+        let now = 1_793_877_600;
+        let samples = widget_samples(now);
+        let kinds: Vec<WidgetKind> = samples.iter().map(|s| s.kind).collect();
+        assert_eq!(
+            kinds,
+            WidgetKind::ALL.to_vec(),
+            "каждый виджет — ровно один раз"
+        );
+        let look = Look::plain();
+        for s in &samples {
+            let name = s.kind.name();
+            assert!(!s.caption.contains("{-"), "{name}: {}", s.caption);
+            assert!(
+                !s.data.contains("\"@"),
+                "{name}: время не подставлено: {}",
+                s.data
+            );
+            assert!(
+                ui::widgets::data_fits(&s.data),
+                "{name}: {} байт",
+                s.data.len()
+            );
+            let req = s.request(&look, 42, 1, samples.len());
+            let caption = req.caption.clone().unwrap_or_default();
+            assert!(
+                caption.chars().count() <= ui::widgets::CAPTION_MAX,
+                "{name}: подпись {}",
+                caption.chars().count()
+            );
+            assert!(
+                !caption.contains("{e:") && !caption.contains("{m:"),
+                "{name}: {caption}"
+            );
+            assert_eq!(req.html, s.kind.html());
+            if let Some(botapi::ReplyMarkup::Inline(m)) = &req.reply_markup {
+                for b in m.inline_keyboard.iter().flatten() {
+                    assert_eq!(
+                        b.action,
+                        botapi::InlineButtonAction::CallbackData(crate::Cb::Sample.encode()),
+                        "{name}: {}",
+                        b.text
+                    );
+                }
+            }
+        }
+        assert_eq!(
+            mockup_tokens("{-shield} {cb} <b>x</b> {}"),
+            "{m:shield} {e:cb} <b>x</b> {}"
+        );
+    }
 
     /// П13: на примерах из «Предпросмотра» ни одна кнопка не ведёт к настоящему действию.
     #[test]

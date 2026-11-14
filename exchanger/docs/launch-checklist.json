@@ -245,7 +245,7 @@
       "milestone": 6,
       "criterion": "Виджеты Bot API 10.4 (решение владельца 13.11): отправка, правка данных, ответ на запросы, замена окна; «Предпросмотр» присылает виджеты; тест лимитов на каждый виджет (HTML ≤ 32 КБ, ≤ 4 КБ сжатым, состояние ≤ 1 КБ); подпись и кнопки достаточны в Telegram без виджетов",
       "status": "todo",
-      "evidence": ""
+      "evidence": "14.11, код (тест): botapi — sendWidget, editMessageWidgetData, answerWidgetQuery, обновление widget_query (тесты botapi::http), replace_message — замена окна «сначала новое, потом удалить старое» (тест); ui::widgets — 19 утверждённых виджетов из assets/widgets, тест лимитов (≤ 32 КБ, ≤ 4 КБ zlib-9, без NUL, состояния макетов ≤ 1 КБ, список = макеты); tgbot отвечает на каждый widget_query (тест every_widget_query_gets_an_answer); «Предпросмотр» присылает все виджеты на данных макетов (тест preview_sends_every_widget_within_limits; демо --preview-widgets, /preview_widgets). ВЖИВУЮ 14.11 на @fexchbot: Telegram отвечает 400 INPUT_MEDIA_WIDGET_NOT_ALLOWED на каждый виджет и на виджет из одной строки — виджеты боту не разрешены; в документации причины нет. Блокер: владелец проверяет @BotFather / версию Telegram. Без виджетов экраны работают карточками (правило 6 BOTAPI-WIDGETS.md)."
     },
     {
       "id": "widget-order",
