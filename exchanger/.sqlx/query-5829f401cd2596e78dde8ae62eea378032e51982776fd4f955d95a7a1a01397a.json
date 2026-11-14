@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT d.code AS \"code!\"\n        FROM directions d\n        JOIN LATERAL (\n            SELECT action, at FROM admin_audit\n            WHERE target_type = 'direction' AND target_id = d.code\n              AND action IN ('direction.open', 'direction.close')\n            ORDER BY at DESC, id DESC\n            LIMIT 1\n        ) last ON last.action = 'direction.close'\n        WHERE NOT d.is_open\n        ORDER BY last.at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "code!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "directions",
+            "name": "code"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5829f401cd2596e78dde8ae62eea378032e51982776fd4f955d95a7a1a01397a"
+}

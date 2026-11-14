@@ -45,6 +45,12 @@ pub enum Need {
     Unreadable { platform: Platform },
     /// Движения инвесторов ждут решения.
     Invest { n: i64 },
+    /// Режим обслуживания: новые чеки не принимаются (П3, принято 14.11).
+    Maintenance { since: Option<DateTime<Utc>> },
+    /// Направления, закрытые вручную; первое из них — для строки.
+    Closed { n: i64, first: domain::Direction },
+    /// Аккаунт юзербота отключён — заявки через него не идут.
+    AccountOff { label: String },
 }
 
 impl Need {
@@ -60,8 +66,13 @@ impl Need {
             | Need::ManualInvoice { n, .. }
             | Need::Unknown { n, .. }
             | Need::AutoPause { n }
-            | Need::Invest { n } => *n,
-            Need::Shortfall { .. } | Need::Session { .. } | Need::Unreadable { .. } => 1,
+            | Need::Invest { n }
+            | Need::Closed { n, .. } => *n,
+            Need::Shortfall { .. }
+            | Need::Session { .. }
+            | Need::Unreadable { .. }
+            | Need::Maintenance { .. }
+            | Need::AccountOff { .. } => 1,
         }
     }
 
@@ -76,6 +87,9 @@ impl Need {
             Need::AutoPause { .. } => 5,
             Need::Unreadable { .. } => 6,
             Need::Invest { .. } => 7,
+            Need::Maintenance { .. } => 8,
+            Need::Closed { .. } => 9,
+            Need::AccountOff { .. } => 10,
         }
     }
 
@@ -205,6 +219,13 @@ fn reserve_dot(r: &Reserve) -> &'static str {
 }
 
 impl DashData {
+    /// Включено обслуживание.
+    fn maintenance(&self) -> bool {
+        self.needs
+            .iter()
+            .any(|n| matches!(n, Need::Maintenance { .. }))
+    }
+
     pub fn state(&self) -> DashState {
         if self.kill_switch || !self.paused.is_empty() || self.needs.iter().any(Need::fire) {
             DashState::Fire
@@ -267,6 +288,27 @@ impl DashData {
                 t.t("dash.v_unreadable"),
             ),
             Need::Invest { n } => (t.t("dash.n_invest"), t.f("dash.v_invest", &[("n", n)])),
+            Need::Maintenance { since } => (
+                t.t("dash.n_maint"),
+                match since {
+                    Some(at) => t.f("dash.v_maint_since", &[("time", &hhmm(*at))]),
+                    None => t.t("dash.v_maint"),
+                },
+            ),
+            Need::Closed { n, first } => (
+                t.t("dash.n_closed"),
+                t.f(
+                    "dash.v_closed",
+                    &[
+                        ("n", n),
+                        ("first", &t.t(&format!("dash.short_{}", first.code()))),
+                    ],
+                ),
+            ),
+            Need::AccountOff { label } => (
+                t.f("dash.n_off", &[("label", &esc(label))]),
+                t.t("dash.v_off"),
+            ),
         }
     }
 
@@ -314,7 +356,9 @@ impl DashData {
             Some(at) => t.f("dash.f_reconcile", &[("time", &hhmm(at))]),
             None => t.t("dash.f_no_reconcile"),
         });
-        if state == DashState::Normal {
+        if self.maintenance() {
+            parts.push(t.t("dash.f_maint"));
+        } else if state == DashState::Normal {
             parts.push(t.t("dash.f_payouts"));
         }
         let compared = self.kpi_cells(t).iter().any(|(_, _, d)| !d.is_empty());
@@ -333,6 +377,7 @@ impl DashData {
         let mut needs = self.needs.clone();
         needs.sort_by_key(Need::rank);
         let mut shortfall = false;
+        let mut dirs = false;
         for n in &needs {
             match n {
                 Need::Shortfall { alert, .. } if !shortfall => {
@@ -351,13 +396,27 @@ impl DashData {
                 Need::Unknown { n, .. } => {
                     out.push(btn(t.f("dash.b_unknown", &[("n", n)]), &Cb::Dirs));
                 }
-                Need::AutoPause { n } => {
-                    out.push(btn(t.f("dash.b_autopause", &[("n", n)]), &Cb::Dirs));
+                // Автопауза и закрытые вручную — одна кнопка «Направления».
+                Need::AutoPause { .. } | Need::Closed { .. } if !dirs => {
+                    dirs = true;
+                    let n: i64 = needs
+                        .iter()
+                        .filter_map(|x| match x {
+                            Need::AutoPause { n } | Need::Closed { n, .. } => Some(*n),
+                            _ => None,
+                        })
+                        .sum();
+                    out.push(btn(t.f("dash.b_autopause", &[("n", &n)]), &Cb::Dirs));
                 }
                 Need::Invest { n } => {
                     out.push(btn(t.f("dash.b_invest", &[("n", n)]), &Cb::Investors));
                 }
-                Need::Shortfall { .. } | Need::Unreadable { .. } => {}
+                Need::Maintenance { .. } => out.push(btn(t.t("dash.b_settings"), &Cb::Settings)),
+                Need::Shortfall { .. }
+                | Need::Unreadable { .. }
+                | Need::AutoPause { .. }
+                | Need::Closed { .. }
+                | Need::AccountOff { .. } => {}
             }
         }
         out.push(btn(t.t("dash.b_reserves"), &Cb::Reserves));
@@ -550,7 +609,7 @@ fn msk(h: u32, m: u32) -> DateTime<Utc> {
 }
 
 /// Три состояния главного экрана на данных макета: обычный день, пожар, тишина.
-pub fn sample_dash() -> [(&'static str, DashData); 3] {
+pub fn sample_dash() -> [(&'static str, DashData); 4] {
     let th = Thresholds::from_target(Decimal::from(1500));
     let reserve = |platform, available: i64, actual: Option<i64>| Reserve {
         platform,
@@ -618,6 +677,31 @@ pub fn sample_dash() -> [(&'static str, DashData); 3] {
         reconciled_at: Some(msk(14, 15)),
         reconcile_bad: true,
     };
+    // П3 (макет «Главный экран пульта при паузах», принят 14.11).
+    let pauses = DashData {
+        kill_switch: false,
+        paused: Vec::new(),
+        needs: vec![
+            Need::Maintenance {
+                since: Some(msk(14, 20)),
+            },
+            Need::Closed {
+                n: 1,
+                first: domain::Direction::XrToCbCheck,
+            },
+            Need::AccountOff {
+                label: "ub-2".into(),
+            },
+        ],
+        kpis: kpis.clone(),
+        reserves: vec![
+            reserve(Platform::CryptoBot, 1480, None),
+            reserve(Platform::XRocket, 1300, None),
+        ],
+        accounts: (1, 2),
+        reconciled_at: Some(msk(14, 0)),
+        reconcile_bad: false,
+    };
     let calm = DashData {
         kill_switch: false,
         paused: Vec::new(),
@@ -631,7 +715,12 @@ pub fn sample_dash() -> [(&'static str, DashData); 3] {
         reconciled_at: Some(msk(14, 0)),
         reconcile_bad: false,
     };
-    [("Обычный день", ok), ("Пожар", fire), ("Тишина", calm)]
+    [
+        ("Обычный день", ok),
+        ("Пожар", fire),
+        ("Тишина", calm),
+        ("Паузы", pauses),
+    ]
 }
 
 impl Inner {
@@ -684,6 +773,11 @@ impl Inner {
             .filter(|b| matches!(b.status.as_str(), "active" | "flood_wait"))
             .count();
         for b in &bots {
+            if b.status == "disabled" {
+                needs.push(Need::AccountOff {
+                    label: b.label.clone(),
+                });
+            }
             if matches!(b.status.as_str(), "logged_out" | "banned") {
                 needs.push(Need::Session {
                     label: b.label.clone(),
@@ -715,6 +809,19 @@ impl Inner {
         }
         if other > 0 {
             needs.push(Need::AutoPause { n: other });
+        }
+        let closed = storage::directions::closed_by_staff(&mut conn).await?;
+        if let Some(first) = closed.first() {
+            needs.push(Need::Closed {
+                n: i64::try_from(closed.len()).unwrap_or(i64::MAX),
+                first: *first,
+            });
+        }
+        let maint = crate::cb::Flag::Maintenance.key();
+        if storage::settings::flag(&mut conn, maint, false).await? {
+            needs.push(Need::Maintenance {
+                since: storage::settings::on_since(&mut conn, maint).await?,
+            });
         }
 
         // Инвесторы.
@@ -870,12 +977,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn three_states_from_the_mockup() {
+    fn four_states_from_the_mockups() {
         let t = Texts::builtin().unwrap();
-        let [(_, ok), (_, fire), (_, calm)] = sample_dash();
+        let [(_, ok), (_, fire), (_, calm), (_, pauses)] = sample_dash();
         assert_eq!(ok.state(), DashState::Normal);
         assert_eq!(fire.state(), DashState::Fire);
         assert_eq!(calm.state(), DashState::Calm);
+        // П3: паузы — не «спокойно», а жёлтые строки «Нужно решить».
+        assert_eq!(pauses.state(), DashState::Normal);
+        let p = pauses.screen(&t).rich.unwrap();
+        assert!(p.contains("Нужно решить · 3"), "{p}");
+        assert!(!p.contains("выплаты идут"), "{p}");
         let s = ok.screen(&t);
         let rich = s.rich.unwrap();
         assert!(rich.contains("Нужно решить · 4"), "{rich}");

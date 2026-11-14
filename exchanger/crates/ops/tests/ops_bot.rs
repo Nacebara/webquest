@@ -1117,6 +1117,61 @@ async fn dash_turns_to_fire_on_a_shortfall_and_refreshes_itself(pool: PgPool) {
     assert_eq!(shortfall["style"], "danger", "{shortfall}");
 }
 
+/// П3 (макет «Главный экран пульта при паузах», принят 14.11): обслуживание, направление,
+/// закрытое вручную, и отключённый аккаунт — жёлтые строки «Нужно решить», а не «Всё спокойно».
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn dash_is_not_calm_while_something_is_paused(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/dash", "Всё спокойно").await;
+    storage::settings::set(
+        &mut o.pool.acquire().await.unwrap(),
+        "maintenance",
+        &serde_json::json!({"on": true}),
+        None,
+    )
+    .await
+    .unwrap();
+    // Закрыто кнопкой пульта — в журнале «direction.close»; закрытые с начала не в счёт.
+    sqlx::query("UPDATE directions SET is_open = false WHERE code = 'xr_to_cb_check'")
+        .execute(&o.pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO admin_audit (staff_id, action, target_type, target_id) \
+         VALUES ($1, 'direction.close', 'direction', 'xr_to_cb_check')",
+    )
+    .bind(OWNER)
+    .execute(&o.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO userbot_accounts (label, phone_masked, status) VALUES ('ub-2', '+7***00', 'disabled')",
+    )
+    .execute(&o.pool)
+    .await
+    .unwrap();
+    let dash = o.say(OWNER, "/dash", "Нужно решить · 3").await;
+    let body = dash.text();
+    assert!(!body.contains("Всё спокойно"), "{body}");
+    for row in [
+        "Обслуживание",
+        "Закрыто вручную",
+        "xR → CB",
+        "ub-2 отключён",
+    ] {
+        assert!(body.contains(row), "нет строки «{row}»: {body}");
+    }
+    assert!(body.contains("обслуживание"), "подвал: {body}");
+    assert!(!body.contains("выплаты идут"), "подвал: {body}");
+    assert!(dash.button("Настройки").is_some(), "{:?}", dash.buttons());
+    assert!(
+        dash.button("Направления · 1").is_some(),
+        "{:?}",
+        dash.buttons()
+    );
+    assert!(dash.button("Аккаунты").is_some(), "{:?}", dash.buttons());
+}
+
 /// Макет «Недостача»: в кошельке меньше, чем по леджеру, — «Это вы выводили?»; «Нет,
 /// разбираться» оставляет выплаты на паузе и закрывает повтор события.
 #[sqlx::test(migrator = "storage::MIGRATOR")]

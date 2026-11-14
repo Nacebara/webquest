@@ -167,6 +167,30 @@ pub async fn set_open(
     Ok(())
 }
 
+/// Направления, которые сотрудник закрыл кнопкой и с тех пор не открыл, — по журналу действий,
+/// по порядку закрытия. Закрытые с самого начала (их ещё ни разу не открывали) сюда не входят:
+/// это не пауза, а направление, с которым сервис не работает (главный экран пульта, П3).
+pub async fn closed_by_staff(conn: &mut PgConnection) -> Result<Vec<Direction>, StorageError> {
+    let codes = sqlx::query_scalar!(
+        r#"
+        SELECT d.code AS "code!"
+        FROM directions d
+        JOIN LATERAL (
+            SELECT action, at FROM admin_audit
+            WHERE target_type = 'direction' AND target_id = d.code
+              AND action IN ('direction.open', 'direction.close')
+            ORDER BY at DESC, id DESC
+            LIMIT 1
+        ) last ON last.action = 'direction.close'
+        WHERE NOT d.is_open
+        ORDER BY last.at
+        "#
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(codes.iter().filter_map(|c| c.parse().ok()).collect())
+}
+
 /// Автопауза системой (резерв, незнакомый ответ, сверка) с причиной.
 pub async fn auto_pause(
     conn: &mut PgConnection,

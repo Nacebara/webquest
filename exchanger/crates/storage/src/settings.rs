@@ -1,5 +1,6 @@
 //! Настройки сервиса (`settings`): JSON по ключу.
 
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 use sqlx::PgConnection;
 
@@ -26,6 +27,21 @@ pub async fn flag(conn: &mut PgConnection, key: &str, default: bool) -> Result<b
         .await?
         .and_then(|v| v.get("on").and_then(Value::as_bool))
         .unwrap_or(default))
+}
+
+/// С какого времени флаг вида `{"on": true}` включён: время последней записи настройки. Флаг
+/// выключен или настройки нет — `None` (главный экран пульта: «Обслуживание · с 14:20»).
+pub async fn on_since(
+    conn: &mut PgConnection,
+    key: &str,
+) -> Result<Option<DateTime<Utc>>, StorageError> {
+    let since = sqlx::query_scalar!(
+        r#"SELECT updated_at FROM settings WHERE key = $1 AND value->>'on' = 'true'"#,
+        key
+    )
+    .fetch_optional(conn)
+    .await?;
+    Ok(since)
 }
 
 pub async fn set(

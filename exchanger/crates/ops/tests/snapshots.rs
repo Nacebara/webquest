@@ -18,10 +18,13 @@ fn dump(s: &Screen) -> String {
 }
 
 #[test]
-fn dash_three_states() {
+fn dash_four_states() {
     let t = Texts::builtin().unwrap();
     // Имена файлов — латиницей (Windows у владельца).
-    for ((_, data), name) in ops::sample_dash().iter().zip(["ok", "fire", "calm"]) {
+    for ((_, data), name) in ops::sample_dash()
+        .iter()
+        .zip(["ok", "fire", "calm", "pauses"])
+    {
         let screen = Look::plain().screen(&data.screen(&t));
         insta::assert_snapshot!(format!("dash_{name}"), dump(&screen));
     }
