@@ -204,3 +204,22 @@ G.update({
   {"id": "a", "name": "После «Принял» · утверждено", "rich": '{dot_closed} <b>ub-2: вход сброшен</b><br>Принял Анна · 14:47 — повторы остановлены', "keys": [[["", "robot", "Аккаунты"]]]},
  ]},
 })
+
+# П3 (шаг 2.8, 14.11): главный экран пульта не «спокоен», когда что-то на паузе.
+DASH_TAIL = ('<hr><table><tr><td>Обменов<br><b>148</b> ▲ 9 %</td><td>Оборот<br><b>12 480</b> ▲ 5 %</td><td>Прибыль<br><b>291.40</b> ▲ 6 %</td></tr></table>'
+  '<table><tr><th>Резерв</th><th class="r">Доступно</th><th class="r">От цели</th></tr>'
+  '<tr><td>{cb} CryptoBot</td><td class="r">1 480.00</td><td class="r">{dot_ok} 99 %</td></tr>'
+  '<tr><td>{xr} xRocket</td><td class="r">1 300.00</td><td class="r">{dot_ok} 87 %</td></tr></table>')
+G.update({
+ "ops_dash_p3": {"bot": P, "user": "/dash", "states": [
+  {"id": "before", "name": "Сейчас: «всё спокойно» · ошибка", "rich": '<h3>{live} Всё спокойно</h3><p>Решать нечего. Выплаты идут, аккаунты на связи.</p>' + DASH_TAIL +
+     '<footer>{dot_ok} Аккаунты 2/2 · сверка 14:00 · ▲▼ к вчера</footer>',
+   "keys": [[["", "chart", "Статистика"], ["", "vault", "Резервы"]], [["", "robot", "Аккаунты"], ["", "dash", "Меню"]]]},
+  {"id": "after", "name": "Будет: паузы — в «Нужно решить» · новое", "rich": '<h3>{alarm} Нужно решить · 3</h3><table>'
+     '<tr><td>{dot_wait}</td><td>Обслуживание</td><td class="r"><b>вкл</b> · с 14:20</td></tr>'
+     '<tr><td>{dot_wait}</td><td>Закрыто вручную</td><td class="r"><b>1</b> · xR → CB</td></tr>'
+     '<tr><td>{dot_wait}</td><td>ub-2 отключён</td><td class="r"><b>пауза</b> · с 13:50</td></tr></table>' + DASH_TAIL +
+     '<footer>{dot_wait} Аккаунты 1/2 · сверка 14:00 · ▲▼ к вчера</footer>',
+   "keys": [[["", "settings", "Настройки"], ["", "pause", "Направления · 1"]], [["", "robot", "Аккаунты"], ["", "dash", "Меню"]]]},
+ ]},
+})
