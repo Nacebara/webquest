@@ -33,3 +33,4 @@ pub mod stop;
 pub mod supervisor;
 pub mod telegram;
 pub mod wallet_log;
+pub mod watchdog;

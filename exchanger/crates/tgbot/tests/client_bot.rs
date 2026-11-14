@@ -74,6 +74,8 @@ struct State {
     replies: HashMap<i64, i64>,
     /// Отдаёт ли Telegram кнопки сообщения в `reply_to_message` (проверяется вживую).
     no_markup_in_replies: bool,
+    /// Сколько ещё раз ответить на getUpdates 409 — «этот токен опрашивает другой процесс».
+    conflicts: usize,
 }
 
 impl State {
@@ -120,8 +122,18 @@ impl FakeTelegram {
                     let Some((method, body)) = read_request(&mut socket).await else {
                         return;
                     };
-                    let result = server.respond(&method, body).await;
-                    let payload = json!({ "ok": true, "result": result }).to_string();
+                    let conflict = method == "getUpdates" && {
+                        let mut s = server.lock();
+                        let hit = s.conflicts > 0;
+                        s.conflicts = s.conflicts.saturating_sub(1);
+                        hit
+                    };
+                    let payload = if conflict {
+                        json!({ "ok": false, "error_code": 409, "description": "Conflict: terminated by other getUpdates request; make sure that only one bot instance is running" }).to_string()
+                    } else {
+                        let result = server.respond(&method, body).await;
+                        json!({ "ok": true, "result": result }).to_string()
+                    };
                     let response = format!(
                         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
                         payload.len()
@@ -1553,4 +1565,37 @@ async fn promo_broadcast_reaches_clients_once(pool: PgPool) {
             .any(|c| c.body["chat_id"] == json!(203)),
         "писали меньше 3 часов назад — не пишем"
     );
+}
+
+/// Шаг 2.7 (Н-9): тот же токен опрашивает другой процесс — Telegram отвечает 409. Бот поднимает
+/// критичную тревогу «запущен второй экземпляр» (одну, повторы — счётчиком) и продолжает опрос.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_second_instance_of_the_bot_raises_a_critical_alert(pool: PgPool) {
+    let e = env(pool).await;
+    e.fake.lock().conflicts = 2;
+    let bot = e.start_bot();
+    let mut alert: Option<(String, i32)> = None;
+    for _ in 0..300 {
+        alert = sqlx::query_as(
+            "SELECT level, count FROM alerts WHERE dedup_key = 'second_instance' AND acked_at IS NULL",
+        )
+        .fetch_optional(&e.pool)
+        .await
+        .unwrap();
+        if alert.as_ref().is_some_and(|(_, n)| *n >= 2) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let (level, count) = alert.expect("second-instance alert raised");
+    assert_eq!(level, "critical");
+    assert_eq!(count, 2, "one alert, repeats counted");
+    // Конфликт прошёл — бот снова отвечает клиентам.
+    e.fake.client_writes("привет");
+    e.fake
+        .wait_for("an answer after the conflict", |c| {
+            c.method == "sendMessage" && c.chat() == Some(CLIENT)
+        })
+        .await;
+    bot.stop().await;
 }

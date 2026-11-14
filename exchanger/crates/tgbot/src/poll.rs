@@ -21,9 +21,55 @@ const MAX_BACKOFF: Duration = Duration::from_secs(30);
 /// Сколько ждать финального подтверждения порции при остановке.
 const CONFIRM_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Ключ тревоги «запущен второй экземпляр бота» (шаг 2.7).
+pub const SECOND_INSTANCE: &str = "second_instance";
+/// Сколько опрос должен идти без 409, чтобы тревога закрылась сама.
+const CONFLICT_CLEARS_AFTER: Duration = Duration::from_secs(600);
+
+/// Telegram ответил 409 на getUpdates: этот же токен опрашивает другой процесс — бот запущен
+/// второй раз (другой компьютер, забытое окно). Обновления делятся между ними случайно: часть
+/// клиентов отвечает «чужой» бот. Тревога персоналу и строка в журнал, без остановки: какой из
+/// двух лишний, решает человек.
+async fn second_instance(inner: &Inner, e: &botapi::Error) {
+    tracing::error!(
+        error = %e,
+        "Telegram: another process polls this bot token (409) — exch is running twice"
+    );
+    let alert = storage::alerts::NewAlert {
+        level: storage::alerts::Level::Critical,
+        topic: storage::alerts::Topic::Errors,
+        dedup_key: SECOND_INSTANCE,
+        title: SECOND_INSTANCE,
+        payload: serde_json::json!({ "error": e.description().unwrap_or_default() }),
+    };
+    let raised = async {
+        let mut conn = inner.pool.acquire().await?;
+        storage::alerts::raise(&mut conn, &alert).await
+    }
+    .await;
+    if let Err(err) = raised {
+        tracing::warn!(error = %err, "cannot raise the second-instance alert");
+    }
+}
+
+async fn conflict_gone(inner: &Inner) {
+    let resolved = async {
+        let mut conn = inner.pool.acquire().await?;
+        storage::alerts::resolve(&mut conn, SECOND_INSTANCE).await
+    }
+    .await;
+    match resolved {
+        Ok(true) => tracing::info!("Telegram: no other process polls this bot any more"),
+        Ok(false) => {}
+        Err(err) => tracing::warn!(error = %err, "cannot resolve the second-instance alert"),
+    }
+}
+
 pub(crate) async fn run(inner: Arc<Inner>, cancel: CancellationToken) {
     let mut last: Option<i64> = None;
     let mut backoff = Duration::from_secs(1);
+    // Когда Telegram последний раз ответил 409 (второй экземпляр).
+    let mut last_conflict: Option<tokio::time::Instant> = None;
     tracing::info!("client bot: polling for updates");
     loop {
         let request = GetUpdates::after(last, inner.cfg.poll_timeout_secs)
@@ -32,9 +78,17 @@ pub(crate) async fn run(inner: Arc<Inner>, cancel: CancellationToken) {
             () = cancel.cancelled() => break,
             result = inner.api.bot().get_updates(&request) => result,
         };
+        inner.poll_attempt.store(
+            chrono::Utc::now().timestamp(),
+            std::sync::atomic::Ordering::Relaxed,
+        );
         match result {
             Ok(updates) => {
                 backoff = Duration::from_secs(1);
+                if last_conflict.is_some_and(|t| t.elapsed() >= CONFLICT_CLEARS_AFTER) {
+                    last_conflict = None;
+                    conflict_gone(&inner).await;
+                }
                 inner.poll_beat.store(
                     chrono::Utc::now().timestamp(),
                     std::sync::atomic::Ordering::Relaxed,
@@ -47,6 +101,10 @@ pub(crate) async fn run(inner: Arc<Inner>, cancel: CancellationToken) {
                 }
             }
             Err(e) => {
+                if e.error_code() == Some(409) {
+                    last_conflict = Some(tokio::time::Instant::now());
+                    second_instance(&inner, &e).await;
+                }
                 let wait = e.retry_after().unwrap_or(backoff);
                 backoff = (backoff * 2).min(MAX_BACKOFF);
                 tracing::warn!(error = %e, wait_ms = wait.as_millis(), "getUpdates failed");

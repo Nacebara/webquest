@@ -6,12 +6,30 @@
 //! шаг 2.4): минута без PostgreSQL не должна выключать exch до прихода человека. Такая задача
 //! перезапускается с паузой 1, 2, 4 … 60 с, пока база и сеть не вернутся.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::future::Future;
+use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
+
+/// Когда задача последний раз перезапускалась после временного сбоя (секунды Unix). Сторож
+/// зависания (шаг 2.7) по этому видит, что задача не зависла, а пережидает базу или сеть.
+static TRANSIENT_RETRY: LazyLock<Mutex<HashMap<&'static str, i64>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn note_transient_retry(task: &'static str) {
+    if let Ok(mut m) = TRANSIENT_RETRY.lock() {
+        m.insert(task, chrono::Utc::now().timestamp());
+    }
+}
+
+/// Когда задача `task` последний раз пережидала сбой базы или сети; `None` — не пережидала.
+pub fn last_transient_retry(task: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+    let t = *TRANSIENT_RETRY.lock().ok()?.get(task)?;
+    chrono::DateTime::from_timestamp(t, 0)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RestartPolicy {
@@ -129,10 +147,12 @@ where
                 delay_ms = after.as_millis() as u64,
                 "task failed: the database or the network is unavailable; waiting, not giving up"
             );
+            note_transient_retry(name);
             tokio::select! {
                 () = tokio::time::sleep(after) => {}
                 () = cancel.cancelled() => return Ok(()),
             }
+            note_transient_retry(name);
             continue;
         }
         match &outcome {
@@ -271,6 +291,8 @@ mod tests {
             runs.load(Ordering::SeqCst) > 5,
             "more failures than the give-up limit"
         );
+        // Сторож зависания видит, что задача пережидала сбой, а не висела (шаг 2.7).
+        assert!(last_transient_retry("engine").is_some());
         cancel.cancel();
         assert!(handle.await.unwrap().is_ok());
     }

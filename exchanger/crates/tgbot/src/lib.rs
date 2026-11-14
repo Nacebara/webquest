@@ -180,7 +180,21 @@ impl ClientBot {
                 locks: locks::KeyedLocks::default(),
                 memory: Mutex::new(Memory::default()),
                 poll_beat: std::sync::atomic::AtomicI64::new(0),
+                poll_attempt: std::sync::atomic::AtomicI64::new(0),
             }),
+        }
+    }
+
+    /// Когда опрос обновлений последний раз прошёл круг (удачно или с ошибкой); `None` — ещё ни
+    /// разу. Для сторожа зависания.
+    pub fn last_poll_attempt(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        match self
+            .inner
+            .poll_attempt
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            0 => None,
+            t => chrono::DateTime::from_timestamp(t, 0),
         }
     }
 
@@ -291,6 +305,9 @@ pub(crate) struct Inner {
     /// Последний удачный ответ getUpdates (секунды Unix, 0 — ещё ни разу): по нему внешний пинг
     /// понимает, что опрос Telegram жив (шаг 2.5).
     poll_beat: std::sync::atomic::AtomicI64,
+    /// Последний круг опроса — удачный или нет (секунды Unix): по нему сторож зависания видит,
+    /// что опрос не завис, а пережидает сеть (шаг 2.7).
+    poll_attempt: std::sync::atomic::AtomicI64,
 }
 
 impl Inner {

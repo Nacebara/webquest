@@ -557,6 +557,8 @@ async fn run() -> anyhow::Result<()> {
     let mut tasks: JoinSet<Result<(), supervisor::GaveUp>> = JoinSet::new();
     // Что должно быть живо, чтобы пинговать наружу (шаг 2.5): движок и опрос Telegram.
     let mut probes: Vec<app::health::Probe> = Vec::new();
+    // Что не должно зависать (сторож, шаг 2.7): круг считается и при пережидании сбоя.
+    let mut progress: Vec<app::health::Probe> = Vec::new();
 
     // Юзерботы и движок: без них процесс только держит пульс и миграции.
     match TelegramSettings::from_config(&cfg) {
@@ -584,6 +586,14 @@ async fn run() -> anyhow::Result<()> {
                 }
                 {
                     let engine = engine.clone();
+                    progress.push(app::health::Probe::new("engine", move || {
+                        engine
+                            .last_beat()
+                            .max(supervisor::last_transient_retry("engine"))
+                    }));
+                }
+                {
+                    let engine = engine.clone();
                     tasks.spawn(supervise(
                         "engine",
                         cancel.clone(),
@@ -603,6 +613,13 @@ async fn run() -> anyhow::Result<()> {
                     Some(token) => {
                         let bot = spawn_bot(&mut tasks, &cancel, &pool, engine, &cfg, token, None)
                             .await?;
+                        {
+                            let bot = bot.clone();
+                            progress.push(app::health::Probe::new("telegram polling", move || {
+                                bot.last_poll_attempt()
+                                    .max(supervisor::last_transient_retry("client-bot"))
+                            }));
+                        }
                         probes.push(app::health::Probe::new("telegram polling", move || {
                             bot.last_poll()
                         }));
@@ -610,6 +627,11 @@ async fn run() -> anyhow::Result<()> {
                 }
             }
         }
+    }
+
+    // Сторож зависания — на своём потоке ОС (шаг 2.7).
+    if !progress.is_empty() {
+        app::watchdog::spawn(Arc::new(progress)).context("cannot start the watchdog")?;
     }
 
     let pinger = match cfg.healthcheck_url.as_deref() {
