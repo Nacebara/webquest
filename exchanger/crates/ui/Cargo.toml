@@ -18,6 +18,8 @@ thiserror.workspace = true
 toml = { version = "1.1.6", default-features = false, features = ["std", "serde", "parse"] }
 
 [dev-dependencies]
+# Тест лимитов виджетов: размер после zlib-9, как считает Telegram (уже в дереве зависимостей).
+flate2 = "1.1.10"
 insta = { version = "1.49.0", default-features = false }
 proptest.workspace = true
 rust_decimal.workspace = true

@@ -7,8 +7,8 @@
 use std::time::Duration;
 
 use botapi::{
-    BotApi, Error, GetUpdates, InlineKeyboardButton, InlineKeyboardMarkup, SendMessage,
-    TransportKind,
+    AnswerWidgetQuery, BotApi, EditMessageWidgetData, Error, GetUpdates, InlineKeyboardButton,
+    InlineKeyboardMarkup, SendMessage, SendWidget, TransportKind,
 };
 use secrecy::SecretString;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -331,4 +331,128 @@ async fn refused_connection_means_not_delivered() {
     assert!(err.not_delivered());
     assert!(!err.outcome_unknown());
     assert_no_token(&err);
+}
+
+/// Шаг 6.7: запрос виджета приходит обновлением `widget_query`; тип запроса — объект.
+#[tokio::test]
+async fn widget_query_update_is_parsed() {
+    let (base, _server) = serve(vec![ok(
+        r#"{"ok":true,"result":[
+            {"update_id":20,"widget_query":{"id":"wq-1","from":{"id":501,"is_bot":false,"first_name":"Анна"},
+             "chat":{"id":501,"type":"private"},"message_id":77,"chat_instance":"ci-1",
+             "type":{"type":"data"},"data":"dash"}}
+        ]}"#,
+    )])
+    .await;
+    let updates = client(&base)
+        .get_updates(&GetUpdates::after(None, 1))
+        .await
+        .unwrap();
+    let q = updates[0].widget_query.as_ref().expect("widget_query");
+    assert_eq!(q.id, "wq-1");
+    assert_eq!(q.data, "dash");
+    assert_eq!(q.message_id, Some(77));
+    assert_eq!(q.kind.kind, "data");
+    assert_eq!(updates[0].chat_id(), Some(501));
+    assert_eq!(updates[0].from().map(|u| u.id), Some(501));
+}
+
+/// Шаг 6.7: отправить виджет, поправить его данные, ответить на запрос — тела и ответы.
+#[tokio::test]
+async fn send_widget_edit_data_and_answer_query() {
+    let (base, server) = serve(vec![
+        ok(r#"{"ok":true,"result":{"message_id":88,"chat":{"id":501,"type":"private"},"date":1790000000,
+              "caption":"Нужно решить · 1","widget":{"html":"<b>w</b>","chat_data":"{\"n\":1}"}}}"#),
+        ok(r#"{"ok":true,"result":true}"#),
+        ok(r#"{"ok":true,"result":true}"#),
+    ])
+    .await;
+    let api = client(&base);
+    let request = SendWidget::new(501, "<b>w</b>")
+        .chat_data(r#"{"n":1}"#)
+        .caption_html("Нужно решить · 1")
+        .allow_queries()
+        .reply_markup(InlineKeyboardMarkup::new(vec![vec![
+            InlineKeyboardButton::callback("Меню", "a:m"),
+        ]]));
+    let message = api.send_widget(&request).await.unwrap();
+    assert_eq!(message.message_id, 88);
+    let widget = message.widget.as_ref().expect("widget in the message");
+    assert_eq!(widget.chat_data.as_deref(), Some(r#"{"n":1}"#));
+    assert!(
+        api.edit_message_widget_data(&EditMessageWidgetData::chat(501, 88, r#"{"n":2}"#))
+            .await
+            .unwrap()
+    );
+    assert!(
+        api.answer_widget_query(&AnswerWidgetQuery::new("wq-1", r#"{"ok":1}"#))
+            .await
+            .unwrap()
+    );
+
+    let recorded = server.await.unwrap();
+    assert_eq!(
+        recorded[0].request_line,
+        format!("POST /bot{TOKEN}/sendWidget HTTP/1.1")
+    );
+    assert_eq!(
+        recorded[0].body,
+        serde_json::json!({
+            "chat_id": 501, "html": "<b>w</b>", "chat_data": "{\"n\":1}",
+            "caption": "Нужно решить · 1", "parse_mode": "HTML", "allow_queries": true,
+            "reply_markup": {"inline_keyboard": [[{"text": "Меню", "callback_data": "a:m"}]]}
+        })
+    );
+    assert_eq!(
+        recorded[1].request_line,
+        format!("POST /bot{TOKEN}/editMessageWidgetData HTTP/1.1")
+    );
+    assert_eq!(
+        recorded[1].body,
+        serde_json::json!({"chat_id": 501, "message_id": 88, "chat_data": "{\"n\":2}"})
+    );
+    assert_eq!(
+        recorded[2].request_line,
+        format!("POST /bot{TOKEN}/answerWidgetQuery HTTP/1.1")
+    );
+    assert_eq!(
+        recorded[2].body,
+        serde_json::json!({"widget_query_id": "wq-1", "data": "{\"ok\":1}"})
+    );
+}
+
+/// Шаг 6.7, «замена окна» (решение 13.11): сначала новое сообщение, потом удаление старого.
+/// Новое не ушло — старое остаётся с кнопками.
+#[tokio::test]
+async fn replacing_a_window_sends_first_and_deletes_after() {
+    let (base, server) = serve(vec![
+        ok(r#"{"ok":true,"result":{"message_id":90,"chat":{"id":501,"type":"private"},"date":1,"widget":{"html":"w"}}}"#),
+        ok(r#"{"ok":true,"result":true}"#),
+    ])
+    .await;
+    let api = client(&base);
+    let sent = api
+        .replace_message(501, 89, api.send_widget(&SendWidget::new(501, "w")))
+        .await
+        .unwrap();
+    assert_eq!(sent.message_id, 90);
+    let recorded = server.await.unwrap();
+    assert!(recorded[0].request_line.contains("/sendWidget "));
+    assert!(recorded[1].request_line.contains("/deleteMessage "));
+    assert_eq!(
+        recorded[1].body,
+        serde_json::json!({"chat_id": 501, "message_id": 89})
+    );
+
+    let (base, server) = serve(vec![status(
+        400,
+        r#"{"ok":false,"error_code":400,"description":"Bad Request: INPUT_MEDIA_WIDGET_TOO_LARGE"}"#,
+    )])
+    .await;
+    let api = client(&base);
+    let failed = api
+        .replace_message(501, 89, api.send_widget(&SendWidget::new(501, "w")))
+        .await;
+    assert!(failed.is_err());
+    assert_eq!(server.await.unwrap().len(), 1, "старое окно не удалено");
 }

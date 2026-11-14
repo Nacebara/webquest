@@ -171,6 +171,141 @@ impl SendMessage {
     }
 }
 
+/// `sendWidget` (Bot API 10.4, шаг 6.7 плана): HTML виджета (1–32768 байт, не больше 4096
+/// сжатым zlib-9), состояние `chat_data` (до 1024 байт), подпись и кнопки. Подпись и кнопки —
+/// всё, что нужно без виджета: приложение без поддержки показывает только их.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SendWidget {
+    pub chat_id: i64,
+    pub html: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chat_data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub caption: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parse_mode: Option<ParseMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_queries: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disable_notification: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply_markup: Option<ReplyMarkup>,
+}
+
+impl SendWidget {
+    pub fn new(chat_id: i64, html: impl Into<String>) -> Self {
+        Self {
+            chat_id,
+            html: html.into(),
+            width: None,
+            height: None,
+            chat_data: None,
+            caption: None,
+            parse_mode: None,
+            allow_queries: None,
+            disable_notification: None,
+            reply_markup: None,
+        }
+    }
+
+    /// Состояние, которое видит только это сообщение (JSON строкой).
+    pub fn chat_data(mut self, data: impl Into<String>) -> Self {
+        self.chat_data = Some(data.into());
+        self
+    }
+
+    /// Подпись под виджетом в HTML (до 1024 знаков после разбора).
+    pub fn caption_html(mut self, caption: impl Into<String>) -> Self {
+        self.caption = Some(caption.into());
+        self.parse_mode = Some(ParseMode::Html);
+        self
+    }
+
+    /// Виджет может спрашивать бота (`TelegramWidget.request`).
+    pub fn allow_queries(mut self) -> Self {
+        self.allow_queries = Some(true);
+        self
+    }
+
+    pub fn silent(mut self) -> Self {
+        self.disable_notification = Some(true);
+        self
+    }
+
+    pub fn reply_markup(mut self, markup: impl Into<ReplyMarkup>) -> Self {
+        self.reply_markup = Some(markup.into());
+        self
+    }
+}
+
+impl Method for SendWidget {
+    const NAME: &'static str = "sendWidget";
+    type Response = Message;
+}
+
+/// `editMessageWidgetData`: новое состояние виджета на месте, без перерисовки. Пропуск поля —
+/// оставить как было, пустая строка — стереть.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EditMessageWidgetData {
+    pub chat_id: i64,
+    pub message_id: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chat_data: Option<String>,
+}
+
+impl EditMessageWidgetData {
+    /// Поменять `chat_data` сообщения.
+    pub fn chat(chat_id: i64, message_id: i32, data: impl Into<String>) -> Self {
+        Self {
+            chat_id,
+            message_id,
+            public_data: None,
+            chat_data: Some(data.into()),
+        }
+    }
+}
+
+impl Method for EditMessageWidgetData {
+    const NAME: &'static str = "editMessageWidgetData";
+    type Response = bool;
+}
+
+/// `answerWidgetQuery`: ответ спросившему виджету (до 1024 байт), состояние не меняет.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AnswerWidgetQuery {
+    pub widget_query_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+}
+
+impl AnswerWidgetQuery {
+    pub fn new(widget_query_id: impl Into<String>, data: impl Into<String>) -> Self {
+        Self {
+            widget_query_id: widget_query_id.into(),
+            data: Some(data.into()),
+        }
+    }
+
+    /// Пустой ответ: запрос принят, сказать нечего (виджет не ждёт `TIMEOUT`).
+    pub fn empty(widget_query_id: impl Into<String>) -> Self {
+        Self {
+            widget_query_id: widget_query_id.into(),
+            data: None,
+        }
+    }
+}
+
+impl Method for AnswerWidgetQuery {
+    const NAME: &'static str = "answerWidgetQuery";
+    type Response = bool;
+}
+
 impl Method for SendMessage {
     const NAME: &'static str = "sendMessage";
     type Response = Message;

@@ -6,7 +6,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use botapi::{CallbackQuery, ChatType, Message, Update, User};
+use botapi::{AnswerWidgetQuery, CallbackQuery, ChatType, Message, Update, User, WidgetQuery};
 use domain::Money;
 use parsers::links::{extract_from_message, parse_bare_code};
 use ui::{Callback, Command, HistoryRow, MenuAction, Screen, UiError};
@@ -381,6 +381,23 @@ impl Inner {
     }
 }
 
+/// Запрос виджета клиента (Bot API 10.4, шаг 6.7). Ответ — на каждый и сразу: виджет ждёт его
+/// не дольше 15 секунд, потом показывает `TIMEOUT`. Своих команд у виджетов клиента пока нет
+/// (они приходят с шагами 6.8–6.10), поэтому — пустой ответ. `data` — недоверенный ввод: в
+/// журнал идёт только его длина.
+async fn widget_query(inner: &Arc<Inner>, query: WidgetQuery) -> Result<(), TgBotError> {
+    tracing::debug!(
+        bytes = query.data.len(),
+        "widget query without a handler: empty answer"
+    );
+    inner
+        .api
+        .bot()
+        .answer_widget_query(&AnswerWidgetQuery::empty(query.id))
+        .await?;
+    Ok(())
+}
+
 /// Одно обновление.
 pub(crate) async fn handle(inner: &Arc<Inner>, update: Update) -> Result<(), TgBotError> {
     // Админ-панель первой: её кнопки, команды и ответы на её вопросы.
@@ -391,6 +408,9 @@ pub(crate) async fn handle(inner: &Arc<Inner>, update: Update) -> Result<(), TgB
     }
     if let Some(query) = update.callback_query {
         return callback(inner, query).await;
+    }
+    if let Some(query) = update.widget_query {
+        return widget_query(inner, query).await;
     }
     // Правка — тоже приход ссылки: чек, созданный через `@send` / `@xrocket` прямо в этом
     // чате, сначала приходит заглушкой «Создание чека…», а ссылка появляется кнопкой в

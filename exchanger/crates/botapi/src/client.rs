@@ -22,9 +22,9 @@ use serde::de::DeserializeOwned;
 use crate::error::{Error, TransportKind, decode_response, scrub};
 use crate::keyboard::InlineKeyboardMarkup;
 use crate::methods::{
-    AddStickerToSet, AnswerCallbackQuery, CreateNewStickerSet, DeleteMessage, EditMessageText,
-    ForwardMessage, GetMe, GetStickerSet, GetUpdates, Method, SendMessage, SendRichMessage,
-    SetMyCommands, StickerFormat, parse_updates,
+    AddStickerToSet, AnswerCallbackQuery, AnswerWidgetQuery, CreateNewStickerSet, DeleteMessage,
+    EditMessageText, EditMessageWidgetData, ForwardMessage, GetMe, GetStickerSet, GetUpdates,
+    Method, SendMessage, SendRichMessage, SendWidget, SetMyCommands, StickerFormat, parse_updates,
 };
 use crate::types::{BotCommand, File, Message, StickerSet, Update, User};
 
@@ -339,7 +339,10 @@ impl BotApi {
         let skipped = updates
             .iter()
             .filter(|u| {
-                u.message.is_none() && u.edited_message.is_none() && u.callback_query.is_none()
+                u.message.is_none()
+                    && u.edited_message.is_none()
+                    && u.callback_query.is_none()
+                    && u.widget_query.is_none()
             })
             .count();
         if updates.len() != total {
@@ -399,6 +402,41 @@ impl BotApi {
             disable_notification: true,
         })
         .await
+    }
+
+    /// Отправить виджет (Bot API 10.4).
+    pub async fn send_widget(&self, request: &SendWidget) -> Result<Message, Error> {
+        self.execute(request).await
+    }
+
+    /// Новое состояние виджета на месте.
+    pub async fn edit_message_widget_data(
+        &self,
+        request: &EditMessageWidgetData,
+    ) -> Result<bool, Error> {
+        self.execute(request).await
+    }
+
+    /// Ответ на запрос виджета — на каждый, за 15 секунд.
+    pub async fn answer_widget_query(&self, request: &AnswerWidgetQuery) -> Result<bool, Error> {
+        self.execute(request).await
+    }
+
+    /// Замена окна (решение владельца 13.11): текст нельзя превратить в виджет правкой и
+    /// наоборот, поэтому сначала уходит новое сообщение (`send`), и только потом удаляется
+    /// прежнее. Чат не пустеет ни на миг; не ушло новое — старое остаётся с кнопками.
+    /// Не удалилось старое (слишком старое, уже удалено) — не беда: новое уже у человека.
+    pub async fn replace_message<T>(
+        &self,
+        chat_id: i64,
+        old_message_id: i32,
+        send: impl std::future::Future<Output = Result<T, Error>>,
+    ) -> Result<T, Error> {
+        let sent = send.await?;
+        if let Err(e) = self.delete_message(chat_id, old_message_id).await {
+            tracing::debug!(error = %e, "Bot API: прежнее окно не удалилось");
+        }
+        Ok(sent)
     }
 
     pub async fn delete_message(&self, chat_id: i64, message_id: i32) -> Result<bool, Error> {

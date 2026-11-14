@@ -76,6 +76,8 @@ struct State {
     no_markup_in_replies: bool,
     /// Сколько ещё раз ответить на getUpdates 409 — «этот токен опрашивает другой процесс».
     conflicts: usize,
+    /// `allowed_updates` последнего getUpdates (сами опросы в `calls` не пишутся).
+    allowed_updates: Value,
 }
 
 impl State {
@@ -254,6 +256,27 @@ impl FakeTelegram {
         self.lock().no_markup_in_replies = true;
     }
 
+    /// Виджет в сообщении `message_id` спрашивает бота (`widget_query`, Bot API 10.4).
+    fn widget_asks(&self, user: i64, message_id: i64, data: &str) -> String {
+        let mut s = self.lock();
+        let id = s.next_update;
+        s.next_update += 1;
+        let query = format!("wq{id}");
+        s.updates.push(json!({
+            "update_id": id,
+            "widget_query": {
+                "id": query,
+                "from": { "id": user, "is_bot": false, "first_name": "Client" },
+                "chat": { "id": user, "type": "private" },
+                "message_id": message_id,
+                "chat_instance": "1",
+                "type": { "type": "data" },
+                "data": data,
+            }
+        }));
+        query
+    }
+
     /// Клиент нажимает инлайн-кнопку `data` под сообщением `message_id`.
     fn client_presses(&self, message_id: i64, data: &str) {
         self.press(message_id, data, 0);
@@ -309,6 +332,7 @@ impl FakeTelegram {
 
     async fn respond(&self, method: &str, body: Value) -> Value {
         if method == "getUpdates" {
+            self.lock().allowed_updates = body["allowed_updates"].clone();
             let offset = body["offset"].as_i64().unwrap_or(0);
             // Как Telegram: запрос с `offset` подтверждает всё, что ниже, — больше не придёт.
             self.lock()
@@ -1675,6 +1699,35 @@ async fn a_slow_invoice_does_not_stop_the_bot_for_other_clients(pool: PgPool) {
             matches!(c.method.as_str(), "sendMessage" | "sendRichMessage")
                 && c.chat() == Some(CLIENT)
                 && c.contains("10.30")
+        })
+        .await;
+    bot.stop().await;
+}
+
+/// Шаг 6.7: на каждый запрос виджета бот отвечает (иначе у виджета `TIMEOUT` через 15 с) — даже
+/// на незнакомый: пустым ответом. Бот просит у Telegram запросы виджетов.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn every_widget_query_gets_an_answer(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let query = e.fake.widget_asks(CLIENT, 41, "no-such-command");
+    let answer = e
+        .fake
+        .wait_for("answerWidgetQuery", |c| c.method == "answerWidgetQuery")
+        .await;
+    assert_eq!(answer.body["widget_query_id"], query);
+    let kinds = e.fake.lock().allowed_updates.clone();
+    assert!(
+        kinds
+            .as_array()
+            .is_some_and(|k| k.contains(&json!("widget_query"))),
+        "{kinds}"
+    );
+    // Бот после запроса жив: клиенту отвечает как обычно.
+    e.fake.client_writes("привет");
+    e.fake
+        .wait_for("an answer to the client", |c| {
+            c.method == "sendMessage" && c.chat() == Some(CLIENT)
         })
         .await;
     bot.stop().await;

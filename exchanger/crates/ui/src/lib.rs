@@ -23,6 +23,7 @@ pub mod preview;
 pub mod screen;
 mod screens;
 pub mod texts;
+pub mod widgets;
 
 pub use callback::{Callback, InvestAction};
 pub use command::Command;

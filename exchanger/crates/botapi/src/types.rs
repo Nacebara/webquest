@@ -153,6 +153,56 @@ pub struct Message {
     /// отдаёт его в ответ на `sendMessage` / `editMessageText`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reply_to_message: Option<Box<Message>>,
+    /// Сообщение — виджет (Bot API 10.4, шаг 6.7 плана).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub widget: Option<Widget>,
+}
+
+/// Виджет в сообщении (`Message.widget`, Bot API 10.4): HTML и его состояние.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Widget {
+    /// Только у общего виджета (`is_shared`); exch общие не шлёт.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<i32>,
+    #[serde(default)]
+    pub html: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub public_data: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat_data: Option<String>,
+}
+
+/// Вид запроса виджета (`WidgetQueryType`): exch отвечает только на `data`; подпись и
+/// транзакции кошелька TON ему не нужны.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WidgetQueryType {
+    #[serde(rename = "type")]
+    pub kind: String,
+}
+
+/// Запрос виджета к боту (`widget_query`, Bot API 10.4). `data` — недоверенный ввод (1–64
+/// байта): сверять с тем, что хранит бот; `from` подделать нельзя — по нему проверять права.
+/// Ответить надо на каждый запрос за 15 секунд (`answerWidgetQuery`), иначе у виджета `TIMEOUT`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WidgetQuery {
+    pub id: String,
+    pub from: User,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat: Option<Chat>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_id: Option<i32>,
+    #[serde(default)]
+    pub chat_instance: String,
+    #[serde(rename = "type")]
+    pub kind: WidgetQueryType,
+    #[serde(default)]
+    pub data: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub widget_id: Option<String>,
 }
 
 impl Message {
@@ -237,6 +287,8 @@ pub enum UpdateKind {
     EditedMessage,
     CallbackQuery,
     MyChatMember,
+    /// Запросы виджетов (Bot API 10.4).
+    WidgetQuery,
 }
 
 /// Обновление. Виды, которые клиенту не нужны, приходят как обновление без полей —
@@ -250,6 +302,8 @@ pub struct Update {
     pub edited_message: Option<Message>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub callback_query: Option<CallbackQuery>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub widget_query: Option<WidgetQuery>,
 }
 
 impl Update {
@@ -260,6 +314,7 @@ impl Update {
             message: None,
             edited_message: None,
             callback_query: None,
+            widget_query: None,
         }
     }
 
@@ -275,6 +330,12 @@ impl Update {
                     .and_then(|q| q.message.as_ref())
                     .map(|m| m.chat.id)
             })
+            .or_else(|| {
+                self.widget_query
+                    .as_ref()
+                    .and_then(|q| q.chat.as_ref())
+                    .map(|c| c.id)
+            })
     }
 
     /// Пользователь, от которого пришло обновление.
@@ -284,6 +345,7 @@ impl Update {
             .or(self.edited_message.as_ref())
             .and_then(|m| m.from.as_ref())
             .or_else(|| self.callback_query.as_ref().map(|q| &q.from))
+            .or_else(|| self.widget_query.as_ref().map(|q| &q.from))
     }
 }
 

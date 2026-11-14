@@ -14,6 +14,8 @@ import sys
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# Код виджетов — один на бота и на эту страницу: assets/widgets (шаг 6.7 плана).
+WIDGETS = os.path.join(HERE, "..", "..", "..", "assets", "widgets")
 HTML_MAX, ZIP_MAX, DATA_MAX = 32768, 4096, 1024
 
 
@@ -36,7 +38,7 @@ def main():
     states = {k: demos[v.get("same", k)]["states"] for k, v in demos.items()}
     src, sizes, bad = {}, {}, []
     for name in sorted({v["w"] for v in demos.values() if v.get("w")}):
-        with open(os.path.join(HERE, f"{name}.html"), encoding="utf-8") as f:
+        with open(os.path.join(WIDGETS, f"{name}.html"), encoding="utf-8") as f:
             html = f.read()
         raw = html.encode("utf-8")
         packed = len(zlib.compress(raw, 9))

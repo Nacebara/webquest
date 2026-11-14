@@ -72,8 +72,11 @@ pub(crate) async fn run(inner: Arc<Inner>, cancel: CancellationToken) {
     let mut last_conflict: Option<tokio::time::Instant> = None;
     tracing::info!("client bot: polling for updates");
     loop {
-        let request = GetUpdates::after(last, inner.cfg.poll_timeout_secs)
-            .allowed(vec![UpdateKind::Message, UpdateKind::CallbackQuery]);
+        let request = GetUpdates::after(last, inner.cfg.poll_timeout_secs).allowed(vec![
+            UpdateKind::Message,
+            UpdateKind::CallbackQuery,
+            UpdateKind::WidgetQuery,
+        ]);
         let result = tokio::select! {
             () = cancel.cancelled() => break,
             result = inner.api.bot().get_updates(&request) => result,
