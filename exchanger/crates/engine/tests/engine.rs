@@ -927,3 +927,113 @@ async fn saved_activation_result_finishes_the_order_after_a_restart(pool: PgPool
     assert_eq!(activations, 1, "кошелёк второй раз не спрашивали");
     e.assert_books_match().await;
 }
+
+async fn alert(e: &common::Env, title: &str) -> Option<(String, String, serde_json::Value, bool)> {
+    sqlx::query_as(
+        "SELECT dedup_key, level, payload, resolved_at IS NOT NULL FROM alerts WHERE title = $1 ORDER BY id DESC LIMIT 1",
+    )
+    .bind(title)
+    .fetch_optional(&e.pool)
+    .await
+    .unwrap()
+}
+
+/// Шаг 2.8 (Ю-3): Telegram ограничил аккаунт — критичная тревога «аккаунт ограничен» с меткой
+/// аккаунта и его кошельками; следующий ответ кошелька через этот аккаунт её закрывает.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_restricted_account_alerts_staff_and_clears_after_the_next_answer(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(CB, usdt(dec!(20))).unwrap();
+    accepted(e.submit(&url).await);
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::Rpc {
+            code: 400,
+            name: "PEER_FLOOD".to_owned(),
+        },
+        1,
+    );
+    e.drain().await;
+    let (key, level, payload, resolved) = alert(&e, "account_restricted").await.expect("alert");
+    assert_eq!(level, "critical");
+    assert!(key.starts_with("account_restricted:"), "{key}");
+    assert!(
+        payload["platforms"]
+            .as_array()
+            .is_some_and(|p| !p.is_empty()),
+        "{payload}"
+    );
+    assert!(!resolved);
+
+    // Аккаунт снова работает: следующая заявка проходит, тревога закрыта сама.
+    sqlx::query("UPDATE directions SET auto_paused = false, pause_reason = NULL")
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    let url = e.world.client_check(CB, usdt(dec!(7))).unwrap();
+    accepted(e.submit(&url).await);
+    e.drain().await;
+    let (_, _, _, resolved) = alert(&e, "account_restricted").await.unwrap();
+    assert!(resolved, "the wallet answered: the alert is closed");
+}
+
+/// Шаг 2.8: Telegram просит паузу дольше 5 минут — критичная тревога с минутами и временем конца.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_long_flood_wait_alerts_staff(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(CB, usdt(dec!(20))).unwrap();
+    accepted(e.submit(&url).await);
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::FloodWait(Duration::from_secs(47 * 60)),
+        1,
+    );
+    e.drain().await;
+    let (_, level, payload, _) = alert(&e, "flood_long").await.expect("alert");
+    assert_eq!(level, "critical");
+    assert_eq!(payload["wait_secs"], serde_json::json!(47 * 60));
+    assert!(payload["until"].as_str().is_some());
+}
+
+/// Шаг 2.8: короткую паузу Telegram (до 5 минут) бот пережидает молча.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_short_flood_wait_is_waited_out_silently(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(CB, usdt(dec!(20))).unwrap();
+    accepted(e.submit(&url).await);
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::FloodWait(Duration::from_secs(60)),
+        1,
+    );
+    e.drain().await;
+    assert!(alert(&e, "flood_long").await.is_none());
+}
+
+/// Шаг 2.8 (макет «Незнакомый ответ»): незнакомый ответ на активацию — направление на паузе и
+/// критичная тревога с ответом (длинные коды скрыты) и номером заявки.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn an_unknown_reply_alerts_staff_with_the_masked_text(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(XR, usdt(dec!(5))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::UnknownReply("Пожалуйста, улыбнитесь в камеру CQ12ABCDEFGH9F".to_owned()),
+        20,
+    );
+    e.drain().await;
+    let (_, level, payload, _) = alert(&e, "unknown_reply").await.expect("alert");
+    assert_eq!(level, "critical");
+    assert_eq!(payload["public"], serde_json::json!(order.public_id));
+    assert_eq!(payload["platform"], serde_json::json!("xrocket"));
+    let text = payload["text"].as_str().unwrap();
+    assert!(
+        text.contains("CQ12…9F") && !text.contains("ABCDEFGH"),
+        "{text}"
+    );
+}

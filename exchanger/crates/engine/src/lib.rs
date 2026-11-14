@@ -14,6 +14,7 @@
 //! `domain::fsm` (в `storage::orders::apply_event`); эффекты перехода — в той же транзакции
 //! ([`effects`]); выплата — одна попытка, неясный исход — сверка или `MANUAL_REVIEW`.
 
+pub mod account_alerts;
 pub mod availability;
 mod effects;
 pub mod fees;
@@ -149,6 +150,8 @@ pub struct Engine {
     /// Когда цикл движка последний раз прошёл круг (секунды Unix, 0 — ещё ни разу): по нему
     /// внешний пинг понимает, что движок жив (шаг 2.5).
     beat: std::sync::atomic::AtomicI64,
+    /// Последняя ошибка, с которой остановился цикл движка: в тревогу «Движок не работает».
+    last_error: std::sync::Mutex<Option<String>>,
 }
 
 impl std::fmt::Debug for Engine {
@@ -172,6 +175,7 @@ impl Engine {
             invest_updates,
             selftest_running: std::sync::atomic::AtomicBool::new(false),
             beat: std::sync::atomic::AtomicI64::new(0),
+            last_error: std::sync::Mutex::new(None),
         }
     }
 
@@ -257,7 +261,25 @@ impl Engine {
         }
     }
 
+    /// С какой ошибкой последний раз остановился цикл движка; `None` — не останавливался.
+    pub fn last_error(&self) -> Option<String> {
+        self.last_error.lock().ok().and_then(|e| e.clone())
+    }
+
     pub async fn run(
+        &self,
+        cancel: tokio_util::sync::CancellationToken,
+    ) -> Result<(), EngineError> {
+        let result = self.run_inner(cancel).await;
+        if let Err(e) = &result
+            && let Ok(mut last) = self.last_error.lock()
+        {
+            *last = Some(e.to_string());
+        }
+        result
+    }
+
+    async fn run_inner(
         &self,
         cancel: tokio_util::sync::CancellationToken,
     ) -> Result<(), EngineError> {

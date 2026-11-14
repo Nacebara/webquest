@@ -280,6 +280,19 @@ impl Engine {
         }
     }
 
+    /// Кошелёк ответил через аккаунт операции: тревоги «вход сброшен», «ограничен», «пауза»
+    /// по этому аккаунту закрываются. Сбой здесь — только в журнал: ответ важнее.
+    pub(crate) async fn wallet_answered(&self, op: &OperationRow) {
+        let r = async {
+            let mut conn = self.pool.acquire().await?;
+            crate::account_alerts::on_answer(&mut conn, op).await
+        }
+        .await;
+        if let Err(e) = r {
+            tracing::warn!(op = op.id, error = %e, "cannot close account alerts");
+        }
+    }
+
     /// Действие не выполнялось: вернуть операцию в очередь. Аккаунт ограничен или
     /// разлогинен, или операция не выполняется дольше `escalate_after` — к человеку и пауза.
     pub(crate) async fn release(&self, op: &OperationRow, e: &BotError) -> Result<(), EngineError> {
@@ -291,6 +304,11 @@ impl Engine {
             let mut conn = self.pool.acquire().await?;
             storage::operations::postpone(&mut conn, op.id, at, crate::UNANSWERED_PAUSE).await?;
             return Ok(());
+        }
+        // Вход сброшен, аккаунт ограничен, долгая пауза Telegram — тревога персоналу (шаг 2.8).
+        {
+            let mut conn = self.pool.acquire().await?;
+            crate::account_alerts::on_bot_error(&mut conn, op, e).await?;
         }
         let fatal = matches!(e, BotError::AccountRestricted | BotError::NotAuthorized);
         let stuck = op.first_released_at.is_some_and(|t| {
@@ -416,6 +434,7 @@ impl Engine {
             Ok(outcome) => outcome,
             Err(e) => return self.release(op, &e).await,
         };
+        self.wallet_answered(op).await;
         // Повторная попытка: «уже активирован» или «не найден» может означать, что чек забрала
         // НАША прошлая попытка (lovec AUDIT.md:46). Списывать деньги клиента нельзя — к человеку.
         let repeated_loss = op.attempts > 1
@@ -672,13 +691,22 @@ impl Engine {
                 if !unrecognised && !repeated_loss {
                     Self::pause_unanswered(&mut tx, op.platform).await?;
                 }
-                // Незнакомый ответ кошелька — приём на этой платформе на паузу (CLAUDE.md п. 13).
+                // Незнакомый ответ кошелька — приём на этой платформе на паузу (CLAUDE.md п. 13)
+                // и тревога персоналу (макет «Незнакомый ответ», шаг 2.8).
                 if unrecognised {
                     storage::directions::auto_pause_platform(
                         &mut tx,
                         op.platform,
                         Side::Source,
                         crate::UNKNOWN_REPLY_PAUSE,
+                    )
+                    .await?;
+                    crate::account_alerts::unknown_reply(
+                        &mut tx,
+                        op,
+                        text.as_deref().unwrap_or_default(),
+                        &order.public_id,
+                        order.direction.code(),
                     )
                     .await?;
                     tracing::error!(
@@ -825,6 +853,7 @@ impl Engine {
             Ok(outcome) => outcome,
             Err(e) => return self.release(op, &e).await,
         };
+        self.wallet_answered(op).await;
         // Сумма чека без ответа: чат кошелька занят, приём и выплаты через него — на паузу
         // сразу, как при активации без ответа (шаг 1.2).
         if outcome.holds_chat() {
@@ -1107,6 +1136,7 @@ impl Engine {
             Ok(outcome) => outcome,
             Err(e) => return self.release(op, &e).await,
         };
+        self.wallet_answered(op).await;
         let fiat = {
             let mut conn = self.pool.acquire().await?;
             storage::orders::details(&mut conn, order_id(op)?)

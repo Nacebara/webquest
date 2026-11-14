@@ -693,6 +693,7 @@ impl Engine {
             Ok(o) => o,
             Err(e) => return self.release(op, &e).await,
         };
+        self.wallet_answered(op).await;
         // Как у заявок: «уже активирован» на повторной попытке мог означать нашу прошлую.
         let repeated_loss = op.attempts > 1
             && matches!(
@@ -852,6 +853,7 @@ impl Engine {
             Ok(o) => o,
             Err(e) => return self.release(op, &e).await,
         };
+        self.wallet_answered(op).await;
         let outcome_holds_chat = outcome.holds_chat();
         match outcome {
             IssueOutcome::Issued { check, .. } => self.invest_issued(op, move_id, &check).await,

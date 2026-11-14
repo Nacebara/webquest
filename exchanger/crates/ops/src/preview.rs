@@ -229,6 +229,43 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
         &look.screen(&crate::stalled_screen(&texts, &payload, 0)),
     )
     .await;
+    // Критичные тревоги шага 2.8 (утверждены владельцем 14.11).
+    let now = chrono::Utc::now();
+    let critical = [
+        (
+            "login_lost",
+            serde_json::json!({"account": "ub-2", "userbot_id": 2, "platforms": ["xrocket"]}),
+        ),
+        (
+            "account_restricted",
+            serde_json::json!({"account": "ub-1", "userbot_id": 1, "platforms": ["cryptobot"]}),
+        ),
+        (
+            "flood_long",
+            serde_json::json!({"account": "ub-1", "userbot_id": 1, "platforms": ["cryptobot"],
+            "wait_secs": 2820, "until": (now + chrono::Duration::minutes(47)).to_rfc3339()}),
+        ),
+        (
+            "engine_down",
+            serde_json::json!({"since": (now - chrono::Duration::minutes(6)).to_rfc3339(),
+            "error": "another engine instance is running"}),
+        ),
+        ("second_instance", serde_json::json!({})),
+        (
+            "unknown_reply",
+            serde_json::json!({"platform": "xrocket", "text": "Чек CQ12…9F временно недоступен, попробуйте позже",
+            "order": 41, "public": "7F3A1C9D2B", "direction": "xr_to_cb_check", "at": now.to_rfc3339()}),
+        ),
+        (
+            "kill_switch",
+            serde_json::json!({"by": "Олег", "at": now.to_rfc3339()}),
+        ),
+    ];
+    for (title, payload) in critical {
+        if let Some(screen) = crate::critical_screen(&texts, title, &payload, 0, now) {
+            send_card(api, chat, &look.screen(&screen)).await;
+        }
+    }
     // Пульт: «Статистика» на данных макета — плитки и график одной картинкой.
     let _ = api
         .send_message(

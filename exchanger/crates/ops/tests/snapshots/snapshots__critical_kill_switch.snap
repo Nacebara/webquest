@@ -1,0 +1,13 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&text)
+---
+--- rich
+
+--- html
+⛔ <b>Выплаты остановлены</b>
+Олег · <tg-time unix="1794655200" format="t">14:20</tg-time>. Заявки ждут, деньги клиентов в леджере.
+Выключит владелец: введите <code>ПОДТВЕРЖДАЮ</code>.
+--- keyboard
+[{"text":"🛠 Обслуживание","callback_data":"a:st:m"}]
+[{"text":"👍 Принял","callback_data":"a:ack:9"}]

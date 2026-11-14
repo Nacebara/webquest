@@ -1,0 +1,12 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&text)
+---
+--- rich
+
+--- html
+⌛ <b>ub-1: Telegram просит паузу 47 мин</b> — до <tg-time unix="1794657720" format="t">15:02</tg-time>
+Операции через ub-1 ждут, новые чеки CryptoBot не принимаем до конца паузы. Короткие паузы (до 5 мин) бот пережидает молча.
+--- keyboard
+[{"text":"🤖 Аккаунты","callback_data":"a:b"}]
+[{"text":"👍 Принял","callback_data":"a:ack:9"}]

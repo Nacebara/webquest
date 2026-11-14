@@ -1,0 +1,13 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&text)
+---
+--- rich
+
+--- html
+🚨 <b>ub-2: вход сброшен</b>
+Telegram завершил сессию. ub-2 на паузе: приём и выплаты через xRocket закрыты.
+--- keyboard
+[{"text":"🔌 Войти заново","style":"primary","callback_data":"a:b"}]
+[{"text":"🔁 Заменить","callback_data":"a:b"},{"text":"🛑 Отключить","callback_data":"a:bp:2:1"}]
+[{"text":"👍 Принял","callback_data":"a:ack:9"}]

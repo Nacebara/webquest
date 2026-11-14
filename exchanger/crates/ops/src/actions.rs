@@ -1789,6 +1789,27 @@ impl Inner {
                     .unwrap_or_else(|| json!({}));
                 value["on"] = json!(on);
                 storage::settings::set(&mut tx, key, &value, Some(staff_id)).await?;
+                // Стоп-кран — критичная тревога всему персоналу, пока его не снимут (шаг 2.8).
+                if *flag == Flag::KillSwitch {
+                    if *on {
+                        storage::alerts::raise_condition(
+                            &mut tx,
+                            &storage::alerts::NewAlert {
+                                level: storage::alerts::Level::Critical,
+                                topic: storage::alerts::Topic::Errors,
+                                dedup_key: "kill_switch",
+                                title: "kill_switch",
+                                payload: json!({
+                                    "by": staff.display_name,
+                                    "at": chrono::Utc::now().to_rfc3339(),
+                                }),
+                            },
+                        )
+                        .await?;
+                    } else {
+                        storage::alerts::resolve(&mut tx, "kill_switch").await?;
+                    }
+                }
                 (
                     "settings.flag",
                     "settings",

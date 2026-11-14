@@ -1,0 +1,13 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&text)
+---
+--- rich
+
+--- html
+🚨 <b>ub-1: аккаунт ограничен</b>
+Telegram ограничил аккаунт — отправлять сообщения ботам кошельков он не может. ub-1 на паузе: приём и выплаты через CryptoBot закрыты.
+Деньги клиентов — в леджере, начатые заявки ждут.
+--- keyboard
+[{"text":"🔁 Заменить аккаунт","style":"primary","callback_data":"a:b"},{"text":"🤖 Аккаунты","callback_data":"a:b"}]
+[{"text":"👍 Принял","callback_data":"a:ack:9"}]

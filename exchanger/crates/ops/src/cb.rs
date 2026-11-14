@@ -197,6 +197,8 @@ pub enum Cb {
     IntakeAsCheck(i64),
     Cancel,
     Ack(i64),
+    /// «Сохранить фикстуру» у тревоги «Незнакомый ответ»: ответ кошелька — JSON для разработчика.
+    Fixture(i64),
     Reconcile,
     Selftest,
     /// Провести расхождение из события сверки как взнос или вывод владельца.
@@ -351,6 +353,7 @@ impl Cb {
             Cb::IntakeAsCheck(id) => format!("iac:{id}"),
             Cb::Cancel => "no".into(),
             Cb::Ack(id) => format!("ack:{id}"),
+            Cb::Fixture(id) => format!("fx:{id}"),
             Cb::Reconcile => "rc".into(),
             Cb::Selftest => "stt".into(),
             Cb::Capital(id) => format!("cap:{id}"),
@@ -455,6 +458,7 @@ impl Cb {
             ["ou", n] => Cb::ConfirmUnknown((*n).to_owned()),
             ["no"] => Cb::Cancel,
             ["ack", _] => Cb::Ack(id(1)?),
+            ["fx", _] => Cb::Fixture(id(1)?),
             ["rc"] => Cb::Reconcile,
             ["stt"] => Cb::Selftest,
             ["cap", _] => Cb::Capital(id(1)?),
@@ -529,6 +533,7 @@ mod tests {
             Cb::Member(big),
             Cb::MemberDisable(big),
             Cb::Ack(big),
+            Cb::Fixture(big),
             Cb::BotPause(i16::MAX, true),
             Cb::PromoTarget(Platform::CryptoBot),
             Cb::PromoTarget(Platform::XRocket),

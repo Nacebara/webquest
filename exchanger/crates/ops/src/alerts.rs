@@ -27,6 +27,14 @@ fn s(v: &Value, key: &str) -> String {
     }
 }
 
+fn platform_of(name: &str) -> Option<domain::Platform> {
+    match name {
+        "cryptobot" => Some(domain::Platform::CryptoBot),
+        "xrocket" => Some(domain::Platform::XRocket),
+        _ => None,
+    }
+}
+
 fn dec(v: &Value, key: &str) -> domain::Decimal {
     s(v, key).parse().unwrap_or_default()
 }
@@ -75,6 +83,32 @@ impl Inner {
             if !queue.iter().any(|q| q.id == id) {
                 storage::alerts::resolve(&mut conn, &key).await?;
             }
+        }
+        // 1б. Движок не проходит круг дольше `engine_down_after` (шаг 2.8): тревога, пока не
+        // заработает. Минуты считаются при показе — от `since`.
+        let after = self.cfg.engine_down_after;
+        let quiet = match self.engine.last_beat() {
+            Some(t) => (chrono::Utc::now() - t).to_std().unwrap_or_default(),
+            None => self.started.elapsed(),
+        };
+        if quiet >= after && self.started.elapsed() >= after {
+            let since = chrono::Utc::now() - chrono::Duration::from_std(quiet).unwrap_or_default();
+            storage::alerts::ensure_condition(
+                &mut conn,
+                &NewAlert {
+                    level: Level::Critical,
+                    topic: Topic::Errors,
+                    dedup_key: "engine_down",
+                    title: "engine_down",
+                    payload: json!({
+                        "since": since.to_rfc3339(),
+                        "error": self.engine.last_error(),
+                    }),
+                },
+            )
+            .await?;
+        } else if quiet < after {
+            storage::alerts::resolve(&mut conn, "engine_down").await?;
         }
         // 2. Доставка: новые и изменившиеся — новым сообщением или правкой копии; критичные,
         // которые никто не принял 15 минут, — повтор новым сообщением со звуком вместо прежнего.
@@ -177,7 +211,9 @@ impl Inner {
                 .parse::<Direction>()
                 .map_or_else(|_| esc(&s(p, key)), |d| self.dir_name(d))
         };
+        let critical = critical_screen(t, &a.title, p, a.id, a.first_at);
         let mut screen = match a.title.as_str() {
+            _ if critical.is_some() => critical.unwrap_or_default(),
             "manual_review" => {
                 let id = p["id"].as_i64().unwrap_or_default();
                 let amount = s(p, "amount");
@@ -331,6 +367,31 @@ impl Inner {
         screen
     }
 
+    /// «Сохранить фикстуру»: ответ кошелька из тревоги «Незнакомый ответ» — готовой строкой для
+    /// `crates/parsers/tests/fixtures` (CLAUDE.md п. 13: словарь не подгоняют, добавляют
+    /// фикстуру). Отдельным сообщением: тревога остаётся на месте.
+    pub(crate) async fn fixture(&self, chat: i64, id: i64) -> Result<(), OpsError> {
+        let alert = {
+            let mut conn = self.pool.acquire().await?;
+            storage::alerts::get(&mut conn, id).await?
+        };
+        let Some(alert) = alert.filter(|a| a.title == "unknown_reply") else {
+            return Ok(());
+        };
+        let case = json!({
+            "platform": alert.payload["platform"],
+            "text": alert.payload["text"],
+            "class": "?",
+        });
+        let text = self
+            .texts
+            .f("alert.fixture", &[("json", &esc(&case.to_string()))]);
+        self.api
+            .send_message(&SendMessage::html(chat, text))
+            .await?;
+        Ok(())
+    }
+
     /// «Принял»: событие закрыто, у всех копий — отметка и без кнопки «Принял».
     pub(crate) async fn ack(&self, staff: &StaffMember, id: i64) -> Result<(), OpsError> {
         let alert = {
@@ -384,6 +445,161 @@ impl Inner {
         }
         Ok(())
     }
+}
+
+/// Критичные тревоги шага 2.8 (утверждены владельцем 14.11 и в макете пульта): вход сброшен,
+/// аккаунт ограничен, долгая пауза Telegram, движок не работает, бот запущен дважды, незнакомый
+/// ответ, стоп-кран. `None` — тревога другого вида.
+pub fn critical_screen(
+    t: &crate::Texts,
+    title: &str,
+    p: &Value,
+    id: i64,
+    first_at: chrono::DateTime<chrono::Utc>,
+) -> Option<Screen> {
+    let screen = match title {
+        "login_lost" | "account_restricted" | "flood_long" => {
+            let account = esc(&s(p, "account"));
+            let platforms = p["platforms"]
+                .as_array()
+                .map(|v| {
+                    v.iter()
+                        .filter_map(|x| x.as_str().and_then(platform_of))
+                        .map(|x| t.t(&format!("names.{}", x.db_name())))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
+                .unwrap_or_default();
+            let route = t.f("alert.route_closed", &[("platforms", &platforms)]);
+            let ub = p["userbot_id"].as_i64().and_then(|x| i16::try_from(x).ok());
+            match title {
+                "login_lost" => {
+                    let mut sc = Screen::new(t.f(
+                        "alert.login_lost",
+                        &[("account", &account), ("route", &route)],
+                    ))
+                    .row(vec![
+                        btn(t.t("alert.b_relogin"), &Cb::Bots).style(botapi::ButtonStyle::Primary),
+                    ]);
+                    let mut second = vec![btn(t.t("alert.b_replace"), &Cb::Bots)];
+                    if let Some(ub) = ub {
+                        second.push(btn(t.t("alert.b_disable"), &Cb::BotPause(ub, true)));
+                    }
+                    sc = sc.row(second);
+                    sc.row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
+                }
+                "account_restricted" => Screen::new(t.f(
+                    "alert.account_restricted",
+                    &[("account", &account), ("route", &route)],
+                ))
+                .row(vec![
+                    btn(t.t("alert.b_replace_account"), &Cb::Bots)
+                        .style(botapi::ButtonStyle::Primary),
+                    btn(t.t("alert.b_accounts"), &Cb::Bots),
+                ])
+                .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))]),
+                _ => {
+                    let minutes = p["wait_secs"].as_u64().unwrap_or_default().div_ceil(60);
+                    let until = s(p, "until")
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .map(crate::dash::hhmm)
+                        .unwrap_or_default();
+                    Screen::new(t.f(
+                        "alert.flood_long",
+                        &[
+                            ("account", &account),
+                            ("minutes", &minutes),
+                            ("until", &until),
+                            ("platforms", &platforms),
+                        ],
+                    ))
+                    .row(vec![btn(t.t("alert.b_accounts"), &Cb::Bots)])
+                    .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
+                }
+            }
+        }
+        "engine_down" => {
+            let since = s(p, "since")
+                .parse::<chrono::DateTime<chrono::Utc>>()
+                .unwrap_or(first_at);
+            let minutes = (chrono::Utc::now() - since).num_minutes().max(1);
+            let error = match p["error"].as_str() {
+                Some(e) if !e.is_empty() => t.f(
+                    "alert.engine_error",
+                    &[("error", &esc(&ui::html::clip(e, 300)))],
+                ),
+                _ => String::new(),
+            };
+            Screen::new(t.f(
+                "alert.engine_down",
+                &[("minutes", &minutes), ("error", &error)],
+            ))
+            .row(vec![
+                btn(t.t("alert.b_system"), &Cb::System).style(botapi::ButtonStyle::Primary),
+            ])
+            .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
+        }
+        "second_instance" => Screen::new(t.t("alert.second_instance"))
+            .row(vec![btn(t.t("alert.b_system"), &Cb::System)])
+            .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))]),
+        "unknown_reply" => {
+            let platform = s(p, "platform");
+            let name = platform_of(&platform).map_or_else(
+                || esc(&platform),
+                |x| t.t(&format!("names.{}", x.db_name())),
+            );
+            let at = s(p, "at")
+                .parse::<chrono::DateTime<chrono::Utc>>()
+                .map(crate::dash::hhmm)
+                .unwrap_or_default();
+            let direction = s(p, "direction").parse::<Direction>().ok();
+            let mut sc = Screen::new(t.f(
+                "alert.unknown_reply",
+                &[
+                    ("platform", &name),
+                    ("at", &at),
+                    ("text", &esc(&s(p, "text"))),
+                    (
+                        "direction",
+                        &direction.map_or_else(
+                            || esc(&s(p, "direction")),
+                            |d| t.t(&format!("names.{}", d.code())),
+                        ),
+                    ),
+                    ("public", &esc(&s(p, "public"))),
+                ],
+            ))
+            .row(vec![btn(t.t("alert.b_fixture"), &Cb::Fixture(id))]);
+            let mut second = Vec::new();
+            if let Some(d) = direction {
+                second.push(btn(t.t("alert.b_unpause"), &Cb::DirClearAuto(d)));
+            }
+            if let Some(order) = p["order"].as_i64() {
+                second.push(btn(t.t("alert.b_order"), &Cb::Order(order)));
+            }
+            if !second.is_empty() {
+                sc = sc.row(second);
+            }
+            sc.row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
+        }
+        "kill_switch" => {
+            let at = s(p, "at")
+                .parse::<chrono::DateTime<chrono::Utc>>()
+                .map(crate::dash::hhmm)
+                .unwrap_or_default();
+            Screen::new(t.f(
+                "alert.kill_switch",
+                &[("by", &esc(&s(p, "by"))), ("at", &at)],
+            ))
+            .row(vec![btn(
+                t.t("alert.b_maint"),
+                &Cb::Toggle(crate::cb::Flag::Maintenance),
+            )])
+            .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
+        }
+        _ => return None,
+    };
+    Some(screen)
 }
 
 /// Макет «Недостача»: «xRocket: меньше на 12.00 · Леджер … · реально … · ub-1 · Выплаты в

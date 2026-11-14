@@ -614,12 +614,17 @@ async fn settings_toggle_the_newcomer_limit_and_the_kill_switch(pool: PgPool) {
         .press(OWNER, &settings, "Включить стоп-кран", "Стоп-кран выплат")
         .await;
     assert!(preview.text().contains("random_id"));
+    let mark = o.tg.mark();
     o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
     assert!(
         storage::settings::flag(&mut conn, "kill_switch_payouts", false)
             .await
             .unwrap()
     );
+    // Шаг 2.8: стоп-кран — критичная тревога всему персоналу («Выплаты остановлены», кто и когда).
+    let alert = o.tg.screen(mark, ADMIN, "Выплаты остановлены").await;
+    assert!(alert.text().contains("Игнат"), "{}", alert.text());
+    assert!(alert.button("Обслуживание").is_some());
     let admin = o.say(ADMIN, "/settings", "Настройки").await;
     o.press(ADMIN, &admin, "Выключить стоп-кран", "роли «Владелец»")
         .await;
@@ -648,6 +653,23 @@ async fn settings_toggle_the_newcomer_limit_and_the_kill_switch(pool: PgPool) {
             .await
             .unwrap()
     );
+    // Стоп-кран снят — тревога закрыта сама.
+    let open = storage::alerts::open_by_key(&mut conn, "kill_switch")
+        .await
+        .unwrap();
+    assert!(open.is_none(), "{open:?}");
+}
+
+/// Шаг 2.8: движок не проходит круг дольше `engine_down_after` — тревога «Движок не работает»
+/// с последней ошибкой; ведёт в «Систему».
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_silent_engine_raises_the_engine_down_alert(pool: PgPool) {
+    let o = ops_with(pool, |c| c.engine_down_after = Duration::from_millis(300)).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    // В тестах цикл движка не запущен — он «молчит» с запуска пульта.
+    let alert = o.tg.screen(0, OWNER, "Движок не работает").await;
+    assert!(alert.button("Система").is_some());
+    assert!(alert.button("Принял").is_some());
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]

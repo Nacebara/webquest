@@ -1,0 +1,11 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&text)
+---
+--- rich
+
+--- html
+🚨 <b>Движок не работает</b>
+--- keyboard
+[{"text":"🖥 Система","style":"primary","callback_data":"a:sy"}]
+[{"text":"👍 Принял","callback_data":"a:ack:9"}]

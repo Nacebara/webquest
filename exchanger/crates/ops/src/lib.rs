@@ -22,7 +22,7 @@
 
 mod actions;
 mod alerts;
-pub use alerts::{mismatch_screen, stalled_screen};
+pub use alerts::{critical_screen, mismatch_screen, stalled_screen};
 mod cb;
 pub mod chart;
 mod dash;
@@ -75,6 +75,8 @@ pub struct OpsConfig {
     /// Как часто повторять критичную тревогу, пока её никто не принял (макет «Алерт и
     /// «Принял»», шаг 2.8): новое сообщение со звуком, прежнее удаляется.
     pub repeat_every: Duration,
+    /// Сколько движок может не проходить круг, прежде чем тревога «Движок не работает».
+    pub engine_down_after: Duration,
     /// Сколько живёт кнопка «Подтвердить» (SPEC §7.4: 60 с).
     pub confirm_ttl: Duration,
     /// Сколько ждать ответа на вопрос пульта.
@@ -90,6 +92,7 @@ impl Default for OpsConfig {
         Self {
             alert_every: Duration::from_secs(5),
             repeat_every: Duration::from_secs(15 * 60),
+            engine_down_after: Duration::from_secs(5 * 60),
             confirm_ttl: Duration::from_secs(60),
             input_ttl: Duration::from_secs(600),
             owner_id: None,
@@ -717,6 +720,10 @@ impl Inner {
             Cb::AskOwner(nonce) => self.ask_owner(staff, &nonce).await?,
             Cb::Ack(id) => {
                 self.ack(staff, id).await?;
+                return Ok(None);
+            }
+            Cb::Fixture(id) => {
+                self.fixture(chat, id).await?;
                 return Ok(None);
             }
             Cb::Inbox => self.inbox(0).await?,

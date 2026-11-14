@@ -152,3 +152,55 @@ fn reconcile_alerts_with_unsettled_operations() {
     let screen = Look::plain().screen(&ops::stalled_screen(&t, &selftest, 4));
     insta::assert_snapshot!("reconcile_stalled_selftest", dump(&screen));
 }
+
+/// Критичные тревоги шага 2.8 (утверждены владельцем 14.11 и в макете пульта).
+#[test]
+fn critical_alerts() {
+    let t = Texts::builtin().unwrap();
+    let first = "2026-11-14T11:15:00Z".parse().unwrap();
+    let cases = [
+        (
+            "login_lost",
+            serde_json::json!({"account": "ub-2", "userbot_id": 2, "platforms": ["xrocket"]}),
+        ),
+        (
+            "account_restricted",
+            serde_json::json!({"account": "ub-1", "userbot_id": 1, "platforms": ["cryptobot"]}),
+        ),
+        (
+            "flood_long",
+            serde_json::json!({"account": "ub-1", "userbot_id": 1, "platforms": ["cryptobot"],
+                "wait_secs": 2820, "until": "2026-11-14T12:02:00+00:00"}),
+        ),
+        (
+            "engine_down",
+            serde_json::json!({"since": "2026-11-14T11:09:00+00:00",
+                "error": "another engine instance is running"}),
+        ),
+        (
+            "second_instance",
+            serde_json::json!({"error": "Conflict: terminated by other getUpdates request"}),
+        ),
+        (
+            "unknown_reply",
+            serde_json::json!({"platform": "xrocket", "text": "Чек CQ12…9F временно недоступен, попробуйте позже",
+                "order": 41, "public": "7F3A1C9D2B", "direction": "xr_to_cb_check",
+                "at": "2026-11-14T11:02:00+00:00"}),
+        ),
+        (
+            "kill_switch",
+            serde_json::json!({"by": "Олег", "at": "2026-11-14T11:20:00+00:00"}),
+        ),
+    ];
+    for (title, payload) in cases {
+        let screen = ops::critical_screen(&t, title, &payload, 9, first).unwrap();
+        let mut text = Look::plain().screen(&screen);
+        // «· N мин» у «Движок не работает» считается от текущего времени — в снимке не нужен.
+        if title == "engine_down" {
+            text.text = text.text.split(" · ").next().unwrap().to_owned();
+            text.rich = None;
+        }
+        insta::assert_snapshot!(format!("critical_{title}"), dump(&text));
+    }
+    assert!(ops::critical_screen(&t, "manual_review", &serde_json::json!({}), 1, first).is_none());
+}
