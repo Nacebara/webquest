@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE orders SET progress_chat_id = $2, progress_message_id = $3, progress_sent_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "aec6db2321e01afce3f356f71319d96a2224247b1b514f2fd317bb1127ada82f"
+}

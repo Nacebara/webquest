@@ -454,6 +454,10 @@ proptest! {
                 ui.terms(&terms),
                 ui.order_done(&order, &common::breakdown(), &s, 9, true),
                 ui.manual_review(&order, Some(&common::usdt(dec!(1))), 15),
+                ui.result_below(
+                    &ui.manual_review(&order, Some(&common::usdt(dec!(1))), 15),
+                    Some(&common::usdt(dec!(1))),
+                ),
             ];
             for screen in &screens {
                 prop_assert!(validate(&screen.html, false).is_ok(), "{mode}: {:?} → {}", s, screen.html);

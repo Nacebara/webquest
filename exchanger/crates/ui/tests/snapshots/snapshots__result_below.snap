@@ -1,0 +1,17 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+🛠 <b>Проверяю вручную</b>
+Деньги у меня: <code>100.00</code> USDT.
+<i>Итог — ниже ⬇️</i>
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000006">🛠</tg-emoji> <b>Проверяю вручную</b>
+Деньги у меня: <code>100.00</code> USDT.
+<i>Итог — ниже ⬇️</i>
+--- keyboard: none

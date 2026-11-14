@@ -425,6 +425,22 @@ impl Ui {
         self.plain(body, keyboard)
     }
 
+    /// Прежнее сообщение заявки, когда итог ушёл новым сообщением (шаг 6.1, макет принят 14.11):
+    /// первая строка прежнего шага (`step` — его экран), деньги у сервиса и «Итог — ниже ⬇️».
+    /// Кнопок нет: нажимать устаревшее незачем.
+    pub fn result_below(&self, step: &Screen, with_me: Option<&Money>) -> Screen {
+        let t = &self.texts.manual;
+        let first = step.html.lines().next().unwrap_or_default();
+        let mut body = Frag::trusted(first);
+        if let Some(m) = with_me {
+            body.push_text("\n");
+            body.push(&self.fill(&t.with_me, &[("amount", &self.money(m))]));
+        }
+        body.push_text("\n");
+        body.push(&self.fill(&t.below, &[]));
+        self.plain(body, Keyboard::None)
+    }
+
     fn refund_reason(&self, reason: &RefundReason) -> Frag {
         let r = &self.texts.refund_reasons;
         match reason {

@@ -1732,3 +1732,60 @@ async fn every_widget_query_gets_an_answer(pool: PgPool) {
         .await;
     bot.stop().await;
 }
+
+/// Шаг 6.1 (К-1, AUDIT-UI Д1; макет принят 14.11): итог, пришедший позже чем через минуту после
+/// сообщения заявки, — новым сообщением, чтобы клиенту пришло уведомление; прежнее сообщение —
+/// «Итог — ниже ⬇️» без кнопок. Итог быстрее минуты — правкой того же сообщения (тест выше).
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_late_result_comes_as_a_new_message(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    e.fake.client_writes(&format!("Вот чек: {url}"));
+    e.fake
+        .wait_for("order message", |c| {
+            c.method == "sendMessage" && c.chat() == Some(CLIENT)
+        })
+        .await;
+    let (order_id, first, _) = e.order_message().await;
+    // Сообщение заявки ушло две минуты назад: итог будет «поздним».
+    sqlx::query("UPDATE orders SET progress_sent_at = now() - interval '2 minutes' WHERE id = $1")
+        .bind(order_id)
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    e.drain().await;
+    let (_, state, _, _, payout_url) = e.orders().await[0].clone();
+    assert_eq!(state, OrderState::Completed);
+    let payout_url = payout_url.expect("ссылка на чек выплаты");
+    e.fake
+        .wait_for("the result as a new message", |c| {
+            c.method == "sendMessage" && c.chat() == Some(CLIENT) && c.contains(&payout_url)
+        })
+        .await;
+    let below = e
+        .fake
+        .wait_for("«Итог — ниже» in the old message", |c| {
+            c.method == "editMessageText"
+                && c.message_id() == Some(first)
+                && c.contains("Итог — ниже")
+        })
+        .await;
+    assert!(
+        below.body["reply_markup"]["inline_keyboard"]
+            .as_array()
+            .is_none_or(|k| k.is_empty()),
+        "у старого сообщения кнопок нет: {}",
+        below.body
+    );
+    // Новое сообщение теперь — сообщение заявки; повторный проход не шлёт итог ещё раз.
+    let (_, now_message, _) = e.order_message().await;
+    assert_ne!(now_message, first);
+    e.drain().await;
+    bot.stop().await;
+    assert_eq!(
+        e.fake.calls_of("sendMessage").len(),
+        2,
+        "сообщение заявки и итог — ровно два"
+    );
+}

@@ -390,6 +390,8 @@ pub struct InvoiceTexts {
 pub struct ManualTexts {
     pub review: String,
     pub review_unknown: String,
+    pub with_me: String,
+    pub below: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

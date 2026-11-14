@@ -52,6 +52,10 @@ pub struct OrderView {
     /// Когда заявка вошла в текущее состояние (по журналу переходов).
     pub state_since: DateTime<Utc>,
     pub progress: Option<ProgressMessage>,
+    /// Когда отправлено сообщение заявки (`None` — заявка старше миграции 0006).
+    pub progress_sent_at: Option<DateTime<Utc>>,
+    /// Из какого состояния заявка пришла в текущее (для строки «Итог — ниже»).
+    pub previous_state: Option<OrderState>,
 }
 
 /// Строка истории клиента.
@@ -130,7 +134,7 @@ pub async fn set_progress_message(
     message: ProgressMessage,
 ) -> Result<(), StorageError> {
     let updated = sqlx::query!(
-        "UPDATE orders SET progress_chat_id = $2, progress_message_id = $3 WHERE id = $1",
+        "UPDATE orders SET progress_chat_id = $2, progress_message_id = $3, progress_sent_at = now() WHERE id = $1",
         order_id,
         message.chat_id,
         message.message_id
@@ -187,6 +191,8 @@ struct ViewRow {
     state_since: DateTime<Utc>,
     progress_chat_id: Option<i64>,
     progress_message_id: Option<i32>,
+    progress_sent_at: Option<DateTime<Utc>>,
+    previous_state: Option<String>,
 }
 
 impl ViewRow {
@@ -216,6 +222,12 @@ impl ViewRow {
             finished_at: self.finished_at,
             state_since: self.state_since,
             progress: progress(self.progress_chat_id, self.progress_message_id),
+            progress_sent_at: self.progress_sent_at,
+            previous_state: self
+                .previous_state
+                .as_deref()
+                .map(|s| parse("order_transitions.from_state", s))
+                .transpose()?,
         })
     }
 }
@@ -241,7 +253,10 @@ pub async fn order_view(
                COALESCE((SELECT max(t.at) FROM order_transitions t
                           WHERE t.order_id = o.id AND t.to_state = o.state),
                         o.created_at) AS "state_since!",
-               o.progress_chat_id, o.progress_message_id
+               o.progress_chat_id, o.progress_message_id, o.progress_sent_at,
+               (SELECT t.from_state FROM order_transitions t
+                 WHERE t.order_id = o.id AND t.to_state = o.state
+                 ORDER BY t.id DESC LIMIT 1) AS previous_state
           FROM orders o
          WHERE o.id = $1
         "#,
@@ -274,7 +289,10 @@ pub async fn order_view_for_user(
                COALESCE((SELECT max(t.at) FROM order_transitions t
                           WHERE t.order_id = o.id AND t.to_state = o.state),
                         o.created_at) AS "state_since!",
-               o.progress_chat_id, o.progress_message_id
+               o.progress_chat_id, o.progress_message_id, o.progress_sent_at,
+               (SELECT t.from_state FROM order_transitions t
+                 WHERE t.order_id = o.id AND t.to_state = o.state
+                 ORDER BY t.id DESC LIMIT 1) AS previous_state
           FROM orders o
          WHERE o.public_id = $1 AND o.user_id = $2
         "#,

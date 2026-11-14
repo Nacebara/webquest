@@ -62,6 +62,42 @@ pub(crate) struct RenderCfg<'a> {
 /// Через сколько секунд от начала заявки шаг считается долгим (макет B1: 20 секунд).
 pub(crate) const SLOW_AFTER: std::time::Duration = std::time::Duration::from_secs(20);
 
+/// Итог позже этого после отправки сообщения заявки — новым сообщением (правило макета:
+/// «если прошло больше минуты — итог новым сообщением, чтобы пришло уведомление»; шаг 6.1).
+pub(crate) const LATE_AFTER: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Итог заявки, о котором клиенту должно прийти уведомление, — и пришёл он поздно: позже
+/// [`LATE_AFTER`] после отправки её сообщения. После того как итог ушёл новым сообщением, время
+/// отправки — уже после итога, и второй раз он не уйдёт. Заявки без времени отправки (старше
+/// миграции 0006) — как раньше.
+fn late_result(view: &OrderView) -> bool {
+    let result = matches!(
+        view.state,
+        OrderState::Completed
+            | OrderState::Refunded
+            | OrderState::ClosedManual
+            | OrderState::IntakeFailed
+            | OrderState::Expired
+    );
+    let late = chrono::Duration::from_std(LATE_AFTER).unwrap_or_default();
+    result
+        && view
+            .progress_sent_at
+            .is_some_and(|sent| view.state_since - sent > late)
+}
+
+/// В прежнем шаге деньги клиента были у сервиса — строка «Деньги у меня».
+fn money_was_with_us(state: OrderState) -> bool {
+    matches!(
+        state,
+        OrderState::Received
+            | OrderState::PayoutPending
+            | OrderState::InvoicePayPending
+            | OrderState::RefundPending
+            | OrderState::ManualReview
+    )
+}
+
 fn money(view: &OrderView, amount: Option<Decimal>) -> Option<Money> {
     amount.and_then(|a| Money::new(a, view.asset).ok())
 }
@@ -477,6 +513,40 @@ pub(crate) async fn ensure_message(
     let screen = render(&inner.ui(), &cfg, &view, &extra);
     let digest = digest(&screen);
     match view.progress {
+        Some(p) if late_result(&view) => {
+            // Сначала итог новым сообщением (со звуком), потом — «Итог — ниже» в прежнем.
+            inner
+                .send_progress(&view, p.chat_id, &screen, digest)
+                .await?;
+            if inner.memory(|m| m.unreachable.contains(&order_id)) {
+                return Ok(());
+            }
+            let ui = inner.ui();
+            let step = view.previous_state.map(|prev| {
+                let was = OrderView {
+                    state: prev,
+                    ..view.clone()
+                };
+                render(&ui, &cfg, &was, &extra)
+            });
+            let with_me = view
+                .previous_state
+                .filter(|s| money_was_with_us(*s))
+                .and_then(|_| money(&view, view.intake_amount));
+            let below = ui.result_below(step.as_ref().unwrap_or(&screen), with_me.as_ref());
+            if let Err(e) = inner
+                .edit_flow(p.chat_id, p.message_id, view.user_id, &below)
+                .await
+            {
+                tracing::debug!(order = order_id, error = %e, "old order message not marked «result below»");
+            }
+            tracing::info!(
+                order = order_id,
+                state = view.state.as_db_str(),
+                "late result sent as a new message"
+            );
+            Ok(())
+        }
         Some(p) => {
             if inner.memory(|m| m.rendered.get(&order_id) == Some(&digest)) {
                 return Ok(());
@@ -689,6 +759,8 @@ mod tests {
             finished_at: None,
             state_since: at,
             progress: None,
+            progress_sent_at: None,
+            previous_state: None,
         }
     }
 

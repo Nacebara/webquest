@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.state,\n               o.intake_amount, o.fee_pct_applied, o.fee_amount, o.payout_amount,\n               o.refund_amount, o.invoice_amount, o.quote_amount_in, o.quote_expires_at,\n               o.invoice_fiat, o.invoice_fiat_amount,\n               COALESCE((SELECT d.fiat_buffer_pct FROM directions d WHERE d.code = o.direction),\n                        0) AS \"fiat_buffer_pct!\",\n               COALESCE((SELECT t.data->>'event' = 'CheckRejected' FROM order_transitions t\n                          WHERE t.order_id = o.id ORDER BY t.id DESC LIMIT 1),\n                        FALSE) AS \"last_check_rejected!\",\n               o.payout_check_url, o.failure_code, o.created_at, o.finished_at,\n               COALESCE((SELECT max(t.at) FROM order_transitions t\n                          WHERE t.order_id = o.id AND t.to_state = o.state),\n                        o.created_at) AS \"state_since!\",\n               o.progress_chat_id, o.progress_message_id\n          FROM orders o\n         WHERE o.public_id = $1 AND o.user_id = $2\n        ",
+  "query": "\n        SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.state,\n               o.intake_amount, o.fee_pct_applied, o.fee_amount, o.payout_amount,\n               o.refund_amount, o.invoice_amount, o.quote_amount_in, o.quote_expires_at,\n               o.invoice_fiat, o.invoice_fiat_amount,\n               COALESCE((SELECT d.fiat_buffer_pct FROM directions d WHERE d.code = o.direction),\n                        0) AS \"fiat_buffer_pct!\",\n               COALESCE((SELECT t.data->>'event' = 'CheckRejected' FROM order_transitions t\n                          WHERE t.order_id = o.id ORDER BY t.id DESC LIMIT 1),\n                        FALSE) AS \"last_check_rejected!\",\n               o.payout_check_url, o.failure_code, o.created_at, o.finished_at,\n               COALESCE((SELECT max(t.at) FROM order_transitions t\n                          WHERE t.order_id = o.id AND t.to_state = o.state),\n                        o.created_at) AS \"state_since!\",\n               o.progress_chat_id, o.progress_message_id, o.progress_sent_at,\n               (SELECT t.from_state FROM order_transitions t\n                 WHERE t.order_id = o.id AND t.to_state = o.state\n                 ORDER BY t.id DESC LIMIT 1) AS previous_state\n          FROM orders o\n         WHERE o.public_id = $1 AND o.user_id = $2\n        ",
   "describe": {
     "columns": [
       {
@@ -262,6 +262,23 @@
             "name": "progress_message_id"
           }
         }
+      },
+      {
+        "ordinal": 25,
+        "name": "progress_sent_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "progress_sent_at"
+          }
+        }
+      },
+      {
+        "ordinal": 26,
+        "name": "previous_state",
+        "type_info": "Text",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -295,8 +312,10 @@
       true,
       null,
       true,
-      true
+      true,
+      true,
+      null
     ]
   },
-  "hash": "89ddd936b79047d4fb611aade6535e5a417ed70c1747b655d78217e92298a834"
+  "hash": "99f5aa2e733e3468176a4acd4748b7429090f7e23394f0be29df6c90405bb368"
 }

@@ -602,6 +602,14 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
             "manual_review",
             ui.manual_review(&order(cb), Some(&usdt(dec!(100))), 15),
         ),
+        // Шаг 6.1: итог ушёл новым сообщением — прежнее сообщение заявки.
+        (
+            "result_below",
+            ui.result_below(
+                &ui.manual_review(&order(cb), Some(&usdt(dec!(100))), 15),
+                Some(&usdt(dec!(100))),
+            ),
+        ),
         (
             "manual_review_unknown",
             ui.manual_review(&order(cb), None, 15),

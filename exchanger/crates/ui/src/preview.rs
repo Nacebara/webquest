@@ -253,10 +253,18 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
                 ui.refund_done(&invoice_order(), &usdt(5125, 2), REFUND_URL, None),
             ],
         },
-        one(
-            "Ручная проверка",
-            ui.manual_review(&o, Some(&usdt(100, 0)), 15),
-        ),
+        // Второе сообщение — то же окно, когда итог пришёл позже минуты новым сообщением
+        // (шаг 6.1, макет принят 14.11).
+        PreviewScreen {
+            title: "Ручная проверка",
+            messages: vec![
+                ui.manual_review(&o, Some(&usdt(100, 0)), 15),
+                ui.result_below(
+                    &ui.manual_review(&o, Some(&usdt(100, 0)), 15),
+                    Some(&usdt(100, 0)),
+                ),
+            ],
+        },
         one("Мульти-чек xRocket", ui.error(&UiError::MultiCheck)),
         one("Чек уже открыт", ui.error(&UiError::AlreadyActivated)),
         one("Чек не подошёл", ui.error(&UiError::NeedsSubscription)),
