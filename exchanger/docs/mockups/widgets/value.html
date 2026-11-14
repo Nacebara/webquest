@@ -30,14 +30,14 @@ button{all:unset;box-sizing:border-box;cursor:pointer;text-align:center}
 <script>
 const W=window.TelegramWidget||{},H=W.HapticFeedback,$=s=>document.getElementById(s);
 let D=null,v=0,R=null,busy=0,done=0;
-const f=x=>(x/10).toFixed(1)+(D.u?' '+D.u:'');
+const dp=()=>D&&D.p!=null?D.p:1,f=x=>{const[a,b]=(x/10**dp()).toFixed(dp()).split('.');return a.replace(/\B(?=(\d{3})+(?!\d))/g,' ')+(b?'.'+b:'')+(D.u?' '+D.u:'')};
 const pos=x=>(x-D.lo)/(D.hi-D.lo)*100;
 function load(){try{D=JSON.parse(W.chatData)}catch(e){}if(!D)return;v=D.v;$('lo').textContent=f(D.lo);$('hi').textContent=f(D.hi);draw()}
 function draw(){if(!D)return;const dv=Math.abs(v-D.v),big=dv>D.own;
  $('v0').textContent=f(D.v);$('v1').textContent=f(v);
  $('ef').innerHTML=D.k?D.kl+' станет <b>'+f(v+D.k)+'</b>':'';
  $('fl').style.width=pos(v)+'%';$('th').style.left=pos(v)+'%';$('was').style.left=pos(D.v)+'%';
- const n=$('nt');n.className='nt'+(big?' w':'');n.textContent=big?'Изменение больше '+(D.own/10).toFixed(1)+' п.п. — бот попросит подтверждение у владельца.':D.m;
+ const n=$('nt');n.className='nt'+(big?' w':'');n.textContent=big?'Изменение больше '+(D.own/10**dp()).toFixed(dp())+' п.п. — бот попросит подтверждение у владельца.':D.m;
  const b=$('sv');b.disabled=v==D.v||busy;b.className=done?'ok':'';if(!done)b.textContent=busy?'Сохраняю…':v==D.v?'Без изменений':(big?'Отправить владельцу ':'Сохранить ')+f(v)}
 function set(x){x=Math.max(D.lo,Math.min(D.hi,x));if(x!=v){v=x;done=0;H?.selectionChanged();draw()}}
 function at(e){set(D.lo+Math.round((e.clientX-R.left)/R.width*(D.hi-D.lo)/D.d)*D.d)}

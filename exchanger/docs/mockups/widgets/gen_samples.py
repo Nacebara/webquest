@@ -227,6 +227,14 @@ S = {
 }
 exec(open(__file__.replace("gen_samples.py", "gaps_samples.py")).read())
 S.update(G)
+# «same_state»: [виджет, id] — показать утверждённое состояние виджета как есть (перерисовка 14.11).
+for v in S.values():
+    if isinstance(v, dict):
+        for i, st in enumerate(v.get("states", [])):
+            if "same_state" in st:
+                w, sid = st["same_state"]
+                src = next(x for x in S[w]["states"] if x["id"] == sid)
+                v["states"][i] = dict(src, id=st["id"], name=st["name"])
 def _br(x):
     if isinstance(x, dict): return {k: (v.replace("\n", "<br>") if k == "rich" and isinstance(v, str) else _br(v)) for k, v in x.items()}
     if isinstance(x, list): return [_br(v) for v in x]
