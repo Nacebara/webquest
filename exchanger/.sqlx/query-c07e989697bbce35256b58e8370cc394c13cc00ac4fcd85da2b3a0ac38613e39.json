@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE alerts SET acked_at = now(), resolved_at = now() WHERE dedup_key = $1 AND acked_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c07e989697bbce35256b58e8370cc394c13cc00ac4fcd85da2b3a0ac38613e39"
+}

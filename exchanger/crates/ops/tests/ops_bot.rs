@@ -307,6 +307,10 @@ impl Drop for Ops {
 }
 
 async fn ops(pool: PgPool) -> Ops {
+    ops_with(pool, |_| {}).await
+}
+
+async fn ops_with(pool: PgPool, tune: impl FnOnce(&mut OpsConfig)) -> Ops {
     let e = common::env(pool).await;
     let common::Env {
         pool,
@@ -326,15 +330,14 @@ async fn ops(pool: PgPool) -> Ops {
             .unwrap();
     }
     let tg = FakeTelegram::start().await;
-    let bot = OpsBot::new(
-        tg.api(),
-        engine.clone(),
-        pool.clone(),
-        OpsConfig {
+    let bot = OpsBot::new(tg.api(), engine.clone(), pool.clone(), {
+        let mut cfg = OpsConfig {
             alert_every: Duration::from_millis(50),
             ..OpsConfig::default()
-        },
-    )
+        };
+        tune(&mut cfg);
+        cfg
+    })
     .unwrap();
     // Один бот: клиентский бот отдаёт обновления пульту первым.
     let client = tgbot::ClientBot::new(
@@ -1262,4 +1265,132 @@ async fn rebalance_card_broadcast_switch_is_owner_only(pool: PgPool) {
         "{:?}",
         admin.buttons()
     );
+}
+
+/// Заявка уходит на разбор: в кошельке xRocket 5 USDT вместо 1000 — выплата не удалась.
+async fn order_in_review(o: &Ops) -> i64 {
+    o.world.set_balance(o.ub, XR, Asset::Usdt, dec!(5)).unwrap();
+    let url = o.world.client_check(CB, usdt(dec!(100))).unwrap();
+    let link = parsers::links::parse_url(&url).unwrap();
+    let order = accepted(o.engine.submit_check(common::CLIENT, &link).await.unwrap());
+    o.drain().await;
+    order.id
+}
+
+/// Шаг 2.8 (макет «Алерт и «Принял»», выбор владельца 14.11): критичную тревогу никто не принял —
+/// раз в `repeat_every` она приходит новым сообщением со звуком, прежнее удаляется. «Принял» у
+/// одного — у всех правка «Принял … — повторы остановлены», и тревога не возвращается, пока
+/// заявка на разборе (раньше следующий круг через 5 с открывал её заново — AUDIT-UI П1).
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_critical_alert_repeats_until_acked_and_the_ack_silences_it(pool: PgPool) {
+    let o = ops_with(pool, |c| c.repeat_every = Duration::from_millis(500)).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
+    let mark = o.tg.mark();
+    order_in_review(&o).await;
+    let first = o.tg.screen(mark, OWNER, "Нужен разбор").await;
+    assert_eq!(first.method, "sendMessage");
+    assert_eq!(
+        first.body["disable_notification"],
+        json!(false),
+        "critical — with sound"
+    );
+
+    let mark = o.tg.mark();
+    let again = o.tg.screen(mark, OWNER, "Повтор 1").await;
+    assert_eq!(again.method, "sendMessage", "a repeat is a new message");
+    assert_ne!(again.message_id, first.message_id);
+    for _ in 0..100 {
+        if o.tg.calls().iter().skip(mark).any(|c| {
+            c.method == "deleteMessage"
+                && c.chat() == Some(OWNER)
+                && c.body["message_id"].as_i64() == first.message_id
+        }) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        o.tg.calls()
+            .iter()
+            .skip(mark)
+            .any(|c| c.method == "deleteMessage"
+                && c.body["message_id"].as_i64() == first.message_id),
+        "the previous copy is deleted: one alert in the chat"
+    );
+
+    let mark = o.tg.mark();
+    let acked = o
+        .press(OWNER, &again, "Принял", "повторы остановлены")
+        .await;
+    assert_eq!(acked.method, "editMessageText");
+    assert!(acked.text().contains("Игнат"), "{}", acked.text());
+    assert!(acked.button("Принял").is_none());
+    o.tg.screen(mark, ADMIN, "повторы остановлены").await;
+
+    // Заявка всё ещё на разборе, но тревога не возвращается: ни повтора, ни новой.
+    let mark = o.tg.mark();
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    let back: Vec<String> =
+        o.tg.calls()
+            .iter()
+            .skip(mark)
+            .filter(|c| c.method == "sendMessage" && c.text().contains("Нужен разбор"))
+            .map(Call::text)
+            .collect();
+    assert!(back.is_empty(), "acked alert came back: {back:#?}");
+}
+
+/// Шаг 2.8: копии тревоги — в базе. Пульт перезапущен, «Принял» правит сообщение, отправленное
+/// до перезапуска, а не шлёт новое.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn after_a_restart_the_ack_edits_the_copy_sent_before_it(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    let mark = o.tg.mark();
+    order_in_review(&o).await;
+    let alert = o.tg.screen(mark, OWNER, "Нужен разбор").await;
+    // Перезапуск пульта: память о копиях пропала, база — нет.
+    o.cancel.cancel();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let bot = OpsBot::new(
+        o.tg.api(),
+        o.engine.clone(),
+        o.pool.clone(),
+        OpsConfig {
+            alert_every: Duration::from_millis(50),
+            ..OpsConfig::default()
+        },
+    )
+    .unwrap();
+    let cancel = CancellationToken::new();
+    {
+        let bot = bot.clone();
+        let cancel = cancel.clone();
+        tokio::spawn(async move { bot.run(cancel).await });
+    }
+    let alert_id: i64 = sqlx::query_scalar("SELECT id FROM alerts WHERE title = 'manual_review'")
+        .fetch_one(&o.pool)
+        .await
+        .unwrap();
+    let mark = o.tg.mark();
+    let press: botapi::Update = serde_json::from_value(json!({
+        "update_id": 999_001,
+        "callback_query": {
+            "id": "cb-restart",
+            "from": { "id": OWNER, "is_bot": false, "first_name": "Staff" },
+            "message": { "message_id": alert.message_id, "date": 1, "chat": { "id": OWNER, "type": "private" } },
+            "chat_instance": "1",
+            "data": ops::Cb::Ack(alert_id).encode(),
+        }
+    }))
+    .unwrap();
+    assert!(tgbot::UpdateHook::try_handle(&bot, &press).await);
+    let edited = o.tg.screen(mark, OWNER, "повторы остановлены").await;
+    assert_eq!(edited.method, "editMessageText");
+    assert_eq!(
+        edited.message_id, alert.message_id,
+        "the copy sent before the restart"
+    );
+    cancel.cancel();
 }

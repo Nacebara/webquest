@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, level, topic, dedup_key, title, payload, count, first_at, last_at,\n               sent_message_id, acked_by, acked_at\n          FROM alerts WHERE dedup_key = $1 AND acked_at IS NULL\n        ",
+  "query": "\n        SELECT id, level, topic, dedup_key, title, payload, count, first_at, last_at,\n               sent_message_id, acked_by, acked_at, repeats\n          FROM alerts\n         WHERE acked_at IS NULL AND (delivered_at IS NULL OR last_at > delivered_at)\n         ORDER BY id\n         LIMIT $1\n        ",
   "describe": {
     "columns": [
       {
@@ -134,11 +134,22 @@
             "name": "acked_at"
           }
         }
+      },
+      {
+        "ordinal": 12,
+        "name": "repeats",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "repeats"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Int8"
       ]
     },
     "nullable": [
@@ -153,8 +164,9 @@
       false,
       true,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "a9c6a2a2ecf3d111e32ef680feadf3ddba8fea45a99c6b8f8e24694ee77de34f"
+  "hash": "af84aa2e6dd25054ab8746af64eb9a92ae3347da936e10ca22f64d885c7a9065"
 }

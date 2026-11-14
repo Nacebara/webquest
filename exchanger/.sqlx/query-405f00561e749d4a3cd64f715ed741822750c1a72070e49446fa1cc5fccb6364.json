@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, level, topic, dedup_key, title, payload, count, first_at, last_at,\n               sent_message_id, acked_by, acked_at\n          FROM alerts\n         WHERE acked_at IS NULL AND (delivered_at IS NULL OR last_at > delivered_at)\n         ORDER BY id\n         LIMIT $1\n        ",
+  "query": "\n        SELECT a.id, a.level, a.topic, a.dedup_key, a.title, a.payload, a.count, a.first_at,\n               a.last_at, a.sent_message_id, a.acked_by, a.acked_at, a.repeats\n          FROM alerts a\n         WHERE a.acked_at IS NULL AND a.level = 'critical'\n           AND (SELECT max(c.sent_at) FROM alert_copies c WHERE c.alert_id = a.id)\n               < now() - $1::bigint * interval '1 second'\n         ORDER BY a.id\n         LIMIT $2\n        ",
   "describe": {
     "columns": [
       {
@@ -134,10 +134,22 @@
             "name": "acked_at"
           }
         }
+      },
+      {
+        "ordinal": 12,
+        "name": "repeats",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "repeats"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
+        "Int8",
         "Int8"
       ]
     },
@@ -153,8 +165,9 @@
       false,
       true,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "5ec97ad39af6c05bf28cf640e49159997097c5df95f15d9aa383c2ce16aa4a46"
+  "hash": "405f00561e749d4a3cd64f715ed741822750c1a72070e49446fa1cc5fccb6364"
 }

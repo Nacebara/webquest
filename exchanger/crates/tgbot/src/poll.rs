@@ -44,7 +44,7 @@ async fn second_instance(inner: &Inner, e: &botapi::Error) {
     };
     let raised = async {
         let mut conn = inner.pool.acquire().await?;
-        storage::alerts::raise(&mut conn, &alert).await
+        storage::alerts::raise_condition(&mut conn, &alert).await
     }
     .await;
     if let Err(err) = raised {

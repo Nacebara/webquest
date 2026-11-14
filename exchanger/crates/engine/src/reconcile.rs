@@ -384,7 +384,7 @@ impl Engine {
                         .await?;
                         tracing::error!(platform = platform.db_name(), %expected, %reference, actual = %a, "reconciliation: money missing, payouts paused");
                     }
-                    storage::alerts::raise(
+                    storage::alerts::raise_condition(
                         &mut tx,
                         &NewAlert {
                             level: if verdict == Verdict::Pause {
@@ -474,7 +474,7 @@ impl Engine {
             why,
             "reconciliation stalled"
         );
-        storage::alerts::raise(
+        storage::alerts::raise_condition(
             conn,
             &NewAlert {
                 level: Level::Critical,
@@ -502,7 +502,7 @@ impl Engine {
         platform: Platform,
         error: &str,
     ) -> Result<(), EngineError> {
-        storage::alerts::raise(
+        storage::alerts::raise_condition(
             conn,
             &NewAlert {
                 level: Level::Warn,

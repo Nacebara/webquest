@@ -38,7 +38,7 @@ impl Inner {
         let queue = storage::admin::review_queue(&mut conn).await?;
         for item in &queue {
             let key = format!("manual_review:{}", item.id);
-            storage::alerts::ensure(
+            storage::alerts::ensure_condition(
                 &mut conn,
                 &NewAlert {
                     level: Level::Critical,
@@ -62,64 +62,110 @@ impl Inner {
             let id = alert.payload["id"].as_i64();
             if id.is_some_and(|id| !queue.iter().any(|q| q.id == id)) {
                 storage::alerts::resolve(&mut conn, &alert.dedup_key).await?;
-                self.state(|st| st.delivered.remove(&alert.id));
             }
         }
-        // 2. Доставка.
+        // Заявка ушла с разбора после «Принял» — состояние ушло: снова попадёт — новая тревога.
+        let acked: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT dedup_key, (payload->>'id')::bigint FROM alerts \
+              WHERE title = 'manual_review' AND acked_by IS NOT NULL AND resolved_at IS NULL",
+        )
+        .fetch_all(&mut *conn)
+        .await?;
+        for (key, id) in acked {
+            if !queue.iter().any(|q| q.id == id) {
+                storage::alerts::resolve(&mut conn, &key).await?;
+            }
+        }
+        // 2. Доставка: новые и изменившиеся — новым сообщением или правкой копии; критичные,
+        // которые никто не принял 15 минут, — повтор новым сообщением со звуком вместо прежнего.
         let pending = storage::alerts::pending(&mut conn, 20).await?;
-        if pending.is_empty() {
+        let repeats = storage::alerts::due_repeats(&mut conn, self.cfg.repeat_every, 20).await?;
+        if pending.is_empty() && repeats.is_empty() {
             return Ok(());
         }
         let staff = storage::staff::list(&mut conn).await?;
         let recipients: Vec<&StaffMember> = staff.iter().filter(|m| m.active()).collect();
         drop(conn);
         for alert in pending {
-            let screen = self.look().screen(&self.render_alert(&alert));
-            let known = self.state(|st| st.delivered.get(&alert.id).cloned().unwrap_or_default());
-            let mut sent = Vec::new();
-            for m in &recipients {
-                let chat = m.tg_user_id;
-                let previous = known.iter().find(|(c, _)| *c == chat).map(|(_, id)| *id);
-                let result = match previous {
-                    Some(message_id) => {
-                        let mut request =
-                            EditMessageText::html(chat, message_id, screen.text.clone());
-                        request.reply_markup = screen.markup();
-                        self.api
-                            .edit_message_text(&request)
-                            .await
-                            .map(|_| message_id)
-                    }
-                    None => {
-                        let mut request = SendMessage::html(chat, screen.text.clone());
-                        request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
-                        // Важное — со звуком, остальное — тихо.
-                        request.disable_notification = Some(alert.level < Level::Warn);
-                        self.api.send_message(&request).await.map(|m| m.message_id)
-                    }
-                };
-                match result {
-                    Ok(id) => sent.push((chat, id)),
-                    Err(e) if e.is_not_modified() => {
-                        if let Some(id) = previous {
-                            sent.push((chat, id));
-                        }
-                    }
-                    // Сотрудник не начинал диалог с пультом или заблокировал его.
-                    Err(e) => tracing::info!(chat, error = %e, "alert not delivered"),
-                }
-            }
-            let first = sent.first().map(|(_, id)| *id);
-            self.state(|st| {
-                st.delivered.insert(alert.id, sent);
-            });
-            let mut conn = self.pool.acquire().await?;
-            storage::alerts::mark_delivered(&mut conn, alert.id, first).await?;
+            self.deliver(alert, &recipients, false).await?;
+        }
+        for alert in repeats {
+            self.deliver(alert, &recipients, true).await?;
         }
         // Новое событие — главный экран правится сразу (макет: «и сразу при событии»).
         if let Err(e) = self.refresh_dashes().await {
             tracing::warn!(error = %e, "ops dash refresh failed");
         }
+        Ok(())
+    }
+
+    /// Показать тревогу каждому сотруднику. Копия уже есть — правка (тихо); нет — новое
+    /// сообщение (важное — со звуком). `repeat` — повтор критичной: новое сообщение со звуком,
+    /// прежнее удаляется, в чате всегда одна копия. Копии — в базе: переживают перезапуск.
+    async fn deliver(
+        &self,
+        mut alert: AlertRow,
+        recipients: &[&StaffMember],
+        repeat: bool,
+    ) -> Result<(), OpsError> {
+        let copies = {
+            let mut conn = self.pool.acquire().await?;
+            if repeat {
+                storage::alerts::bump_repeat(&mut conn, alert.id).await?;
+                alert.repeats += 1;
+            }
+            storage::alerts::copies(&mut conn, alert.id).await?
+        };
+        let screen = self.look().screen(&self.render_alert(&alert));
+        let mut first = None;
+        for m in recipients {
+            let chat = m.tg_user_id;
+            let previous = copies
+                .iter()
+                .find(|c| c.chat_id == chat)
+                .map(|c| c.message_id);
+            if let (Some(message_id), false) = (previous, repeat) {
+                let mut request = EditMessageText::html(chat, message_id, screen.text.clone());
+                request.reply_markup = screen.markup();
+                match self.api.edit_message_text(&request).await {
+                    Ok(_) => {
+                        first.get_or_insert(message_id);
+                        continue;
+                    }
+                    Err(e) if e.is_not_modified() => {
+                        first.get_or_insert(message_id);
+                        continue;
+                    }
+                    // Сотрудник удалил сообщение — пришлём новое.
+                    Err(e) if e.is_message_gone() => {}
+                    Err(e) => {
+                        tracing::info!(chat, error = %e, "alert not updated");
+                        continue;
+                    }
+                }
+            }
+            let mut request = SendMessage::html(chat, screen.text.clone());
+            request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
+            // Важное — со звуком, остальное — тихо.
+            request.disable_notification = Some(alert.level < Level::Warn);
+            match self.api.send_message(&request).await {
+                Ok(sent) => {
+                    first.get_or_insert(sent.message_id);
+                    let mut conn = self.pool.acquire().await?;
+                    storage::alerts::save_copy(&mut conn, alert.id, chat, sent.message_id).await?;
+                    drop(conn);
+                    if let (Some(old), true) = (previous, repeat)
+                        && let Err(e) = self.api.delete_message(chat, old).await
+                    {
+                        tracing::debug!(chat, error = %e, "previous alert copy not deleted");
+                    }
+                }
+                // Сотрудник не начинал диалог с пультом или заблокировал его.
+                Err(e) => tracing::info!(chat, error = %e, "alert not delivered"),
+            }
+        }
+        let mut conn = self.pool.acquire().await?;
+        storage::alerts::mark_delivered(&mut conn, alert.id, first).await?;
         Ok(())
     }
 
@@ -276,6 +322,12 @@ impl Inner {
                 &[("n", &a.count), ("at", &crate::views::when(a.last_at))],
             ));
         }
+        if a.repeats > 0 && a.acked_at.is_none() {
+            screen.text.push_str(&t.f(
+                "alert.unacked",
+                &[("n", &a.repeats), ("since", &crate::dash::hhmm(a.first_at))],
+            ));
+        }
         screen
     }
 
@@ -289,21 +341,40 @@ impl Inner {
         let Some(alert) = alert else {
             return Ok(());
         };
-        let mut screen = self.render_alert(&alert);
-        screen.text.push_str(
-            &self
-                .texts
-                .f("alert.acked", &[("name", &esc(&staff.display_name))]),
+        // Макет «Алерт и «Принял»»: первая строка тревоги с серой точкой и «Принял Анна · 14:47 —
+        // повторы остановлены»; остальные кнопки остаются, «Принял» уходит.
+        let full = self.render_alert(&alert);
+        let head = full.text.lines().next().unwrap_or_default();
+        let head = head
+            .strip_prefix("{e:")
+            .and_then(|r| r.split_once("} "))
+            .map_or(head, |(_, rest)| rest);
+        let mut screen = full.clone();
+        screen.text = self.texts.f(
+            "alert.acked",
+            &[
+                ("head", &head),
+                ("name", &esc(&staff.display_name)),
+                (
+                    "at",
+                    &crate::dash::hhmm(alert.acked_at.unwrap_or_else(chrono::Utc::now)),
+                ),
+            ],
         );
+        let ack_data = Cb::Ack(id).encode();
         for row in &mut screen.keyboard {
             row.retain(|b| {
-                !matches!(&b.action, botapi::InlineButtonAction::CallbackData(d) if d.starts_with("ack:"))
+                !matches!(&b.action, botapi::InlineButtonAction::CallbackData(d) if *d == ack_data)
             });
         }
         screen.keyboard.retain(|r| !r.is_empty());
-        let copies = self.state(|st| st.delivered.remove(&id).unwrap_or_default());
-        for (chat, message_id) in copies {
-            let mut request = EditMessageText::html(chat, message_id, screen.text.clone());
+        let screen = self.look().screen(&screen);
+        let copies = {
+            let mut conn = self.pool.acquire().await?;
+            storage::alerts::copies(&mut conn, id).await?
+        };
+        for c in copies {
+            let mut request = EditMessageText::html(c.chat_id, c.message_id, screen.text.clone());
             request.reply_markup = screen.markup();
             if let Err(e) = self.api.edit_message_text(&request).await
                 && !e.is_not_modified()

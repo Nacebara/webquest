@@ -339,7 +339,7 @@ impl Engine {
                 // Подсказка и ручное включение: выключаем только когда выровнялось.
                 PromoMode::Hint => {
                     if !on && th.should_start(s, t) {
-                        storage::alerts::raise(
+                        storage::alerts::raise_condition(
                             &mut tx,
                             &NewAlert {
                                 level: Level::Notice,

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, level, topic, dedup_key, title, payload, count, first_at, last_at,\n               sent_message_id, acked_by, acked_at\n          FROM alerts WHERE id = $1\n        ",
+  "query": "\n        SELECT id, level, topic, dedup_key, title, payload, count, first_at, last_at,\n               sent_message_id, acked_by, acked_at, repeats\n          FROM alerts WHERE id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -134,6 +134,17 @@
             "name": "acked_at"
           }
         }
+      },
+      {
+        "ordinal": 12,
+        "name": "repeats",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "repeats"
+          }
+        }
       }
     ],
     "parameters": {
@@ -153,8 +164,9 @@
       false,
       true,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "689823ecc37ed3d021249b4265798cbdb185290b799baa1804663deb63643dca"
+  "hash": "1a33ff7817b98701a25b7bb7a78d70bff2c634322d1973f2cc907a20f625a792"
 }

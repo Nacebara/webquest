@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, level, topic, dedup_key, title, payload, count, first_at, last_at,\n               sent_message_id, acked_by, acked_at\n          FROM alerts\n         WHERE acked_at IS NULL\n         ORDER BY CASE level WHEN 'critical' THEN 0 WHEN 'warn' THEN 1 WHEN 'notice' THEN 2 ELSE 3 END,\n                  last_at DESC\n         LIMIT $1\n        ",
+  "query": "\n        SELECT id, level, topic, dedup_key, title, payload, count, first_at, last_at,\n               sent_message_id, acked_by, acked_at, repeats\n          FROM alerts WHERE dedup_key = $1 AND acked_at IS NULL\n        ",
   "describe": {
     "columns": [
       {
@@ -134,11 +134,22 @@
             "name": "acked_at"
           }
         }
+      },
+      {
+        "ordinal": 12,
+        "name": "repeats",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "repeats"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Int8"
+        "Text"
       ]
     },
     "nullable": [
@@ -153,8 +164,9 @@
       false,
       true,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "3bdb5f91287bbecf6ec904bba07d8c7d80cc687a3893603f7f7693da65acbce8"
+  "hash": "e6617929de296702ba72bbaf15cf34096e664efae0868eb81ea4d31d59f85639"
 }

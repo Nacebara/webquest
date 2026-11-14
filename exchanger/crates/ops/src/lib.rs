@@ -72,6 +72,9 @@ const DASH_EVERY: Duration = Duration::from_secs(60);
 pub struct OpsConfig {
     /// Как часто проверять и рассылать события.
     pub alert_every: Duration,
+    /// Как часто повторять критичную тревогу, пока её никто не принял (макет «Алерт и
+    /// «Принял»», шаг 2.8): новое сообщение со звуком, прежнее удаляется.
+    pub repeat_every: Duration,
     /// Сколько живёт кнопка «Подтвердить» (SPEC §7.4: 60 с).
     pub confirm_ttl: Duration,
     /// Сколько ждать ответа на вопрос пульта.
@@ -86,6 +89,7 @@ impl Default for OpsConfig {
     fn default() -> Self {
         Self {
             alert_every: Duration::from_secs(5),
+            repeat_every: Duration::from_secs(15 * 60),
             confirm_ttl: Duration::from_secs(60),
             input_ttl: Duration::from_secs(600),
             owner_id: None,
@@ -183,7 +187,6 @@ pub(crate) struct State {
     awaiting: HashMap<i64, Awaiting>,
     pending: HashMap<String, Pending>,
     /// Сообщения событий у персонала: id события → (чат, сообщение).
-    delivered: HashMap<i64, Vec<(i64, i32)>>,
     /// Окно пульта в чате: последнее сообщение экрана (туда открываются ссылки из таблиц).
     windows: HashMap<i64, i32>,
     /// Последний открытый список сотрудника — куда ведёт «‹ Назад» из карточки.
