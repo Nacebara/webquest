@@ -59,7 +59,7 @@ def main():
             for row in st["keys"] + [r for p in st.get("pre", []) for r in p.get("keys", [])]:
                 for _, icon, _ in row:
                     if icon:
-                        keys.add("mono/" + icon)
+                        keys.add("color/" + icon[2:] if icon.startswith("c:") else "mono/" + icon)
     for extra in ("color/cb", "color/xr", "color/swap", "color/robot", "color/rates"):
         keys.add(extra)
     emoji = {}
