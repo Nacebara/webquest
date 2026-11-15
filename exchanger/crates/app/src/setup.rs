@@ -1,7 +1,8 @@
 //! `exch setup` — мастер первой настройки по-русски, как у гаранта: всё по вопросам, с
 //! проверкой каждого ответа. База PostgreSQL — по паролю пользователя `postgres` (база `exch`
 //! создаётся сама), бот — по токену (проверка getMe), ID владельца — из сообщения боту,
-//! ключ шифрования сессий — создаётся сам, вход юзерботом — сразу для обоих кошельков.
+//! ключ шифрования сессий — создаётся сам, вход юзерботом — сразу для обоих кошельков: на двух
+//! разных аккаунтах (по умолчанию) или на одном (решение владельца 17.11, веха 4.1).
 //!
 //! Секреты пишутся только в `.env` (прежний — в `.env.bak`) и на экран не выводятся. Каждый
 //! шаг сохраняется сразу: прервали — следующий запуск продолжит с того же места.
@@ -430,16 +431,68 @@ fn config_file(paths: &Paths) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Кошелёк — на каком аккаунте он уже подключён.
+type Bound = Vec<(Platform, String)>;
+
+/// Метка аккаунта для входа в кошелёк `platform`. `separate` — кошельки на разных аккаунтах:
+/// блокировка одного аккаунта не останавливает второй кошелёк. Один аккаунт — та же метка, что
+/// у уже подключённого кошелька (второй вход берёт сохранённую сессию без кода).
+/// `accounts` — все известные аккаунты и годится ли аккаунт для нового кошелька (не заблокирован
+/// и не выключен человеком).
+pub fn userbot_label(
+    platform: Platform,
+    bound: &Bound,
+    accounts: &[(String, bool)],
+    separate: bool,
+) -> String {
+    let others: Vec<&str> = bound
+        .iter()
+        .filter(|(p, _)| *p != platform)
+        .map(|(_, l)| l.as_str())
+        .collect();
+    if !separate {
+        if let Some(l) = others.first() {
+            return (*l).to_owned();
+        }
+        if let Some((l, _)) = accounts.iter().find(|(_, usable)| *usable) {
+            return l.clone();
+        }
+    }
+    // Свободный рабочий аккаунт (вход был, кошелька нет) — его и берём: телефон уже вводили.
+    // Заблокированный или выключенный — никогда: кошелёк уходит с него на новый (веха 4.2).
+    if let Some((free, _)) = accounts
+        .iter()
+        .find(|(a, usable)| *usable && !bound.iter().any(|(_, l)| l == a))
+    {
+        return free.clone();
+    }
+    (1..)
+        .map(|n| format!("ub-{n}"))
+        .find(|l| !accounts.iter().any(|(a, _)| a == l) && !others.contains(&l.as_str()))
+        .unwrap_or_else(|| "ub-1".to_owned())
+}
+
 async fn userbots(w: &Wizard<'_>, pool: &PgPool) -> anyhow::Result<()> {
     let cfg = Config::from_lookup(|k| w.get(k)).context("настройки после мастера")?;
     let tg = TelegramSettings::from_config(&cfg)?;
     println!(
         "Юзербот — отдельный аккаунт Telegram, на нём кошельки CryptoBot и xRocket с вашим капиталом. Руками им потом не пользуйтесь."
     );
+    let mut separate = None;
     for platform in Platform::ALL {
         let mut conn = pool.acquire().await?;
         let list = wallets::list(&mut conn).await?;
-        let accounts = sessions::list(&mut conn).await?;
+        let accounts: Vec<(String, bool)> = sessions::list(&mut conn)
+            .await?
+            .into_iter()
+            .map(|a| {
+                let usable = !matches!(
+                    a.status,
+                    sessions::UserbotStatus::Banned | sessions::UserbotStatus::Disabled
+                );
+                (a.label, usable)
+            })
+            .collect();
         drop(conn);
         let name = platform_name(platform);
         if let Some(wl) = list.iter().find(|w| w.platform == platform && w.is_active) {
@@ -453,12 +506,34 @@ async fn userbots(w: &Wizard<'_>, pool: &PgPool) -> anyhow::Result<()> {
             println!("⚠️ {name}: не подключён — запустите exch setup позже.");
             continue;
         }
-        // Один аккаунт на оба кошелька: второй вход берёт ту же сессию без кода.
-        let label = list
-            .first()
-            .map(|w| w.userbot_label.clone())
-            .or_else(|| accounts.first().map(|a| a.label.clone()))
-            .unwrap_or_else(|| "ub-1".to_owned());
+        let bound: Bound = list
+            .iter()
+            .filter(|w| w.is_active)
+            .map(|w| (w.platform, w.userbot_label.clone()))
+            .collect();
+        let separate = match separate {
+            Some(s) => s,
+            None => {
+                let s = prompt::yes(
+                    "Кошельки — на двух разных аккаунтах? Советую да: если Telegram ограничит один аккаунт, второй кошелёк продолжит работать. «Нет» — оба кошелька на одном аккаунте.",
+                    true,
+                )
+                .await?;
+                separate = Some(s);
+                s
+            }
+        };
+        let label = userbot_label(platform, &bound, &accounts, separate);
+        if separate && !bound.is_empty() && !accounts.iter().any(|(a, _)| *a == label) {
+            println!(
+                "Аккаунт {label} — другой номер телефона, не тот, на котором {}.",
+                bound
+                    .iter()
+                    .map(|(p, _)| platform_name(*p))
+                    .collect::<Vec<_>>()
+                    .join(" и ")
+            );
+        }
         let mut auth = MtprotoAuthenticator {
             cfg: tg.mtproto(&label),
             key: tg.session_key(),
@@ -470,6 +545,9 @@ async fn userbots(w: &Wizard<'_>, pool: &PgPool) -> anyhow::Result<()> {
                 "✅ {name}: подключён (аккаунт {}, {}).",
                 r.label, r.phone_masked
             ),
+            Err(crate::login::LoginCmdError::AccountUnderOtherLabel { other, .. }) => println!(
+                "❌ {name}: этот номер уже подключён как {other}. Нужен другой аккаунт — или запустите exch setup ещё раз и ответьте «нет» на вопрос о двух аккаунтах."
+            ),
             Err(e) => println!("❌ {name}: вход не удался: {e}. Запустите exch setup ещё раз."),
         }
     }
@@ -479,6 +557,44 @@ async fn userbots(w: &Wizard<'_>, pool: &PgPool) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ok(v: &[&str]) -> Vec<(String, bool)> {
+        v.iter().map(|s| ((*s).to_owned(), true)).collect()
+    }
+
+    /// Веха 4.1: мастер подключает кошельки на два аккаунта (по умолчанию) или на один.
+    #[test]
+    fn wallets_go_to_one_or_two_userbot_accounts() {
+        use Platform::{CryptoBot as CB, XRocket as XR};
+        let none: Bound = vec![];
+        // Чистая установка: CryptoBot — ub-1; xRocket — ub-2 или тот же ub-1.
+        assert_eq!(userbot_label(CB, &none, &[], true), "ub-1");
+        assert_eq!(userbot_label(CB, &none, &[], false), "ub-1");
+        let cb_on_1: Bound = vec![(CB, "ub-1".into())];
+        assert_eq!(userbot_label(XR, &cb_on_1, &ok(&["ub-1"]), true), "ub-2");
+        assert_eq!(userbot_label(XR, &cb_on_1, &ok(&["ub-1"]), false), "ub-1");
+        // Вход в ub-2 был, кошелёк не привязался (прервали) — берём ub-2, а не ub-3.
+        assert_eq!(
+            userbot_label(XR, &cb_on_1, &ok(&["ub-1", "ub-2"]), true),
+            "ub-2"
+        );
+    }
+
+    /// Веха 4.2: аккаунт заблокирован, его кошелёк отвязан — новый вход идёт на новый аккаунт,
+    /// а не обратно на заблокированный.
+    #[test]
+    fn a_blocked_account_is_never_picked_again() {
+        use Platform::{CryptoBot as CB, XRocket as XR};
+        let xr_on_2: Bound = vec![(XR, "ub-2".into())];
+        let blocked = vec![("ub-1".to_owned(), false), ("ub-2".to_owned(), true)];
+        assert_eq!(userbot_label(CB, &xr_on_2, &blocked, true), "ub-3");
+        // Один аккаунт: к рабочему ub-2, где уже xRocket.
+        assert_eq!(userbot_label(CB, &xr_on_2, &blocked, false), "ub-2");
+        // Оба кошелька были на заблокированном ub-1: новый аккаунт ub-2.
+        let only_blocked = vec![("ub-1".to_owned(), false)];
+        assert_eq!(userbot_label(CB, &vec![], &only_blocked, true), "ub-2");
+        assert_eq!(userbot_label(CB, &vec![], &only_blocked, false), "ub-2");
+    }
 
     #[test]
     fn token_and_hash_shapes() {
