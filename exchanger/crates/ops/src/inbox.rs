@@ -102,9 +102,29 @@ impl Inner {
             &[("who", &who), ("text", &esc(&question))],
         );
         let mut order_id = None;
+        let mut foreign = false;
         if let Some(public) = order {
             let mut conn = self.pool.acquire().await?;
             order_id = storage::admin::find_order(&mut conn, public).await?;
+            // Б-1 (аудит 11.11): номер приходит из кнопки клиента — прикладываем только его
+            // собственную заявку. Чужой номер (увиденный на скриншоте) — вопрос без заявки.
+            if let Some(id) = order_id {
+                let owner: i64 = sqlx::query_scalar("SELECT user_id FROM orders WHERE id = $1")
+                    .bind(id)
+                    .fetch_one(&mut *conn)
+                    .await?;
+                if owner != client {
+                    tracing::warn!(
+                        client,
+                        "support question names someone else's order: not attached"
+                    );
+                    order_id = None;
+                    foreign = true;
+                }
+            }
+        }
+        if let Some(public) = order.filter(|_| !foreign) {
+            let mut conn = self.pool.acquire().await?;
             let line = match order_id {
                 Some(id) => {
                     let (state, updated): (String, chrono::DateTime<Utc>) =

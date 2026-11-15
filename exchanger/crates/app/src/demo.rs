@@ -61,6 +61,31 @@ pub fn demo_database_url(url: &str) -> anyhow::Result<String> {
     Ok(out)
 }
 
+/// Б-3 (аудит 11.11): основная база — боевая (есть вход юзербота или заявки). Тогда токен из
+/// `.env` — боевой, и демо рядом с работающим ботом перехватило бы сообщения клиентов и ответило
+/// им симулятором. `false` — основной базы нет или она пустая.
+pub async fn main_database_is_live(main_url: &str) -> anyhow::Result<bool> {
+    if !sqlx::Postgres::database_exists(main_url)
+        .await
+        .unwrap_or(false)
+    {
+        return Ok(false);
+    }
+    let main = storage::connect(main_url).await?;
+    Ok(database_is_live(&main).await)
+}
+
+/// База боевая: в ней есть вход юзербота или хоть одна заявка.
+pub async fn database_is_live(pool: &PgPool) -> bool {
+    sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM userbot_accounts WHERE session_ciphertext IS NOT NULL) \
+             OR EXISTS (SELECT 1 FROM orders)",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(false)
+}
+
 /// Пересоздать базу демо и применить миграции. Только база `…_demo`.
 pub async fn fresh_database(demo_url: &str) -> anyhow::Result<PgPool> {
     let name = demo_url

@@ -210,3 +210,24 @@ fn store_debug_shows_label_only() {
         b"secret-bytes"
     );
 }
+
+/// Б-3 (аудит 11.11): основная база со входом юзербота — боевая, демо с её токеном не
+/// запускается.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_database_with_a_userbot_login_is_live(pool: sqlx::PgPool) {
+    assert!(
+        !app::demo::database_is_live(&pool).await,
+        "пустая база — не боевая"
+    );
+    sqlx::query(
+        "INSERT INTO userbot_accounts (label, phone_masked, session_ciphertext, session_nonce) \
+         VALUES ('ub-1', '+31******42', '\\x00', '\\x00')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert!(
+        app::demo::database_is_live(&pool).await,
+        "есть вход юзербота — боевая"
+    );
+}

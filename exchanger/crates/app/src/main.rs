@@ -731,10 +731,22 @@ async fn demo(
     preview_only: Vec<String>,
 ) -> anyhow::Result<()> {
     let cfg = load_config()?;
-    let token = cfg
-        .client_bot_token
-        .clone()
-        .context("CLIENT_BOT_TOKEN is not set: the demo runs the real bot on the simulator")?;
+    // Б-3: у демо может быть свой бот (`DEMO_BOT_TOKEN`). Без него берётся `CLIENT_BOT_TOKEN`,
+    // но только если основная база не боевая — иначе демо ответило бы настоящим клиентам.
+    let token = match cfg.demo_bot_token.clone() {
+        Some(t) => t,
+        None => {
+            anyhow::ensure!(
+                !app::demo::main_database_is_live(cfg.database_url.expose_secret()).await?,
+                "the main database is live (userbot login or orders): CLIENT_BOT_TOKEN is the \
+                 production bot, the demo would answer real clients. Set DEMO_BOT_TOKEN to a \
+                 separate test bot"
+            );
+            cfg.client_bot_token.clone().context(
+                "CLIENT_BOT_TOKEN is not set: the demo runs the real bot on the simulator",
+            )?
+        }
+    };
     let url = app::demo::demo_database_url(cfg.database_url.expose_secret())?;
     let pool = app::demo::fresh_database(&url).await?;
     let base = engine::Engine::new(pool.clone(), engine::EngineConfig::default());

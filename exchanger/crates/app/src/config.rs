@@ -34,6 +34,8 @@ pub struct Config {
     pub database_url: SecretString,
     pub owner_tg_id: i64,
     pub client_bot_token: Option<SecretString>,
+    /// Отдельный тестовый бот для `exch demo` (Б-3): демо не берёт боевой токен.
+    pub demo_bot_token: Option<SecretString>,
     pub tg_api_id: Option<i32>,
     pub tg_api_hash: Option<SecretString>,
     pub session_key: Option<SessionKey>,
@@ -89,6 +91,7 @@ impl Config {
             database_url,
             owner_tg_id,
             client_bot_token: secret("CLIENT_BOT_TOKEN"),
+            demo_bot_token: secret("DEMO_BOT_TOKEN"),
             tg_api_id: parse_num("TG_API_ID", get("TG_API_ID"))?,
             tg_api_hash: secret("TG_API_HASH"),
             session_key: get("SESSION_KEY").map(parse_session_key).transpose()?,

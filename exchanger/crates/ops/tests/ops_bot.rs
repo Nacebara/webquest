@@ -1472,3 +1472,45 @@ async fn after_a_restart_the_ack_edits_the_copy_sent_before_it(pool: PgPool) {
     );
     cancel.cancel();
 }
+
+/// Б-1 (аудит 11.11): номер заявки в обращении приходит из кнопки клиента. Чужая заявка (номер
+/// увиден на скриншоте) к вопросу не прикладывается — оператор не ответит ссылкой на чужой чек.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_support_question_never_carries_someone_elses_order(pool: PgPool) {
+    use tgbot::UpdateHook as _;
+    let o = ops(pool).await;
+    // Заявка клиента CLIENT; спрашивает другой человек.
+    let order = order_in_review(&o).await;
+    let public: String = sqlx::query_scalar("SELECT public_id FROM orders WHERE id = $1")
+        .bind(order)
+        .fetch_one(&o.pool)
+        .await
+        .unwrap();
+    let stranger = botapi::User {
+        id: 777_001,
+        is_bot: false,
+        first_name: "Чужой".into(),
+        last_name: None,
+        username: None,
+        language_code: None,
+        is_premium: None,
+    };
+    let mark = o.tg.mark();
+    assert!(
+        o.bot
+            .support_question(&stranger, "где мои деньги?", Some(&public))
+            .await
+    );
+    let question = o.tg.screen(mark, OWNER, "Обращение").await;
+    assert!(
+        question.text().contains("где мои деньги?"),
+        "{}",
+        question.text()
+    );
+    assert!(
+        !question.text().contains(&public),
+        "чужая заявка не приложена: {}",
+        question.text()
+    );
+    assert!(question.button("Заявка").is_none(), "{:?}", question.body);
+}
