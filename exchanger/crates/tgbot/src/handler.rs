@@ -6,7 +6,11 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use botapi::{AnswerWidgetQuery, CallbackQuery, ChatType, Message, Update, User, WidgetQuery};
+use botapi::{
+    AnswerInlineQuery, AnswerWidgetQuery, CallbackQuery, ChatType, InlineKeyboardButton,
+    InlineKeyboardMarkup, InlineQuery, InlineQueryResultArticle, Message, Update, User,
+    WidgetQuery,
+};
 use domain::Money;
 use parsers::links::{extract_from_message, parse_bare_code};
 use ui::{Callback, Command, HistoryRow, MenuAction, Screen, UiError};
@@ -447,6 +451,37 @@ async fn widget_query(inner: &Arc<Inner>, query: WidgetQuery) -> Result<(), TgBo
     Ok(())
 }
 
+/// Inline-режим (идея владельца 16.11): `@бот 100` в любом чате — карточки курса по открытым
+/// направлениям, человек отправляет выбранную другу. Условия — общие, не личные: карточку
+/// увидит не тот, кто спросил. Ответ кэшируется на 30 секунд — курс меняется редко.
+async fn inline_query(inner: &Arc<Inner>, query: InlineQuery) -> Result<(), TgBotError> {
+    let Some(bot) = inner.bot_username() else {
+        return Ok(());
+    };
+    let terms = inner.terms().await?;
+    let results = inner
+        .ui()
+        .inline_cards(&terms.terms, &query.query, bot)
+        .into_iter()
+        .map(|card| {
+            let button = InlineKeyboardButton::url(card.button, card.url);
+            InlineQueryResultArticle::new(card.id, card.title, card.html)
+                .description(card.description)
+                .reply_markup(InlineKeyboardMarkup::new(vec![vec![button]]))
+        })
+        .collect();
+    inner
+        .api
+        .bot()
+        .answer_inline_query(&AnswerInlineQuery {
+            inline_query_id: query.id,
+            results,
+            cache_time: 30,
+        })
+        .await?;
+    Ok(())
+}
+
 /// Одно обновление.
 pub(crate) async fn handle(inner: &Arc<Inner>, update: Update) -> Result<(), TgBotError> {
     // Админ-панель первой: её кнопки, команды и ответы на её вопросы.
@@ -460,6 +495,9 @@ pub(crate) async fn handle(inner: &Arc<Inner>, update: Update) -> Result<(), TgB
     }
     if let Some(query) = update.widget_query {
         return widget_query(inner, query).await;
+    }
+    if let Some(query) = update.inline_query {
+        return inline_query(inner, query).await;
     }
     // Правка — тоже приход ссылки: чек, созданный через `@send` / `@xrocket` прямо в этом
     // чате, сначала приходит заглушкой «Создание чека…», а ссылка появляется кнопкой в

@@ -277,6 +277,24 @@ impl FakeTelegram {
         query
     }
 
+    /// Человек набирает `@бот {query}` в любом чате.
+    fn inline_asks(&self, user: i64, query: &str) -> String {
+        let mut s = self.lock();
+        let id = s.next_update;
+        s.next_update += 1;
+        let query_id = format!("iq{id}");
+        s.updates.push(json!({
+            "update_id": id,
+            "inline_query": {
+                "id": query_id,
+                "from": { "id": user, "is_bot": false, "first_name": "Client" },
+                "query": query,
+                "offset": "",
+            }
+        }));
+        query_id
+    }
+
     /// Клиент нажимает инлайн-кнопку `data` под сообщением `message_id`.
     fn client_presses(&self, message_id: i64, data: &str) {
         self.press(message_id, data, 0);
@@ -1962,5 +1980,38 @@ async fn the_first_exchange_comes_with_confetti_and_the_next_one_without(pool: P
         .filter(|c| c.body.get("message_effect_id").is_some())
         .count();
     assert_eq!(effects, 0, "конфетти — только у первого обмена");
+    bot.stop().await;
+}
+
+/// Inline-режим (идея владельца 16.11): `@бот 100` в любом чате — карточки курса с кнопкой
+/// «Обменять» по ссылке на бота.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn inline_query_gets_rate_cards_for_a_friend(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let query = e.fake.inline_asks(CLIENT, "100");
+    let answer = e
+        .fake
+        .wait_for("answerInlineQuery", |c| c.method == "answerInlineQuery")
+        .await;
+    assert_eq!(answer.body["inline_query_id"], json!(query));
+    let results = answer.body["results"].as_array().expect("карточки");
+    assert!(!results.is_empty(), "{}", answer.body);
+    for r in results {
+        assert_eq!(r["type"], "article");
+        let text = r["input_message_content"]["message_text"].as_str().unwrap();
+        assert!(text.contains("100.00"), "{text}");
+        let url = r["reply_markup"]["inline_keyboard"][0][0]["url"]
+            .as_str()
+            .unwrap();
+        assert_eq!(url, "https://t.me/exch_test_bot?start=inline");
+    }
+    let kinds = e.fake.lock().allowed_updates.clone();
+    assert!(
+        kinds
+            .as_array()
+            .is_some_and(|k| k.contains(&json!("inline_query"))),
+        "{kinds}"
+    );
     bot.stop().await;
 }

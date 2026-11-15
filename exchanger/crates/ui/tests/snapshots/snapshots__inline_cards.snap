@@ -1,0 +1,63 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: out.trim_end()
+---
+## «100»
+[cb_to_xr_check] 100.00 USDT CryptoBot → 97.50 USDT xRocket
+Комиссия 2.5 % · обычно 10 секунд
+<b>CryptoBot → xRocket</b>
+Чек на <code>100.00</code> USDT → чек на <b>97.50 USDT</b>
+<i>Комиссия 2.5 % · обычно 10 секунд</i>
+[Обменять в @exch_test_bot → https://t.me/exch_test_bot?start=inline]
+
+[xr_to_cb_check] 100.00 USDT xRocket → 98.50 USDT CryptoBot
+Комиссия 1.5 % · обычно 10 секунд
+<b>xRocket → CryptoBot</b>
+Чек на <code>100.00</code> USDT → чек на <b>98.50 USDT</b>
+<i>Комиссия 1.5 % · обычно 10 секунд</i>
+[Обменять в @exch_test_bot → https://t.me/exch_test_bot?start=inline]
+
+## «55,5 usdt»
+[cb_to_xr_check] 55.50 USDT CryptoBot → 54.11 USDT xRocket
+Комиссия 2.5 % · обычно 10 секунд
+<b>CryptoBot → xRocket</b>
+Чек на <code>55.50</code> USDT → чек на <b>54.11 USDT</b>
+<i>Комиссия 2.5 % · обычно 10 секунд</i>
+[Обменять в @exch_test_bot → https://t.me/exch_test_bot?start=inline]
+
+[xr_to_cb_check] 55.50 USDT xRocket → 54.66 USDT CryptoBot
+Комиссия 1.5 % · обычно 10 секунд
+<b>xRocket → CryptoBot</b>
+Чек на <code>55.50</code> USDT → чек на <b>54.66 USDT</b>
+<i>Комиссия 1.5 % · обычно 10 секунд</i>
+[Обменять в @exch_test_bot → https://t.me/exch_test_bot?start=inline]
+
+## «»
+[cb_to_xr_check] 100.00 USDT CryptoBot → 97.50 USDT xRocket
+Комиссия 2.5 % · обычно 10 секунд
+<b>CryptoBot → xRocket</b>
+Чек на <code>100.00</code> USDT → чек на <b>97.50 USDT</b>
+<i>Комиссия 2.5 % · обычно 10 секунд</i>
+[Обменять в @exch_test_bot → https://t.me/exch_test_bot?start=inline]
+
+[xr_to_cb_check] 100.00 USDT xRocket → 98.50 USDT CryptoBot
+Комиссия 1.5 % · обычно 10 секунд
+<b>xRocket → CryptoBot</b>
+Чек на <code>100.00</code> USDT → чек на <b>98.50 USDT</b>
+<i>Комиссия 1.5 % · обычно 10 секунд</i>
+[Обменять в @exch_test_bot → https://t.me/exch_test_bot?start=inline]
+
+## «5000»
+[cb_to_xr_check] CryptoBot → xRocket: от 2 до 500 USDT
+5000.00 USDT — вне лимита
+<b>CryptoBot → xRocket</b>
+Меняю чеки от <code>2</code> до <code>500</code> USDT.
+<i>Обычно 10 секунд</i>
+[Обменять в @exch_test_bot → https://t.me/exch_test_bot?start=inline]
+
+[xr_to_cb_check] xRocket → CryptoBot: от 2 до 300 USDT
+5000.00 USDT — вне лимита
+<b>xRocket → CryptoBot</b>
+Меняю чеки от <code>2</code> до <code>300</code> USDT.
+<i>Обычно 10 секунд</i>
+[Обменять в @exch_test_bot → https://t.me/exch_test_bot?start=inline]

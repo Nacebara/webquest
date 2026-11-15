@@ -114,3 +114,26 @@ fn main_menu_commands_and_rich_keyboard() {
     ));
     insta::assert_snapshot!("menu_and_commands", out);
 }
+
+/// Inline-режим (`@бот 100`, идея владельца 16.11): карточки — сообщение, которое человек
+/// отправит другу. Премиум-эмодзи в них нет: сообщение уходит от его имени.
+#[test]
+fn inline_cards() {
+    let ui = common::premium_ui();
+    let mut out = String::new();
+    for query in ["100", "55,5 usdt", "", "5000"] {
+        out.push_str(&format!("## «{query}»\n"));
+        for card in ui.inline_cards(&common::terms(), query, "exch_test_bot") {
+            out.push_str(&format!(
+                "[{}] {}\n{}\n{}\n[{} → {}]\n\n",
+                card.id, card.title, card.description, card.html, card.button, card.url
+            ));
+            assert!(
+                !card.html.contains("tg-emoji"),
+                "без премиум-эмодзи: {}",
+                card.html
+            );
+        }
+    }
+    insta::assert_snapshot!("inline_cards", out.trim_end());
+}

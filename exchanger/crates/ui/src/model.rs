@@ -85,6 +85,20 @@ impl Terms {
     }
 }
 
+/// Карточка inline-режима (`@бот 100`): строка в списке Telegram и сообщение с кнопкой.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InlineCard {
+    /// Направление: id результата для Telegram.
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    /// HTML сообщения (без премиум-эмодзи: его отправляет человек).
+    pub html: String,
+    pub button: String,
+    /// Ссылка кнопки: бот со стартовым параметром `inline`.
+    pub url: String,
+}
+
 /// Заявка, к которой относится сообщение.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderRef {

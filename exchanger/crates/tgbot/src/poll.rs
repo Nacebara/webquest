@@ -79,6 +79,7 @@ pub(crate) async fn run(inner: Arc<Inner>, cancel: CancellationToken) {
             UpdateKind::EditedMessage,
             UpdateKind::CallbackQuery,
             UpdateKind::WidgetQuery,
+            UpdateKind::InlineQuery,
         ]);
         let result = tokio::select! {
             () = cancel.cancelled() => break,

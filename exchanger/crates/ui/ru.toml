@@ -168,6 +168,17 @@ line = "Комиссия <s>{base}</s> <b>{fee}</b> — на чек до {up_to}
 line_all = "Комиссия <s>{base}</s> <b>{fee}</b> — на любой чек"
 
 # «Обменять» — макет B1: один вопрос, две кнопки, комиссия прямо на кнопке.
+# Inline-режим (идея владельца 16.11): «@бот 100» в любом чате — карточка курса другу.
+# Сообщение уходит от имени человека: без премиум-эмодзи, только текст и кнопка «Обменять».
+[inline]
+title = "{amount} USDT {src} → {payout} USDT {dst}"
+description = "Комиссия {pct} · обычно 10 секунд"
+card = "<b>{src} → {dst}</b>\nЧек на <code>{amount}</code> USDT → чек на <b>{payout} USDT</b>\n<i>Комиссия {pct} · обычно 10 секунд</i>"
+range_title = "{src} → {dst}: от {min} до {max} USDT"
+range_description = "{amount} USDT — вне лимита"
+range_card = "<b>{src} → {dst}</b>\nМеняю чеки от <code>{min}</code> до <code>{max}</code> USDT.\n<i>Обычно 10 секунд</i>"
+button = "Обменять в @{bot}"
+
 [exchange]
 title = "<b>Что меняем?</b>"
 button = "{direction} · {fee}"

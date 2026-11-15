@@ -272,6 +272,22 @@ pub struct SendCheckTexts {
     pub head: String,
 }
 
+/// Inline-режим: «@бот 100» в любом чате — карточка курса другу (идея владельца 16.11).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InlineTexts {
+    /// Строка в списке Telegram: «100 USDT CryptoBot → 97.50 USDT xRocket».
+    pub title: String,
+    pub description: String,
+    /// Сообщение, которое уйдёт в чат.
+    pub card: String,
+    /// Сумма вне лимита направления — карточка с лимитами вместо расчёта.
+    pub range_title: String,
+    pub range_description: String,
+    pub range_card: String,
+    pub button: String,
+}
+
 /// «Квитанция» — строки сумм столбиком (выбор владельца 8 ноября 2026).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -686,6 +702,7 @@ pub struct Texts {
     pub terms: TermsTexts,
     pub exchange: ExchangeTexts,
     pub send_check: SendCheckTexts,
+    pub inline: InlineTexts,
     pub receipt: ReceiptTexts,
     pub howto: HowtoTexts,
     pub invoice_prompt: InvoicePromptTexts,

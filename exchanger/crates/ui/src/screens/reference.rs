@@ -13,8 +13,8 @@ use crate::emoji::Emoji;
 use crate::fmt::{self, TimeFormat};
 use crate::html::{Frag, clip, fill_text};
 use crate::model::{
-    DirectionStatus, DirectionTerms, HistoryPage, HistoryRow, HistorySummary, OrderCard,
-    PauseReason, Terms, UiError,
+    DirectionStatus, DirectionTerms, HistoryPage, HistoryRow, HistorySummary, InlineCard,
+    OrderCard, PauseReason, Terms, UiError,
 };
 use crate::screen::{Keyboard, Screen};
 
@@ -55,6 +55,18 @@ fn example_quote(
     };
     let quote = quote_check_exchange(amount, policy, domain::Step::from_dp(2)?).ok()?;
     Some((policy.average_pct(amount).ok()?, quote))
+}
+
+/// Сумма из inline-запроса: первое число («100», «55,5», «100usdt»). Нет числа — `None`.
+pub(crate) fn inline_amount(query: &str) -> Option<Decimal> {
+    query
+        .split(|c: char| c.is_whitespace())
+        .map(|w| {
+            w.trim_end_matches(|c: char| c.is_alphabetic())
+                .replace(',', ".")
+        })
+        .find_map(|w| w.parse::<Decimal>().ok())
+        .filter(|a| *a > Decimal::ZERO && *a <= Decimal::from(10_000_000))
 }
 
 /// Самая низкая обычная ставка направления: со ступенями — самая дешёвая ступень.
@@ -538,6 +550,74 @@ impl Ui {
     /// значками и лимиты, пример расчёта столбиком («Ваш чек · Комиссия · Чек xRocket»),
     /// «Скопируйте, чтобы создать чек ⬇️» и под сообщением кнопка с командой кошелька.
     /// Направление на паузе — сразу ошибка E11 (чек ещё не прислан, деньги у клиента).
+    /// Inline-режим (`@бот 100` в любом чате, идея владельца 16.11): по карточке на открытое
+    /// направление обмена чеками. Сумма — из запроса, нет суммы — 100. Расчёт — та же формула,
+    /// что в квитанции; сумма вне лимита — карточка с лимитами.
+    pub fn inline_cards(&self, terms: &Terms, query: &str, bot: &str) -> Vec<InlineCard> {
+        let amount = inline_amount(query).unwrap_or(Decimal::ONE_HUNDRED);
+        let t = &self.texts.inline;
+        let url = format!("https://t.me/{bot}?start=inline");
+        terms
+            .open()
+            .filter(|d| d.direction.flow() == Flow::CheckExchange)
+            .map(|d| {
+                let src = self.wallet_name(d.direction.source());
+                let dst = self.wallet_name(d.direction.target());
+                let shown = fmt::amount(amount, domain::Asset::Usdt);
+                let in_range = amount >= d.min && amount <= d.max;
+                let (title, description, card) = match example_quote(d, amount).filter(|_| in_range)
+                {
+                    Some((pct, q)) => {
+                        let payout = fmt::amount(q.payout, domain::Asset::Usdt);
+                        let pct = fmt::percent(pct);
+                        let args = [
+                            ("src", src),
+                            ("dst", dst),
+                            ("amount", shown.as_str()),
+                            ("payout", payout.as_str()),
+                            ("pct", pct.as_str()),
+                        ];
+                        (
+                            fill_text(&t.title, &args),
+                            fill_text(&t.description, &args),
+                            self.fill_plain(&t.card, &args),
+                        )
+                    }
+                    None => {
+                        let (min, max) = (fmt::bare_amount(d.min), fmt::bare_amount(d.max));
+                        let args = [
+                            ("src", src),
+                            ("dst", dst),
+                            ("amount", shown.as_str()),
+                            ("min", min.as_str()),
+                            ("max", max.as_str()),
+                        ];
+                        (
+                            fill_text(&t.range_title, &args),
+                            fill_text(&t.range_description, &args),
+                            self.fill_plain(&t.range_card, &args),
+                        )
+                    }
+                };
+                InlineCard {
+                    id: d.direction.code().to_owned(),
+                    title,
+                    description,
+                    html: card,
+                    button: fill_text(&t.button, &[("bot", bot)]),
+                    url: url.clone(),
+                }
+            })
+            .collect()
+    }
+
+    /// Шаблон с подстановками в обычный HTML: подстановки экранированы.
+    fn fill_plain(&self, template: &str, args: &[(&str, &str)]) -> String {
+        let frags: Vec<(&str, Frag)> = args.iter().map(|(k, v)| (*k, Frag::text(v))).collect();
+        let refs: Vec<(&str, &Frag)> = frags.iter().map(|(k, f)| (*k, f)).collect();
+        self.fill(template, &refs).into_plain()
+    }
+
     pub fn send_check(&self, terms: &Terms, direction: Direction) -> Screen {
         let Some(d) = terms.get(direction).filter(|d| {
             d.status == DirectionStatus::Open && direction.flow() == Flow::CheckExchange
