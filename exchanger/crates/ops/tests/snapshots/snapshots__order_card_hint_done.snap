@@ -76,6 +76,5 @@ xRocket v3, 14:04:04 — нет ответа</blockquote>
 удержано 97.50 в xRocket</blockquote>
 --- keyboard
 [{"text":"✋ Взять","style":"primary","callback_data":"a:ot:15"},{"text":"💬 Написать","callback_data":"a:sq:51234567"}]
-[{"text":"🔄 Повторить выплату","callback_data":"a:od:15:rp"}]
-[{"text":"↩️ Вернуть","callback_data":"a:od:15:rf"},{"text":"✅ Выплачено","callback_data":"a:od:15:cp"}]
+[{"text":"✅ Выплачено","style":"primary","callback_data":"a:od:15:cp"}]
 [{"text":"🗑 Закрыть без выплаты","style":"danger","callback_data":"a:od:15:cl"}]

@@ -875,6 +875,8 @@ impl Inner {
         let t = &self.texts;
         let need = action.min_role();
         let mut unknown_key: Option<String> = None;
+        // Действие с суммой для кнопки «Проверил — …» при неясном исходе.
+        let mut unknown_label: Option<String> = None;
         // Подпись кнопки «Подтвердить» по действию («Повторить выплату 97.50»).
         let mut confirm_label: Option<String> = None;
         let text = match &action {
@@ -1243,6 +1245,14 @@ impl Inner {
                 if *kind == DecisionKind::Close {
                     warning = format!("{}\n{warning}", t.t("order.warn_close"));
                 }
+                unknown_label = Some(t.f(
+                    match kind {
+                        DecisionKind::RetryInvoice => "order.unknown_retry_invoice",
+                        DecisionKind::Refund => "order.unknown_refund",
+                        _ => "order.unknown_retry",
+                    },
+                    &[("amount", &money(sum))],
+                ));
                 confirm_label = Some(t.f(
                     match kind {
                         DecisionKind::RetryPayout => "order.b_do_retry",
@@ -1493,8 +1503,16 @@ impl Inner {
         if staff.role >= need {
             let danger = action.irreversible();
             let nonce = self.hold_for(staff.tg_user_id, action, ttl);
+            // Неясный исход: на кнопке — что именно произойдёт и сколько (аудит 16.11, П-1),
+            // а не голое «подтверждаю».
             let confirm = match unknown_key {
-                Some(_) => btn(t.t("order.b_do_unknown"), &Cb::ConfirmUnknown(nonce)),
+                Some(_) => btn(
+                    t.f(
+                        "order.b_do_unknown",
+                        &[("action", &unknown_label.clone().unwrap_or_default())],
+                    ),
+                    &Cb::ConfirmUnknown(nonce),
+                ),
                 None => btn(
                     confirm_label.unwrap_or_else(|| t.t("common.confirm")),
                     &Cb::Confirm(nonce),

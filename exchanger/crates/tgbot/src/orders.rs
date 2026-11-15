@@ -163,6 +163,10 @@ fn reject_error(view: &OrderView, extra: &Extra) -> UiError {
             order: view.public_id.clone(),
         },
         Some("not_a_check") => UiError::NotCheckOrInvoice,
+        // Аудит 16.11, К-5: лимит на сутки и остановленные выплаты — свои экраны, а не «что-то
+        // пошло не так, попробуйте через минуту» (клиент пробовал бы снова и снова).
+        Some("daily_limit") => UiError::DailyLimit,
+        Some("service_paused") => UiError::Maintenance { until: None },
         _ => UiError::Internal,
     }
 }
@@ -1067,6 +1071,12 @@ mod tests {
                 OrderState::Rejected,
                 "not_a_check",
                 UiError::NotCheckOrInvoice,
+            ),
+            (OrderState::Rejected, "daily_limit", UiError::DailyLimit),
+            (
+                OrderState::Rejected,
+                "service_paused",
+                UiError::Maintenance { until: None },
             ),
         ];
         for (state, code, expected) in cases {

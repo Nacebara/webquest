@@ -6,7 +6,7 @@ expression: "both(p, q)"
 --- html
 💼 <b>Пополнение</b>
 Пришлите сюда чек USDT CryptoBot или xRocket — от <code>10.00 USDT</code>.
-Как создать чек: в любом чате наберите <code>@send 100usdt</code> или <code>@xrocket 100</code>, отправьте и перешлите ссылку сюда.
+Как создать чек: наберите здесь <code>@send 100usdt</code> или <code>@xrocket 100</code> и выберите чек — я сразу его заберу.
 Следующий чек в ближайшие 15 минут пойдёт в инвестиции, а не в обмен.
 --- keyboard: inline
 [{"callback_data":"inv","text":"Отмена"}]
@@ -15,7 +15,7 @@ expression: "both(p, q)"
 --- html
 <tg-emoji emoji-id="5368000000000000020">💼</tg-emoji> <b>Пополнение</b>
 Пришлите сюда чек USDT CryptoBot или xRocket — от <code>10.00 USDT</code>.
-Как создать чек: в любом чате наберите <code>@send 100usdt</code> или <code>@xrocket 100</code>, отправьте и перешлите ссылку сюда.
+Как создать чек: наберите здесь <code>@send 100usdt</code> или <code>@xrocket 100</code> и выберите чек — я сразу его заберу.
 Следующий чек в ближайшие 15 минут пойдёт в инвестиции, а не в обмен.
 --- keyboard: inline
 [{"callback_data":"inv","text":"Отмена"}]

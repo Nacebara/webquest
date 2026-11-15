@@ -66,3 +66,24 @@ fn client_texts_use_premium_emoji_roles_only() {
         "обычные эмодзи в текстах клиента — нужна роль {{e_…}}: {bad:#?}"
     );
 }
+
+/// Чек — на предъявителя: созданный в группе заберёт посторонний (аудит 16.11, К-6). Создавать
+/// чек — только здесь, в чате с ботом.
+#[test]
+fn never_advise_creating_a_check_in_any_chat() {
+    let mut files = vec![crates_dir().join("ui").join("ru.toml")];
+    let widgets = crates_dir().join("..").join("assets").join("widgets");
+    for entry in fs::read_dir(&widgets).expect("assets/widgets") {
+        files.push(entry.expect("запись папки").path());
+    }
+    for file in files {
+        let text = fs::read_to_string(&file)
+            .expect("файл читается")
+            .to_lowercase();
+        assert!(
+            !text.contains("в любом чате") && !text.contains("в любой чат"),
+            "{}: чек создают только здесь, в чате с ботом",
+            file.display()
+        );
+    }
+}

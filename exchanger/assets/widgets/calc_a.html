@@ -57,7 +57,7 @@ tr.onpointerdown=e=>{if(!D)return;R=tr.getBoundingClientRect();tr.setPointerCapt
 tr.onpointermove=e=>{if(R&&tr.hasPointerCapture(e.pointerId))at(e)};
 tr.onpointerup=tr.onpointercancel=()=>R=null;
 $('sw').onclick=()=>{if(!D||D.d.length<2)return;d=1-d;H?.impactOccurred('light');draw()};
-$('cp').onclick=()=>{if(!D||$('cp').disabled)return;const r=D.d[d];W.copyText?.(cmd(r[0],D.a[i]));$('cp').textContent='Скопировано — вставьте в любой чат';clearTimeout(cpT);cpT=setTimeout(()=>{cpT=0;draw()},2500)};
+$('cp').onclick=()=>{if(!D||$('cp').disabled)return;const r=D.d[d];W.copyText?.(cmd(r[0],D.a[i]));$('cp').textContent='Скопировано — вставьте сюда, в поле ввода';clearTimeout(cpT);cpT=setTimeout(()=>{cpT=0;draw()},2500)};
 W.onEvent?.('chatDataChanged',load);
 load();
 </script>

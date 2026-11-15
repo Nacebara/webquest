@@ -418,7 +418,25 @@ impl OrderView {
         if !posted && role >= Role::Admin {
             s = s.row(vec![decide(DecisionKind::Intake, "order.b_intake")]);
         }
-        if posted {
+        // Сверка видела, что неясная выплата прошла (аудит 16.11, П-1): повтор или возврат —
+        // это двойная выплата. Остаётся найти чек в истории кошелька и отметить выплаченной.
+        let went_through = self
+            .reconcile
+            .as_ref()
+            .is_some_and(|h| h.done == Some(true));
+        let paid_out = went_through
+            && self
+                .reconcile
+                .as_ref()
+                .is_some_and(|h| matches!(h.kind.as_str(), "create_payout_check" | "pay_invoice"));
+        if posted && went_through {
+            if paid_out && role >= Role::Admin {
+                s = s.row(vec![
+                    decide(DecisionKind::ClosePaid, "order.b_paid")
+                        .style(botapi::ButtonStyle::Primary),
+                ]);
+            }
+        } else if posted {
             s = s.row(vec![match c.direction.flow() {
                 Flow::CheckExchange => decide(DecisionKind::RetryPayout, "order.b_retry"),
                 Flow::InvoicePayment => decide(DecisionKind::RetryInvoice, "order.b_retry_invoice"),
