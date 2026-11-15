@@ -1680,6 +1680,14 @@ async fn every_widget_query_gets_an_answer(pool: PgPool) {
             .is_some_and(|k| k.contains(&json!("widget_query"))),
         "{kinds}"
     );
+    // Чек из инлайн-режима кошелька приходит правкой: без подписки Telegram её не пришлёт,
+    // а поддельный сервер присылает всё подряд — поэтому проверяем саму подписку.
+    assert!(
+        kinds
+            .as_array()
+            .is_some_and(|k| k.contains(&json!("edited_message"))),
+        "{kinds}"
+    );
     // Бот после запроса жив: клиенту отвечает как обычно.
     e.fake.client_writes("привет");
     e.fake

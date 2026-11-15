@@ -78,10 +78,22 @@ pub enum Emoji {
     /// Огонёк «Выгодно» в строке текста — пламя без плитки (выбор владельца 9 ноября 2026,
     /// вариант А). В таблицах — плитка [`Emoji::Promo`].
     Flame,
+    /// «Где деньги» (концепция Б, выбор владельца 15.11): деньги в чеке клиента.
+    InCheck,
+    /// Деньги у сервиса — в безопасности.
+    WithMe,
+    /// Пришла не та монета (меняем только USDT).
+    OtherCoin,
+    /// Заявка закрыта оператором.
+    Closed,
+    /// Выплаты в кошелёк закончились — резерв пуст.
+    Empty,
+    /// Кнопка «Ответить» оператору (AUDIT-UI С3).
+    Reply,
 }
 
 impl Emoji {
-    pub const ALL: [Emoji; 38] = [
+    pub const ALL: [Emoji; 44] = [
         Emoji::Wait,
         Emoji::Ok,
         Emoji::Err,
@@ -120,6 +132,12 @@ impl Emoji {
         Emoji::Rules,
         Emoji::Down,
         Emoji::Flame,
+        Emoji::InCheck,
+        Emoji::WithMe,
+        Emoji::OtherCoin,
+        Emoji::Closed,
+        Emoji::Empty,
+        Emoji::Reply,
     ];
 
     pub const fn key(self) -> &'static str {
@@ -162,6 +180,12 @@ impl Emoji {
             Emoji::Rules => "rules",
             Emoji::Down => "down",
             Emoji::Flame => "flame",
+            Emoji::InCheck => "in_check",
+            Emoji::WithMe => "with_me",
+            Emoji::OtherCoin => "other_coin",
+            Emoji::Closed => "closed",
+            Emoji::Empty => "empty",
+            Emoji::Reply => "reply",
         }
     }
 
@@ -206,6 +230,12 @@ impl Emoji {
             Emoji::Rules => "🛡",
             Emoji::Down => "⬇️",
             Emoji::Flame => "🔥",
+            Emoji::InCheck => "🎟",
+            Emoji::WithMe => "🛡",
+            Emoji::OtherCoin => "🪙",
+            Emoji::Closed => "📮",
+            Emoji::Empty => "🫙",
+            Emoji::Reply => "↩️",
         }
     }
 
@@ -254,6 +284,12 @@ impl Emoji {
             Emoji::Rules => "color/shield",
             Emoji::Down => "color/down",
             Emoji::Flame => "color/flame",
+            Emoji::InCheck => "color/in_check",
+            Emoji::WithMe => "color/with_me",
+            Emoji::OtherCoin => "color/other_coin",
+            Emoji::Closed => "color/closed",
+            Emoji::Empty => "color/empty",
+            Emoji::Reply => "mono/reply",
         }
     }
 
@@ -298,6 +334,12 @@ impl Emoji {
             Emoji::Rules => "mono/shield",
             Emoji::Down => "mono/down",
             Emoji::Flame => "mono/fire",
+            Emoji::InCheck => "mono/ticket",
+            Emoji::WithMe => "mono/shield",
+            Emoji::OtherCoin => "mono/coin",
+            Emoji::Closed => "mono/flag",
+            Emoji::Empty => "mono/wallet",
+            Emoji::Reply => "mono/reply",
         }
     }
 }

@@ -72,8 +72,11 @@ pub(crate) async fn run(inner: Arc<Inner>, cancel: CancellationToken) {
     let mut last_conflict: Option<tokio::time::Instant> = None;
     tracing::info!("client bot: polling for updates");
     loop {
+        // Правки нужны: чек из инлайн-режима кошелька приходит заглушкой, ссылка — правкой
+        // (checkwait.rs, способ 1). Без подписки Telegram правки не присылает (аудит 16.11, А-1).
         let request = GetUpdates::after(last, inner.cfg.poll_timeout_secs).allowed(vec![
             UpdateKind::Message,
+            UpdateKind::EditedMessage,
             UpdateKind::CallbackQuery,
             UpdateKind::WidgetQuery,
         ]);

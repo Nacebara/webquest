@@ -412,8 +412,9 @@ mod tests {
         let manifest = read_manifest(&dir).unwrap();
         assert_eq!(
             manifest.icons.len(),
-            121,
-            "+ стрелка «вниз» (8.11), пламя для текста (9.11), инвестиции — плитка и линия (13.11)"
+            127,
+            "+ стрелка «вниз» (8.11), пламя для текста (9.11), инвестиции — плитка и линия (13.11), \
+             концепция «где деньги» — 5 плиток и «Ответить» (15.11)"
         );
         for icon in &manifest.icons {
             assert!(dir.join(&icon.animated).is_file(), "{}", icon.animated);

@@ -324,6 +324,41 @@
    "static": "static/color/invest.png"
   },
   {
+   "key": "color/in_check",
+   "label": "Деньги в чеке",
+   "emoji": "🎟",
+   "animated": "color/in_check.tgs",
+   "static": "static/color/in_check.png"
+  },
+  {
+   "key": "color/with_me",
+   "label": "Деньги у меня",
+   "emoji": "🛡",
+   "animated": "color/with_me.tgs",
+   "static": "static/color/with_me.png"
+  },
+  {
+   "key": "color/other_coin",
+   "label": "Не та монета",
+   "emoji": "🪙",
+   "animated": "color/other_coin.tgs",
+   "static": "static/color/other_coin.png"
+  },
+  {
+   "key": "color/closed",
+   "label": "Закрыта",
+   "emoji": "📮",
+   "animated": "color/closed.tgs",
+   "static": "static/color/closed.png"
+  },
+  {
+   "key": "color/empty",
+   "label": "Выплаты закончились",
+   "emoji": "🫙",
+   "animated": "color/empty.tgs",
+   "static": "static/color/empty.png"
+  },
+  {
    "key": "mono/swap",
    "label": "Обмен",
    "emoji": "🔄",
@@ -847,6 +882,13 @@
    "emoji": "💼",
    "animated": "mono/invest.tgs",
    "static": "static/mono/invest.png"
+  },
+  {
+   "key": "mono/reply",
+   "label": "Ответить",
+   "emoji": "↩️",
+   "animated": "mono/reply.tgs",
+   "static": "static/mono/reply.png"
   }
  ]
 }
