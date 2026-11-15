@@ -125,6 +125,7 @@ fn quote(expires_at: DateTime<Utc>) -> InvoiceQuote {
         fee: usdt(125, 2),
         to_pay: usdt(5125, 2),
         expires_at,
+        invoice_code: Some("IVA1B2C37Q".to_owned()),
     }
 }
 
@@ -281,7 +282,9 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
             title: "Лимит и пауза",
             messages: vec![
                 ui.error(&UiError::DailyLimit),
-                ui.error(&UiError::InvoiceRefused(InvoiceRefusal::Paused)),
+                ui.error(&UiError::InvoiceRefused(InvoiceRefusal::Paused {
+                    platform: domain::Platform::XRocket,
+                })),
             ],
         },
         one(

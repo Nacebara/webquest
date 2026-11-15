@@ -177,6 +177,7 @@ pub fn quote(description: Option<&str>, fiat: bool) -> InvoiceQuote {
         fee: usdt(dec!(0.3)),
         to_pay: usdt(dec!(10.3)),
         expires_at: at(12, 49),
+        invoice_code: Some("IVA1B2C37Q".to_owned()),
     }
 }
 
@@ -428,7 +429,9 @@ pub fn all_errors() -> Vec<(&'static str, UiError)> {
         ("check_used", UiError::CheckUsed),
         (
             "invoice_refused_paused",
-            UiError::InvoiceRefused(InvoiceRefusal::Paused),
+            UiError::InvoiceRefused(InvoiceRefusal::Paused {
+                platform: Platform::XRocket,
+            }),
         ),
         (
             "invoice_refused_maintenance",

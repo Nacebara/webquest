@@ -612,15 +612,17 @@ expression: errors.trim_end()
 ## invoice_refused_paused
 ### plain
 --- html
-⏸ <b>Оплата счетов на паузе</b>
-Счёт не открывал, деньги не списаны. Пока можно обменять чек.
+⏸ <b>Счета xRocket на паузе</b>
+Обычно до часа. Обмен чеков работает.
+Счёт не открывал, деньги не списаны.
 --- keyboard: inline
 [{"callback_data":"exchange","text":"💱 Обменять"},{"callback_data":"terms","text":"📈 Курс"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> <b>Оплата счетов на паузе</b>
-Счёт не открывал, деньги не списаны. Пока можно обменять чек.
+<tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> <b>Счета xRocket на паузе</b>
+Обычно до часа. Обмен чеков работает.
+Счёт не открывал, деньги не списаны.
 --- keyboard: inline
 [{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","text":"Обменять"},{"callback_data":"terms","icon_custom_emoji_id":"5368000000000000015","text":"Курс"}]
 

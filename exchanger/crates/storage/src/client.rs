@@ -56,6 +56,8 @@ pub struct OrderView {
     pub progress_sent_at: Option<DateTime<Utc>>,
     /// Из какого состояния заявка пришла в текущее (для строки «Итог — ниже»).
     pub previous_state: Option<OrderState>,
+    /// Код счёта из ссылки клиента (оплата счёта).
+    pub invoice_code: Option<String>,
 }
 
 /// Строка истории клиента.
@@ -193,6 +195,7 @@ struct ViewRow {
     progress_message_id: Option<i32>,
     progress_sent_at: Option<DateTime<Utc>>,
     previous_state: Option<String>,
+    invoice_start_param: Option<String>,
 }
 
 impl ViewRow {
@@ -228,6 +231,7 @@ impl ViewRow {
                 .as_deref()
                 .map(|s| parse("order_transitions.from_state", s))
                 .transpose()?,
+            invoice_code: self.invoice_start_param,
         })
     }
 }
@@ -256,7 +260,8 @@ pub async fn order_view(
                o.progress_chat_id, o.progress_message_id, o.progress_sent_at,
                (SELECT t.from_state FROM order_transitions t
                  WHERE t.order_id = o.id AND t.to_state = o.state
-                 ORDER BY t.id DESC LIMIT 1) AS previous_state
+                 ORDER BY t.id DESC LIMIT 1) AS previous_state,
+               o.invoice_start_param
           FROM orders o
          WHERE o.id = $1
         "#,
@@ -292,7 +297,8 @@ pub async fn order_view_for_user(
                o.progress_chat_id, o.progress_message_id, o.progress_sent_at,
                (SELECT t.from_state FROM order_transitions t
                  WHERE t.order_id = o.id AND t.to_state = o.state
-                 ORDER BY t.id DESC LIMIT 1) AS previous_state
+                 ORDER BY t.id DESC LIMIT 1) AS previous_state,
+               o.invoice_start_param
           FROM orders o
          WHERE o.public_id = $1 AND o.user_id = $2
         "#,

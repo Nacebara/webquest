@@ -226,6 +226,7 @@ pub(crate) fn quote(view: &OrderView) -> Option<InvoiceQuote> {
         fee: money(view, view.fee_amount)?,
         to_pay: money(view, view.quote_amount_in)?,
         expires_at: view.quote_expires_at?,
+        invoice_code: view.invoice_code.clone(),
     })
 }
 
@@ -809,6 +810,7 @@ mod tests {
             progress: None,
             progress_sent_at: None,
             previous_state: None,
+            invoice_code: None,
         }
     }
 

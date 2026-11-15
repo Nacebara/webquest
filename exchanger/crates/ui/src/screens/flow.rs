@@ -298,6 +298,30 @@ impl Ui {
     }
 
     /// «Оплачиваю счёт CryptoBot» — шаг, как «Отправляю» у обмена.
+    /// «Счёт IV…85» по коду счёта (макет «Счёт оплачен»); кода нет — «Заявка <номер>».
+    fn invoice_ref(&self, q: &InvoiceQuote) -> Frag {
+        let t = &self.texts.invoice;
+        match q
+            .invoice_code
+            .as_deref()
+            .map(str::trim)
+            .filter(|c| !c.is_empty())
+        {
+            Some(code) => {
+                let chars: Vec<char> = code.chars().collect();
+                let short = if chars.len() > 6 {
+                    let head: String = chars[..2].iter().collect();
+                    let tail: String = chars[chars.len() - 2..].iter().collect();
+                    format!("{head}…{tail}")
+                } else {
+                    code.to_owned()
+                };
+                self.fill(&t.paid_ref_invoice, &[("code", &Frag::text(&short))])
+            }
+            None => self.fill(&t.paid_ref_order, &[("order", &Frag::text(&q.order.id))]),
+        }
+    }
+
     /// «Оплачиваю счёт». Оплата затянулась — строка «Дольше обычного» (макет B1; шаг 6.3, Д8).
     pub fn invoice_paying(&self, q: &InvoiceQuote, slow: bool) -> Screen {
         let body = self.fill(
@@ -383,7 +407,7 @@ impl Ui {
                         ("x_short", &self.amount_text(&q.to_pay)),
                         ("fee_pct", &self.pct(q.fee_pct)),
                         ("fee_short", &self.amount_text(&q.fee)),
-                        ("order", &Frag::text(&q.order.id)),
+                        ("ref", &self.invoice_ref(q)),
                         ("time", &self.at(finished_at, TimeFormat::Time)),
                     ],
                 ),

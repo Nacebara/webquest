@@ -124,6 +124,9 @@ pub struct InvoiceQuote {
     /// Сколько прислать клиенту (`X`).
     pub to_pay: Money,
     pub expires_at: DateTime<Utc>,
+    /// Код счёта из ссылки (`IV17661985`): в «Счёт оплачен» — «Счёт IV…85» (макет). `None` —
+    /// не знаем, тогда номер заявки.
+    pub invoice_code: Option<String>,
 }
 
 /// Переплата по счёту.
@@ -138,12 +141,21 @@ pub enum Excess {
 /// Почему не берём подходящий счёт прямо сейчас. Денег клиента у нас нет.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InvoiceRefusal {
-    Paused,
+    /// Оплата счетов этого кошелька на паузе (макет «Лимит и пауза»: «Счета xRocket на паузе»).
+    Paused {
+        platform: domain::Platform,
+    },
     Maintenance,
     DailyLimit,
-    NoReserve { max: Money },
-    BelowMinimum { min: Money },
-    AboveMaximum { max: Money },
+    NoReserve {
+        max: Money,
+    },
+    BelowMinimum {
+        min: Money,
+    },
+    AboveMaximum {
+        max: Money,
+    },
 }
 
 /// Причина возврата (S9).

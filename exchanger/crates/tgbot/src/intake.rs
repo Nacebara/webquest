@@ -106,7 +106,7 @@ pub(crate) async fn process(
 }
 
 /// Отказ по счёту → экран. Денег клиента у нас нет.
-fn invoice_error(reason: &InvoiceReject) -> UiError {
+fn invoice_error(reason: &InvoiceReject, platform: domain::Platform) -> UiError {
     let usdt = |x: domain::Decimal| {
         domain::Money::new(x, domain::Asset::Usdt)
             .unwrap_or_else(|_| domain::Money::zero(domain::Asset::Usdt))
@@ -125,7 +125,9 @@ fn invoice_error(reason: &InvoiceReject) -> UiError {
             UiError::InvoiceUnsuitable(InvoiceProblem::AlreadyPaid)
         }
         InvoiceReject::PendingInvoice { order: o } => UiError::InvoicePending { order: order(o) },
-        InvoiceReject::DirectionClosed => UiError::InvoiceRefused(InvoiceRefusal::Paused),
+        InvoiceReject::DirectionClosed => {
+            UiError::InvoiceRefused(InvoiceRefusal::Paused { platform })
+        }
         InvoiceReject::ServicePaused => UiError::InvoiceRefused(InvoiceRefusal::Maintenance),
         InvoiceReject::NoReserve { max } => {
             UiError::InvoiceRefused(InvoiceRefusal::NoReserve { max: usdt(*max) })
@@ -187,7 +189,9 @@ async fn submit_invoice(
         }
         InvoiceSubmitted::Rejected(reason) => {
             tracing::info!(user, reason = reason.code(), "invoice rejected");
-            inner.reply_error(chat, &invoice_error(&reason)).await
+            inner
+                .reply_error(chat, &invoice_error(&reason, link.platform))
+                .await
         }
     }
 }

@@ -44,7 +44,7 @@ impl Ui {
     fn invoice_refusal(&self, refusal: &InvoiceRefusal) -> Frag {
         let r = &self.texts.invoice_refusals;
         match refusal {
-            InvoiceRefusal::Paused => self.fill(&r.paused, &[]),
+            InvoiceRefusal::Paused { .. } => self.fill(&r.paused, &[]),
             InvoiceRefusal::Maintenance => self.fill(&r.maintenance, &[]),
             InvoiceRefusal::DailyLimit => self.fill(&r.daily_limit, &[]),
             InvoiceRefusal::NoReserve { max } => {
@@ -337,8 +337,8 @@ impl Ui {
                 self.err_keys(&[ErrKey::History]),
             ),
             UiError::InvoiceCheckBusy => (self.fill(&e.invoice_check_busy, &[]), Keyboard::None),
-            UiError::InvoiceRefused(InvoiceRefusal::Paused) => (
-                self.fill(&e.invoice_paused, &[]),
+            UiError::InvoiceRefused(InvoiceRefusal::Paused { platform }) => (
+                self.fill(&e.invoice_paused, &[("wallet", &self.wallet(*platform))]),
                 Keyboard::inline_rows(vec![vec![
                     self.cb_button(
                         Some(Emoji::Exchange),

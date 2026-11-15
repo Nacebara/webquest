@@ -379,6 +379,8 @@ pub struct InvoiceTexts {
     pub underpaid: String,
     pub paying: String,
     pub paid: String,
+    pub paid_ref_invoice: String,
+    pub paid_ref_order: String,
     /// Переплата вернулась чеком (кнопка «Забрать»).
     pub excess_refund: String,
     /// Переплата возвращается, чек ещё создаётся.
