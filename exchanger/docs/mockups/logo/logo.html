@@ -1,50 +1,76 @@
 <!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:Man;src:url(node_modules/@fontsource/manrope/files/manrope-latin-800-normal.woff2)}
 body{margin:0;background:#eef1f4;font:14px/1.4 -apple-system,"Segoe UI",Roboto,sans-serif;color:#1b2430}
-.grid{display:grid;grid-template-columns:repeat(3,420px);gap:18px;padding:18px}
+.grid{display:grid;grid-template-columns:repeat(3,440px);gap:18px;padding:18px}
 .card{background:#fff;border-radius:18px;padding:16px;box-shadow:0 1px 0 #dde3ea}
 .card h4{margin:0 0 10px;font-size:15px}.card p{margin:8px 0 0;color:#5d6b7a;font-size:13px}
 .top{display:flex;gap:14px;align-items:center}
-.big{width:200px;height:200px;border-radius:50%;overflow:hidden;flex:none}
+.big{width:190px;height:190px;border-radius:50%;overflow:hidden;flex:none}
 .strips{display:grid;gap:8px;flex:1}
 .strip{display:flex;gap:10px;align-items:center;justify-content:center;border-radius:12px;padding:10px 6px}
-.strip.d{background:#0e1621}.strip.l{background:#f4f6f8;border:1px solid #e3e8ee}
+.d{background:#0e1621}.l{background:#f4f6f8;border:1px solid #e3e8ee}
 .av{border-radius:50%;overflow:hidden;flex:none}
-.chat{margin-top:12px;border-radius:12px;overflow:hidden;border:1px solid #e3e8ee}
+.lock{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.lk{display:flex;align-items:center;justify-content:center;gap:10px;border-radius:12px;padding:14px 8px}
+.lk .tile{width:44px;height:44px;border-radius:13.5px;overflow:hidden;flex:none}
+.wm{font:800 34px/1 Man,sans-serif;letter-spacing:-.035em}
+.lk.l .wm{color:#16202c}.lk.d .wm{color:#fff}
+.chat{margin-top:10px;border-radius:12px;overflow:hidden;border:1px solid #e3e8ee}
 .row{display:flex;gap:10px;align-items:center;padding:8px 10px}
 .row.d{background:#17212b;color:#f5f5f5}.row.l{background:#fff}
-.row b{font-size:14.5px;display:block}.row small{font-size:13px;color:#7f91a4;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:250px}
+.row b{font-size:14.5px;display:block}.row small{font-size:13px;color:#7f91a4;display:block}
 .row .t{margin-left:auto;font-size:12px;color:#7f91a4;align-self:flex-start}
 svg{display:block;width:100%;height:100%}
 #solo{position:fixed;left:0;top:0;width:640px;height:640px}
 </style></head><body><div class="grid" id="g"></div><div id="solo"></div>
 <script>
 const shade=(hex,k)=>{const to=k>0?255:0;return '#'+[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)).map(x=>Math.round(x+(to-x)*Math.abs(k)).toString(16).padStart(2,'0')).join('')};
-const AMBER='#CC7300', NIGHT='#283050', W='#fff';
+const AMBER='#CC7300', NIGHT='#283050', SKY='#1C97E6', W='#fff', PEACH=shade('#CC7300',0.62);
 let seq=0;
-function bg(color,hi=0.10,lo=-0.16){const id='b'+(++seq);return `<defs><linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${shade(color,hi)}"/><stop offset="1" stop-color="${shade(color,lo)}"/></linearGradient><linearGradient id="${id}h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset=".7" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect width="24" height="24" fill="url(#${id}g)"/><rect width="24" height="24" fill="url(#${id}h)"/>`}
-const g=(body,sw=2.1,tr='')=>`<g fill="none" stroke="${W}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"${tr?` transform="${tr}"`:''}>${body}</g>`;
-const at=(s,cx=12,cy=12)=>`translate(${cx} ${cy}) scale(${s}) translate(-12 -12)`;
+const grad=(id,c,hi=0.12,lo=-0.12)=>`<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${shade(c,hi)}"/><stop offset="1" stop-color="${shade(c,lo)}"/></linearGradient>`;
+const gloss=(id)=>`<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset=".7" stop-color="#fff" stop-opacity="0"/></linearGradient>`;
+// фон: оранжевая плитка (как эмодзи) во весь квадрат; аватарка обрезается кругом
+const amberBg=()=>{const i='a'+(++seq);return `<defs>${grad(i+'g',AMBER,0.12,-0.14)}${gloss(i+'h')}</defs><rect width="24" height="24" fill="url(#${i}g)"/><rect width="24" height="24" fill="url(#${i}h)"/>`};
+const nightBg=()=>{const i='n'+(++seq);return `<defs><radialGradient id="${i}" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="${shade(NIGHT,0.14)}"/><stop offset="1" stop-color="${shade(NIGHT,-0.28)}"/></radialGradient></defs><rect width="24" height="24" fill="url(#${i})"/>`};
+const tile=(c,x,y,s,r)=>{const i='t'+(++seq);return `<defs>${grad(i+'g',c,0.12,-0.08)}${gloss(i+'h')}</defs><rect x="${x}" y="${y}" width="${s}" height="${s}" rx="${r}" fill="url(#${i}g)"/><rect x="${x}" y="${y}" width="${s}" height="${s}" rx="${r}" fill="url(#${i}h)"/>`};
 const SWAP='<path d="M5.6 9h12.2M14.8 5.9l3.1 3.1-3.1 3.1"/><path d="M18.4 15H6.2M9.2 11.9L6.1 15l3.1 3.1"/>';
+const stroke=(body,sw,tr='',c=W)=>`<g fill="none" stroke="${c}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"${tr?` transform="${tr}"`:''}>${body}</g>`;
+const at=(s,cx=12,cy=12)=>`translate(${cx} ${cy}) scale(${s}) translate(-12 -12)`;
+// чек-стрелка: тело с выемкой (как у чека) и острие
+const arrowTicket=(y,dir,fill,perf)=>{
+  const h=4.8,c=y+h/2;
+  const body=dir>0
+    ?`M6.4 ${y}H15.2L18.8 ${c}L15.2 ${y+h}H6.4A1.4 1.4 0 0 1 5 ${y+h-1.4}V${c+0.95}A0.95 0.95 0 0 0 5 ${c-0.95}V${y+1.4}A1.4 1.4 0 0 1 6.4 ${y}Z`
+    :`M17.6 ${y}H8.8L5.2 ${c}L8.8 ${y+h}H17.6A1.4 1.4 0 0 0 19 ${y+h-1.4}V${c+0.95}A0.95 0.95 0 0 1 19 ${c-0.95}V${y+1.4}A1.4 1.4 0 0 0 17.6 ${y}Z`;
+  const px=dir>0?8.3:15.7;
+  return `<path d="${body}" fill="${fill}" stroke="${fill}" stroke-width=".7" stroke-linejoin="round"/>`+
+    (perf?`<path d="M${px} ${y+1.1}V${y+h-1.1}" stroke="${perf}" stroke-width=".75" stroke-linecap="round" stroke-dasharray=".05 1.05"/>`:'');
+};
+const ticket=(cx,cy,w,h,rot,fill,perf)=>{const x=cx-w/2,y=cy-h/2,r=1.3,n=1.05;
+  const d=`M${x+r} ${y}H${x+w-r}A${r} ${r} 0 0 1 ${x+w} ${y+r}V${cy-n}A${n} ${n} 0 0 0 ${x+w} ${cy+n}V${y+h-r}A${r} ${r} 0 0 1 ${x+w-r} ${y+h}H${x+r}A${r} ${r} 0 0 1 ${x} ${y+h-r}V${cy+n}A${n} ${n} 0 0 0 ${x} ${cy-n}V${y+r}A${r} ${r} 0 0 1 ${x+r} ${y}Z`;
+  return `<g transform="rotate(${rot} ${cx} ${cy})"><path d="${d}" fill="${fill}"/>${perf?`<path d="M${x+w*0.3} ${y+1.2}V${y+h-1.2}" stroke="${perf}" stroke-width=".8" stroke-linecap="round" stroke-dasharray=".05 1.1"/>`:''}</g>`};
 const EARROW='<path d="M7 11h10"/><path d="M17 11A5 5 0 1 0 12 16"/><path d="M12 16h4.4"/><path d="M14.5 14.1l1.9 1.9-1.9 1.9"/>';
-function tileOnNight(body,sw,s){const id='t'+(++seq);return `<defs><radialGradient id="${id}n" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="${shade(NIGHT,0.12)}"/><stop offset="1" stop-color="${shade(NIGHT,-0.25)}"/></radialGradient><linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${shade(AMBER,0.12)}"/><stop offset="1" stop-color="${shade(AMBER,-0.08)}"/></linearGradient><linearGradient id="${id}h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset=".7" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect width="24" height="24" fill="url(#${id}n)"/><rect x="4.3" y="4.3" width="15.4" height="15.4" rx="4.8" fill="url(#${id}g)"/><rect x="4.3" y="4.3" width="15.4" height="15.4" rx="4.8" fill="url(#${id}h)"/>`+g(body,sw,s)}
 const C=[
- {id:'n1',name:'1 · Обмен',note:'Наш значок «Обмен» во весь круг: стрелки туда и обратно. Самый крупный знак в 28 px. Минус — такой знак есть у многих обменников.',
-  svg:()=>bg(AMBER)+g(SWAP,1.8,at(1.1))},
- {id:'n2',name:'2 · Плитка на ночном',note:'Ровно наш премиум-эмодзи «Обмен»: оранжевая плитка на тёмно-синем круге. Сразу видно семью значков бота; выделяется в обеих темах.',
-  svg:()=>tileOnNight(SWAP,1.9,at(0.62))},
- {id:'n3',name:'3 · «e» → стрелка',note:'Монограмма: «e» из eXCH одной линией, хвост уходит стрелкой вправо — «отдал → получил». Свой знак, такого нет ни у кого.',
-  svg:()=>bg(AMBER)+g(EARROW,2.0,at(1.12,12,13.5))},
- {id:'n4',name:'4 · Плитка с «e»',note:'Монограмма на нашей плитке на ночном круге: свой знак и семья эмодзи сразу.',
-  svg:()=>tileOnNight(EARROW,1.9,at(0.66,12,13.5))},
- {id:'n5',name:'5 · Оборот',note:'Две стрелки гонятся вокруг монеты. Минус — похоже на «Обновить».',
-  svg:()=>bg(AMBER)+g('<path d="M6.3 10.2A6 6 0 0 1 16.9 8.4"/><path d="M17.7 13.8A6 6 0 0 1 7.1 15.6"/><path d="M17.3 5.6l-.3 2.9-2.9-.3"/><path d="M6.7 18.4l.3-2.9 2.9.3"/>',1.8,at(1.04))+`<circle cx="12" cy="12" r="2.3" fill="${W}"/>`},
- {id:'n6',name:'6 · Обмен на ночном',note:'Тот же «Обмен» во весь круг, но фон — ночной, стрелки — оранжевые. Строже и дороже, меньше похоже на «ещё один обменник».',
-  svg:()=>{const id='q'+(++seq);return `<defs><radialGradient id="${id}n" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="${shade(NIGHT,0.12)}"/><stop offset="1" stop-color="${shade(NIGHT,-0.25)}"/></radialGradient><linearGradient id="${id}a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${shade(AMBER,0.3)}"/><stop offset="1" stop-color="${shade(AMBER,0)}"/></linearGradient></defs><rect width="24" height="24" fill="url(#${id}n)"/><g fill="none" stroke="url(#${id}a)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" transform="${at(1.1)}">${SWAP}</g>`}},
+ {id:'m1',name:'1 · Чек ⇄ чек',note:'Два чека-стрелки навстречу друг другу: ровно то, что делает бот. Сплошные формы, выемка чека и пунктир отрыва — как в нашем значке «Деньги в чеке». Свой знак, у обменников такого нет.',
+  mark:()=>arrowTicket(6.0,1,W,AMBER)+arrowTicket(13.2,-1,PEACH,null)},
+ {id:'m2',name:'2 · Два чека',note:'Два чека внахлёст — «обмен чеками» без стрелок. Спокойный, «банковский» знак; в 28 px читается как два билета.',
+  mark:()=>ticket(10.4,10.0,11.5,7,-14,PEACH,null)+ticket(13.4,13.8,11.5,7,0,W,AMBER)},
+ {id:'m3',name:'3 · Две плитки',bg:'night',note:'Две наши плитки-эмодзи: синяя и оранжевая с обменом. Два кошелька — один обмен. Яркий в списке чатов, сразу видно семью значков бота.',
+  mark:()=>tile(SKY,3.6,3.6,11.2,3.5)+`<rect x="8.6" y="8.6" width="12.8" height="12.8" rx="4.1" fill="${shade(NIGHT,-0.1)}"/>`+tile(AMBER,9.2,9.2,11.6,3.6)+stroke(SWAP,2.2,at(0.46,15,15))},
+ {id:'m4',name:'4 · «e» → стрелка',note:'Монограмма: «e» из exch одной линией, хвост уходит стрелкой — «отдал → получил». Из прошлого раунда, линия выверена.',
+  mark:()=>stroke(EARROW,2.0,at(1.12,12,13.5))},
+ {id:'m5',name:'5 · Обмен, сплошной',note:'Наш знак «Обмен», но из сплошных форм, а не линий: тяжелее, «дороже», лучше держится в 28 px. Вторая стрелка — светлым тоном.',
+  mark:()=>`<path d="M5.4 7.7H14.2V5.9L18.8 8.9 14.2 11.9V10.1H5.4Z" fill="${W}" stroke="${W}" stroke-width="1.1" stroke-linejoin="round"/><path d="M18.6 16.3H9.8V18.1L5.2 15.1 9.8 12.1V13.9H18.6Z" fill="${PEACH}" stroke="${PEACH}" stroke-width="1.1" stroke-linejoin="round"/>`},
+ {id:'m6',name:'6 · Монета-обмен',note:'Белая монета с обменом внутри: деньги и обмен одним знаком. Самый читаемый в мелком размере.',
+  mark:()=>`<circle cx="12" cy="12" r="7.4" fill="${W}"/><circle cx="12" cy="12" r="6.2" fill="none" stroke="${PEACH}" stroke-width=".6"/>`+stroke(SWAP,1.9,at(0.58),AMBER)},
 ];
-const svg=(c)=>`<svg viewBox="0 0 24 24">${c.svg()}</svg>`;
-const av=(c,s)=>`<div class="av" style="width:${s}px;height:${s}px">${svg(c)}</div>`;
-document.getElementById('g').innerHTML=C.map(c=>`<div class="card" id="${c.id}"><h4>${c.name}</h4><div class="top"><div class="big">${svg(c)}</div><div class="strips"><div class="strip d">${av(c,56)}${av(c,40)}${av(c,28)}</div><div class="strip l">${av(c,56)}${av(c,40)}${av(c,28)}</div></div></div>
-<div class="chat"><div class="row l">${av(c,48)}<div><b>exch</b><small>97.50 USDT ждут вас в xRocket</small></div><span class="t">14:05</span></div><div class="row d">${av(c,48)}<div><b>exch</b><small>97.50 USDT ждут вас в xRocket</small></div><span class="t">14:05</span></div></div><p>${c.note}</p></div>`).join('');
-window.SOLO=(i)=>{document.getElementById('solo').innerHTML=svg(C[i])};
-window.N=C.length;document.title='ready';
+const avatar=(c)=>`<svg viewBox="0 0 24 24">${c.bg==='night'?nightBg():amberBg()}${c.mark()}</svg>`;
+// в связке — знак на плитке (скругление 31 %, как у наших эмодзи)
+const tileSvg=(c)=>`<svg viewBox="0 0 24 24"><defs><clipPath id="cl${++seq}"><rect width="24" height="24" rx="7.4"/></clipPath></defs><g clip-path="url(#cl${seq})">${c.bg==='night'?nightBg():amberBg()}${c.mark()}</g></svg>`;
+const av=(c,s)=>`<div class="av" style="width:${s}px;height:${s}px">${avatar(c)}</div>`;
+document.getElementById('g').innerHTML=C.map(c=>`<div class="card"><h4>${c.name}</h4><div class="top"><div class="big">${avatar(c)}</div><div class="strips"><div class="strip d">${av(c,56)}${av(c,40)}${av(c,28)}</div><div class="strip l">${av(c,56)}${av(c,40)}${av(c,28)}</div></div></div>
+<div class="lock"><div class="lk l"><div class="tile">${tileSvg(c)}</div><span class="wm">exch</span></div><div class="lk d"><div class="tile">${tileSvg(c)}</div><span class="wm">exch</span></div></div>
+<div class="chat"><div class="row l">${av(c,46)}<div><b>exch</b><small>97.50 USDT ждут вас в xRocket</small></div><span class="t">14:05</span></div><div class="row d">${av(c,46)}<div><b>exch</b><small>97.50 USDT ждут вас в xRocket</small></div><span class="t">14:05</span></div></div><p>${c.note}</p></div>`).join('');
+window.SOLO=(i)=>{document.getElementById('solo').innerHTML=avatar(C[i])};window.N=C.length;
+document.fonts.load('34px Man','exch').then(()=>document.fonts.ready).then(()=>{document.title='ready'});
 </script></body></html>

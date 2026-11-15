@@ -173,7 +173,7 @@ line_all = "Комиссия <s>{base}</s> <b>{fee}</b> — на любой че
 [inline]
 title = "{amount} USDT {src} → {payout} USDT {dst}"
 description = "Комиссия {pct} · обычно 10 секунд"
-card = "<b>{src} → {dst}</b>\nЧек на <code>{amount}</code> USDT → чек на <b>{payout} USDT</b>\n<i>Комиссия {pct} · обычно 10 секунд</i>"
+card = "<b>{src} → {dst}</b>\nЧек на <code>{amount}</code>\u00A0USDT → чек на <b>{payout}\u00A0USDT</b>\n<i>Комиссия {pct} · обычно 10 секунд</i>"
 range_title = "{src} → {dst}: от {min} до {max} USDT"
 range_description = "{amount} USDT — вне лимита"
 range_card = "<b>{src} → {dst}</b>\nМеняю чеки от <code>{min}</code> до <code>{max}</code> USDT.\n<i>Обычно 10 секунд</i>"
