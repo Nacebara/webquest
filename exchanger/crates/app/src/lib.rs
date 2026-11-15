@@ -12,6 +12,7 @@
 //! - [`setup`] — мастер `exch setup`; [`check`] — проверка `exch check`; [`db`] — база;
 //! - [`demo`] — `exch demo`: бот и пульт на симуляторе кошельков, без денег.
 
+pub mod backup;
 pub mod check;
 pub mod config;
 pub mod db;

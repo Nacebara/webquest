@@ -18,6 +18,8 @@ struct File {
     log: Log,
     #[serde(default)]
     health: Health,
+    #[serde(default)]
+    backup: Backup,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -44,6 +46,16 @@ struct Health {
     url: Option<String>,
 }
 
+/// Резервные копии базы (веха 10).
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Backup {
+    dir: Option<String>,
+    at: Option<String>,
+    keep: Option<u32>,
+    pg_bin: Option<String>,
+}
+
 /// Значения файла под именами переменных окружения (`TZ_OWNER`, `SUPPORT_CONTACT`, …).
 pub fn parse(text: &str) -> Result<HashMap<&'static str, String>, String> {
     let f: File = toml::from_str(text).map_err(|e| e.to_string())?;
@@ -60,6 +72,10 @@ pub fn parse(text: &str) -> Result<HashMap<&'static str, String>, String> {
     put("LOG_DIR", f.log.dir);
     put("LOG_KEEP_DAYS", f.log.keep_days.map(|d| d.to_string()));
     put("HEALTHCHECK_URL", f.health.url);
+    put("BACKUP_DIR", f.backup.dir);
+    put("BACKUP_AT", f.backup.at);
+    put("BACKUP_KEEP", f.backup.keep.map(|d| d.to_string()));
+    put("PG_BIN", f.backup.pg_bin);
     Ok(out)
 }
 

@@ -60,6 +60,15 @@ enum Command {
     },
     /// Применить миграции и выйти.
     Migrate,
+    /// Резервная копия базы сейчас (в папку из config.toml) с проверкой восстановлением.
+    /// `--check` — не снимать новую, а проверить последнюю копию в папке.
+    Backup {
+        #[arg(long)]
+        check: bool,
+    },
+    /// Восстановить базу из копии (компьютер сломался): только в пустую или новую базу из
+    /// DATABASE_URL, копия сначала проверяется. Нужен тот же SESSION_KEY, что был при копии.
+    Restore { file: PathBuf },
     /// Войти аккаунтом юзербота и привязать его к кошельку платформы. Телефон, код и пароль
     /// 2FA спрашиваются в терминале и никуда не сохраняются, сессия — только зашифрованной.
     Login {
@@ -215,7 +224,12 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
     // Вывод для человека: короткие строки, только предупреждения.
     let human = matches!(
         command,
-        Command::Listen { .. } | Command::Emoji(_) | Command::Setup | Command::Check
+        Command::Listen { .. }
+            | Command::Emoji(_)
+            | Command::Setup
+            | Command::Check
+            | Command::Backup { .. }
+            | Command::Restore { .. }
     );
     // LOG_FORMAT=text — обычный текст, json — для сервера; не задан — текст в окне программы,
     // JSON, когда вывод идёт в файл или журнал сервера.
@@ -262,6 +276,8 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
             Command::Setup => setup(paths, bare).await,
             Command::Check => check(paths).await,
             Command::Migrate => migrate().await,
+            Command::Backup { check } => backup(paths, check).await,
+            Command::Restore { file } => restore(paths, file).await,
             Command::Selftest { amount } => selftest(amount).await,
             Command::GenSessionKey => {
                 use base64::Engine as _;
@@ -668,7 +684,104 @@ async fn run() -> anyhow::Result<()> {
         ));
     }
 
+    // Резервные копии базы по расписанию (веха 10).
+    {
+        let settings =
+            app::backup::BackupSettings::from_lookup(&app::project::locate().dir, |k| {
+                std::env::var(k).ok().filter(|v| !v.trim().is_empty())
+            })?;
+        let pool = pool.clone();
+        let url = cfg.database_url.clone();
+        let tz = cfg.tz_owner.clone();
+        tasks.spawn(supervise(
+            "backup",
+            cancel.clone(),
+            RestartPolicy::default(),
+            move |token| {
+                app::backup::run(
+                    pool.clone(),
+                    url.clone(),
+                    settings.clone(),
+                    tz.clone(),
+                    token,
+                )
+            },
+        ));
+    }
+
     wait(tasks, cancel).await
+}
+
+/// `exch backup`: копия сейчас с проверкой или (`--check`) проверка последней копии.
+async fn backup(paths: &app::project::Paths, check_only: bool) -> anyhow::Result<()> {
+    let cfg = load_config()?;
+    let settings = app::backup::BackupSettings::from_lookup(&paths.dir, |k| {
+        std::env::var(k).ok().filter(|v| !v.trim().is_empty())
+    })?;
+    if check_only {
+        let dir = settings
+            .dir
+            .as_ref()
+            .context("копии выключены: [backup] dir = \"off\"")?;
+        let last = app::backup::list(dir)?
+            .pop()
+            .with_context(|| format!("в {} нет копий", dir.display()))?;
+        let c = app::backup::verify(&last, &cfg.database_url, &settings, None).await?;
+        println!(
+            "✅ {} восстанавливается: миграция {}, {}",
+            last.display(),
+            c.migration,
+            rows_text(&c.rows)
+        );
+        return Ok(());
+    }
+    let pool = connect_and_migrate(&cfg).await?;
+    let r = app::backup::make(&pool, &cfg.database_url, &settings).await;
+    app::backup::record(&pool, &r).await?;
+    let o = r?;
+    println!(
+        "✅ Копия {} ({} КБ) снята и проверена восстановлением: {}",
+        o.file.display(),
+        o.bytes / 1024,
+        rows_text(&o.checked.rows)
+    );
+    Ok(())
+}
+
+/// `exch restore <файл>`: копия в пустую базу после вопроса.
+async fn restore(paths: &app::project::Paths, file: PathBuf) -> anyhow::Result<()> {
+    let cfg = load_config()?;
+    let settings = app::backup::BackupSettings::from_lookup(&paths.dir, |k| {
+        std::env::var(k).ok().filter(|v| !v.trim().is_empty())
+    })?;
+    if let Some(why) = app::backup::restore_blocker(&cfg.database_url).await? {
+        anyhow::bail!(
+            "{why}. Укажите в DATABASE_URL новую базу (например, exch_restored) и повторите"
+        );
+    }
+    if !app::prompt::yes(
+        &format!("Восстановить {} в базу из DATABASE_URL?", file.display()),
+        false,
+    )
+    .await?
+    {
+        println!("Ничего не сделано.");
+        return Ok(());
+    }
+    let c = app::backup::restore(&file, &cfg.database_url, &settings).await?;
+    println!(
+        "✅ База восстановлена: миграция {}, {}. Дальше — exch check, затем запуск.",
+        c.migration,
+        rows_text(&c.rows)
+    );
+    Ok(())
+}
+
+fn rows_text(rows: &[(String, i64)]) -> String {
+    rows.iter()
+        .map(|(t, n)| format!("{t} {n}"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Клиентский бот и пульт в нём (один токен) поверх движка. В демо перед пультом стоит

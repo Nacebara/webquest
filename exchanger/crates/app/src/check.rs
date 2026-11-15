@@ -148,7 +148,70 @@ pub async fn run(paths: &Paths) -> Report {
     if let Err(e) = from_database(&mut r, &cfg, &pool).await {
         r.fail("База данных", format!("не удалось прочитать: {e}"));
     }
+    backups(&mut r, paths, &pool).await;
     r
+}
+
+/// Резервные копии (веха 10): включены ли, когда последняя и проверена ли она.
+async fn backups(r: &mut Report, paths: &Paths, pool: &storage::PgPool) {
+    let title = "Резервные копии";
+    let s = match crate::backup::BackupSettings::from_lookup(&paths.dir, |k| {
+        std::env::var(k).ok().filter(|v| !v.trim().is_empty())
+    }) {
+        Ok(s) => s,
+        Err(e) => {
+            r.fail(title, format!("{e:#}"));
+            return;
+        }
+    };
+    let Some(dir) = &s.dir else {
+        r.warn(
+            title,
+            "выключены ([backup] dir = \"off\") — поломка диска унесёт базу",
+        );
+        return;
+    };
+    if let Err(e) = crate::backup::find_tool("pg_dump", s.pg_bin.as_deref()) {
+        r.fail(title, format!("{e:#}"));
+        return;
+    }
+    let last = match pool.acquire().await {
+        Ok(mut conn) => storage::settings::get(&mut conn, crate::backup::LAST_KEY)
+            .await
+            .ok()
+            .flatten(),
+        Err(_) => None,
+    };
+    let at = last
+        .as_ref()
+        .and_then(|v| v.get("at").and_then(|a| a.as_str()))
+        .and_then(|a| chrono::DateTime::parse_from_rfc3339(a).ok())
+        .map(|d| d.with_timezone(&chrono::Utc));
+    match at {
+        Some(at) if chrono::Utc::now() - at < chrono::Duration::hours(26) => r.ok(
+            title,
+            format!(
+                "последняя {} UTC, проверена восстановлением; папка {}, каждый день в {}",
+                at.format("%d.%m %H:%M"),
+                dir.display(),
+                s.at
+            ),
+        ),
+        Some(at) => r.warn(
+            title,
+            format!(
+                "последняя копия {} UTC — старше суток; проверьте журнал и тревоги или запустите exch backup",
+                at.format("%d.%m %H:%M")
+            ),
+        ),
+        None => r.warn(
+            title,
+            format!(
+                "копий ещё нет — первая через 5 минут после запуска, или сейчас: exch backup (папка {})",
+                dir.display()
+            ),
+        ),
+    }
 }
 
 async fn database(r: &mut Report, url: &str) -> bool {
