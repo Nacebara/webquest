@@ -1,0 +1,75 @@
+{
+ "ok": true,
+ "result": {
+  "message_id": 1354,
+  "from": {
+   "id": 999,
+   "is_bot": true,
+   "first_name": "Exch",
+   "username": "exch_test_bot"
+  },
+  "chat": {
+   "id": 1000001,
+   "first_name": "Owner",
+   "username": "owner",
+   "type": "private"
+  },
+  "date": 1794700000,
+  "rich_message": {
+   "blocks": [
+    {
+     "type": "paragraph",
+     "text": {
+      "type": "bold",
+      "text": "Курс и лимиты"
+     }
+    },
+    {
+     "type": "table",
+     "cells": [
+      [
+       {
+        "text": "Куда",
+        "is_header": true,
+        "align": "center",
+        "valign": "middle"
+       },
+       {
+        "text": "Комиссия",
+        "is_header": true,
+        "align": "center",
+        "valign": "middle"
+       }
+      ],
+      [
+       {
+        "text": "CryptoBot → xRocket",
+        "align": "left",
+        "valign": "middle"
+       },
+       {
+        "text": "2.5 %",
+        "align": "left",
+        "valign": "middle"
+       }
+      ]
+     ]
+    },
+    {
+     "type": "details",
+     "summary": "Подробнее",
+     "blocks": [
+      {
+       "type": "paragraph",
+       "text": "Текст"
+      }
+     ]
+    },
+    {
+     "type": "footer",
+     "text": "Обновлено"
+    }
+   ]
+  }
+ }
+}

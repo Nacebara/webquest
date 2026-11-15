@@ -1,0 +1,73 @@
+{
+ "ok": true,
+ "result": {
+  "message_id": 1352,
+  "from": {
+   "id": 999,
+   "is_bot": true,
+   "first_name": "Exch",
+   "username": "exch_test_bot"
+  },
+  "chat": {
+   "id": 1000001,
+   "first_name": "Owner",
+   "username": "owner",
+   "type": "private"
+  },
+  "date": 1794700000,
+  "edit_date": 1794700000,
+  "text": "97.50 USDT ждут вас в xRocket\nK7M2Q9XR4T · за 9 с\nПрислали 100.00 · комиссия 2.5 % (2.50)\nЗаявка K7M2Q9XR4T\nизменено",
+  "entities": [
+   {
+    "offset": 0,
+    "length": 10,
+    "type": "bold"
+   },
+   {
+    "offset": 30,
+    "length": 10,
+    "type": "code"
+   },
+   {
+    "offset": 43,
+    "length": 6,
+    "type": "italic"
+   },
+   {
+    "offset": 50,
+    "length": 57,
+    "type": "expandable_blockquote"
+   },
+   {
+    "offset": 108,
+    "length": 8,
+    "type": "italic"
+   }
+  ],
+  "reply_markup": {
+   "inline_keyboard": [
+    [
+     {
+      "text": "Забрать 97.50 USDT",
+      "style": "success",
+      "url": "https://t.me/xrocket"
+     }
+    ],
+    [
+     {
+      "text": "@send 100usdt",
+      "style": "primary",
+      "copy_text": {
+       "text": "@send 100usdt"
+      }
+     },
+     {
+      "text": "Отправляю…",
+      "callback_data": "noop"
+     }
+    ]
+   ]
+  },
+  "has_protected_content": true
+ }
+}

@@ -473,3 +473,93 @@ async fn widgets_not_allowed_is_recognised() {
         .unwrap_err();
     assert!(e.widget_not_allowed(), "{e}");
 }
+
+/// Шаг 3.2 плана: настоящие ответы Telegram (записаны 17.11 тестовым ботом, персональные поля
+/// заменены) на каждый вид сообщения exch. Сервер отвечает ими — клиент обязан их разобрать.
+/// Перезаписать: `scratchpad`-скрипт записи из сессии 17.11 (отправляет владельцу и удаляет).
+mod recorded {
+    use super::*;
+
+    fn fixture(name: &str) -> String {
+        let path = format!(
+            "{}/tests/fixtures/telegram/{name}.json",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"))
+    }
+
+    #[tokio::test]
+    async fn every_recorded_telegram_reply_is_read() {
+        let names = [
+            "get_me",
+            "send_message_protected_with_buttons",
+            "send_message_with_effect",
+            "send_rich_message",
+            "edit_message_text",
+            "set_message_reaction",
+            "send_widget_not_allowed",
+            "delete_message",
+        ];
+        let replies = names
+            .iter()
+            .map(|n| {
+                let body = fixture(n);
+                let ok = body.contains("\"ok\": true");
+                if ok {
+                    super::ok(&body)
+                } else {
+                    super::status(400, &body)
+                }
+            })
+            .collect();
+        let (base, server) = serve(replies).await;
+        let api = client(&base);
+
+        let me = api.get_me().await.unwrap();
+        assert_eq!(me.username.as_deref(), Some("exch_test_bot"));
+
+        let sent = api
+            .send_message(&SendMessage::html(1_000_001, "x").protect())
+            .await
+            .unwrap();
+        let keyboard = sent.reply_markup.expect("кнопки из живого ответа");
+        let actions: Vec<_> = keyboard
+            .inline_keyboard
+            .iter()
+            .flatten()
+            .map(|b| &b.action)
+            .collect();
+        assert!(
+            matches!(actions[0], botapi::InlineButtonAction::Url(_)),
+            "{actions:?}"
+        );
+        assert!(
+            matches!(actions[1], botapi::InlineButtonAction::CopyText(_)),
+            "{actions:?}"
+        );
+        assert_eq!(actions[2], &botapi::InlineButtonAction::Disabled);
+
+        // Эффект «конфетти» принят Telegram — сообщение разобрано.
+        api.send_message(&SendMessage::html(1_000_001, "x").effect("5046509860389126442"))
+            .await
+            .unwrap();
+        api.send_rich_message(&botapi::SendRichMessage::new(1_000_001, "<p>x</p>"))
+            .await
+            .unwrap();
+        api.edit_message_text(&botapi::EditMessageText::html(1_000_001, 1, "x"))
+            .await
+            .unwrap();
+        assert!(
+            api.set_message_reaction(&botapi::SetMessageReaction::emoji(1_000_001, 1, "👀"))
+                .await
+                .unwrap()
+        );
+        let widget = api
+            .send_widget(&botapi::SendWidget::new(1_000_001, "<p>x</p>"))
+            .await
+            .expect_err("виджеты Telegram пока выключил");
+        assert!(widget.widget_not_allowed(), "{widget}");
+        assert!(api.delete_message(1_000_001, 1).await.unwrap());
+        server.await.unwrap();
+    }
+}

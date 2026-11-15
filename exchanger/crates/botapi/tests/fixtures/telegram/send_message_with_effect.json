@@ -1,0 +1,21 @@
+{
+ "ok": true,
+ "result": {
+  "message_id": 1353,
+  "from": {
+   "id": 999,
+   "is_bot": true,
+   "first_name": "Exch",
+   "username": "exch_test_bot"
+  },
+  "chat": {
+   "id": 1000001,
+   "first_name": "Owner",
+   "username": "owner",
+   "type": "private"
+  },
+  "date": 1794700000,
+  "text": "Первый обмен 🎉",
+  "effect_id": "5046509860389126442"
+ }
+}
