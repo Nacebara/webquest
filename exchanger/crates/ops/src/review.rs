@@ -668,12 +668,12 @@ impl Inner {
             .iter()
             .find(|w| w.is_active && w.platform == card.direction.target())
             .map(|w| w.userbot_label.clone());
-        let taken_by = match storage::admin::review_queue(&mut conn)
-            .await?
-            .into_iter()
-            .find(|q| q.id == id)
-            .and_then(|q| q.taken_by)
-        {
+        let holder = if card.state == OrderState::ManualReview {
+            storage::admin::taker(&mut conn, id).await?
+        } else {
+            None
+        };
+        let taken_by = match holder {
             Some(sid) => Some(
                 storage::staff::get(&mut conn, sid)
                     .await?

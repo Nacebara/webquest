@@ -1562,6 +1562,10 @@ impl Inner {
             ..
         } = &action
         {
+            // П-2: пока ждали подтверждения, заявку мог забрать другой — решает он.
+            if let crate::views::Claim::Taken(name) = self.claim(staff, *order, false).await? {
+                return self.taken_by_other(staff, *order, &name).await;
+            }
             let decision = match kind {
                 DecisionKind::RetryPayout => OperatorDecision::RetryPayout { previous_failed },
                 DecisionKind::RetryInvoice => {

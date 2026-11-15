@@ -37,6 +37,21 @@ pub struct QueueItem {
     pub taken_by: Option<i64>,
 }
 
+/// Кто держит заявку на разборе (П-2, аудит 16.11): последний «Взять» после того, как заявка
+/// пришла на разбор. Прошлый круг разбора не считается.
+pub async fn taker(conn: &mut PgConnection, order_id: i64) -> Result<Option<i64>, StorageError> {
+    Ok(sqlx::query_scalar(
+        "SELECT a.staff_id FROM admin_audit a \
+          WHERE a.target_type = 'order' AND a.target_id = $1::BIGINT::TEXT AND a.action = 'order.take' \
+            AND a.at >= COALESCE((SELECT max(t.at) FROM order_transitions t \
+                                   WHERE t.order_id = $1 AND t.to_state = 'MANUAL_REVIEW'), '-infinity') \
+          ORDER BY a.id DESC LIMIT 1",
+    )
+    .bind(order_id)
+    .fetch_optional(conn)
+    .await?)
+}
+
 /// Заявки на ручном разборе, старые сверху.
 pub async fn review_queue(conn: &mut PgConnection) -> Result<Vec<QueueItem>, StorageError> {
     let rows = sqlx::query!(
@@ -49,6 +64,9 @@ pub async fn review_queue(conn: &mut PgConnection) -> Result<Vec<QueueItem>, Sto
                (SELECT a.staff_id FROM admin_audit a
                  WHERE a.target_type = 'order' AND a.target_id = o.id::TEXT
                    AND a.action = 'order.take'
+                   AND a.at >= COALESCE((SELECT max(t.at) FROM order_transitions t
+                                          WHERE t.order_id = o.id
+                                            AND t.to_state = 'MANUAL_REVIEW'), '-infinity')
                  ORDER BY a.id DESC LIMIT 1) AS taken_by
           FROM orders o
          WHERE o.state = 'MANUAL_REVIEW'

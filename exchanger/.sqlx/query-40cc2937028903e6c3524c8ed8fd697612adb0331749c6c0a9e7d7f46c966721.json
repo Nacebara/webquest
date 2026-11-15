@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.intake_amount,\n               o.payout_amount, o.manual_reason,\n               COALESCE((SELECT max(t.at) FROM order_transitions t\n                          WHERE t.order_id = o.id AND t.to_state = 'MANUAL_REVIEW'),\n                        o.updated_at) AS \"since!\",\n               (SELECT a.staff_id FROM admin_audit a\n                 WHERE a.target_type = 'order' AND a.target_id = o.id::TEXT\n                   AND a.action = 'order.take'\n                 ORDER BY a.id DESC LIMIT 1) AS taken_by\n          FROM orders o\n         WHERE o.state = 'MANUAL_REVIEW'\n         ORDER BY 9\n        ",
+  "query": "\n        SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.intake_amount,\n               o.payout_amount, o.manual_reason,\n               COALESCE((SELECT max(t.at) FROM order_transitions t\n                          WHERE t.order_id = o.id AND t.to_state = 'MANUAL_REVIEW'),\n                        o.updated_at) AS \"since!\",\n               (SELECT a.staff_id FROM admin_audit a\n                 WHERE a.target_type = 'order' AND a.target_id = o.id::TEXT\n                   AND a.action = 'order.take'\n                   AND a.at >= COALESCE((SELECT max(t.at) FROM order_transitions t\n                                          WHERE t.order_id = o.id\n                                            AND t.to_state = 'MANUAL_REVIEW'), '-infinity')\n                 ORDER BY a.id DESC LIMIT 1) AS taken_by\n          FROM orders o\n         WHERE o.state = 'MANUAL_REVIEW'\n         ORDER BY 9\n        ",
   "describe": {
     "columns": [
       {
@@ -120,5 +120,5 @@
       null
     ]
   },
-  "hash": "1cf39242b14d56be285425d3e9982c567223799e8851d2523c6ca32611bb58db"
+  "hash": "40cc2937028903e6c3524c8ed8fd697612adb0331749c6c0a9e7d7f46c966721"
 }

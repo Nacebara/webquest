@@ -793,6 +793,92 @@ async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
     );
 }
 
+/// Заявка на разборе после неудачной выплаты; владелец и админ открыли её карточку.
+async fn review_cards(o: &Ops) -> (storage::orders::OrderRow, Call, Call) {
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
+    o.world.set_balance(o.ub, XR, Asset::Usdt, dec!(5)).unwrap();
+    let url = o.world.client_check(CB, usdt(dec!(100))).unwrap();
+    let link = parsers::links::parse_url(&url).unwrap();
+    let order = accepted(o.engine.submit_check(common::CLIENT, &link).await.unwrap());
+    let mark = o.tg.mark();
+    o.drain().await;
+    let owner_alert = o.tg.screen(mark, OWNER, "Нужен разбор").await;
+    let admin_alert = o.tg.screen(mark, ADMIN, "Нужен разбор").await;
+    o.world
+        .set_balance(o.ub, XR, Asset::Usdt, dec!(1000))
+        .unwrap();
+    let owner = o
+        .press(OWNER, &owner_alert, "Открыть заявку", "Ручной разбор")
+        .await;
+    let admin = o
+        .press(ADMIN, &admin_alert, "Открыть заявку", "Ручной разбор")
+        .await;
+    (order, owner, admin)
+}
+
+async fn order_state(o: &Ops, id: i64) -> OrderState {
+    let mut conn = o.pool.acquire().await.unwrap();
+    storage::orders::get(&mut conn, id, false)
+        .await
+        .unwrap()
+        .state
+}
+
+/// П-2 (аудит 16.11): «Взять» закрепляет заявку. Второй сотрудник не примет противоречивое
+/// денежное решение — видит, кто взял, и может только «Забрать себе»; прежний получает
+/// предупреждение.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn taking_an_order_locks_its_decisions_to_the_taker(pool: PgPool) {
+    let o = ops(pool).await;
+    let (order, owner, admin) = review_cards(&o).await;
+    o.press(ADMIN, &admin, "Взять", "Заявку взял(а) Анна").await;
+    // Владелец нажимает «Взять» и «Вернуть» на своей карточке — заявка уже у Анны.
+    let taken = o.press(OWNER, &owner, "Взять", "уже взял(а)").await;
+    assert!(taken.text().contains("Анна"), "{}", taken.text());
+    let taken = o.press(OWNER, &owner, "Вернуть", "уже взял(а)").await;
+    assert_eq!(order_state(&o, order.id).await, OrderState::ManualReview);
+    // «Забрать себе»: заявка у владельца, Анне — предупреждение.
+    let mark = o.tg.mark();
+    let mine = o.press(OWNER, &taken, "Забрать себе", "Заявка ваша").await;
+    assert!(mine.text().contains("Анна"), "{}", mine.text());
+    let notice = o.tg.screen(mark, ADMIN, "забрал(а) себе").await;
+    assert!(
+        notice.text().contains(&order.public_id) && notice.text().contains("Игнат"),
+        "{}",
+        notice.text()
+    );
+    // Теперь решить не может Анна, а владелец — может.
+    o.press(ADMIN, &admin, "Вернуть", "уже взял(а)").await;
+    o.press(OWNER, &mine, "Вернуть", "Коротко причина").await;
+    let preview = o
+        .say(OWNER, "клиент просит вернуть", "Вернуть клиенту?")
+        .await;
+    o.press(OWNER, &preview, "Вернуть", "возврат").await;
+    o.drain().await;
+    assert_eq!(order_state(&o, order.id).await, OrderState::Refunded);
+    let takes = o.audit("order.take").await;
+    assert_eq!(takes.len(), 2, "{takes:?}");
+}
+
+/// Решение, начатое до того, как заявку забрали, не выполняется: подтверждение перепроверяет,
+/// кто держит заявку.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_decision_confirmed_after_a_take_over_is_refused(pool: PgPool) {
+    let o = ops(pool).await;
+    let (order, owner, admin) = review_cards(&o).await;
+    // Анна начинает возврат: никто не брал — решение само закрепляет заявку за ней.
+    o.press(ADMIN, &admin, "Вернуть", "Коротко причина").await;
+    let preview = o
+        .say(ADMIN, "клиент просит вернуть", "Вернуть клиенту?")
+        .await;
+    let taken = o.press(OWNER, &owner, "Взять", "уже взял(а)").await;
+    o.press(OWNER, &taken, "Забрать себе", "Заявка ваша").await;
+    o.press(ADMIN, &preview, "Вернуть", "уже взял(а)").await;
+    o.drain().await;
+    assert_eq!(order_state(&o, order.id).await, OrderState::ManualReview);
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn client_card_sets_a_personal_fee(pool: PgPool) {
     let o = ops(pool).await;

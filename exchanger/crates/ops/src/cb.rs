@@ -163,6 +163,8 @@ pub enum Cb {
     Order(i64),
     OrderAsk,
     Take(i64),
+    /// «Забрать себе» заявку, которую взял другой (П-2).
+    TakeOver(i64),
     Decide(i64, DecisionKind),
     UserAsk,
     User(i64),
@@ -322,6 +324,7 @@ impl Cb {
             Cb::Order(id) => format!("o:{id}"),
             Cb::OrderAsk => "oa".into(),
             Cb::Take(id) => format!("ot:{id}"),
+            Cb::TakeOver(id) => format!("ow:{id}"),
             Cb::Decide(id, k) => format!("od:{id}:{}", k.code()),
             Cb::UserAsk => "ua".into(),
             Cb::User(id) => format!("u:{id}"),
@@ -420,6 +423,7 @@ impl Cb {
             ["o", _] => Cb::Order(id(1)?),
             ["oa"] => Cb::OrderAsk,
             ["ot", _] => Cb::Take(id(1)?),
+            ["ow", _] => Cb::TakeOver(id(1)?),
             ["od", _, k] => Cb::Decide(
                 id(1)?,
                 DecisionKind::ALL.into_iter().find(|x| x.code() == *k)?,
@@ -571,6 +575,7 @@ mod tests {
             all.extend(TermField::ALL.map(|f| Cb::UserEdit(big, d, f)));
         }
         all.extend(DecisionKind::ALL.map(|k| Cb::Decide(big, k)));
+        all.push(Cb::TakeOver(big));
         all.extend(Flag::ALL.map(Cb::Toggle));
         all.extend(EmojiStyle::ALL.map(Cb::EmojiStyle));
         all.extend(Emoji::ALL.map(Cb::EmojiRole));

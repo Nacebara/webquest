@@ -125,7 +125,94 @@ pub fn menu_screen(t: &crate::Texts, role: Role, c: &MenuCounts) -> Screen {
     ])
 }
 
+/// Итог «Взять» (П-2): заявка моя (`from` — у кого забрал(а), если забрал(а)) или её держит
+/// другой сотрудник (его имя).
+pub(crate) enum Claim {
+    Mine { from: Option<i64> },
+    Taken(String),
+}
+
 impl Inner {
+    /// Закрепить заявку за сотрудником. Под блокировкой строки заявки: двое, нажавшие
+    /// одновременно, не возьмут её оба. `force` — «Забрать себе»: берёт и у другого.
+    pub(crate) async fn claim(
+        &self,
+        staff: &StaffMember,
+        order: i64,
+        force: bool,
+    ) -> Result<Claim, OpsError> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("SELECT id FROM orders WHERE id = $1 FOR UPDATE")
+            .bind(order)
+            .execute(&mut *tx)
+            .await?;
+        let holder = storage::admin::taker(&mut tx, order).await?;
+        match holder {
+            Some(h) if h == staff.tg_user_id => {
+                tx.commit().await?;
+                return Ok(Claim::Mine { from: None });
+            }
+            Some(h) if !force => {
+                tx.commit().await?;
+                let name = match storage::staff::get(&mut *self.pool.acquire().await?, h).await? {
+                    Some(m) => m.display_name,
+                    None => h.to_string(),
+                };
+                return Ok(Claim::Taken(name));
+            }
+            _ => {}
+        }
+        let target = order.to_string();
+        storage::audit::record(
+            &mut tx,
+            &storage::audit::NewAudit {
+                staff_id: staff.tg_user_id,
+                action: "order.take",
+                target_type: Some("order"),
+                target_id: Some(&target),
+                before: None,
+                after: None,
+                reason: None,
+                double_confirmed: false,
+            },
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(Claim::Mine { from: holder })
+    }
+
+    /// Заявку держит другой: карточка с пометкой и «Забрать себе».
+    pub(crate) async fn taken_by_other(
+        &self,
+        staff: &StaffMember,
+        order: i64,
+        name: &str,
+    ) -> Result<Screen, OpsError> {
+        let notice = self
+            .texts
+            .f("order.taken_by_other", &[("name", &esc(name))]);
+        Ok(self
+            .order(Some(staff), order)
+            .await?
+            .notice(&notice)
+            .row(vec![btn(
+                self.texts.t("order.b_take_over"),
+                &Cb::TakeOver(order),
+            )]))
+    }
+
+    /// Публичный номер заявки — для уведомлений.
+    pub(crate) async fn public_id(&self, order: i64) -> Result<String, OpsError> {
+        let mut conn = self.pool.acquire().await?;
+        Ok(
+            sqlx::query_scalar("SELECT public_id FROM orders WHERE id = $1")
+                .bind(order)
+                .fetch_optional(&mut *conn)
+                .await?
+                .unwrap_or_else(|| order.to_string()),
+        )
+    }
+
     pub(crate) fn dir_name(&self, d: Direction) -> String {
         self.texts.t(&format!("names.{}", d.code()))
     }
@@ -1376,29 +1463,46 @@ impl Inner {
                 "user.ask",
                 &Cb::Page(List::Users, 0),
             )),
-            Cb::Take(id) => {
-                let mut tx = self.pool.begin().await?;
-                let target = id.to_string();
-                storage::audit::record(
-                    &mut tx,
-                    &storage::audit::NewAudit {
-                        staff_id: staff.tg_user_id,
-                        action: "order.take",
-                        target_type: Some("order"),
-                        target_id: Some(&target),
-                        before: None,
-                        after: None,
-                        reason: None,
-                        double_confirmed: false,
-                    },
-                )
-                .await?;
-                tx.commit().await?;
-                Ok(self.order(Some(staff), id).await?.notice(
+            Cb::Take(id) => match self.claim(staff, id, false).await? {
+                Claim::Mine { .. } => Ok(self.order(Some(staff), id).await?.notice(
                     &self
                         .texts
                         .f("order.taken", &[("name", &esc(&staff.display_name))]),
-                ))
+                )),
+                Claim::Taken(name) => self.taken_by_other(staff, id, &name).await,
+            },
+            Cb::TakeOver(id) => {
+                let previous = match self.claim(staff, id, true).await? {
+                    Claim::Mine { from } => from,
+                    Claim::Taken(_) => None,
+                };
+                let mut notice = self
+                    .texts
+                    .f("order.taken", &[("name", &esc(&staff.display_name))]);
+                if let Some(prev) = previous.filter(|p| *p != staff.tg_user_id) {
+                    let public = self.public_id(id).await?;
+                    let text = self.texts.f(
+                        "order.taken_over_notice",
+                        &[
+                            ("public", &esc(&public)),
+                            ("name", &esc(&staff.display_name)),
+                        ],
+                    );
+                    let screen = self.look().screen(&Screen::new(text));
+                    if let Err(e) = self
+                        .api
+                        .send_message(&botapi::SendMessage::html(prev, screen.text))
+                        .await
+                    {
+                        tracing::info!(error = %e, "previous taker not notified");
+                    }
+                    let name = match self.staff(prev).await? {
+                        Some(m) => m.display_name,
+                        None => prev.to_string(),
+                    };
+                    notice = self.texts.f("order.taken_over", &[("name", &esc(&name))]);
+                }
+                Ok(self.order(Some(staff), id).await?.notice(&notice))
             }
             Cb::IntakeAsCheck(id) => {
                 if let Some(denied) = self.deny(staff, Role::Admin) {
@@ -1421,6 +1525,10 @@ impl Inner {
                 };
                 if let Some(denied) = self.deny(staff, need) {
                     return Ok(denied);
+                }
+                // П-2: решает тот, кто взял; никто не брал — решение само закрепляет заявку.
+                if let Claim::Taken(name) = self.claim(staff, id, false).await? {
+                    return self.taken_by_other(staff, id, &name).await;
                 }
                 let input = if kind == DecisionKind::Intake {
                     Input::DecisionAmount { order: id }
