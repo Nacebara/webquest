@@ -281,3 +281,59 @@ async fn directions_and_steps_are_read(pool: PgPool) {
         dec!(0.01)
     );
 }
+
+/// Веха 4.2: кошелёк нельзя перенести на другой аккаунт, пока его деньги в полёте — операция
+/// без итога или удержание живой заявки; ответ пришёл бы старому аккаунту.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_wallet_with_money_in_flight_cannot_move(pool: PgPool) {
+    setup(&pool).await;
+    let mut conn = pool.acquire().await.unwrap();
+    assert!(
+        storage::wallets::move_blockers(&mut conn, XR)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    drop(conn);
+    let id = order(&pool, "CQmove1").await;
+    let xr = wallet(&pool, XR).await;
+    let mut conn = pool.acquire().await.unwrap();
+    storage::holds::place(&mut conn, id, xr, Asset::Usdt, dec!(97.5))
+        .await
+        .unwrap();
+    let op_id = storage::operations::insert(
+        &mut conn,
+        &op(id, OpKind::CreatePayoutCheck, "ord-move-payout", xr),
+    )
+    .await
+    .unwrap();
+    let blockers = storage::wallets::move_blockers(&mut conn, XR)
+        .await
+        .unwrap();
+    assert_eq!(blockers.len(), 2, "{blockers:?}");
+    assert!(
+        blockers[0].contains("ord-move-payout (pending)"),
+        "{blockers:?}"
+    );
+    assert!(blockers[1].contains("держит 97.5 USDT"), "{blockers:?}");
+    // Другой кошелёк свободен.
+    assert!(
+        storage::wallets::move_blockers(&mut conn, CB)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    // Неясный исход держит так же, как живая операция.
+    sqlx::query("UPDATE operations SET status = 'unknown' WHERE id = $1")
+        .bind(op_id)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    assert!(
+        storage::wallets::move_blockers(&mut conn, XR)
+            .await
+            .unwrap()
+            .iter()
+            .any(|b| b.contains("(unknown)"))
+    );
+}

@@ -472,6 +472,50 @@ pub fn userbot_label(
         .unwrap_or_else(|| "ub-1".to_owned())
 }
 
+/// Что с аккаунтом подключённого кошелька.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Health {
+    Working,
+    /// Вход сброшен: войти заново в тот же аккаунт.
+    LoggedOut,
+    /// Заблокирован Telegram, выключен человеком или ограничен кошельком: только перенос.
+    Blocked,
+}
+
+async fn health(pool: &PgPool, label: &str) -> anyhow::Result<Health> {
+    let mut conn = pool.acquire().await?;
+    let status = sessions::find(&mut conn, label).await?.map(|a| a.status);
+    let restricted =
+        storage::alerts::open_by_key(&mut conn, &format!("account_restricted:{label}"))
+            .await?
+            .is_some();
+    Ok(match status {
+        _ if restricted => Health::Blocked,
+        Some(sessions::UserbotStatus::Banned | sessions::UserbotStatus::Disabled) => {
+            Health::Blocked
+        }
+        Some(sessions::UserbotStatus::LoggedOut) => Health::LoggedOut,
+        _ => Health::Working,
+    })
+}
+
+/// Сколько по учёту лежит в кошельке платформы: «1000.00 USDT, 2.5 TON».
+async fn ledger_left(pool: &PgPool, platform: Platform) -> anyhow::Result<String> {
+    let mut conn = pool.acquire().await?;
+    let label = domain::wallet_label(platform);
+    let parts: Vec<String> = storage::ledger::wallet_balances(&mut conn)
+        .await?
+        .into_iter()
+        .filter(|b| b.label == label && !b.ledger_balance.is_zero())
+        .map(|b| format!("{} {}", b.ledger_balance.round_dp(2), b.asset))
+        .collect();
+    Ok(if parts.is_empty() {
+        "ничего".to_owned()
+    } else {
+        parts.join(", ")
+    })
+}
+
 async fn userbots(w: &Wizard<'_>, pool: &PgPool) -> anyhow::Result<()> {
     let cfg = Config::from_lookup(|k| w.get(k)).context("настройки после мастера")?;
     let tg = TelegramSettings::from_config(&cfg)?;
@@ -482,51 +526,106 @@ async fn userbots(w: &Wizard<'_>, pool: &PgPool) -> anyhow::Result<()> {
     for platform in Platform::ALL {
         let mut conn = pool.acquire().await?;
         let list = wallets::list(&mut conn).await?;
-        let accounts: Vec<(String, bool)> = sessions::list(&mut conn)
-            .await?
-            .into_iter()
-            .map(|a| {
-                let usable = !matches!(
-                    a.status,
-                    sessions::UserbotStatus::Banned | sessions::UserbotStatus::Disabled
-                );
-                (a.label, usable)
-            })
-            .collect();
+        let rows = sessions::list(&mut conn).await?;
         drop(conn);
         let name = platform_name(platform);
-        if let Some(wl) = list.iter().find(|w| w.platform == platform && w.is_active) {
-            println!("✅ {name}: подключён (аккаунт {}).", wl.userbot_label);
-            continue;
+        let mut accounts: Vec<(String, bool)> = Vec::new();
+        for a in &rows {
+            let usable = health(pool, &a.label).await? != Health::Blocked;
+            accounts.push((a.label.clone(), usable));
         }
-        let ask = format!(
-            "Подключить кошелёк {name} сейчас? Понадобятся телефон аккаунта, код из Telegram и облачный пароль."
-        );
-        if !prompt::yes(&ask, true).await? {
-            println!("⚠️ {name}: не подключён — запустите exch setup позже.");
-            continue;
+        let mut move_wallet = false;
+        let mut relogin = None;
+        if let Some(wl) = list.iter().find(|w| w.platform == platform && w.is_active) {
+            let old = wl.userbot_label.clone();
+            match health(pool, &old).await? {
+                Health::Working => {
+                    println!("✅ {name}: подключён (аккаунт {old}).");
+                    continue;
+                }
+                Health::LoggedOut => {
+                    println!(
+                        "⚠️ {name}: вход в аккаунт {old} сброшен — Telegram больше не пускает бота."
+                    );
+                    if prompt::yes(
+                        &format!(
+                            "Войти в {old} заново? Понадобятся код из Telegram и облачный пароль."
+                        ),
+                        true,
+                    )
+                    .await?
+                    {
+                        relogin = Some(old.clone());
+                    }
+                }
+                Health::Blocked => {
+                    println!(
+                        "⛔ {name}: аккаунт {old} заблокирован или ограничен кошельком — работать с него нельзя."
+                    );
+                }
+            }
+            if relogin.is_none() {
+                let left = ledger_left(pool, platform).await?;
+                println!("По учёту в кошельке {name} на {old}: {left}.");
+                if !prompt::yes(
+                    &format!("Перенести кошелёк {name} на другой аккаунт?"),
+                    true,
+                )
+                .await?
+                {
+                    println!("⚠️ {name}: остаётся на {old}; приём и выплаты через него не пойдут.");
+                    continue;
+                }
+                let mut conn = pool.acquire().await?;
+                let blockers = wallets::move_blockers(&mut conn, platform).await?;
+                drop(conn);
+                if !blockers.is_empty() {
+                    println!(
+                        "❌ {name}: сначала разберите в пульте — деньги ещё в полёте: {}.",
+                        blockers.join(", ")
+                    );
+                    continue;
+                }
+                if let Some(a) = accounts.iter_mut().find(|(l, _)| *l == old) {
+                    a.1 = false;
+                }
+                move_wallet = true;
+            }
+        } else {
+            let ask = format!(
+                "Подключить кошелёк {name} сейчас? Понадобятся телефон аккаунта, код из Telegram и облачный пароль."
+            );
+            if !prompt::yes(&ask, true).await? {
+                println!("⚠️ {name}: не подключён — запустите exch setup позже.");
+                continue;
+            }
         }
         let bound: Bound = list
             .iter()
-            .filter(|w| w.is_active)
+            .filter(|w| w.is_active && w.platform != platform)
             .map(|w| (w.platform, w.userbot_label.clone()))
             .collect();
-        let separate = match separate {
-            Some(s) => s,
+        let label = match relogin {
+            Some(l) => l,
             None => {
-                let s = prompt::yes(
-                    "Кошельки — на двух разных аккаунтах? Советую да: если Telegram ограничит один аккаунт, второй кошелёк продолжит работать. «Нет» — оба кошелька на одном аккаунте.",
-                    true,
-                )
-                .await?;
-                separate = Some(s);
-                s
+                let separate = match separate {
+                    Some(s) => s,
+                    None => {
+                        let s = prompt::yes(
+                            "Кошельки — на двух разных аккаунтах? Советую да: если Telegram ограничит один аккаунт, второй кошелёк продолжит работать. «Нет» — оба кошелька на одном аккаунте.",
+                            true,
+                        )
+                        .await?;
+                        separate = Some(s);
+                        s
+                    }
+                };
+                userbot_label(platform, &bound, &accounts, separate)
             }
         };
-        let label = userbot_label(platform, &bound, &accounts, separate);
-        if separate && !bound.is_empty() && !accounts.iter().any(|(a, _)| *a == label) {
+        if !bound.is_empty() && !accounts.iter().any(|(a, _)| *a == label) {
             println!(
-                "Аккаунт {label} — другой номер телефона, не тот, на котором {}.",
+                "Аккаунт {label} — новый номер телефона, не тот, на котором {}.",
                 bound
                     .iter()
                     .map(|(p, _)| platform_name(*p))
@@ -539,12 +638,24 @@ async fn userbots(w: &Wizard<'_>, pool: &PgPool) -> anyhow::Result<()> {
             key: tg.session_key(),
             prompt: mtproto::TerminalPrompt,
         };
-        let target = LoginTarget { label, platform };
+        let target = LoginTarget {
+            label,
+            platform,
+            move_wallet,
+        };
         match run_login(pool, &target, &mut auth).await {
-            Ok(r) => println!(
-                "✅ {name}: подключён (аккаунт {}, {}).",
-                r.label, r.phone_masked
-            ),
+            Ok(r) => {
+                println!(
+                    "✅ {name}: подключён (аккаунт {}, {}).",
+                    r.label, r.phone_masked
+                );
+                if let Some(old) = r.moved_from {
+                    println!(
+                        "Кошелёк {name} перенесён с {old} на {}. Дальше:\n  1. Запустите exch. Первая сверка покажет в пульте «{name}: меньше на …» — это деньги, оставшиеся на {old}. Ответьте «Да, это я».\n  2. Только потом пополните {name} на {} — сверка спросит «Это вы пополняли?», ответьте «Да, это я».",
+                        r.label, r.label
+                    );
+                }
+            }
             Err(crate::login::LoginCmdError::AccountUnderOtherLabel { other, .. }) => println!(
                 "❌ {name}: этот номер уже подключён как {other}. Нужен другой аккаунт — или запустите exch setup ещё раз и ответьте «нет» на вопрос о двух аккаунтах."
             ),

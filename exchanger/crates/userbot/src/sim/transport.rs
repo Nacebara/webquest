@@ -55,6 +55,7 @@ fn before_effect(fault: Option<&Fault>) -> Option<TransportError> {
             code: *code,
             name: name.clone(),
         }),
+        Fault::NotAuthorized => Some(TransportError::NotAuthorized),
         _ => None,
     }
 }

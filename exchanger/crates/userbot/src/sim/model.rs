@@ -297,6 +297,8 @@ pub enum Fault {
     FloodWait(Duration),
     /// Ошибка RPC до выполнения (например, `PEER_ID_INVALID`).
     Rpc { code: i32, name: String },
+    /// Сессия отозвана или аккаунт удалён: `NotAuthorized`, ничего не сделано.
+    NotAuthorized,
     /// Ответ бота придёт в поток через это время (действие выполнено сразу).
     DelayReply(Duration),
     /// Сначала «Подождите, идёт обработка…», через `final_after` — правка того же

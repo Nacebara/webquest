@@ -189,6 +189,26 @@ pub async fn save_session(
     Ok(())
 }
 
+/// Telegram больше не пускает аккаунт (сессия отозвана или аккаунт удалён): `exch check` и
+/// мастер настройки видят это и предлагают войти заново или перенести кошелёк (веха 4.2).
+/// Выключенный человеком аккаунт так и остаётся выключенным.
+pub async fn mark_logged_out(conn: &mut PgConnection, label: &str) -> Result<(), StorageError> {
+    sqlx::query("UPDATE userbot_accounts SET status = 'logged_out' WHERE label = $1 AND status IN ('active', 'flood_wait', 'new')")
+        .bind(label)
+        .execute(conn)
+        .await?;
+    Ok(())
+}
+
+/// Аккаунт снова получил ответ кошелька: вход позади.
+pub async fn mark_answering(conn: &mut PgConnection, label: &str) -> Result<(), StorageError> {
+    sqlx::query("UPDATE userbot_accounts SET status = 'active', last_ok_at = now() WHERE label = $1 AND status = 'logged_out'")
+        .bind(label)
+        .execute(conn)
+        .await?;
+    Ok(())
+}
+
 /// Сменить статус. `active` заодно отмечает `last_ok_at`.
 pub async fn set_status(
     conn: &mut PgConnection,

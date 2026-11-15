@@ -79,6 +79,9 @@ pub(crate) async fn on_bot_error(
     if let (Some(p), Some(x)) = (payload.as_object_mut(), extra.as_object()) {
         p.extend(x.clone());
     }
+    if title == "login_lost" {
+        storage::sessions::mark_logged_out(&mut *conn, &label).await?;
+    }
     let key = format!("{title}:{label}");
     storage::alerts::raise_condition(
         conn,
@@ -103,6 +106,7 @@ pub(crate) async fn on_answer(
     let Some((label, _, _)) = account_of(&mut *conn, op).await? else {
         return Ok(());
     };
+    storage::sessions::mark_answering(&mut *conn, &label).await?;
     for title in ["login_lost", "account_restricted", "flood_long"] {
         storage::alerts::resolve(&mut *conn, &format!("{title}:{label}")).await?;
     }

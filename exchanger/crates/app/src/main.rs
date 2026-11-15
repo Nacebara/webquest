@@ -488,7 +488,7 @@ async fn login(label: String, platform: domain::Platform) -> anyhow::Result<()> 
         key: tg.session_key(),
         prompt: mtproto::TerminalPrompt,
     };
-    let target = app::login::LoginTarget { label, platform };
+    let target = app::login::LoginTarget::new(label, platform);
     app::login::run_login(&pool, &target, &mut auth).await?;
     Ok(())
 }

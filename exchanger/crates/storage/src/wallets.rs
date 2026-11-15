@@ -144,3 +144,33 @@ pub async fn userbot_paused(
     .await?
     .unwrap_or(false))
 }
+
+/// Что держит кошелёк платформы на старом аккаунте (веха 4.2): операции, исход которых ещё не
+/// известен, и удержания живых заявок. Пока список не пуст, кошелёк переносить нельзя: деньги в
+/// полёте, их ответ придёт старому аккаунту.
+pub async fn move_blockers(
+    conn: &mut PgConnection,
+    platform: Platform,
+) -> Result<Vec<String>, StorageError> {
+    let mut out: Vec<String> = sqlx::query_scalar(
+        "SELECT op.idempotency_key || ' (' || op.status || ')' FROM operations op \
+          WHERE op.platform = $1 AND op.status IN ('pending', 'dispatched', 'unknown') \
+            AND op.kind NOT IN ('read_balance', 'open_invoice') \
+          ORDER BY op.id",
+    )
+    .bind(platform.db_name())
+    .fetch_all(&mut *conn)
+    .await?;
+    let holds: Vec<String> = sqlx::query_scalar(
+        "SELECT COALESCE('заявка ' || o.public_id, 'вывод инвестора #' || h.invest_move_id::TEXT) \
+                || ' держит ' || trim_scale(h.amount)::TEXT || ' ' || h.asset \
+           FROM holds h JOIN wallet_accounts w ON w.id = h.wallet_account_id \
+           LEFT JOIN orders o ON o.id = h.order_id \
+          WHERE w.label = $1 AND h.state = 'active' ORDER BY h.id",
+    )
+    .bind(wallet_label(platform))
+    .fetch_all(&mut *conn)
+    .await?;
+    out.extend(holds);
+    Ok(out)
+}

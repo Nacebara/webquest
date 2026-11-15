@@ -978,6 +978,40 @@ async fn a_restricted_account_alerts_staff_and_clears_after_the_next_answer(pool
     assert!(resolved, "the wallet answered: the alert is closed");
 }
 
+/// Веха 4.2: Telegram сбросил вход аккаунта — тревога «вход сброшен» и отметка у аккаунта:
+/// `exch check` и мастер настройки видят её и предлагают войти заново или перенести кошелёк.
+/// Следующий ответ кошелька через аккаунт снимает отметку.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_lost_login_marks_the_account_until_the_wallet_answers(pool: PgPool) {
+    let e = env(pool).await;
+    let status = |pool: PgPool| async move {
+        sqlx::query_scalar::<_, String>("SELECT status FROM userbot_accounts ORDER BY id LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+    let url = e.world.client_check(CB, usdt(dec!(20))).unwrap();
+    accepted(e.submit(&url).await);
+    e.world
+        .inject(e.ub, Call::SendText, Fault::NotAuthorized, 1);
+    e.drain().await;
+    let (_, level, _, resolved) = alert(&e, "login_lost").await.expect("alert");
+    assert_eq!(level, "critical");
+    assert!(!resolved);
+    assert_eq!(status(e.pool.clone()).await, "logged_out");
+    // Вход вернули (exch login): кошелёк снова отвечает — отметка снята, тревога закрыта.
+    sqlx::query("UPDATE directions SET auto_paused = false, pause_reason = NULL")
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    let url = e.world.client_check(CB, usdt(dec!(7))).unwrap();
+    accepted(e.submit(&url).await);
+    e.drain().await;
+    assert_eq!(status(e.pool.clone()).await, "active");
+    let (_, _, _, resolved) = alert(&e, "login_lost").await.unwrap();
+    assert!(resolved);
+}
+
 /// Шаг 2.8: Telegram просит паузу дольше 5 минут — критичная тревога с минутами и временем конца.
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn a_long_flood_wait_alerts_staff(pool: PgPool) {

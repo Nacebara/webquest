@@ -32,6 +32,19 @@ use crate::session_store::{from_stored, to_stored};
 pub struct LoginTarget {
     pub label: String,
     pub platform: Platform,
+    /// Перенести кошелёк на этот аккаунт с другого (прежний заблокирован или вход в него
+    /// потерян, веха 4.2). Учёт кошелька не меняется: остаток на прежнем аккаунте покажет сверка.
+    pub move_wallet: bool,
+}
+
+impl LoginTarget {
+    pub fn new(label: String, platform: Platform) -> Self {
+        Self {
+            label,
+            platform,
+            move_wallet: false,
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -46,6 +59,15 @@ pub enum LoginCmdError {
         platform: Platform,
         wallet: &'static str,
         bound: String,
+    },
+    #[error(
+        "wallet {} still has money in flight: {}; settle these orders in the panel first, nothing was changed",
+        .platform.db_name(),
+        .blockers.join(", ")
+    )]
+    WalletBusy {
+        platform: Platform,
+        blockers: Vec<String>,
     },
     #[error(
         "userbot {label} belongs to Telegram account {bound}, but this login is account {got}: use a new label for another account, nothing was saved"
@@ -89,20 +111,32 @@ pub struct Prepared {
     pub sealed: Option<SealedSession>,
 }
 
+/// Кошелёк свободен для этой метки. Возвращает прежний аккаунт, если кошелёк переносится.
 async fn check_wallet_free(
     conn: &mut PgConnection,
     target: &LoginTarget,
-) -> Result<(), LoginCmdError> {
-    if let Some(binding) = wallets::wallet_binding(conn, target.platform).await?
-        && binding.userbot_label != target.label
-    {
+) -> Result<Option<String>, LoginCmdError> {
+    let Some(binding) = wallets::wallet_binding(&mut *conn, target.platform).await? else {
+        return Ok(None);
+    };
+    if binding.userbot_label == target.label {
+        return Ok(None);
+    }
+    if !target.move_wallet {
         return Err(LoginCmdError::WalletBoundElsewhere {
             platform: target.platform,
             wallet: wallet_label(target.platform),
             bound: binding.userbot_label,
         });
     }
-    Ok(())
+    let blockers = wallets::move_blockers(conn, target.platform).await?;
+    if !blockers.is_empty() {
+        return Err(LoginCmdError::WalletBusy {
+            platform: target.platform,
+            blockers,
+        });
+    }
+    Ok(Some(binding.userbot_label))
 }
 
 /// Шаг 1: проверки до сети.
@@ -133,6 +167,8 @@ pub struct Registered {
     pub wallet_id: i16,
     /// Сохранённая сессия была рабочей: код не понадобился.
     pub already_authorized: bool,
+    /// Кошелёк перенесён с этого аккаунта (веха 4.2).
+    pub moved_from: Option<String>,
 }
 
 /// Маска для БД: при входе по рабочей сессии телефон может быть неизвестен (`***`) — тогда
@@ -178,7 +214,7 @@ pub async fn register(
             other: other.label.clone(),
         });
     }
-    check_wallet_free(&mut tx, target).await?;
+    let moved_from = check_wallet_free(&mut tx, target).await?;
 
     let phone_masked = phone_mask(existing, outcome).to_owned();
     let userbot_id = wallets::ensure_userbot(&mut tx, label, &phone_masked).await?;
@@ -186,6 +222,29 @@ pub async fn register(
     sessions::save_session(&mut tx, label, &to_stored(&outcome.sealed)).await?;
     sessions::set_status(&mut tx, label, UserbotStatus::Active).await?;
     let wallet_id = wallets::ensure_wallet(&mut tx, target.platform, userbot_id).await?;
+    if let Some(old) = &moved_from {
+        // Журнал пульта: перенос кошелька — решение владельца, оно должно быть видно.
+        let owner: Option<i64> =
+            sqlx::query_scalar("SELECT tg_user_id FROM staff WHERE role = 'owner' AND disabled_at IS NULL ORDER BY created_at LIMIT 1")
+                .fetch_optional(&mut *tx)
+                .await?;
+        if let Some(owner) = owner {
+            storage::audit::record(
+                &mut tx,
+                &storage::audit::NewAudit {
+                    staff_id: owner,
+                    action: "wallet.move",
+                    target_type: Some("wallet"),
+                    target_id: Some(wallet_label(target.platform)),
+                    before: Some(serde_json::json!({ "account": old })),
+                    after: Some(serde_json::json!({ "account": label })),
+                    reason: Some("exch setup: прежний аккаунт не работает"),
+                    double_confirmed: true,
+                },
+            )
+            .await?;
+        }
+    }
     tx.commit().await?;
 
     Ok(Registered {
@@ -196,6 +255,7 @@ pub async fn register(
         platform: target.platform,
         wallet_id,
         already_authorized: outcome.already_authorized,
+        moved_from,
     })
 }
 
