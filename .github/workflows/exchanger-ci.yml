@@ -109,3 +109,48 @@ jobs:
 
       - name: cargo clippy for Windows
         run: cargo clippy --workspace --all-targets --all-features --target x86_64-pc-windows-gnu -- -D warnings
+
+  # Шаг 3.3 плана: настоящая сборка exch.exe на Windows (владелец запускает бот там, рядом с
+  # гарантом) — то же, что соберёт он сам; готовый файл — артефакт запуска CI.
+  windows-build:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      SQLX_OFFLINE: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        shell: bash
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: exchanger
+          key: windows-msvc
+
+      - name: cargo build --release
+        run: cargo build --release --bin exch
+
+      - name: exch --help (бинарник запускается)
+        run: target/release/exch.exe --help
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exch-windows
+          path: exchanger/target/release/exch.exe
+          retention-days: 14
+
+  # Шаг 3.3 плана: известные уязвимости зависимостей. Исключения — с причиной в
+  # exchanger/.cargo/audit.toml.
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: cargo audit
+        run: cargo audit

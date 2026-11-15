@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE alerts SET repeats = repeats + 1 WHERE id = $1 AND acked_at IS NULL RETURNING repeats",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "repeats",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "alerts",
+            "name": "repeats"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ae46eba57c69e7b2d8eae499c155f48f44ee04ca79913b03e064af32ffa9d005"
+}

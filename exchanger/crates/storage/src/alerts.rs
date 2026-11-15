@@ -6,7 +6,7 @@
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use sqlx::PgConnection;
+use sqlx::{Connection, PgConnection};
 
 use crate::error::StorageError;
 
@@ -295,23 +295,6 @@ pub async fn resolve(conn: &mut PgConnection, dedup_key: &str) -> Result<bool, S
     Ok(n == 1)
 }
 
-/// Последняя тревога с ключом принята человеком, а причина ещё не ушла: заново не открывать.
-async fn acked_and_ongoing(
-    conn: &mut PgConnection,
-    dedup_key: &str,
-) -> Result<Option<i64>, StorageError> {
-    Ok(sqlx::query_scalar!(
-        r#"
-        SELECT id FROM alerts
-         WHERE dedup_key = $1 AND acked_by IS NOT NULL AND resolved_at IS NULL
-           AND id = (SELECT max(id) FROM alerts WHERE dedup_key = $1)
-        "#,
-        dedup_key
-    )
-    .fetch_optional(conn)
-    .await?)
-}
-
 /// Поднять тревогу-состояние (недостача, вход сброшен, движок не работает): то же, что
 /// [`raise`], но если человек её уже принял, а причина не ушла ([`resolve`] не звали), — тихо
 /// обновить принятую (счётчик, данные), без новой тревоги со звуком (шаг 2.8, AUDIT-UI П1).
@@ -319,17 +302,32 @@ pub async fn raise_condition(
     conn: &mut PgConnection,
     a: &NewAlert<'_>,
 ) -> Result<i64, StorageError> {
-    if let Some(id) = acked_and_ongoing(&mut *conn, a.dedup_key).await? {
-        sqlx::query!(
-            "UPDATE alerts SET count = count + 1, last_at = now(), payload = $2 WHERE id = $1",
-            id,
-            a.payload,
-        )
-        .execute(&mut *conn)
-        .await?;
-        return Ok(id);
-    }
-    raise(conn, a).await
+    // Решение «принята — тихо обновить, нет — поднять» — под блокировкой последней строки
+    // ключа: «Принял», нажатый между проверкой и вставкой, иначе поднимал принятую тревогу
+    // заново со звуком (та же гонка, что у `ensure_condition`, найдена 16.11). `FOR UPDATE`
+    // ждёт незавершённое «Принял» и видит его итог.
+    let mut tx = conn.begin().await?;
+    let last = sqlx::query!(
+        "SELECT id, acked_by, resolved_at FROM alerts WHERE dedup_key = $1 ORDER BY id DESC LIMIT 1 FOR UPDATE",
+        a.dedup_key
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+    let id = match last {
+        Some(row) if row.acked_by.is_some() && row.resolved_at.is_none() => {
+            sqlx::query!(
+                "UPDATE alerts SET count = count + 1, last_at = now(), payload = $2 WHERE id = $1",
+                row.id,
+                a.payload,
+            )
+            .execute(&mut *tx)
+            .await?;
+            row.id
+        }
+        _ => raise(&mut tx, a).await?,
+    };
+    tx.commit().await?;
+    Ok(id)
 }
 
 /// [`ensure`] для состояния, которое проверяется по кругу (заявка на разборе): принятое
@@ -338,10 +336,27 @@ pub async fn ensure_condition(
     conn: &mut PgConnection,
     a: &NewAlert<'_>,
 ) -> Result<bool, StorageError> {
-    if acked_and_ongoing(&mut *conn, a.dedup_key).await?.is_some() {
-        return Ok(false);
-    }
-    ensure(conn, a).await
+    // Проверка «по ключу уже есть нерешённая тревога — принятая или нет» и вставка — одним
+    // запросом. Раньше это были два запроса: «Принял», нажатый между ними, делал прежнюю
+    // тревогу принятой, частичный уникальный индекс (`WHERE acked_at IS NULL`) переставал её
+    // видеть — и принятая тревога заводилась заново (гонка, найдена 16.11 под нагрузкой тестов).
+    let n = sqlx::query!(
+        r#"
+        INSERT INTO alerts (level, topic, dedup_key, title, payload)
+        SELECT $1::text, $2::text, $3::text, $4::text, $5::jsonb
+         WHERE NOT EXISTS (SELECT 1 FROM alerts WHERE dedup_key = $3 AND resolved_at IS NULL)
+        ON CONFLICT (dedup_key) WHERE acked_at IS NULL DO NOTHING
+        "#,
+        a.level.as_db_str(),
+        a.topic.as_db_str(),
+        a.dedup_key,
+        a.title,
+        a.payload,
+    )
+    .execute(conn)
+    .await?
+    .rows_affected();
+    Ok(n == 1)
 }
 
 /// Копия тревоги у сотрудника: его чат и сообщение.
@@ -412,11 +427,15 @@ pub async fn due_repeats(
 }
 
 /// Критичная тревога повторена ещё раз.
-pub async fn bump_repeat(conn: &mut PgConnection, id: i64) -> Result<(), StorageError> {
-    sqlx::query!("UPDATE alerts SET repeats = repeats + 1 WHERE id = $1", id)
-        .execute(conn)
-        .await?;
-    Ok(())
+/// Засчитать повтор тревоги — только если её ещё никто не принял (одним запросом: «Принял»
+/// не проскочит между проверкой и повтором). `None` — уже принята, повтор не нужен.
+pub async fn bump_repeat(conn: &mut PgConnection, id: i64) -> Result<Option<i32>, StorageError> {
+    Ok(sqlx::query_scalar!(
+        "UPDATE alerts SET repeats = repeats + 1 WHERE id = $1 AND acked_at IS NULL RETURNING repeats",
+        id
+    )
+    .fetch_optional(conn)
+    .await?)
 }
 
 /// Открытое событие по ключу (`balance_mismatch:xrocket` …).

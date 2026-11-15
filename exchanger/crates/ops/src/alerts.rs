@@ -142,11 +142,15 @@ impl Inner {
         recipients: &[&StaffMember],
         repeat: bool,
     ) -> Result<(), OpsError> {
+        let _turn = self.alert_turn.lock().await;
         let copies = {
             let mut conn = self.pool.acquire().await?;
             if repeat {
-                storage::alerts::bump_repeat(&mut conn, alert.id).await?;
-                alert.repeats += 1;
+                // Повтор засчитывается, только если тревогу ещё никто не принял.
+                match storage::alerts::bump_repeat(&mut conn, alert.id).await? {
+                    Some(n) => alert.repeats = n,
+                    None => return Ok(()),
+                }
             }
             storage::alerts::copies(&mut conn, alert.id).await?
         };
@@ -394,6 +398,7 @@ impl Inner {
 
     /// «Принял»: событие закрыто, у всех копий — отметка и без кнопки «Принял».
     pub(crate) async fn ack(&self, staff: &StaffMember, id: i64) -> Result<(), OpsError> {
+        let _turn = self.alert_turn.lock().await;
         let alert = {
             let mut conn = self.pool.acquire().await?;
             storage::alerts::ack(&mut conn, id, staff.tg_user_id).await?;

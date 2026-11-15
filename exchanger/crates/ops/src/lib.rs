@@ -223,6 +223,9 @@ pub(crate) struct Inner {
     started: Instant,
     /// Имя бота для ссылок-переходов в таблицах.
     bot_username: std::sync::OnceLock<String>,
+    /// Повтор тревоги и «Принял» — по очереди: иначе повтор, начатый до «Принял», уходил
+    /// после него («Повтор 2» у всех уже принятой тревоги, гонка найдена 16.11).
+    alert_turn: tokio::sync::Mutex<()>,
 }
 
 impl OpsBot {
@@ -244,6 +247,7 @@ impl OpsBot {
                 look: std::sync::RwLock::new((Arc::new(Look::plain()), String::new())),
                 started: Instant::now(),
                 bot_username: std::sync::OnceLock::new(),
+                alert_turn: tokio::sync::Mutex::new(()),
             }),
         })
     }

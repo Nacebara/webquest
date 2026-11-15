@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO alerts (level, topic, dedup_key, title, payload)\n        SELECT $1::text, $2::text, $3::text, $4::text, $5::jsonb\n         WHERE NOT EXISTS (SELECT 1 FROM alerts WHERE dedup_key = $3 AND resolved_at IS NULL)\n        ON CONFLICT (dedup_key) WHERE acked_at IS NULL DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2bd018b9b8ea223a6695b2ee834cd2bf3dcee9e95a32a1bdd91a4a05ef5df246"
+}
