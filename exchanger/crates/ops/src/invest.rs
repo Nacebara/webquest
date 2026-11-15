@@ -156,6 +156,11 @@ impl Inner {
                 InvestRefusal::UnknownUser => t.t("invest.r_user"),
                 InvestRefusal::ReasonTooShort => t.t("invest.r_reason"),
                 InvestRefusal::BadAmount => t.t("invest.r_amount"),
+                InvestRefusal::OverWalletExcess { amount, room } => t.f(
+                    "invest.r_excess",
+                    &[("amount", &usdt(amount)), ("room", &usdt(room))],
+                ),
+                InvestRefusal::NotMeasured => t.t("invest.r_not_measured"),
                 other => esc(&other.to_string()),
             },
         };

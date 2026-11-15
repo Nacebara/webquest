@@ -74,6 +74,12 @@ pub enum InvestRefusal {
     BadTerms(&'static str),
     #[error("unknown user")]
     UnknownUser,
+    /// «Деньги пришли» больше, чем реально лежит сверх учёта в кошельке (шаг 5.4, как 1.6).
+    #[error("only {room} above the ledger in the wallet, {amount} entered")]
+    OverWalletExcess { amount: Decimal, room: Decimal },
+    /// Кошелёк не сверяли после активации: сколько пришло, неизвестно.
+    #[error("the wallet was not measured after this activation")]
+    NotMeasured,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -485,6 +491,45 @@ impl Engine {
         Ok(m)
     }
 
+    /// Шаг 5.4: «Деньги пришли» по пополнению — как у заявки (шаг 1.6): если кошелёк после
+    /// активации не замерен (чат держит неотвеченная активация), чат освобождается и сверка
+    /// читает баланс. Владелец уже разбирает движение, кошелёк остаётся на паузе.
+    async fn measure_before_deposit(&self, move_id: i64) -> Result<(), InvestError> {
+        let mut conn = self.pool.acquire().await?;
+        let m = storage::invest::get(&mut conn, move_id, false).await?;
+        if m.kind != MoveKind::Deposit || m.status != MoveStatus::Manual {
+            return Ok(());
+        }
+        let ops = storage::operations::for_invest_move(&mut conn, move_id).await?;
+        let Some(op) = ops
+            .iter()
+            .rev()
+            .find(|o| o.kind == OpKind::ActivateCheck && o.status == OpStatus::Unknown)
+        else {
+            return Ok(());
+        };
+        let measured = crate::operator::reading_after(&mut conn, op, ASSET)
+            .await
+            .map_err(|e| match e {
+                crate::operator::OperatorError::Engine(e) => InvestError::Engine(e),
+                crate::operator::OperatorError::Refused(r) => {
+                    InvestError::Engine(EngineError::Invariant(format!("reading: {r:?}")))
+                }
+            })?;
+        if measured.is_some() {
+            return Ok(());
+        }
+        drop(conn);
+        tracing::info!(
+            invest_move = move_id,
+            platform = op.platform.db_name(),
+            "investor deposit: releasing the wallet chat to measure the balance"
+        );
+        self.unanswered_resolved(op.platform).await;
+        self.reconcile_balances().await?;
+        Ok(())
+    }
+
     /// Решение владельца по движению с неясным исходом (`manual`): что было на самом деле.
     pub async fn invest_resolve(
         &self,
@@ -497,6 +542,9 @@ impl Engine {
         let reason = reason.trim();
         if reason.chars().count() < 3 {
             return Err(InvestRefusal::ReasonTooShort.into());
+        }
+        if matches!(verdict, InvestVerdict::Happened { amount: Some(_) }) {
+            self.measure_before_deposit(move_id).await?;
         }
         let mut tx = self.pool.begin().await?;
         let m = storage::invest::get(&mut tx, move_id, true).await?;
@@ -537,6 +585,27 @@ impl Engine {
                 let amount = amount
                     .filter(|a| *a > Decimal::ZERO)
                     .ok_or(InvestRefusal::BadAmount)?;
+                // Шаг 5.4: зачислить можно только то, что реально лежит в кошельке сверх учёта
+                // по замеру после активации, — как «Деньги пришли» у заявки (шаг 1.6, М-5).
+                if let Some(o) = open_op.filter(|o| o.kind == OpKind::ActivateCheck) {
+                    let room = match crate::operator::intake_room(&mut tx, o, ASSET).await {
+                        Ok(r) => r,
+                        Err(crate::operator::OperatorError::Refused(
+                            crate::operator::Refusal::NotMeasured,
+                        )) => return Err(InvestRefusal::NotMeasured.into()),
+                        Err(crate::operator::OperatorError::Refused(r)) => {
+                            return Err(InvestError::Engine(EngineError::Invariant(format!(
+                                "intake room: {r:?}"
+                            ))));
+                        }
+                        Err(crate::operator::OperatorError::Engine(e)) => {
+                            return Err(InvestError::Engine(e));
+                        }
+                    };
+                    if amount > room {
+                        return Err(InvestRefusal::OverWalletExcess { amount, room }.into());
+                    }
+                }
                 storage::ledger::post(
                     &mut tx,
                     &ledger::invest_deposit(m.platform, ASSET, m.user_id, amount)?,

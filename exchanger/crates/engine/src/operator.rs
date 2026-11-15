@@ -225,7 +225,7 @@ fn check_limit(staff: &StaffMember, amount: Decimal) -> Result<(), Refusal> {
 /// Чего правило не ловит: две неясные активации на одном кошельке делят общий излишек, и
 /// сотрудник может приписать сумму не той заявке. Больше реально пришедшего в сумме всё равно
 /// не зачислить.
-async fn intake_room(
+pub(crate) async fn intake_room(
     conn: &mut PgConnection,
     op: &OperationRow,
     asset: Asset,
@@ -251,7 +251,7 @@ async fn intake_room(
 
 /// Последний настоящий замер кошелька активации `op`, сделанный после её отправки:
 /// (кошелёк, когда, реальный баланс минус леджер).
-async fn reading_after(
+pub(crate) async fn reading_after(
     conn: &mut PgConnection,
     op: &OperationRow,
     asset: Asset,

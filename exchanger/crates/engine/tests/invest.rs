@@ -14,6 +14,7 @@ use rust_decimal_macros::dec;
 use sqlx::PgPool;
 use storage::invest::{Investor, MoveStatus};
 use storage::staff::StaffMember;
+use userbot::sim::{Call, Fault};
 
 const INVESTOR: i64 = 222;
 
@@ -319,5 +320,90 @@ async fn profit_is_a_share_of_fee_revenue_by_capital(pool: PgPool) {
     // Новых проводок нет — второй раз не начислит.
     assert!(e.engine.invest_accrue().await.unwrap().credited.is_empty());
     assert_eq!(balance(&e).await, dec!(1000) + expected);
+    e.assert_books_match().await;
+}
+
+/// Шаг 5.2: пополнение инвестора, ответ на активацию потерян («выполнил и вернул таймаут» или
+/// разрыв после отправки) — повтор активации видит, что чек уже наш, и зачисляет ровно один раз.
+async fn deposit_with_a_lost_reply(pool: PgPool, fault: Fault) {
+    let e = env(pool).await;
+    grant(&e, 0, dec!(100)).await;
+    let url = e.world.client_check(CB, usdt(dec!(150))).unwrap();
+    let link = parsers::links::parse_url(&url).unwrap();
+    e.world.inject(e.ub, Call::SendText, fault.clone(), 1);
+    let id = e.engine.invest_deposit(INVESTOR, &link).await.unwrap();
+    e.drain().await;
+    e.engine.recover().await.unwrap();
+    e.drain().await;
+    let m = get_move(&e, id).await;
+    assert_eq!(m.status, MoveStatus::Done, "{fault:?}");
+    assert_eq!(balance(&e).await, dec!(150), "{fault:?}: одно зачисление");
+    let credits: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM ledger_transactions t JOIN operations op ON op.id = t.operation_id \
+          WHERE t.kind = 'invest_deposit' AND op.invest_move_id = $1",
+    )
+    .bind(id)
+    .fetch_one(&e.pool)
+    .await
+    .unwrap();
+    assert_eq!(credits, 1, "{fault:?}");
+    e.assert_books_match().await;
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_deposit_whose_reply_timed_out_is_credited_once(pool: PgPool) {
+    deposit_with_a_lost_reply(pool, Fault::TimeoutAfterEffect).await;
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_deposit_whose_connection_dropped_is_credited_once(pool: PgPool) {
+    deposit_with_a_lost_reply(pool, Fault::DisconnectedAfterEffect).await;
+}
+
+/// Шаг 5.4 (М-5, как 1.6 у заявки): пополнение на 3 USDT без ответа кошелька, владелец решает
+/// «деньги пришли» — 300 вместо 3 движок не зачисляет: столько в кошельке сверх учёта нет. Замер
+/// делает само решение (неотвеченная активация держала чат кошелька).
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_deposit_confirmed_by_hand_cannot_exceed_the_wallet(pool: PgPool) {
+    let e = env(pool).await;
+    let staff = grant(&e, 0, dec!(100)).await;
+    let url = e.world.client_check(XR, usdt(dec!(3))).unwrap();
+    let link = parsers::links::parse_url(&url).unwrap();
+    e.world.inject(e.ub, Call::SendText, Fault::NoReply, 1);
+    let id = e.engine.invest_deposit(INVESTOR, &link).await.unwrap();
+    e.drain().await;
+    assert_eq!(get_move(&e, id).await.status, MoveStatus::Manual);
+    let r = e
+        .engine
+        .invest_resolve(
+            id,
+            &staff,
+            &InvestVerdict::Happened {
+                amount: Some(dec!(300)),
+            },
+            "чек нашёлся в истории",
+        )
+        .await;
+    assert_eq!(
+        refusal(r),
+        InvestRefusal::OverWalletExcess {
+            amount: dec!(300),
+            room: dec!(3)
+        }
+    );
+    assert_eq!(balance(&e).await, dec!(0), "отказ ничего не зачислил");
+    e.engine
+        .invest_resolve(
+            id,
+            &staff,
+            &InvestVerdict::Happened {
+                amount: Some(dec!(3)),
+            },
+            "чек нашёлся в истории",
+        )
+        .await
+        .unwrap();
+    assert_eq!(balance(&e).await, dec!(3));
+    assert_eq!(get_move(&e, id).await.status, MoveStatus::Done);
     e.assert_books_match().await;
 }
