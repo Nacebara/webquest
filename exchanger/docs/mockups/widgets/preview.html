@@ -110,6 +110,9 @@ section.block { margin-top: 52px; }
 .kb .row { display: flex; gap: 4px; }
 .kb .key { flex: 1; min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px; border-radius: 10px; background: var(--tg-btn); color: #fff; font-size: 14.5px; font-weight: 500; text-align: center; }
 .kb .key.primary { background: #3A86F0; } .kb .key.success { background: #2FA34F; } .kb .key.danger { background: #E0483F; }
+.cxsheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin: 16px 0 22px; }
+.cxi { display: grid; justify-items: center; gap: 6px; padding: 12px 6px; border: 1px solid var(--line); border-radius: 14px; font-size: 13px; color: var(--muted); text-align: center; }
+.cxi .ce { width: 56px; height: 56px; margin: 0; }
 .ce { display: inline-block; width: 1.25em; height: 1.25em; vertical-align: -0.28em; margin-right: 2px; font-style: normal; text-align: center; line-height: 1.25em; }
 .key .ce { width: 20px; height: 20px; color: #fff; }
 .unsup { margin: 6px 12px 2px; padding: 10px 12px; border-radius: 10px; background: rgba(127,140,155,.16); color: var(--tg-mut); font-size: 14px; font-style: italic; }
@@ -357,6 +360,15 @@ table.sz { max-width: 820px; }
     </div>
   </section>
 
+
+  <section class="block">
+    <h2>Концепция: значок говорит главное<small>15 ноября · на приёмку</small></h2>
+    <p class="lead">Не одинаковые карточки, а одна идея: первый значок сразу отвечает на главный вопрос клиента — <b>где мои деньги</b> и что делать. Без стены одинаковых красных крестиков: красный — только когда правда что-то не так. Все значки анимированы: короткий жест и покой. Новые — первые восемь.</p>
+    <div class="cxsheet"><div class="cxi"><i class="ce" data-k="color/in_check"></i><span>Деньги в чеке</span></div><div class="cxi"><i class="ce" data-k="color/with_me"></i><span>Деньги у меня</span></div><div class="cxi"><i class="ce" data-k="color/refund"></i><span>Возвращаю</span></div><div class="cxi"><i class="ce" data-k="color/done"></i><span>У вас</span></div><div class="cxi"><i class="ce" data-k="color/other_coin"></i><span>Не та монета</span></div><div class="cxi"><i class="ce" data-k="color/empty"></i><span>Выплаты закончились</span></div><div class="cxi"><i class="ce" data-k="color/closed"></i><span>Закрыта оператором</span></div><div class="cxi"><i class="ce" data-k="mono/reply"></i><span>Ответить</span></div><div class="cxi"><i class="ce" data-k="color/err"></i><span>Ошибка</span></div><div class="cxi"><i class="ce" data-k="color/limit"></i><span>Лимит</span></div><div class="cxi"><i class="ce" data-k="color/maint"></i><span>Обслуживание</span></div><div class="cxi"><i class="ce" data-k="color/manual"></i><span>Вручную</span></div></div>
+    <div class="demo rec" data-w="cx_errors"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge">Выберите А или Б</span><h3>Ошибки</h3><p><b>А</b> — значок говорит, что случилось, а строка с маленьким значком — где деньги. <b>Б</b> — значок первой строки сразу говорит, где деньги; текст короче.</p><ul><li class="plus">Обе — две строки и кнопка, суммы моноширинные.</li><li class="plus">Советую <b>Б</b>: один значок, глаз сразу видит «деньги в чеке» или «возвращаю».</li></ul></div></div>
+    <div class="demo rec" data-w="cx_flows"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge">Новое</span><h3>Итог позже, закрыта, поддержка</h3><p>Те же решения, что вы приняли, — в новом виде: «Деньги у меня» значком, печать «Закрыта», ответ оператора карточкой с кнопкой «Ответить».</p></div></div>
+    <div class="demo rec" data-w="cx_pult"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge">Пульт</span><h3>Без обычных эмодзи</h3><p>В текстах пульта сейчас 86 обычных эмодзи (✅ ⛔ 💼 ⚠️…). Все — на наши анимированные значки, первая строка — коротко и жирно, номер заявки — копируется.</p></div></div>
+  </section>
 
   <section class="block">
     <h2>Клиент: находки на решение<small>15 ноября · шаг 6.5</small></h2>
@@ -656,6 +668,7 @@ document.querySelectorAll('[data-theme-btn]').forEach((b) => b.addEventListener(
   if (v === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = v;
   document.querySelectorAll('[data-theme-btn]').forEach((x) => x.setAttribute('aria-pressed', x === b));
 }));
+  setTimeout(() => { const sh = document.querySelector(".cxsheet"); if (sh) mountAll(sh); }, 300);
 </script>
 </body>
 </html>
