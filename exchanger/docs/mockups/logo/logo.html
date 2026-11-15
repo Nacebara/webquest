@@ -1,0 +1,71 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:Unb;src:url(node_modules/@fontsource/unbounded/files/unbounded-latin-800-normal.woff2)}
+@font-face{font-family:UnbB;src:url(node_modules/@fontsource/unbounded/files/unbounded-latin-700-normal.woff2)}
+@font-face{font-family:Inter9;src:url(node_modules/@fontsource/inter/files/inter-latin-900-normal.woff2)}
+@font-face{font-family:Inter8;src:url(node_modules/@fontsource/inter/files/inter-latin-800-normal.woff2)}
+@font-face{font-family:Inter5;src:url(node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2)}
+@font-face{font-family:Man8;src:url(node_modules/@fontsource/manrope/files/manrope-latin-800-normal.woff2)}
+@font-face{font-family:Mont9;src:url(node_modules/@fontsource/montserrat/files/montserrat-latin-900-normal.woff2)}
+@font-face{font-family:Mont5;src:url(node_modules/@fontsource/montserrat/files/montserrat-latin-500-normal.woff2)}
+@font-face{font-family:Onest8;src:url(node_modules/@fontsource/onest/files/onest-latin-800-normal.woff2)}
+@font-face{font-family:SG7;src:url(node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-700-normal.woff2)}
+@font-face{font-family:Rub8;src:url(node_modules/@fontsource/rubik/files/rubik-latin-800-normal.woff2)}
+body{margin:0;background:#fff}
+svg{display:block}
+</style></head><body><div id="out"></div><script>
+const NS='http://www.w3.org/2000/svg';
+// Градиент плитки наших значков: светлее сверху слева, глубже снизу справа + стеклянный блик.
+function shade(hex,k){const to=k>0?255:0;return '#'+[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)).map(x=>Math.round(x+(to-x)*Math.abs(k)).toString(16).padStart(2,'0')).join('')}
+const V=[
+ {id:'v1',name:'1 · Плитка значков, Inter',base:'#CC7300',hi:0.12,lo:-0.10,parts:[['e','Inter8'],['XCH','Inter9']],size:205,ls:-6},
+ {id:'v2',name:'2 · Темнее, Manrope',base:'#B85F00',hi:0.14,lo:-0.22,parts:[['eXCH','Man8']],size:200,ls:-4},
+ {id:'v3',name:'3 · Широкий, Unbounded',base:'#C46A00',hi:0.12,lo:-0.18,parts:[['e','UnbB'],['XCH','Unb']],size:150,ls:-2},
+ {id:'v4',name:'4 · Лёгкая «e», Montserrat',base:'#C66C00',hi:0.12,lo:-0.16,parts:[['e','Mont5'],['XCH','Mont9']],size:190,ls:-4},
+ {id:'v5',name:'5 · X — стрелки обмена',base:'#C26800',hi:0.12,lo:-0.18,arrowX:true,parts:[['e','SG7'],['X','SG7'],['CH','SG7']],size:205,ls:-4},
+ {id:'v6',name:'6 · Кремовый текст, Onest',base:'#A95500',hi:0.16,lo:-0.20,cream:true,parts:[['eXCH','Onest8']],size:205,ls:-6},
+ {id:'v7',name:'7 · Блик-полоса, Rubik',base:'#CC7300',hi:0.10,lo:-0.18,band:true,parts:[['eXCH','Rub8']],size:200,ls:-5},
+ {id:'v8',name:'8 · Минимал, Inter',base:'#BF6400',hi:0.08,lo:-0.12,flat:true,parts:[['e','Inter5'],['XCH','Inter8']],size:200,ls:-6},
+];
+function make(v){
+ const s=document.createElementNS(NS,'svg');s.setAttribute('viewBox','0 0 640 640');s.setAttribute('width',640);s.setAttribute('height',640);s.id=v.id;
+ const top=shade(v.base,v.hi),bot=shade(v.base,v.lo);
+ s.innerHTML=`<defs>
+  <linearGradient id="${v.id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bot}"/></linearGradient>
+  <linearGradient id="${v.id}h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="${v.flat?0.08:0.18}"/><stop offset=".62" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <linearGradient id="${v.id}b" x1="0" y1="0" x2="1" y2="1"><stop offset=".30" stop-color="#fff" stop-opacity="0"/><stop offset=".42" stop-color="#fff" stop-opacity=".13"/><stop offset=".52" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <filter id="${v.id}s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#5a2a00" flood-opacity=".35"/></filter>
+ </defs>
+ <rect width="640" height="640" fill="url(#${v.id}g)"/>
+ <rect width="640" height="640" fill="url(#${v.id}h)"/>
+ ${v.band?`<rect width="640" height="640" fill="url(#${v.id}b)"/>`:''}
+ <g id="${v.id}t" filter="url(#${v.id}s)"></g>`;
+ document.getElementById('out').appendChild(s);
+ const g=s.querySelector('#'+v.id+'t');
+ const fill=v.cream?'#FFF1DC':'#FFFFFF';
+ // Раскладка: части текста подряд, по центру.
+ let x=0;const els=[];
+ for(const [txt,font] of v.parts){
+  if(v.arrowX&&txt==='X'){x+=v.size*0.1;els.push({arrow:true,w:v.size*0.72,pad:v.size*0.1});x+=v.size*0.72+v.ls+v.size*0.06;continue;}
+  const t=document.createElementNS(NS,'text');t.setAttribute('font-family',font);t.setAttribute('font-size',v.size);t.setAttribute('fill',fill);t.setAttribute('letter-spacing',v.ls);t.textContent=txt;g.appendChild(t);
+  const w=t.getComputedTextLength();els.push({t,w});x+=w+v.ls;
+ }
+ let cx=320-(x-v.ls)/2;
+ for(const e of els){
+  if(e.arrow){
+   cx+=e.pad;
+   const h=v.size*0.66, y0=320-h/2, x0=cx+v.size*0.06, x1=cx+e.w-v.size*0.06, sw=v.size*0.155, a=v.size*0.2;
+   const p=document.createElementNS(NS,'g');p.setAttribute('stroke',fill);p.setAttribute('stroke-width',sw);p.setAttribute('stroke-linecap','round');p.setAttribute('stroke-linejoin','round');p.setAttribute('fill','none');
+   p.innerHTML=`<path d="M${x0} ${y0+h} L${x1} ${y0}"/><path d="M${x1-a} ${y0} L${x1} ${y0} L${x1} ${y0+a}"/><path d="M${x0} ${y0} L${x1} ${y0+h}"/><path d="M${x0} ${y0+h-a} L${x0} ${y0+h} L${x0+a} ${y0+h}"/>`;
+   g.appendChild(p);cx+=e.w+v.ls+v.size*0.06;continue;
+  }
+  e.t.setAttribute('x',cx);e.t.setAttribute('y',320);e.t.setAttribute('dominant-baseline','central');cx+=e.w+v.ls;
+ }
+ // По центру по настоящим границам знаков (ширина с межбуквенным интервалом врёт).
+ const bb=g.getBBox();
+ const dx=320-(bb.x+bb.width/2), dy=320-(bb.y+bb.height/2);
+ const inner=document.createElementNS(NS,'g');inner.setAttribute('transform',`translate(${dx} ${dy})`);
+ while(g.firstChild) inner.appendChild(g.firstChild);
+ g.appendChild(inner);
+}
+Promise.all(['Unb','UnbB','Inter9','Inter8','Inter5','Man8','Mont9','Mont5','Onest8','SG7','Rub8'].map(f=>document.fonts.load('200px '+f,'eXCH'))).then(()=>document.fonts.ready).then(()=>{V.forEach(make);document.title='ready';window.VARIANTS=V.map(v=>({id:v.id,name:v.name}));});
+</script></body></html>

@@ -37,15 +37,25 @@ def main():
     demos = {k: v for k, v in samples.items() if isinstance(v, dict) and ("w" in v or "states" in v)}
     states = {k: demos[v.get("same", k)]["states"] for k, v in demos.items()}
     src, sizes, bad = {}, {}, []
-    for name in sorted({v["w"] for v in demos.values() if v.get("w")}):
-        with open(os.path.join(WIDGETS, f"{name}.html"), encoding="utf-8") as f:
+    # «Имя+pol» — виджет с правкой из samples["_patches"] (макеты «до → после», полировка 15.11):
+    # старое находится ровно один раз, иначе сборка падает — правка не расходится с кодом.
+    patches = samples.get("_patches", {})
+    names = {v["w"] for v in demos.values() if v.get("w")}
+    names |= {s["w"] for d in demos for s in states[d] if s.get("w")}
+    for name in sorted(names):
+        base = name.split("+")[0]
+        with open(os.path.join(WIDGETS, f"{base}.html"), encoding="utf-8") as f:
             html = f.read()
+        for old, new in patches.get(name, []):
+            if html.count(old) != 1:
+                sys.exit(f"{name}: правка не найдена ровно один раз: {old[:60]}")
+            html = html.replace(old, new)
         raw = html.encode("utf-8")
         packed = len(zlib.compress(raw, 9))
-        data = max(
+        data = max((
             len(json.dumps(live(s.get(k, {})), ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
-            for d, v in demos.items() if v.get("w") == name for s in states[d] for k in ("data", "answer")
-        )
+            for d, v in demos.items() for s in states[d] if (s.get("w") or v.get("w")) == name for k in ("data", "answer")
+        ), default=0)
         src[name] = html
         sizes[name] = {"html": len(raw), "zip": packed, "data": data}
         if len(raw) > HTML_MAX or packed > ZIP_MAX or data > DATA_MAX or "\0" in html:

@@ -105,6 +105,25 @@ section.block { margin-top: 52px; }
 .rich summary::after { content: "›"; color: var(--tg-mut); }
 .rich blockquote { margin: 6px 0 2px; padding: 5px 10px; border-left: 3px solid var(--tg-link); background: color-mix(in srgb, var(--tg-link) 10%, transparent); border-radius: 4px 8px 8px 4px; }
 .rich s { color: var(--tg-mut); }
+.rich pre { margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--tg-link) 8%, transparent); font: 12.5px/1.45 ui-monospace, Menlo, monospace; white-space: pre; overflow: hidden; }
+.rich mark { background: color-mix(in srgb, #f5b400 32%, transparent); color: inherit; padding: 0 3px; border-radius: 4px; }
+.rich aside { margin: 6px 0; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--tg-mut) 12%, transparent); font-size: 13px; }
+.rich hr { border: 0; border-top: 1px solid var(--tg-line); margin: 8px 0; }
+.rich u { text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
+.rich blockquote cite { display: block; font-style: normal; font-size: 12.5px; color: var(--tg-mut); margin-top: 3px; }
+.rich blockquote cite::before { content: "— "; }
+.rich blockquote[expandable] { position: relative; padding-right: 22px; }
+.rich blockquote[expandable]::after { content: "⌄"; position: absolute; right: 8px; top: 2px; color: var(--tg-link); font-size: 15px; }
+.rich tg-spoiler { color: transparent; border-radius: 4px; background: radial-gradient(circle, var(--tg-mut) .9px, transparent 1.3px) 0 0 / 4px 4px, color-mix(in srgb, var(--tg-mut) 14%, transparent); }
+.rich .tb { margin: 6px 0 4px; } .rich .tb .btn { display: inline-block; padding: 6px 14px; border-radius: 9px; background: #3A86F0; color: #fff; font-size: 13.5px; font-weight: 500; }
+.ph-head .th.after { color: #2FA34F; font-weight: 700; }
+table.roles td:nth-child(2) { white-space: nowrap; }
+table.roles code { font-family: ui-monospace, Menlo, monospace; color: var(--accent); }
+table.roles .q { border-left: 3px solid var(--accent); padding: 2px 8px; display: inline-block; }
+table.roles s { color: var(--muted); }
+table.roles mark { background: color-mix(in srgb, #f5b400 35%, transparent); color: inherit; padding: 0 3px; border-radius: 4px; }
+.sp { color: transparent; border-radius: 4px; background: radial-gradient(circle, var(--muted) .9px, transparent 1.3px) 0 0 / 4px 4px; }
+ol.props { margin: 12px 0 0; padding-left: 22px; font-size: 15px; } ol.props li { margin: 7px 0; } ol.props b { color: var(--fg); }
 .kb { width: 330px; max-width: 100%; margin-top: 4px; display: grid; gap: 4px; }
 .kb:empty { display: none; }
 .kb .row { display: flex; gap: 4px; }
@@ -362,6 +381,50 @@ table.sz { max-width: 820px; }
 
 
   <section class="block">
+    <h2>Полировка: до → после<small>15 ноября · на решение</small></h2>
+    <p class="lead">Слева — как сейчас в боте или в утверждённом макете, справа — что предлагаю. Справа тексты короче на треть, а у каждого вида шрифта своя работа. Ничего не придумано заново: та же концепция, значки и кнопки, только доведено до конца.</p>
+    <div class="cols">
+      <div class="card"><h3>11 предложений</h3><ol class="props">
+        <li><b>У каждого шрифта — своя работа.</b> Жирный — одно главное событие. Моно — суммы и номера (тап копирует). Курсив — тихий голос. Цитата — чужие слова. Таблица справа.</li>
+        <li><b>Без заголовков.</b> 27 экранов с крупным заголовком становятся «значок + жирная строка», как все карточки. В коде это одна правка, все экраны меняются сразу.</li>
+        <li><b>Один ритм карточки.</b> Значок и событие → деньги → что сделать → тихая строка → кнопки. До кнопок не больше трёх строк.</li>
+        <li><b>Короче на треть.</b> Глагол первым, одна мысль в строке. Редкие случаи — в свёрнутой цитате. «Чек уже открыт через меня»: было 32 слова, стало 6 и раскрывашка.</li>
+        <li><b>Чужие слова — цитатой с подписью.</b> Ответ оператора, ответ кошелька, причина сотрудника: сразу видно, кто сказал.</li>
+        <li><b>Деньги на виду — под спойлером.</b> Ссылка на чек в пульте — это деньги. Она скрыта, пока её не нажмут.</li>
+        <li><b>Старое рядом с новым — зачёркнуто.</b> Выгодный курс: <s>2.5 %</s> 0.3 % — в «Курсе» и в квитанции.</li>
+        <li><b>Время — в поясе читателя.</b> Все часы — тегом времени Telegram: клиент из любой страны видит своё время.</li>
+        <li><b>Одна цветная кнопка на карточку.</b> Зелёная — только «забрать деньги», красная — необратимое, синяя — главный шаг.</li>
+        <li><b>Виджеты — те же правила.</b> Подписи обычным шрифтом, суммы моно. «Ещё 15 мин» вместо «14:30», похожего на время на часах. «1 · 12.00» вместо «1 12.00», которое читается как 112.00.</li>
+        <li><b>Страж стиля.</b> Тест ловит обычный эмодзи вместо нашего, заголовок и первую строку длиннее пяти слов, чтобы стиль не «поплыл» через месяц.</li>
+      </ol></div>
+      <div class="card"><h3>Роли шрифтов</h3>
+        <table class="an roles"><tr><th>Вид</th><th>Пример</th><th>Работа</th></tr>
+          <tr><td>Жирный</td><td><b>Счёт оплачен</b></td><td>Одно главное событие, до 5 слов</td></tr>
+          <tr><td>Моно</td><td><code>97.50</code> <code>K7M2Q9XR4T</code></td><td>Суммы, номера, команды: тап копирует</td></tr>
+          <tr><td>Курсив</td><td><i>Обычно до 15 минут</i></td><td>Тихий голос: сроки, «делать ничего не нужно»</td></tr>
+          <tr><td>Цитата</td><td><span class="q">Проверяем.<br><small>— Анна, оператор</small></span></td><td>Чужие слова, всегда с подписью</td></tr>
+          <tr><td>Свёрнутая цитата</td><td>⌄ подробнее</td><td>Редкое и подробности: кому надо — раскроет</td></tr>
+          <tr><td>Зачёркнутый</td><td><s>2.5 %</s> <b>0.3 %</b></td><td>Старое рядом с новым</td></tr>
+          <tr><td>Маркер</td><td><mark>0.3 %</mark></td><td>Одна цифра, ради которой экран; не больше одной</td></tr>
+          <tr><td>Подвал</td><td><small>Обновлено 14:05</small></td><td>Мелкая серая справка</td></tr>
+          <tr><td>Врезка</td><td><b>Мы не пишем первыми</b></td><td>Памятка, которую нельзя пропустить</td></tr>
+          <tr><td>Спойлер</td><td><span class="sp">t.me/xrocket…</span></td><td>Деньги на виду: ссылки на чеки в пульте</td></tr>
+          <tr><td>Подчёркнутый</td><td>—</td><td>Не используем: путают со ссылкой</td></tr>
+          <tr><td>Заголовок</td><td>—</td><td>Не используем (ваше решение)</td></tr>
+        </table>
+        <p style="margin:10px 0 0;font-size:13px;color:var(--muted)">Маркер, подвал, врезка и раскрывашка есть только в rich-сообщениях. В обычных тексте их работу делают курсив и свёрнутая цитата.</p>
+      </div>
+    </div>
+    <div class="demo rec" data-w="pol_client" data-mode="ba"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge">До → после</span><h3>Клиент · 8 карточек</h3><p>Переключайте карточки сверху. Кнопки те же, что вы приняли.</p><ul><li class="plus">Ошибки — по концепции Б: первый значок говорит, где деньги.</li><li class="plus">«Чек не найден»: 21 слово → 12. «Сверяю, дошёл ли чек»: 30 → 20 — и первая строка сразу говорит, что происходит.</li><li class="plus">Суммы и номера — моно: тап копирует.</li><li class="plus">Ответ поддержки — цитатой с подписью и кнопкой «Ответить».</li><li class="plus">«Курс» и «Помощь» — без заголовка. «Мы не пишем первыми» — врезкой: это защита от мошенников, она должна бросаться в глаза.</li></ul></div></div>
+    <div class="demo rec" data-w="pol_ops" data-mode="ba"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge">До → после</span><h3>Пульт · 5 карточек</h3><p>Тот же язык, что у клиента: сотрудник и клиент видят один бот, а не два разных.</p><ul><li class="plus">Причина сотрудника и ответ кошелька — цитатой с подписью: кто и когда.</li><li class="plus">Ссылка на чек — под спойлером: это деньги, через плечо их не должно быть видно.</li><li class="plus">Тревога: суммы и кошельки читаются сразу — «100.00 CryptoBot → 97.50 xRocket». Строка «ответа нет» повторяла причину — убрал. Когда кошелёк что-то ответил, его слова идут цитатой с подписью, как в «Незнакомом ответе».</li><li class="plus">Главный экран почти не меняется: только без заголовка, и сумма — моно.</li><li class="plus">Подтверждение: сумма — в первой строке. Кнопки — как вы приняли 14.11.</li></ul></div></div>
+    <div class="demo rec" data-w="pol_emoji" data-mode="ba"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge">Значки · до → после</span><h3>Премиум-эмодзи: 4 правки</h3><p>Проверил все 127 значков в размере текста (20 px) и крупно, в обеих темах. Набор ровный, но четыре места выбиваются:</p><ul><li class="plus"><b>«Отправляю»</b> — единственный цветной значок без плитки; в 20 px рассыпался на зелёные полоски. Теперь чек летит на мятной плитке, как все.</li><li class="plus"><b>«Тревога»</b> была маленьким квадратом в рамке — на светлой теме выглядела белой наклейкой. Теперь коралловая плитка, «!» вздрагивает, плитка бьётся дважды, как сердце.</li><li class="plus"><b>«Деньги у меня»</b> в 20 px не отличалась от «Щита». Внутри теперь золотая монета.</li><li class="plus"><b>Точки статуса</b>: «Ждём» и «На связи» были круглее остальных. Все точки — со скруглением плитки.</li></ul><div class="cxsheet"><div class="cxi"><i class="ce" data-k="color/sending">·</i>Отправляю · сейчас</div><div class="cxi"><i class="ce" data-k="color/sending_pol">·</i>после</div><div class="cxi"><i class="ce" data-k="color/alarm">·</i>Тревога · сейчас</div><div class="cxi"><i class="ce" data-k="color/alarm_pol">·</i>после</div><div class="cxi"><i class="ce" data-k="color/with_me">·</i>Деньги у меня · сейчас</div><div class="cxi"><i class="ce" data-k="color/with_me_pol">·</i>после</div><div class="cxi"><i class="ce" data-k="color/shield">·</i>Щит · для сравнения</div><div class="cxi"><i class="ce" data-k="color/dot_wait_pol">·</i>Точки · одна форма</div></div><p class="k">Все значки по-прежнему анимированы, петли бесшовны (проверка набора пройдена). Правка — <b>emoji-polish-15-11.diff</b>: примете — перегенерирую набор, и Telegram подхватит.</p></div></div>
+    <div class="demo" data-w="pol_emoji_ops" data-mode="ba"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge">Значки · пульт</span><h3>Тревога и точки в пульте</h3><p>Те же правки, как их видит сотрудник.</p></div></div>
+    <div class="demo rec" data-w="pol_w_calc" data-mode="ba"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge">Виджет · до → после</span><h3>Живая квитанция</h3><ul><li class="plus">Подписи — обычным шрифтом, суммы — моно: читается как чек из магазина, а не как код.</li><li class="plus">Выгодный курс: старая комиссия зачёркнута — видно, сколько экономит клиент. Огонёк остаётся в заголовке и на шкале.</li></ul><p class="k">Справа — <b>настоящий код виджета</b> с правкой. Примете — ровно эта правка уйдёт в бота.</p></div></div>
+    <div class="demo rec" data-w="pol_w_invoice" data-mode="ba"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge">Виджет · до → после</span><h3>Живой счёт</h3><ul><li class="plus">«Цена держится ещё 14:30» легко принять за время на часах. Стало «ещё 15 мин», в последнюю минуту — секунды.</li><li class="plus">Квитанция — как в «Обменять»: подписи обычные, суммы моно.</li></ul></div></div>
+    <div class="demo rec" data-w="pol_w_dash" data-mode="ba"><div><div class="chips"></div><div class="phones"></div></div><div class="notes"><span class="badge">Виджет · до → после</span><h3>Живой пульт</h3><ul><li class="plus">«1 12.00» читалось как «112.00». Стало «1 · 12.00».</li><li class="plus">Строка внизу переносится по смыслу, а не посреди «5 мин / назад». Точка — на уровне первой строки.</li></ul></div></div>
+  </section>
+
+  <section class="block">
     <h2>Концепция: значок говорит главное<small>15 ноября · на приёмку</small></h2>
     <p class="lead">Не одинаковые карточки, а одна идея: первый значок сразу отвечает на главный вопрос клиента — <b>где мои деньги</b> и что делать. Без стены одинаковых красных крестиков: красный — только когда правда что-то не так. Все значки анимированы: короткий жест и покой. Новые — первые восемь.</p>
     <div class="cxsheet"><div class="cxi"><i class="ce" data-k="color/in_check"></i><span>Деньги в чеке</span></div><div class="cxi"><i class="ce" data-k="color/with_me"></i><span>Деньги у меня</span></div><div class="cxi"><i class="ce" data-k="color/refund"></i><span>Возвращаю</span></div><div class="cxi"><i class="ce" data-k="color/done"></i><span>У вас</span></div><div class="cxi"><i class="ce" data-k="color/other_coin"></i><span>Не та монета</span></div><div class="cxi"><i class="ce" data-k="color/empty"></i><span>Выплаты закончились</span></div><div class="cxi"><i class="ce" data-k="color/closed"></i><span>Закрыта оператором</span></div><div class="cxi"><i class="ce" data-k="mono/reply"></i><span>Ответить</span></div><div class="cxi"><i class="ce" data-k="color/err"></i><span>Ошибка</span></div><div class="cxi"><i class="ce" data-k="color/limit"></i><span>Лимит</span></div><div class="cxi"><i class="ce" data-k="color/maint"></i><span>Обслуживание</span></div><div class="cxi"><i class="ce" data-k="color/manual"></i><span>Вручную</span></div></div>
@@ -564,7 +627,7 @@ function phone(name, theme, st, opts = {}) {
   const ops = meta.bot.includes('пульт');
   const el = document.createElement('div');
   el.className = 'ph'; el.dataset.tg = theme;
-  el.innerHTML = `<div class="ph-head"><span class="bk">‹</span><span class="av${ops ? ' ops' : ''}">${ops ? ce('robot') : ce('swap')}</span><div><b>${meta.bot}</b><small>${ops ? 'служебный бот' : 'бот'}</small></div><span class="th">${theme === 'dark' ? 'тёмная' : 'светлая'}</span></div><div class="ph-chat"></div>`;
+  el.innerHTML = `<div class="ph-head"><span class="bk">‹</span><span class="av${ops ? ' ops' : ''}">${ops ? ce('robot') : ce('swap')}</span><div><b>${meta.bot}</b><small>${ops ? 'служебный бот' : 'бот'}</small></div><span class="th${opts.tag === 'после' ? ' after' : ''}">${opts.tag || (theme === 'dark' ? 'тёмная' : 'светлая')}</span></div><div class="ph-chat"></div>`;
   const chat = el.querySelector('.ph-chat');
   const ph = { el, name, theme, st, tw: null };
   ph.render = (s) => {
@@ -587,7 +650,7 @@ function phone(name, theme, st, opts = {}) {
     const id = 'w' + (++twSeq);
     ph.ctx = { st: s };
     ph.tw = window.__tw[id] = makeTW(theme, ph.ctx);
-    fr.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>:root{${THEME[theme]}}${TGCSS}${s.below ? NOBAND : ''}</style><script>window.TelegramWidget=parent.__tw['${id}'];<\/script></head><body>${SRC[demoOf(name).w]}</body></html>`;
+    fr.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>:root{${THEME[theme]}}${TGCSS}${s.below ? NOBAND : ''}</style><script>window.TelegramWidget=parent.__tw['${id}'];<\/script></head><body>${SRC[s.w || demoOf(name).w]}</body></html>`;
     const fit = () => { try { const d = fr.contentDocument; if (d && d.documentElement) { const b = d.body, cs = getComputedStyle(b); const h = Math.min(600, Math.max(50, Math.ceil(b.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom)))); if (Math.abs(fr.offsetHeight - h) > 1) fr.style.height = h + 'px'; } } catch (e) {} };
     fr.addEventListener('load', () => { fit(); if (s.silent) setTimeout(() => ph.tw._fire('activated'), 400); });
     clearInterval(ph.fitT); ph.fitT = setInterval(fit, 250);
@@ -608,6 +671,7 @@ function phone(name, theme, st, opts = {}) {
 function demo(box) {
   const name = box.dataset.w;
   const phones = box.querySelector('.phones');
+  if (box.dataset.mode === 'ba') { pairDemo(box, name, phones); return; }
   if (name === 'fallback') {
     phones.append(phone('order_a', 'light', statesOf('order_a').find((s) => s.id === 'done'), { fallback: true }).el, phone('calc_b', 'dark', statesOf('calc_b')[1], { fallback: true }).el);
     return;
@@ -637,6 +701,23 @@ function demo(box) {
     if (b.dataset.play) { play(); return; }
     pick(states.find((x) => x.id === b.dataset.s));
   });
+}
+// «до → после»: слева как сейчас, справа предлагаю; чипы — пары, тема — общая для обоих.
+function pairDemo(box, name, phones) {
+  const st = statesOf(name), pairs = [];
+  for (let i = 0; i + 1 < st.length; i += 2) pairs.push([st[i], st[i + 1]]);
+  let cur = 0, theme = 'light';
+  const draw = () => { phones.innerHTML = ''; pairs[cur].forEach((s, k) => phones.append(phone(name, theme, s, { tag: k ? 'после' : 'до' }).el)); };
+  const chips = box.querySelector('.chips');
+  chips.innerHTML = (pairs.length > 1 ? pairs.map((p, i) => `<button type="button" data-p="${i}" aria-pressed="${i === 0}">${p[1].name}</button>`).join('') : '') +
+    '<button type="button" class="play" data-t="1" aria-pressed="false">Тёмная тема</button>';
+  chips.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.t) { theme = theme === 'light' ? 'dark' : 'light'; b.setAttribute('aria-pressed', theme === 'dark'); }
+    else { cur = +b.dataset.p; chips.querySelectorAll('[data-p]').forEach((x) => x.setAttribute('aria-pressed', x === b)); }
+    draw();
+  });
+  draw();
 }
 document.querySelectorAll('.demo').forEach(demo);
 
@@ -668,7 +749,7 @@ document.querySelectorAll('[data-theme-btn]').forEach((b) => b.addEventListener(
   if (v === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = v;
   document.querySelectorAll('[data-theme-btn]').forEach((x) => x.setAttribute('aria-pressed', x === b));
 }));
-  setTimeout(() => { const sh = document.querySelector(".cxsheet"); if (sh) mountAll(sh); }, 300);
+  setTimeout(() => document.querySelectorAll(".cxsheet").forEach(mountAll), 300);
 </script>
 </body>
 </html>

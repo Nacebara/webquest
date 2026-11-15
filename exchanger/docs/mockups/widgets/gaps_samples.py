@@ -459,3 +459,116 @@ G.update({
   {"id": "inv_new", "name": "Предлагаю · инвесторы", "rich": '<h3>{invest} Инвесторы · 3</h3><table><tr><td>В обороте</td><td class="r"><b>4 200.00</b></td></tr><tr><td>Прибыль за неделю</td><td class="r">{dot_ok} 63.40</td></tr></table>', "keys": [[["", "invest", "Карточка"]]]},
  ]},
 })
+
+# ═══ Полировка 15.11 — «до → после» (просьба владельца: разная типографика, короче, без заголовков) ═══
+# Каждый пример — пара состояний: чётное — как сейчас (код или утверждённый экран), нечётное — предлагаю.
+# Страница показывает пару рядом (data-mode="ba"). «После» у виджетов — настоящий код виджета с правкой
+# из _patches: если владелец примет, ровно эта правка уйдёт в assets/widgets.
+import copy as _copy
+def _ba(sid, name, before, after):
+    b = dict(before, id=sid + "_b", name="Сейчас")
+    a = dict(after, id=sid + "_a", name=name)
+    return [b, a]
+def _st(demo, sid):
+    return _copy.deepcopy(next(s for s in (G.get(demo) or S[demo])["states"] if s["id"] == sid))
+ACK_ROW = [["", "ack", "Принял"]]
+G.update({
+ "pol_client": {"bot": C, "user": "", "states":
+  _ba("nf", "Ошибка: чек не найден",
+      {"rich": '{err} <b>Чек не найден</b>\nЯ ничего не получил. Если чек истёк или удалён — деньги у того, кто его создал. Если ссылка неполная — пришлите её целиком.', "keys": [[HOWTO, SUPPORT]]},
+      {"rich": '{in_check} <b>Чек не найден</b>\nЯ ничего не получил — деньги у создателя чека.\n<i>Ссылка обрезана? Пришлите её целиком.</i>', "keys": [[HOWTO, SUPPORT]]})
+  + _ba("used", "Ошибка: чек уже открыт через меня",
+      {"rich": '{err} <b>Этот чек уже открыт через меня</b>\nОбычный чек: деньги у того, кто прислал его первым. Мульти-чек CryptoBot: свою долю я уже взял, вашу можно забрать в @send. Если вы сами уже меняли этот чек — итог в сообщении той заявки.', "keys": [[HISTORY]]},
+      {"rich": '{err} <b>Чек уже открыт через меня</b>\nДеньги у того, кто прислал его первым.\n<blockquote expandable>Мульти-чек CryptoBot: свою долю я взял, вашу заберите в @send.\nМеняли его сами — итог в сообщении той заявки.</blockquote>', "keys": [[HISTORY]]})
+  + _ba("unk", "Сверяю, дошёл ли чек",
+      {"rich": '{manual} <b>Проверяю вручную</b>\nКошелёк не ответил вовремя — сверяю, дошёл ли чек. Если деньги у меня, они в безопасности; если нет — остались в чеке. Обычно до 15 минут.\n<i>Ничего делать не нужно — напишу сюда.</i>', "keys": [[SUPPORT, ORDR]]},
+      {"rich": '{manual} <b>Сверяю, дошёл ли чек</b>\nКошелёк не ответил вовремя. Деньги не пропадут: они или у меня, или в вашем чеке.\n<i>Обычно до 15 минут — напишу сюда.</i>', "keys": [[SUPPORT, ORDR]]})
+  + _ba("manual", "Ручная проверка",
+      {"rich": '{manual} <b>Проверяю вручную</b>\nДеньги у меня: 100.00 USDT. Обычно до 15 минут.\n<i>Ничего делать не нужно — напишу сюда.</i>', "keys": [[SUPPORT, ORDR]]},
+      {"rich": '{manual} <b>Проверяю вручную</b>\nДеньги у меня: <code>100.00</code> USDT.\n<i>Обычно до 15 минут — напишу сюда.</i>', "keys": [[SUPPORT, ORDR]]})
+  + _ba("refund", "Возврат",
+      {"rich": '{refund} <b>Возвращаю 100.00 USDT</b>\nСумма больше текущего лимита 500.', "keys": [[["success", "claim", "Забрать 100.00&nbsp;USDT"]]]},
+      {"rich": '{refund} <b>Возвращаю 100.00 USDT</b>\nБольше лимита — сейчас принимаю до <code>500</code>.\n<i>Без комиссии, чек CryptoBot — в кнопке.</i>', "keys": [[["success", "claim", "Забрать 100.00&nbsp;USDT"]]]})
+  + _ba("answer", "Ответ поддержки",
+      {"pre": [{"rich": 'Передал оператору · заявка <code>K7M2Q9XR4T</code>', "keys": []}],
+       "rich": '<b>Оператор Анна:</b> деньги у нас, проверяем. Чек будет через 5 минут.', "keys": []},
+      {"pre": [{"rich": 'Передал оператору · заявка <code>K7M2Q9XR4T</code>', "keys": []}],
+       "rich": '{support} <b>Ответ поддержки</b>\n<blockquote>Деньги у нас, проверяем. Чек будет через 5 минут.<cite>Анна, оператор</cite></blockquote>', "keys": [[["", "reply", "Ответить"]]]})
+  + _ba("rates", "Курс и лимиты — без заголовка",
+      {"rich": table(True), "keys": TABLE_KEYS},
+      {"rich": '<p>{rates} <b>Курс и лимиты</b></p><table><tr><th></th><th>Куда</th><th class="r">Комиссия</th><th class="r">USDT</th></tr>'
+         '<tr><td>{dot_ok}</td><td>CryptoBot → xRocket</td><td class="r">{fire} 0.3&nbsp;%</td><td class="r">1–500</td></tr>'
+         '<tr><td>{dot_ok}</td><td>xRocket → CryptoBot</td><td class="r">1.5&nbsp;%</td><td class="r">1–500</td></tr>'
+         '<tr><td>{dot_ok}</td><td>Счёт CryptoBot</td><td class="r">2.5&nbsp;%</td><td class="r">1–300</td></tr>'
+         '<tr><td>{dot_wait}</td><td>Счёт xRocket</td><td class="r">—</td><td class="r">пауза</td></tr></table>'
+         '<p>{flame} <b>Выгодно до 300 USDT:</b> <s>2.5&nbsp;%</s> <mark>0.3&nbsp;%</mark></p>'
+         '<p><i>Комиссия от 0.10 USDT · первые обмены до 100 USDT</i></p><footer>Обновлено 14:05</footer>', "keys": TABLE_KEYS})
+  + _ba("help", "Помощь — без заголовка, короче",
+      {"rich": '<h3>{-help} Помощь</h3><p>Пришлите чек или ссылку на счёт — остальное сделаю сам.</p>'
+         '<details open><summary>{swap} Как обменять чек</summary><p>Наберите здесь <code>@send 100usdt</code> или <code>@xrocket 100</code> и выберите чек — верну чеком другого кошелька, обычно за 10 секунд.</p><p>Подходят чеки в USDT для одного человека, без капчи и подписок. Мульти-чеки — только CryptoBot.</p><div class="tb"><span class="btn">Обменять</span></div></details>'
+         '<details><summary>{invoice} Как оплатить счёт</summary></details><details><summary>{history} Где мои деньги</summary></details><details><summary>{shield} Правила</summary></details>'
+         '<footer>{lock} Мы не пишем первыми и не просим пароли, PIN и коды.</footer>', "keys": [[["primary", "support", "Написать оператору"]]]},
+      {"rich": '<p>{-help} <b>Помощь</b></p><p>Пришлите чек или ссылку на счёт — остальное сделаю сам.</p>'
+         '<details open><summary>{swap} Как обменять чек</summary><p>Наберите <code>@send 100usdt</code> или <code>@xrocket 100</code> и выберите чек. Верну чеком другого кошелька — обычно за 10 секунд.</p><p><i>Чек — в USDT, для одного человека, без капчи и подписок. Мульти-чеки — только CryptoBot.</i></p><div class="tb"><span class="btn">Обменять</span></div></details>'
+         '<details><summary>{invoice} Как оплатить счёт</summary></details><details><summary>{history} Где мои деньги</summary></details><details><summary>{shield} Правила</summary></details>'
+         '<aside>{lock} <b>Мы не пишем первыми</b> и не просим пароли, PIN и коды.</aside>', "keys": [[["primary", "support", "Написать оператору"]]]})
+ },
+ "pol_ops": {"bot": P, "user": "", "states":
+  _ba("dash", "Главный экран — без заголовка",
+      {"rich": '<h3>{alarm} Нужно решить · 4</h3><div class="rows"><div>{dot_act}<span>Разбор</span><b>2 <small>· старейший 6 мин</small></b></div><div>{dot_wait}<span>Оплатить счёт вручную</span><b>1 <small>· 12.00</small></b></div><div>{dot_wait}<span>Незнакомый ответ</span><b>1 <small>· xRocket</small></b></div></div><hr><div class="kpi"><div><small>Обменов</small><b>148</b><em class="up">▲ 9&nbsp;%</em></div><div><small>Оборот</small><b>12 480</b><em class="up">▲ 5&nbsp;%</em></div><div><small>Прибыль</small><b>291.40</b><em class="up">▲ 6&nbsp;%</em></div></div><table><tr><th>Резерв</th><th class="r">Доступно</th><th class="r">От цели</th></tr><tr><td>{cb} CryptoBot</td><td class="r">2 140.00</td><td class="r">{dot_ok} 143&nbsp;%</td></tr><tr><td>{xr} xRocket</td><td class="r">640.00</td><td class="r">{dot_wait} 43&nbsp;%</td></tr></table><footer>{live} Аккаунты 2/2 · сверка 14:00 · выплаты идут · ▲▼ к вчера</footer>', "keys": [[["primary", "queue", "Разбор · 2"], ["", "order", "Заявки"]]]},
+      {"rich": '<p>{alarm} <b>Нужно решить · 4</b></p><div class="rows"><div>{dot_act}<span>Разбор</span><b>2 <small>· старейший 6 мин</small></b></div><div>{dot_wait}<span>Оплатить счёт вручную</span><b>1 <small>· <code>12.00</code></small></b></div><div>{dot_wait}<span>Незнакомый ответ</span><b>1 <small>· xRocket</small></b></div></div><hr><div class="kpi"><div><small>Обменов</small><b>148</b><em class="up">▲ 9&nbsp;%</em></div><div><small>Оборот</small><b>12 480</b><em class="up">▲ 5&nbsp;%</em></div><div><small>Прибыль</small><b>291.40</b><em class="up">▲ 6&nbsp;%</em></div></div><table><tr><th>Резерв</th><th class="r">Доступно</th><th class="r">От цели</th></tr><tr><td>{cb} CryptoBot</td><td class="r">2 140.00</td><td class="r">{dot_ok} 143&nbsp;%</td></tr><tr><td>{xr} xRocket</td><td class="r">640.00</td><td class="r">{dot_wait} 43&nbsp;%</td></tr></table><footer>{live} Аккаунты 2/2 · выплаты идут · сверка 14:00 · ▲▼ к вчера</footer>', "keys": [[["primary", "queue", "Разбор · 2"], ["", "order", "Заявки"]]]})
+  + _ba("alert", "Тревога «Нужен разбор»",
+      {"rich": '{alarm} <b>Нужен разбор</b> · <code>K7M2Q9XR4T</code>\nCB → xR · 100.00 → 97.50 · клиент 51234567\nВыплата: нет ответа 30 с, чек не найден\n<blockquote expandable>xRocket v3 · 14:04:04 · ответа нет</blockquote>', "keys": [[["", "order", "Открыть"], ["primary", "take", "Взять"]], [ACK_ROW[0]]]},
+      {"rich": '{alarm} <b>Нужен разбор</b> · <code>K7M2Q9XR4T</code>\n<code>100.00</code> CryptoBot → <code>97.50</code> xRocket · клиент <code>51234567</code>\nВыплата: нет ответа 30 с, чек не найден.', "keys": [[["", "order", "Открыть"], ["primary", "take", "Взять"]], [ACK_ROW[0]]]})
+  + _ba("unknown", "Незнакомый ответ кошелька",
+      {"rich": '{warn} <b>Незнакомый ответ</b> · xRocket · 14:02\n<blockquote>Чек CQ12…9F временно недоступен, попробуйте позже</blockquote>xR → CB на автопаузе · заявка <code>7F3A1C9D2B</code> в разборе', "keys": [[["", "export", "Сохранить фикстуру"]], [["", "play", "Снять паузу"], ["", "order", "Заявка"]]]},
+      {"rich": '{warn} <b>Незнакомый ответ</b> · xRocket\n<blockquote>Чек CQ12…9F временно недоступен, попробуйте позже<cite>xRocket · 14:02</cite></blockquote>xR → CB на автопаузе · заявка <code>7F3A1C9D2B</code> в разборе', "keys": [[["", "export", "Сохранить фикстуру"]], [["", "play", "Снять паузу"], ["", "order", "Заявка"]]]})
+  + _ba("intake", "Подтверждение: зачислить",
+      {"rich": _st("ops_intake", "c")["rich"], "keys": _st("ops_intake", "c")["keys"]},
+      {"rich": '{warn} <b>Зачислить 30.00 USDT?</b>\n{cb} CryptoBot · заявка <code>K7M2Q9XR4T</code>\n<blockquote>Деньги в чате кошелька, ответа не было<cite>Анна · причина</cite></blockquote>Сначала сверю кошелёк: зачислю не больше, чем там лишнего.\n<b>Необратимо.</b> <i>Кнопка действует 60 с.</i>', "keys": [[["danger", "done", "Зачислить 30.00"], ["", "close", "Отмена"]]]})
+  + _ba("paid", "Подтверждение: выплачено, чек под спойлером",
+      {"rich": _st("ops_paid", "c")["rich"], "keys": _st("ops_paid", "c")["keys"]},
+      {"rich": '{warn} <b>Отметить выплаченной?</b>\nКлиент <code>51234567</code> получил <code>97.50</code> USDT вне бота · заявка <code>K7M2Q9XR4T</code>\nЧек: <tg-spoiler>t.me/xrocket?start=mc_7Q4Hk2</tg-spoiler>\n<blockquote>Чек нашёлся в истории кошелька<cite>Анна · причина</cite></blockquote><b>Необратимо.</b> <i>Кнопка действует 60 с.</i>', "keys": [[["danger", "done", "Отметить выплаченной"], ["", "close", "Отмена"]]]})
+ },
+})
+# Виджеты: «после» — тот же виджет с правкой (_patches); старое — как утверждено.
+def _wba(key, sid, name, wname):
+    b = _st(key, sid); a = _st(key, sid)
+    b.update(id=sid + "_b", name="Сейчас"); a.update(id=sid + "_a", name=name, w=wname)
+    return [b, a]
+G.update({
+ "pol_w_calc": {"bot": C, "user": S["calc_b"].get("user", ""), "w": "calc_b", "states": _wba("calc_b", "promo", "Квитанция: выгодный курс", "calc_b+pol") + _wba("calc_b", "usual", "Квитанция: обычный курс", "calc_b+pol")},
+ "pol_w_invoice": {"bot": C, "user": S["invoice"].get("user", ""), "w": "invoice", "states": _wba("invoice", "wait", "Живой счёт: к оплате", "invoice+pol") + _wba("invoice", "short", "Живой счёт: не хватает", "invoice+pol")},
+ "pol_w_dash": {"bot": P, "user": S["dash"].get("user", ""), "w": "dash", "states": _wba("dash", "day", "Живой пульт: обычный день", "dash+pol") + _wba("dash", "fire", "Живой пульт: пожар", "dash+pol")},
+ "_patches": {
+  "calc_b+pol": [
+   [".pr{background:var(--t);border-radius:10px;padding:8px 12px 10px;font:.9em/1.5 ui-monospace,monospace}", ".pr{background:var(--t);border-radius:10px;padding:8px 12px 10px;font-size:.92em;line-height:1.6}"],
+   [".r b{font-weight:400}", ".r b{font:500 1em ui-monospace,monospace}.r s{color:var(--h);margin-right:4px}"],
+   ["f.textContent='Комиссия '+(pr?'🔥 ':'')+rate;", "f.textContent='Комиссия ';if(pr&&r[3]){const o=document.createElement('s');o.textContent=r[3];f.append(o)}f.append(rate);"],
+  ],
+  "invoice+pol": [
+   [".pr{margin-top:10px;background:var(--t);border-radius:10px;padding:7px 12px;font:.88em/1.55 ui-monospace,monospace}", ".pr{margin-top:10px;background:var(--t);border-radius:10px;padding:7px 12px;font-size:.9em;line-height:1.6}.pr b{font:600 1em ui-monospace,monospace}"],
+   ["const mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');", "const mm=s=>s>=60?Math.ceil(s/60)+' мин':s+' с';"],
+  ],
+  "dash+pol": [
+   ["<b>'+r[2]+'</b> <small>'+r[3]+'</small>", "<b>'+r[2]+'</b> <small>· '+r[3]+'</small>"],
+   [".ft{display:flex;align-items:center;", ".nw{white-space:nowrap}.ft{display:flex;align-items:baseline;"],
+   [".ft i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}", ".ft i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none;transform:translateY(-1px)}"],
+   [" t.textContent=txt;", " t.replaceChildren(...txt.split(' · ').flatMap((x,j)=>{const s=document.createElement('span');s.className='nw';s.textContent=x;return j?[' · ',s]:[s]}));"],
+  ],
+ },
+})
+# Значки: «после» — те же значки с правкой из emoji-polish-15-11.diff (ключи *_pol собирает страница).
+_TXT = ('{sending} Отправляю <b>97.50</b> USDT в xRocket\n{with_me} <b>Деньги у меня</b> · <code>100.00</code> USDT\n'
+        '{shield} <b>Защищено</b> · вход по коду')
+_OPS = ('{alarm} <b>Нужен разбор</b> · <code>K7M2Q9XR4T</code>'
+        '<div class="rows"><div>{dot_act}<span>Разбор</span><b>2</b></div><div>{dot_wait}<span>Счёт вручную</span><b>1</b></div>'
+        '<div>{dot_ok}<span>Резервы</span><b>в норме</b></div><div>{dot_work}<span>Рассылка</span><b>идёт</b></div>'
+        '<div>{dot_closed}<span>xRocket → CryptoBot</span><b>закрыто</b></div></div><footer>{live} Аккаунты 2/2 · выплаты идут</footer>')
+def _pol(txt):
+    import re as _re
+    return _re.sub(r"\{(sending|alarm|with_me|dot_ok|dot_work|dot_wait|dot_act|dot_closed|live)\}", r"{\1_pol}", txt)
+G.update({
+ "pol_emoji": {"bot": C, "user": "", "states": _ba("txt", "Значки в тексте", {"rich": _TXT, "keys": []}, {"rich": _pol(_TXT), "keys": []})},
+ "pol_emoji_ops": {"bot": P, "user": "", "states": _ba("ops", "Тревога и точки", {"rich": _OPS, "keys": []}, {"rich": _pol(_OPS), "keys": []})},
+})
