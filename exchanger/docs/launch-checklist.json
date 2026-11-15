@@ -1,6 +1,6 @@
 {
   "about": "Критерии запуска exch. Пункты не удаляются и не ослабляются, меняется только status (todo / done / verified_live) и evidence. План — docs/PLAN-v2.md, находки — docs/AUDIT-2026-11-11.md.",
-  "updated": "2026-11-14",
+  "updated": "2026-11-17",
   "items": [
     {
       "id": "base-checks",
@@ -132,50 +132,50 @@
       "id": "t-2",
       "milestone": 3,
       "criterion": "Тесты botapi разбирают записанные настоящие ответы Telegram (Т-2)",
-      "status": "todo",
-      "evidence": ""
+      "status": "done",
+      "evidence": "17.11, 6fd1837: 8 настоящих ответов Telegram в crates/botapi/tests/fixtures/telegram, тест recorded::every_recorded_telegram_reply_is_read; перезапись — tools/telegram/record.py."
     },
     {
       "id": "t-1",
       "milestone": 3,
       "criterion": "CI собирает exch под Windows (Т-1)",
-      "status": "todo",
-      "evidence": "11.11.2026: cargo check --target x86_64-pc-windows-gnu проходит (разовая проверка, не CI)"
+      "status": "done",
+      "evidence": "17.11, 6df61f9: задача windows-build (windows-2022, артефакт exch-windows) в exchanger-ci; прогоны 172–180 зелёные."
     },
     {
       "id": "t-3",
       "milestone": 3,
       "criterion": "cargo audit без уязвимостей и в CI (Т-3)",
-      "status": "todo",
-      "evidence": "11.11.2026: 9 уязвимостей, все с исправленными версиями"
+      "status": "done",
+      "evidence": "17.11, 6df61f9: cargo audit в CI, уязвимые библиотеки обновлены, исключения с причинами — .cargo/audit.toml."
     },
     {
       "id": "zh-2",
       "milestone": 3,
       "criterion": "Премиум-эмодзи: перенос наборов по ключу, все роли с эмодзи (Ж-2)",
-      "status": "todo",
-      "evidence": ""
+      "status": "done",
+      "evidence": "17.11, 395bd64: наборы сопоставляются по содержимому файлов, а не по порядку; adopt --from @Kazinakabot проходит. Осталось владельцу: exch emoji install --owner <id> (допишет 11 новых значков)."
     },
     {
       "id": "b-1-3",
       "milestone": 3,
       "criterion": "Чужая заявка не прикладывается к вопросу; .env.* вне git; демо не стартует на боевых данных (Б-1…Б-3)",
-      "status": "todo",
-      "evidence": ""
+      "status": "done",
+      "evidence": "17.11, 9c91dcd: Б-1 (флаг foreign), Б-2 (.env.* в .gitignore), Б-3 (DEMO_BOT_TOKEN, демо не стартует на живой базе); тесты в ops_bot.rs и app/tests/session_store.rs."
     },
     {
       "id": "ub-accounts",
       "milestone": 4,
       "criterion": "Один или два аккаунта юзербота настраиваются мастером; видно, какой аккаунт на каком кошельке (БП-2)",
-      "status": "todo",
-      "evidence": ""
+      "status": "done",
+      "evidence": "17.11, dbc7d5e: мастер спрашивает «на двух разных аккаунтах?» (по умолчанию да), выбор меток — тесты setup::tests; exch check — «на аккаунте X» по каждому кошельку. Живой проход мастера — в вехе 9."
     },
     {
       "id": "ub-procedure",
       "milestone": 4,
       "criterion": "Процедура «аккаунт заблокирован / вход сброшен» описана и пройдена на симуляторе (БП-2)",
-      "status": "todo",
-      "evidence": ""
+      "status": "done",
+      "evidence": "17.11, 2d58ef0: сброшенный вход отмечается у аккаунта (тест a_lost_login_marks_the_account_until_the_wallet_answers), мастер предлагает войти заново или перенести кошелёк; перенос запрещён, пока деньги в полёте (тесты a_wallet_with_money_in_flight_cannot_move, a_wallet_moves_off_a_blocked_account); docs/RUNBOOK.md."
     },
     {
       "id": "yu-1",
@@ -202,8 +202,8 @@
       "id": "invest-deposit-cap",
       "milestone": 5,
       "criterion": "«Деньги пришли» по пополнению инвестора ограничено замером кошелька, как у заявки (М-5)",
-      "status": "todo",
-      "evidence": ""
+      "status": "done",
+      "evidence": "17.11, de42bec: тест a_deposit_confirmed_by_hand_cannot_exceed_the_wallet (300 вместо 3 — отказ, 3 — зачислено); потерянный ответ при пополнении — ровно одно зачисление (5.2, два теста)."
     },
     {
       "id": "k-1",
@@ -356,15 +356,15 @@
       "id": "backup",
       "milestone": 10,
       "criterion": "Бэкап базы по расписанию; восстановление проверено на деле",
-      "status": "todo",
-      "evidence": ""
+      "status": "in_progress",
+      "evidence": "17.11, 34742f8: ежедневная копия pg_dump внутри exch run, каждая проверяется восстановлением во временную базу (тест a_backup_is_restore_checked_and_a_broken_one_is_caught); exch backup, exch backup --check, exch restore. Осталось: пройти на сервере владельца."
     },
     {
       "id": "update",
       "milestone": 10,
       "criterion": "Обновление и откат — одна понятная последовательность, пройдена владельцем",
-      "status": "todo",
-      "evidence": ""
+      "status": "in_progress",
+      "evidence": "17.11, 2741217: прежний exch стартует на базе, обновлённой новым (тест an_older_exch_starts_on_a_newer_database); последовательность — docs/RUNBOOK.md «Обновление exch и откат». Осталось: пройти владельцем."
     },
     {
       "id": "ub-watch",
@@ -377,8 +377,8 @@
       "id": "runbook",
       "milestone": 10,
       "criterion": "Инструкция «что делать, если…» для владельца и персонала, включая вывод прибыли руками и блокировку аккаунта (БП-1)",
-      "status": "todo",
-      "evidence": ""
+      "status": "in_progress",
+      "evidence": "17.11: docs/RUNBOOK.md — вход сброшен, аккаунт заблокирован, копии, «компьютер сломался», обновление и откат. Дальше: вывод прибыли руками, чужая сессия, служба."
     },
     {
       "id": "neighbour",
