@@ -1388,49 +1388,6 @@ async fn missing_check_link_tells_where_the_money_is(pool: PgPool) {
     assert_eq!(n, 1, "владельцу — событие с устройством сообщения");
 }
 
-#[sqlx::test(migrator = "storage::MIGRATOR")]
-async fn plain_view_switches_back_to_the_rich_card_in_the_same_message(pool: PgPool) {
-    let e = env(pool).await;
-    let bot = e.start_bot_with(true);
-    e.fake.client_writes("/terms");
-    e.fake
-        .wait_for("rich terms", |c| {
-            c.method == "sendRichMessage" && c.contains("Курс и лимиты") && c.contains("\"plain\"")
-        })
-        .await;
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    let message = e.fake.lock().next_message;
-    e.fake.client_presses(message, "plain");
-    let plain = e
-        .fake
-        .wait_for("plain edit", |c| {
-            c.method == "editMessageText" && c.message_id() == Some(message)
-        })
-        .await;
-    assert!(plain.body["text"].is_string(), "простой вид — обычный HTML");
-    assert!(plain.contains("\"rich\"") && plain.contains("Красивый вид"));
-    assert!(
-        !plain.contains("\"plain\""),
-        "кнопки «Простой вид» больше нет"
-    );
-    e.fake.client_presses(message, "rich");
-    let rich = e
-        .fake
-        .wait_for("rich edit", |c| {
-            c.method == "editMessageText"
-                && c.message_id() == Some(message)
-                && c.body["rich_message"].is_object()
-        })
-        .await;
-    assert!(rich.contains("\"plain\""), "в карточке снова «Простой вид»");
-    bot.stop().await;
-    assert_eq!(
-        e.fake.calls_of("sendRichMessage").len() + e.fake.calls_of("sendMessage").len(),
-        1,
-        "вид меняется в том же сообщении, новых нет"
-    );
-}
-
 /// «История» по решению владельца 8 ноября: время в строке — кнопка в тексте (callback, как в
 /// гаранте); нажали — карточка заявки, без «/start» в чате.
 #[sqlx::test(migrator = "storage::MIGRATOR")]
@@ -1790,27 +1747,20 @@ async fn a_late_result_comes_as_a_new_message(pool: PgPool) {
     );
 }
 
-/// Шаг 6.3 (К-4): «Поддержка» и «Простой вид» переживают перезапуск бота — состояние в базе.
-/// Раньше после перезапуска вопрос клиента получал подсказку «Пришлите чек…», а карточки снова
-/// шли красивым видом.
+/// Шаг 6.3 (К-4): нажатая «Поддержка» переживает перезапуск бота — состояние в базе. Раньше
+/// после перезапуска вопрос клиента получал подсказку «Пришлите чек…».
 #[sqlx::test(migrator = "storage::MIGRATOR")]
-async fn support_and_plain_view_survive_a_restart(pool: PgPool) {
+async fn support_survives_a_restart(pool: PgPool) {
     let e = env(pool).await;
     let bot = e.start_bot_with(true);
     e.fake.client_writes("/terms");
     e.fake
         .wait_for("rich terms", |c| {
-            c.method == "sendRichMessage" && c.contains("\"plain\"")
+            c.method == "sendRichMessage" && c.contains("Курс")
         })
         .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
     let message = e.fake.lock().next_message;
-    e.fake.client_presses(message, "plain");
-    e.fake
-        .wait_for("plain edit", |c| {
-            c.method == "editMessageText" && c.message_id() == Some(message)
-        })
-        .await;
     e.fake.client_presses(message, "support");
     e.fake
         .wait_for("support screen", |c| c.contains("Напишите вопрос"))
@@ -1827,16 +1777,6 @@ async fn support_and_plain_view_survive_a_restart(pool: PgPool) {
         })
         .await;
     assert!(!answer.contains("Пришлите чек"), "{}", answer.body);
-    e.fake.client_writes("/terms");
-    let terms = e
-        .fake
-        .wait_for("terms after restart", |c| {
-            (c.method == "sendMessage" || c.method == "sendRichMessage")
-                && c.contains("Курс")
-                && c.contains("\"rich\"")
-        })
-        .await;
-    assert_eq!(terms.method, "sendMessage", "простой вид после перезапуска");
     bot.stop().await;
 }
 

@@ -280,12 +280,10 @@ impl Inner {
     }
 }
 
-/// Что бот помнит в памяти между обновлениями. Не переживает рестарт — кроме «Простого вида» и
-/// ожидания вопроса в поддержку: они ещё и в базе (`client_prefs`, шаг 6.3) и читаются при запуске.
+/// Что бот помнит в памяти между обновлениями. Не переживает рестарт — кроме ожидания вопроса в
+/// поддержку: оно ещё и в базе (`client_prefs`, шаг 6.3) и читается при запуске.
 #[derive(Default)]
 pub(crate) struct Memory {
-    /// Клиенты, которые попросили простой вид вместо rich.
-    plain_view: HashSet<i64>,
     /// Последние rich-сообщения: (чат, сообщение) → экран, чтобы прислать его простым видом.
     rich_sent: HashMap<(i64, i32), Screen>,
     rich_order: VecDeque<(i64, i32)>,
@@ -378,7 +376,7 @@ impl Inner {
     }
 
     /// Имя бота (для `/cmd@bot`) и меню команд. Сбой не мешает работать.
-    /// «Простой вид» и «Поддержка нажата» — из базы в память (шаг 6.3, К-4).
+    /// «Поддержка нажата» — из базы в память (шаг 6.3, К-4).
     async fn load_client_prefs(&self) {
         let since =
             chrono::Utc::now() - chrono::Duration::from_std(SUPPORT_WAIT).unwrap_or_default();
@@ -395,24 +393,12 @@ impl Inner {
         };
         let now = chrono::Utc::now();
         self.memory(|m| {
-            m.plain_view.extend(saved.plain_view.iter().copied());
             for (user, order, at) in &saved.support_waits {
                 let age = (now - *at).to_std().unwrap_or_default();
                 let since = Instant::now().checked_sub(age).unwrap_or_else(Instant::now);
                 m.support_wait.insert(*user, (order.clone(), since));
             }
         });
-    }
-
-    /// Записать «Простой вид» в базу. Не записалось — не беда: в памяти он есть.
-    pub(crate) async fn save_plain_view(&self, user: i64, plain: bool) {
-        let saved = match self.pool.acquire().await {
-            Ok(mut conn) => storage::client_prefs::set_plain_view(&mut conn, user, plain).await,
-            Err(e) => Err(e.into()),
-        };
-        if let Err(e) = saved {
-            tracing::warn!(error = %e, "plain view not saved");
-        }
     }
 
     /// Записать ожидание вопроса в поддержку (`Some`) или снять его (`None`).
@@ -538,7 +524,9 @@ impl Inner {
         })
     }
 
-    pub(crate) fn prefers_plain(&self, user: i64) -> bool {
-        !self.cfg.rich_messages || self.memory(|m| m.plain_view.contains(&user))
+    /// Карточки (rich) выключены настройкой — всё обычным HTML. Кнопки «Простой вид» у клиента
+    /// нет (решение владельца 15.11).
+    pub(crate) fn prefers_plain(&self, _user: i64) -> bool {
+        !self.cfg.rich_messages
     }
 }

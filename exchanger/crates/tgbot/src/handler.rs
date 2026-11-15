@@ -69,11 +69,9 @@ impl Inner {
         let rich = match &screen.rich_html {
             Some(rich) if !self.prefers_plain(user) => rich,
             Some(_) => {
-                // Простой вид: тот же экран HTML, с «Красивым видом» вместо «Простого вида».
+                // Карточки выключены настройкой (`rich_messages = false`): тот же экран HTML.
                 let screen = &self.with_menu_button(chat, screen).await;
-                let plain = self.ui().plain_screen(screen);
-                let message = self.api.send_html(chat, &plain).await?;
-                self.remember_rich(message.chat.id, message.message_id, screen);
+                let message = self.api.send_html(chat, screen).await?;
                 return Ok(Some(message.message_id));
             }
             None => return self.reply(chat, screen).await.map(|()| None),
@@ -663,8 +661,6 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
                 .replace(chat, message, &inner.ui().cancelled(None))
                 .await
         }
-        Callback::PlainView => switch_view(inner, chat, user, message, View::Plain).await,
-        Callback::RichView => switch_view(inner, chat, user, message, View::Rich).await,
         Callback::PayByCheck(id) => match inner.own_order(user, &id).await? {
             Some(view) => crate::orders::show_awaiting(inner, &view).await,
             None => Ok(()),
@@ -703,62 +699,4 @@ impl Inner {
         let mut conn = self.pool.acquire().await?;
         Ok(storage::client::order_view_for_user(&mut conn, user, public_id).await?)
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum View {
-    Plain,
-    Rich,
-}
-
-/// «Простой вид» / «Красивый вид»: дальше этому клиенту — выбранный вид, а этот экран
-/// меняется в том же сообщении. Не вышло править (Telegram не меняет вид сообщения) — новым
-/// сообщением.
-async fn switch_view(
-    inner: &Arc<Inner>,
-    chat: i64,
-    user: i64,
-    message: Option<&Message>,
-    view: View,
-) -> Result<(), TgBotError> {
-    let screen = inner.memory(|m| {
-        match view {
-            View::Plain => m.plain_view.insert(user),
-            View::Rich => m.plain_view.remove(&user),
-        };
-        message.and_then(|msg| m.rich_sent.get(&(chat, msg.message_id)).cloned())
-    });
-    inner
-        .save_plain_view(user, matches!(view, View::Plain))
-        .await;
-    let (Some(screen), Some(message)) = (screen, message) else {
-        return Ok(());
-    };
-    let Some(rich) = screen.rich_html.as_deref() else {
-        return inner.reply(chat, &screen).await;
-    };
-    let ui = inner.ui();
-    let edited = match view {
-        View::Plain => {
-            inner
-                .api
-                .edit_html(chat, message.message_id, &ui.plain_screen(&screen))
-                .await
-        }
-        View::Rich => {
-            inner
-                .api
-                .edit_rich(chat, message.message_id, rich, &ui.rich_keyboard(&screen))
-                .await
-        }
-    };
-    match edited {
-        Ok(crate::api::Edited::Done | crate::api::Edited::NotModified) => return Ok(()),
-        Ok(crate::api::Edited::Gone) => {}
-        Err(e) if e.is_rejection() => {
-            tracing::debug!(error = %e, ?view, "cannot switch the view in place, sending anew");
-        }
-        Err(e) => return Err(e.into()),
-    }
-    inner.reply_doc(chat, user, &screen).await
 }

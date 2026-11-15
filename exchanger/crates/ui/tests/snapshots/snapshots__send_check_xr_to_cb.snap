@@ -27,13 +27,13 @@ expression: "both(p, q)"
 Комиссия 1.5 %      1.50
 ————————————————————————
 Чек CryptoBot      98.50</code></pre>
-<i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji>
+<i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000036">⬇️</tg-emoji>
 --- rich
 <p><tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <b>xRocket</b> → <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <b>CryptoBot</b></p><pre><code class="language-Пример · можно от 2 до 300 USDT">Ваш чек xRocket   100.00
 Комиссия 1.5 %      1.50
 ————————————————————————
 Чек CryptoBot      98.50</code></pre>
-<p><i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji></p>
+<p><i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000036">⬇️</tg-emoji></p>
 --- keyboard: inline
 [{"copy_text":{"text":"@xrocket 100"},"style":"primary","text":"@xrocket 100"}]
 [{"callback_data":"howto:xr_to_cb_check","icon_custom_emoji_id":"5368000000000000026","text":"Инструкция"},{"callback_data":"exchange:back","icon_custom_emoji_id":"5368000000000000032","text":"Назад"}]

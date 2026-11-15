@@ -461,7 +461,6 @@ impl Ui {
         if let Some(at) = terms.updated_at {
             doc.footer(&self.fill(&t.updated, &[("time", &self.at(at, TimeFormat::Time))]));
         }
-        let b = &self.texts.buttons;
         let keyboard = Keyboard::inline_rows(vec![vec![
             self.cb_button(
                 Some(Emoji::Exchange),
@@ -469,7 +468,6 @@ impl Ui {
                 &Callback::Exchange,
             )
             .style(ButtonStyle::Primary),
-            self.cb_button(Some(Emoji::Details), &b.plain_view, &Callback::PlainView),
         ]]);
         self.dual(doc, keyboard)
     }

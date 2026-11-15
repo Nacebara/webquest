@@ -23,7 +23,7 @@ expression: "both(p, q)"
 <p>Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.</p>
 <footer>Обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></footer>
 --- keyboard: inline
-[{"callback_data":"exchange","style":"primary","text":"💱 Обменять"},{"callback_data":"plain","text":"👁 Простой вид"}]
+[{"callback_data":"exchange","style":"primary","text":"💱 Обменять"}]
 
 ### premium
 --- html
@@ -46,4 +46,4 @@ expression: "both(p, q)"
 <p>Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.</p>
 <footer>Обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></footer>
 --- keyboard: inline
-[{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять"},{"callback_data":"plain","icon_custom_emoji_id":"5368000000000000024","text":"Простой вид"}]
+[{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","style":"primary","text":"Обменять"}]

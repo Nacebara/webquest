@@ -27,13 +27,13 @@ expression: "both(p, q)"
 Пришло              8.00
 ————————————————————————
 Не хватает          2.30</pre>
-<i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji>
+<i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000036">⬇️</tg-emoji>
 --- rich
 <p><tg-emoji emoji-id="5368000000000000003">⚠️</tg-emoji> <b>Не хватает <code>2.30</code> USDT</b></p><pre>К оплате           10.30
 Пришло              8.00
 ————————————————————————
 Не хватает          2.30</pre>
-<p><i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000037">⬇️</tg-emoji></p>
+<p><i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000036">⬇️</tg-emoji></p>
 --- keyboard: inline
 [{"copy_text":{"text":"@xrocket 2.30"},"style":"primary","text":"@xrocket 2.30"}]
 [{"callback_data":"refund:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000005","text":"Вернуть 8.00"}]

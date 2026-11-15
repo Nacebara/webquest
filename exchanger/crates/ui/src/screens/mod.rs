@@ -148,30 +148,10 @@ impl Ui {
             .collect()
     }
 
-    /// Клавиатура rich-экрана — как у экрана. Прежде бот дописывал «Не отображается?» к
-    /// каждому rich-экрану; в макете B1 переход на простой вид — кнопка «Простой вид»
-    /// только в «Курс и лимиты».
+    /// Клавиатура rich-экрана — как у экрана. Кнопки «Простой вид» нет (решение владельца
+    /// 15.11): если Telegram не принял карточку, бот сам шлёт тот же экран обычным HTML.
     pub fn rich_keyboard(&self, screen: &Screen) -> Keyboard {
         screen.keyboard.clone()
-    }
-
-    /// Справочный экран простым видом: тот же HTML, а «Простой вид» на клавиатуре заменён на
-    /// «Красивый вид» — вернуть карточку.
-    pub fn plain_screen(&self, screen: &Screen) -> Screen {
-        let plain = Callback::PlainView.encode();
-        let mut out = screen.clone();
-        if let Keyboard::Inline(markup) = &mut out.keyboard {
-            for button in markup.inline_keyboard.iter_mut().flatten() {
-                if button.action == botapi::InlineButtonAction::CallbackData(plain.clone()) {
-                    *button = self.cb_button(
-                        Some(Emoji::RichView),
-                        &self.texts.buttons.rich_view,
-                        &Callback::RichView,
-                    );
-                }
-            }
-        }
-        out
     }
 
     // ---- общие кусочки ------------------------------------------------------------------

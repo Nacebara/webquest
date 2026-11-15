@@ -190,10 +190,7 @@ pub struct ButtonTexts {
     pub notify: String,
     pub more: String,
     pub open_wallet: String,
-    pub not_rendered: String,
     /// «Простой вид» — в «Курс и лимиты» (макет B1).
-    pub plain_view: String,
-    pub rich_view: String,
     pub prev: String,
     pub next: String,
     pub page: String,
