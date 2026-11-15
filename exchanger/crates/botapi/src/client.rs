@@ -22,9 +22,10 @@ use serde::de::DeserializeOwned;
 use crate::error::{Error, TransportKind, decode_response, scrub};
 use crate::keyboard::InlineKeyboardMarkup;
 use crate::methods::{
-    AddStickerToSet, AnswerCallbackQuery, AnswerWidgetQuery, CreateNewStickerSet, DeleteMessage,
-    EditMessageText, EditMessageWidgetData, ForwardMessage, GetMe, GetStickerSet, GetUpdates,
-    Method, SendMessage, SendRichMessage, SendWidget, SetMyCommands, StickerFormat, parse_updates,
+    AddStickerToSet, AnswerCallbackQuery, AnswerInlineQuery, AnswerWidgetQuery,
+    CreateNewStickerSet, DeleteMessage, EditMessageText, EditMessageWidgetData, ForwardMessage,
+    GetMe, GetStickerSet, GetUpdates, Method, SendMessage, SendRichMessage, SendWidget,
+    SetMessageReaction, SetMyCommands, StickerFormat, parse_updates,
 };
 use crate::types::{BotCommand, File, Message, StickerSet, Update, User};
 
@@ -343,6 +344,7 @@ impl BotApi {
                     && u.edited_message.is_none()
                     && u.callback_query.is_none()
                     && u.widget_query.is_none()
+                    && u.inline_query.is_none()
             })
             .count();
         if updates.len() != total {
@@ -419,6 +421,15 @@ impl BotApi {
 
     /// Ответ на запрос виджета — на каждый, за 15 секунд.
     pub async fn answer_widget_query(&self, request: &AnswerWidgetQuery) -> Result<bool, Error> {
+        self.execute(request).await
+    }
+
+    /// Реакция бота на сообщение (👀 — «увидел ссылку»).
+    pub async fn set_message_reaction(&self, request: &SetMessageReaction) -> Result<bool, Error> {
+        self.execute(request).await
+    }
+
+    pub async fn answer_inline_query(&self, request: &AnswerInlineQuery) -> Result<bool, Error> {
         self.execute(request).await
     }
 

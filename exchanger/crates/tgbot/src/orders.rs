@@ -21,7 +21,7 @@ use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use ui::{Breakdown, Excess, InvoiceQuote, OrderCard, OrderRef, RefundReason, Screen, Ui, UiError};
 
-use crate::api::Edited;
+use crate::api::{Edited, SendOpts};
 use crate::{Inner, TgBotError};
 
 /// Сколько заявок пересинхронизировать за проход.
@@ -88,6 +88,23 @@ fn late_result(view: &OrderView) -> bool {
         && view
             .progress_sent_at
             .is_some_and(|sent| view.state_since - sent > late)
+}
+
+/// Эффект «конфетти» (🎉) из стандартных эффектов сообщений Telegram. Если Telegram его не
+/// примет, сообщение уйдёт без эффекта (`Api::send_html_opts`).
+pub const CONFETTI_EFFECT: &str = "5046509860389126442";
+
+/// Обмен готов, и это первый готовый обмен клиента. Только пока текущее сообщение заявки
+/// отправлено до итога: после нового сообщения с конфетти условие гаснет само.
+async fn first_exchange(inner: &Inner, view: &OrderView) -> Result<bool, TgBotError> {
+    let before_result = view
+        .progress_sent_at
+        .is_some_and(|sent| sent <= view.state_since);
+    if !inner.cfg.first_exchange_confetti || view.state != OrderState::Completed || !before_result {
+        return Ok(false);
+    }
+    let mut conn = inner.pool.acquire().await?;
+    Ok(!storage::client::completed_before(&mut conn, view.user_id, view.id).await?)
 }
 
 /// В прежнем шаге деньги клиента были у сервиса — строка «Деньги у меня».
@@ -445,14 +462,15 @@ impl Inner {
         chat: i64,
         user: i64,
         screen: &Screen,
+        opts: &SendOpts,
     ) -> Result<botapi::Message, botapi::Error> {
         match screen.rich_html.as_deref() {
             Some(rich) if !self.prefers_plain(user) => self
                 .api
-                .send_rich(chat, rich, &screen.keyboard, screen)
+                .send_rich_opts(chat, rich, &screen.keyboard, screen, opts)
                 .await
                 .map(|(message, _)| message),
-            _ => self.api.send_html(chat, screen).await,
+            _ => self.api.send_html_opts(chat, screen, opts).await,
         }
     }
 
@@ -482,14 +500,21 @@ impl Inner {
         self.api.edit_html(chat, message_id, screen).await
     }
 
+    /// Сообщение заявки. Всегда с запретом пересылки: итог приходит правкой этого сообщения
+    /// с кнопкой-чеком на предъявителя, а запрет ставится только при отправке (идея 16.11).
     async fn send_progress(
         &self,
         view: &OrderView,
         chat: i64,
         screen: &Screen,
         digest: u64,
+        effect: Option<&'static str>,
     ) -> Result<(), TgBotError> {
-        match self.send_flow(chat, view.user_id, screen).await {
+        let opts = SendOpts {
+            protect: true,
+            effect,
+        };
+        match self.send_flow(chat, view.user_id, screen, &opts).await {
             Ok(message) => {
                 self.store_progress(
                     view.id,
@@ -543,11 +568,16 @@ pub(crate) async fn ensure_message(
     };
     let screen = render(&inner.ui(), &cfg, &view, &extra);
     let digest = digest(&screen);
+    // Первый обмен клиента — праздник (идея владельца 16.11): итог новым сообщением с
+    // конфетти. Эффект бывает только у нового сообщения, поэтому — тот же путь, что у позднего
+    // итога: новое сообщение и «Итог — ниже» в прежнем.
+    let first_win = view.progress.is_some() && first_exchange(inner, &view).await?;
     match view.progress {
-        Some(p) if late_result(&view) => {
+        Some(p) if late_result(&view) || first_win => {
             // Сначала итог новым сообщением (со звуком), потом — «Итог — ниже» в прежнем.
+            let effect = first_win.then_some(CONFETTI_EFFECT);
             inner
-                .send_progress(&view, p.chat_id, &screen, digest)
+                .send_progress(&view, p.chat_id, &screen, digest, effect)
                 .await?;
             if inner.memory(|m| m.unreachable.contains(&order_id)) {
                 return Ok(());
@@ -606,7 +636,11 @@ pub(crate) async fn ensure_message(
                     Ok(())
                 }
                 // Клиент удалил сообщение: итог всё равно должен до него дойти.
-                Ok(Edited::Gone) => inner.send_progress(&view, p.chat_id, &screen, digest).await,
+                Ok(Edited::Gone) => {
+                    inner
+                        .send_progress(&view, p.chat_id, &screen, digest, None)
+                        .await
+                }
                 Err(e) if e.is_forbidden() => {
                     inner.memory(|m| m.unreachable.insert(order_id));
                     Ok(())
@@ -624,7 +658,7 @@ pub(crate) async fn ensure_message(
             }
             // Бот работает только в личке: чат клиента = его id.
             inner
-                .send_progress(&view, view.user_id, &screen, digest)
+                .send_progress(&view, view.user_id, &screen, digest, None)
                 .await?;
             // Шаг затянется — то же сообщение получит «Дольше обычного», а через 2 минуты —
             // «Проверяю вручную» (макет B1, «Дольше обычного»).

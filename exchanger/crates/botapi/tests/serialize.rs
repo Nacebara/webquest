@@ -433,3 +433,52 @@ fn disabled_button_from_a_live_telegram_reply_is_parsed() {
     let sent = serde_json::to_value(botapi::InlineKeyboardButton::disabled("1 / 3")).unwrap();
     assert_eq!(sent, serde_json::json!({"text": "1 / 3", "disabled": {}}));
 }
+
+#[test]
+fn protected_message_with_an_effect() {
+    let request = SendMessage::html(7, "<b>97.50 USDT</b>")
+        .protect()
+        .effect("5046509860389126442");
+    let json = serde_json::to_value(&request).unwrap();
+    assert_eq!(json["protect_content"], true);
+    assert_eq!(json["message_effect_id"], "5046509860389126442");
+    let plain = serde_json::to_value(SendMessage::html(7, "x")).unwrap();
+    assert!(plain.get("protect_content").is_none() && plain.get("message_effect_id").is_none());
+}
+
+#[test]
+fn reaction_is_an_emoji_list() {
+    let request = botapi::SetMessageReaction::emoji(7, 41, "👀");
+    assert_eq!(
+        serde_json::to_value(&request).unwrap(),
+        json!({"chat_id": 7, "message_id": 41, "reaction": [{"type": "emoji", "emoji": "👀"}]})
+    );
+}
+
+#[test]
+fn inline_answer_is_a_list_of_articles() {
+    let request = botapi::AnswerInlineQuery {
+        inline_query_id: "q1".into(),
+        results: vec![
+            botapi::InlineQueryResultArticle::new("cb", "100 → 97.50", "<b>Обмен</b>")
+                .description("CryptoBot → xRocket"),
+        ],
+        cache_time: 30,
+    };
+    let json = serde_json::to_value(&request).unwrap();
+    assert_eq!(json["results"][0]["type"], "article");
+    assert_eq!(
+        json["results"][0]["input_message_content"]["parse_mode"],
+        "HTML"
+    );
+    assert_eq!(json["results"][0]["description"], "CryptoBot → xRocket");
+    assert_eq!(json["cache_time"], 30);
+}
+
+#[test]
+fn inline_query_update_is_read() {
+    let raw = json!([{"update_id": 5, "inline_query": {"id": "q1", "from": {"id": 9, "is_bot": false, "first_name": "A"}, "query": "100", "offset": ""}}]);
+    let updates = botapi::methods::parse_updates(serde_json::from_value(raw).unwrap());
+    assert_eq!(updates[0].inline_query.as_ref().unwrap().query, "100");
+    assert_eq!(updates[0].from().unwrap().id, 9);
+}

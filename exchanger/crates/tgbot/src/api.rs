@@ -30,6 +30,13 @@ pub(crate) enum Edited {
     Gone,
 }
 
+/// Как отправить сообщение: запрет пересылки (в нём чек на предъявителя) и эффект.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct SendOpts {
+    pub protect: bool,
+    pub effect: Option<&'static str>,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct Api {
     bot: BotApi,
@@ -77,20 +84,34 @@ impl Api {
 
     /// Экран обычным HTML (денежный поток и все экраны без rich).
     pub(crate) async fn send_html(&self, chat: i64, screen: &Screen) -> Result<Message, Error> {
-        self.send_html_with(chat, &screen.html, &screen.keyboard)
+        self.send_html_opts(chat, screen, &SendOpts::default())
             .await
     }
 
-    async fn send_html_with(
+    /// То же с запретом пересылки и эффектом. Неизвестный Telegram эффект — не повод терять
+    /// сообщение: повтор без эффекта.
+    pub(crate) async fn send_html_opts(
         &self,
         chat: i64,
-        html: &str,
-        keyboard: &Keyboard,
+        screen: &Screen,
+        opts: &SendOpts,
     ) -> Result<Message, Error> {
-        let mut request = SendMessage::html(chat, html);
-        request.reply_markup = keyboard.reply_markup();
-        self.retry("sendMessage", false, || self.bot.send_message(&request))
+        let mut request = SendMessage::html(chat, screen.html.as_str());
+        request.reply_markup = screen.keyboard.reply_markup();
+        request.protect_content = opts.protect.then_some(true);
+        request.message_effect_id = opts.effect.map(str::to_owned);
+        match self
+            .retry("sendMessage", false, || self.bot.send_message(&request))
             .await
+        {
+            Err(err) if err.is_rejection() && request.message_effect_id.is_some() => {
+                tracing::info!(error = %err, "message effect rejected, sending without it");
+                request.message_effect_id = None;
+                self.retry("sendMessage", false, || self.bot.send_message(&request))
+                    .await
+            }
+            other => other,
+        }
     }
 
     /// Экран ответом-цитатой на сообщение `reply_to`. Ответ Telegram содержит текущий вид
@@ -122,17 +143,18 @@ impl Api {
         .await
     }
 
-    /// Справочный экран rich-сообщением; Telegram отказал по существу — HTML-фолбэк.
-    /// Возвращает сообщение и `true`, если ушло rich.
-    pub(crate) async fn send_rich(
+    /// Rich с запретом пересылки (эффект — только у обычных сообщений денежного потока).
+    pub(crate) async fn send_rich_opts(
         &self,
         chat: i64,
         rich_html: &str,
         rich_keyboard: &Keyboard,
         screen: &Screen,
+        opts: &SendOpts,
     ) -> Result<(Message, bool), Error> {
         let mut request = SendRichMessage::new(chat, rich_html);
         request.reply_markup = rich_keyboard.reply_markup();
+        request.protect_content = opts.protect.then_some(true);
         match self
             .retry("sendRichMessage", false, || {
                 self.bot.send_rich_message(&request)
@@ -142,7 +164,7 @@ impl Api {
             Ok(message) => Ok((message, true)),
             Err(err) if err.is_rejection() => {
                 tracing::info!(error = %err, "rich message rejected, sending the HTML fallback");
-                let message = self.send_html(chat, screen).await?;
+                let message = self.send_html_opts(chat, screen, opts).await?;
                 Ok((message, false))
             }
             Err(err) => Err(err),

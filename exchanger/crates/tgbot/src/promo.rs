@@ -74,7 +74,9 @@ pub(crate) async fn tick(inner: &Arc<Inner>, cancel: &CancellationToken) -> Resu
             continue;
         }
         // Бот работает только в личке: чат клиента = его id.
-        let sent = inner.send_flow(user, user, &screen).await;
+        let sent = inner
+            .send_flow(user, user, &screen, &crate::api::SendOpts::default())
+            .await;
         if let Err(e) = &sent
             && !e.is_forbidden()
         {

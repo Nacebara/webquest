@@ -27,13 +27,15 @@ pub use keyboard::{
     ReplyKeyboardMarkup, ReplyKeyboardRemove, ReplyMarkup,
 };
 pub use methods::{
-    AddStickerToSet, AnswerCallbackQuery, AnswerWidgetQuery, CreateNewStickerSet, DeleteMessage,
-    EditContent, EditMessageText, EditMessageWidgetData, ForwardMessage, GetMe, GetStickerSet,
-    GetUpdates, InputSticker, LinkPreviewOptions, Method, ParseMode, ReplyParameters, RichMessage,
-    SendMessage, SendRichMessage, SendWidget, SetMyCommands, StickerFormat,
+    AddStickerToSet, AnswerCallbackQuery, AnswerInlineQuery, AnswerWidgetQuery,
+    CreateNewStickerSet, DeleteMessage, EditContent, EditMessageText, EditMessageWidgetData,
+    ForwardMessage, GetMe, GetStickerSet, GetUpdates, InlineQueryResultArticle, InputSticker,
+    InputTextMessageContent, LinkPreviewOptions, Method, ParseMode, ReactionType, ReplyParameters,
+    RichMessage, SendMessage, SendRichMessage, SendWidget, SetMessageReaction, SetMyCommands,
+    StickerFormat,
 };
 pub use types::{
-    BotCommand, BotCommandScope, CallbackQuery, Chat, ChatType, EntityKind, File, Message,
-    MessageEntity, MessageOrigin, ResponseParameters, Sticker, StickerSet, Update, UpdateKind,
-    User, Widget, WidgetQuery, WidgetQueryType,
+    BotCommand, BotCommandScope, CallbackQuery, Chat, ChatType, EntityKind, File, InlineQuery,
+    Message, MessageEntity, MessageOrigin, ResponseParameters, Sticker, StickerSet, Update,
+    UpdateKind, User, Widget, WidgetQuery, WidgetQueryType,
 };

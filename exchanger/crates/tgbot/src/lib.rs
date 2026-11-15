@@ -37,6 +37,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use botapi::BotApi;
+
+/// Реакция «увидел ссылку» — из списка реакций Telegram, доступных ботам.
+pub(crate) const SEEN_REACTION: &str = "👀";
 use domain::Decimal;
 use engine::Engine;
 use sqlx::PgPool;
@@ -44,6 +47,7 @@ use tokio_util::sync::CancellationToken;
 use ui::{Screen, Ui};
 
 pub use limits::RateLimits;
+pub use orders::CONFETTI_EFFECT;
 
 /// Обработчик, который видит каждое обновление раньше клиентского бота: админ-панель
 /// персонала живёт в этом же боте (решение владельца 7 ноября 2026: один бот, как гарант).
@@ -100,6 +104,8 @@ pub struct ClientBotConfig {
     pub check_link_wait: Duration,
     /// …и на каких моментах ожидания пробовать служебную пересылку.
     pub check_link_forward_at: Vec<Duration>,
+    /// Первый готовый обмен клиента — новым сообщением с конфетти (идея владельца 16.11).
+    pub first_exchange_confetti: bool,
 }
 
 impl Default for ClientBotConfig {
@@ -115,6 +121,7 @@ impl Default for ClientBotConfig {
             terms_ttl: Duration::from_secs(10),
             settings_ttl: Duration::from_secs(60),
             rich_messages: true,
+            first_exchange_confetti: true,
             notice_interval: Duration::from_secs(20),
             shutdown_grace: Duration::from_secs(10),
             check_link_step: Duration::from_secs(2),
@@ -482,6 +489,18 @@ impl Inner {
 
     /// Отметить ссылки сообщения как взятые. `true` — среди них есть новая (ещё не взятая
     /// из этого же сообщения), её надо обработать.
+    /// Реакция 👀 на сообщение со ссылкой (идея владельца 16.11): клиент за долю секунды
+    /// видит, что бот заметил чек. Ответа Telegram не ждём, сбой — не ошибка обмена.
+    pub(crate) fn react_seen(&self, chat: i64, message_id: i32) {
+        let bot = self.api.bot().clone();
+        tokio::spawn(async move {
+            let reaction = botapi::SetMessageReaction::emoji(chat, message_id, SEEN_REACTION);
+            if let Err(error) = bot.set_message_reaction(&reaction).await {
+                tracing::debug!(%error, "reaction was not set");
+            }
+        });
+    }
+
     pub(crate) fn first_seen_links(
         &self,
         chat: i64,

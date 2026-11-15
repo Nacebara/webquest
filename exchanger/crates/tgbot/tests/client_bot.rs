@@ -589,12 +589,18 @@ impl Env {
         self.start_bot_with(false)
     }
 
-    /// Бот с rich-сообщениями (справочные экраны — карточками).
+    /// Бот с rich-сообщениями (справочные экраны — карточками). Конфетти первого обмена
+    /// выключено: остальные тесты проверяют итог правкой сообщения заявки.
     fn start_bot_with(&self, rich_messages: bool) -> Running {
+        self.start_bot_cfg(rich_messages, false)
+    }
+
+    fn start_bot_cfg(&self, rich_messages: bool, first_exchange_confetti: bool) -> Running {
         let ui = Ui::builtin(EmojiSet::plain(), UiConfig::default()).unwrap();
         let cfg = ClientBotConfig {
             poll_timeout_secs: 0,
             rich_messages,
+            first_exchange_confetti,
             shutdown_grace: Duration::from_secs(5),
             check_link_step: Duration::from_millis(100),
             check_link_wait: Duration::from_secs(3),
@@ -1848,5 +1854,113 @@ async fn history_from_a_result_comes_as_a_new_message(pool: PgPool) {
         })
         .await;
     assert!(history.chat() == Some(CLIENT));
+    bot.stop().await;
+}
+
+/// Идеи владельца 16.11: реакция 👀 на ссылку сразу и запрет пересылки сообщения заявки
+/// (в нём будет чек на предъявителя — запрет ставится только при отправке).
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_check_link_gets_eyes_and_the_order_message_is_protected(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    e.fake.client_writes(&format!("Вот чек: {url}"));
+    let reaction = e
+        .fake
+        .wait_for("👀 on the client's message", |c| {
+            c.method == "setMessageReaction"
+        })
+        .await;
+    assert_eq!(reaction.body["chat_id"], json!(CLIENT));
+    assert_eq!(
+        reaction.body["reaction"],
+        json!([{"type": "emoji", "emoji": "👀"}])
+    );
+    let order = e
+        .fake
+        .wait_for("order message", |c| {
+            c.method == "sendMessage" && c.chat() == Some(CLIENT)
+        })
+        .await;
+    assert_eq!(order.body["protect_content"], json!(true), "{}", order.body);
+    // Текст без ссылки — без реакции.
+    let reactions = || {
+        e.fake
+            .calls()
+            .iter()
+            .filter(|c| c.method == "setMessageReaction")
+            .count()
+    };
+    let before = reactions();
+    e.fake.client_writes("привет");
+    e.fake
+        .wait_for("hint without a link", |c| {
+            c.method == "sendMessage" && c.contains("Пришлите чек")
+        })
+        .await;
+    assert_eq!(reactions(), before, "на текст без ссылки бот не реагирует");
+    bot.stop().await;
+}
+
+/// Первый готовый обмен клиента — новым сообщением с конфетти; второй — как обычно, правкой.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn the_first_exchange_comes_with_confetti_and_the_next_one_without(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot_cfg(false, true);
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    e.fake.client_writes(&url);
+    let (_, first_message, _) = e.order_message().await;
+    e.drain().await;
+    let payout = e.orders().await[0]
+        .4
+        .clone()
+        .expect("ссылка на чек выплаты");
+    let result = e
+        .fake
+        .wait_for("the first result as a new message", |c| {
+            c.method == "sendMessage" && c.contains(&payout)
+        })
+        .await;
+    assert_eq!(
+        result.body["message_effect_id"],
+        json!(tgbot::CONFETTI_EFFECT)
+    );
+    assert_eq!(result.body["protect_content"], json!(true));
+    e.fake
+        .wait_for(
+            "«Итог — ниже» in the first order message",
+            |c| {
+                c.method == "editMessageText"
+                    && c.message_id() == Some(first_message)
+                    && c.contains("Итог — ниже")
+            },
+        )
+        .await;
+    // Второй обмен: итог правкой своего сообщения, без эффекта.
+    let mark = e.fake.calls().len();
+    let url = e.world.client_check(CB, usdt(dec!(50))).unwrap();
+    e.fake.client_writes(&url);
+    let mut second = None;
+    for _ in 0..50 {
+        e.drain().await;
+        if let Some(order) = e.orders().await.get(1)
+            && order.4.is_some()
+        {
+            second = order.4.clone();
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let second = second.expect("второй обмен с чеком выплаты");
+    e.fake
+        .wait_for("the second result as an edit", |c| {
+            c.method == "editMessageText" && c.contains(&second)
+        })
+        .await;
+    let effects = e.fake.calls()[mark..]
+        .iter()
+        .filter(|c| c.body.get("message_effect_id").is_some())
+        .count();
+    assert_eq!(effects, 0, "конфетти — только у первого обмена");
     bot.stop().await;
 }

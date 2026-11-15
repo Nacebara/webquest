@@ -11,6 +11,7 @@ use domain::Money;
 use parsers::links::{extract_from_message, parse_bare_code};
 use ui::{Callback, Command, HistoryRow, MenuAction, Screen, UiError};
 
+use crate::api::SendOpts;
 use crate::terms::TermsSnapshot;
 use crate::{Inner, Notice, RateLimits, TgBotError, intake};
 
@@ -66,19 +67,39 @@ impl Inner {
         user: i64,
         screen: &Screen,
     ) -> Result<Option<i32>, TgBotError> {
+        self.send_doc_opts(chat, user, screen, &SendOpts::default())
+            .await
+    }
+
+    /// [`Self::send_doc`] с параметрами отправки: «История» защищена от пересылки — в её
+    /// карточке заявки бывает кнопка с чеком на предъявителя.
+    async fn send_doc_opts(
+        &self,
+        chat: i64,
+        user: i64,
+        screen: &Screen,
+        opts: &SendOpts,
+    ) -> Result<Option<i32>, TgBotError> {
         let rich = match &screen.rich_html {
             Some(rich) if !self.prefers_plain(user) => rich,
             Some(_) => {
                 // Карточки выключены настройкой (`rich_messages = false`): тот же экран HTML.
                 let screen = &self.with_menu_button(chat, screen).await;
-                let message = self.api.send_html(chat, screen).await?;
+                let message = self.api.send_html_opts(chat, screen, opts).await?;
                 return Ok(Some(message.message_id));
             }
-            None => return self.reply(chat, screen).await.map(|()| None),
+            None => {
+                let screen = self.with_menu_button(chat, screen).await;
+                self.api.send_html_opts(chat, &screen, opts).await?;
+                return Ok(None);
+            }
         };
         let screen = &self.with_menu_button(chat, screen).await;
         let keyboard = self.ui().rich_keyboard(screen);
-        let (message, sent_rich) = self.api.send_rich(chat, rich, &keyboard, screen).await?;
+        let (message, sent_rich) = self
+            .api
+            .send_rich_opts(chat, rich, &keyboard, screen, opts)
+            .await?;
         if sent_rich {
             self.remember_rich(message.chat.id, message.message_id, screen);
         }
@@ -308,7 +329,11 @@ impl Inner {
                 Err(e) => return Err(e.into()),
             }
         }
-        if let Some(id) = self.send_doc(chat, user, &screen).await? {
+        let protect = SendOpts {
+            protect: true,
+            ..SendOpts::default()
+        };
+        if let Some(id) = self.send_doc_opts(chat, user, &screen, &protect).await? {
             self.memory(|m| {
                 if m.history_messages.len() > 4096 {
                     m.history_messages.clear();
@@ -487,6 +512,7 @@ async fn message_update(
         if !inner.first_seen_links(chat, message.message_id, &found) {
             return Ok(());
         }
+        inner.react_seen(chat, message.message_id);
         tracing::info!(
             user = from.id,
             via = ?wallet_via_bot(message),
@@ -533,10 +559,14 @@ async fn message_update(
     }
     // Запомнить ссылки этого сообщения: правка без новых ссылок не станет второй заявкой.
     inner.first_seen_links(chat, message.message_id, &found);
+    if !found.is_empty() {
+        inner.react_seen(chat, message.message_id);
+    }
     // Чек через инлайн-режим кошелька ещё создаётся: ссылка придёт правкой — подождать.
     if found.is_empty()
         && let Some(platform) = wallet_via_bot(message)
     {
+        inner.react_seen(chat, message.message_id);
         crate::checkwait::start(inner.clone(), chat, from.id, message.message_id, platform);
         return Ok(());
     }

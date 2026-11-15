@@ -110,6 +110,9 @@ pub struct SendMessage {
     pub disable_notification: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub protect_content: Option<bool>,
+    /// Эффект сообщения — только в личных чатах (например, конфетти).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_effect_id: Option<String>,
     /// Ответ-цитата на сообщение этого чата.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reply_parameters: Option<ReplyParameters>,
@@ -144,9 +147,22 @@ impl SendMessage {
             link_preview_options: Some(LinkPreviewOptions::disabled()),
             disable_notification: None,
             protect_content: None,
+            message_effect_id: None,
             reply_parameters: None,
             reply_markup: None,
         }
+    }
+
+    /// Запрет пересылки и сохранения: в сообщении чек на предъявителя (аудит 16.11).
+    pub fn protect(mut self) -> Self {
+        self.protect_content = Some(true);
+        self
+    }
+
+    /// Эффект сообщения (`message_effect_id`), только в личном чате.
+    pub fn effect(mut self, effect_id: impl Into<String>) -> Self {
+        self.message_effect_id = Some(effect_id.into());
+        self
     }
 
     pub fn thread(mut self, thread_id: i32) -> Self {
@@ -323,6 +339,8 @@ pub struct SendRichMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub protect_content: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_effect_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub reply_markup: Option<ReplyMarkup>,
 }
 
@@ -334,8 +352,21 @@ impl SendRichMessage {
             rich_message: RichMessage::new(html),
             disable_notification: None,
             protect_content: None,
+            message_effect_id: None,
             reply_markup: None,
         }
+    }
+
+    /// Запрет пересылки и сохранения (как [`SendMessage::protect`]).
+    pub fn protect(mut self) -> Self {
+        self.protect_content = Some(true);
+        self
+    }
+
+    /// Эффект сообщения, только в личном чате.
+    pub fn effect(mut self, effect_id: impl Into<String>) -> Self {
+        self.message_effect_id = Some(effect_id.into());
+        self
     }
 
     pub fn thread(mut self, thread_id: i32) -> Self {
@@ -619,4 +650,102 @@ pub struct GetStickerSet {
 impl Method for GetStickerSet {
     const NAME: &'static str = "getStickerSet";
     type Response = crate::types::StickerSet;
+}
+
+/// `setMessageReaction` (Bot API 7.0): реакция бота на сообщение. Только эмодзи из списка
+/// реакций Telegram (например, «👀»).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SetMessageReaction {
+    pub chat_id: i64,
+    pub message_id: i32,
+    pub reaction: Vec<ReactionType>,
+}
+
+/// Вид реакции. Боту доступны обычные эмодзи из списка реакций.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ReactionType {
+    Emoji { emoji: String },
+}
+
+impl SetMessageReaction {
+    pub fn emoji(chat_id: i64, message_id: i32, emoji: &str) -> Self {
+        Self {
+            chat_id,
+            message_id,
+            reaction: vec![ReactionType::Emoji {
+                emoji: emoji.to_owned(),
+            }],
+        }
+    }
+}
+
+impl Method for SetMessageReaction {
+    const NAME: &'static str = "setMessageReaction";
+    type Response = bool;
+}
+
+/// `answerInlineQuery`: ответ на `@бот …` в любом чате — карточки, которые человек отправит сам.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AnswerInlineQuery {
+    pub inline_query_id: String,
+    pub results: Vec<InlineQueryResultArticle>,
+    /// Сколько секунд Telegram держит ответ в кэше (курс меняется — коротко).
+    pub cache_time: u32,
+}
+
+impl Method for AnswerInlineQuery {
+    const NAME: &'static str = "answerInlineQuery";
+    type Response = bool;
+}
+
+/// Карточка-статья inline-режима: заголовок и строка в списке, при выборе — текст сообщения.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct InlineQueryResultArticle {
+    #[serde(rename = "type")]
+    pub kind: &'static str,
+    pub id: String,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub input_message_content: InputTextMessageContent,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply_markup: Option<InlineKeyboardMarkup>,
+}
+
+impl InlineQueryResultArticle {
+    pub fn new(id: impl Into<String>, title: impl Into<String>, html: impl Into<String>) -> Self {
+        Self {
+            kind: "article",
+            id: id.into(),
+            title: title.into(),
+            description: None,
+            input_message_content: InputTextMessageContent {
+                message_text: html.into(),
+                parse_mode: Some(ParseMode::Html),
+                link_preview_options: Some(LinkPreviewOptions::disabled()),
+            },
+            reply_markup: None,
+        }
+    }
+
+    pub fn description(mut self, text: impl Into<String>) -> Self {
+        self.description = Some(text.into());
+        self
+    }
+
+    pub fn reply_markup(mut self, markup: InlineKeyboardMarkup) -> Self {
+        self.reply_markup = Some(markup);
+        self
+    }
+}
+
+/// Текст, который уйдёт в чат при выборе карточки.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct InputTextMessageContent {
+    pub message_text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parse_mode: Option<ParseMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link_preview_options: Option<LinkPreviewOptions>,
 }

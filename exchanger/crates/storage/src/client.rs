@@ -129,6 +129,22 @@ pub async fn progress_message(
     Ok(progress(row.progress_chat_id, row.progress_message_id))
 }
 
+/// Есть ли у клиента другие завершённые заявки, кроме этой: первый обмен празднуем конфетти.
+pub async fn completed_before(
+    conn: &mut PgConnection,
+    user_id: i64,
+    order_id: i64,
+) -> Result<bool, StorageError> {
+    let found = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM orders WHERE user_id = $1 AND id <> $2 AND state = 'COMPLETED') AS "found!""#,
+        user_id,
+        order_id
+    )
+    .fetch_one(conn)
+    .await?;
+    Ok(found)
+}
+
 /// Запомнить сообщение прогресса (после отправки или после замены удалённого клиентом).
 pub async fn set_progress_message(
     conn: &mut PgConnection,

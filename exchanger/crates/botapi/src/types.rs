@@ -289,6 +289,8 @@ pub enum UpdateKind {
     MyChatMember,
     /// Запросы виджетов (Bot API 10.4).
     WidgetQuery,
+    /// `@бот …` в любом чате (inline-режим включается в @BotFather, `/setinline`).
+    InlineQuery,
 }
 
 /// Обновление. Виды, которые клиенту не нужны, приходят как обновление без полей —
@@ -304,6 +306,18 @@ pub struct Update {
     pub callback_query: Option<CallbackQuery>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub widget_query: Option<WidgetQuery>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inline_query: Option<InlineQuery>,
+}
+
+/// `@бот …` в любом чате: что набрал человек.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InlineQuery {
+    pub id: String,
+    pub from: User,
+    pub query: String,
+    #[serde(default)]
+    pub offset: String,
 }
 
 impl Update {
@@ -315,6 +329,7 @@ impl Update {
             edited_message: None,
             callback_query: None,
             widget_query: None,
+            inline_query: None,
         }
     }
 
@@ -346,6 +361,7 @@ impl Update {
             .and_then(|m| m.from.as_ref())
             .or_else(|| self.callback_query.as_ref().map(|q| &q.from))
             .or_else(|| self.widget_query.as_ref().map(|q| &q.from))
+            .or_else(|| self.inline_query.as_ref().map(|q| &q.from))
     }
 }
 
