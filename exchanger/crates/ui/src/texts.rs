@@ -569,6 +569,7 @@ pub struct SupportTexts {
     pub contact: String,
     pub sent: String,
     pub sent_no_order: String,
+    pub answer: String,
     pub unavailable: String,
     pub unavailable_contact: String,
 }

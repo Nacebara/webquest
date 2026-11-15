@@ -1377,7 +1377,8 @@ async fn a_critical_alert_repeats_until_acked_and_the_ack_silences_it(pool: PgPo
     let again = o.tg.screen(mark, OWNER, "Повтор 1").await;
     assert_eq!(again.method, "sendMessage", "a repeat is a new message");
     assert_ne!(again.message_id, first.message_id);
-    for _ in 0..100 {
+    // До 5 секунд: под нагрузкой полного прогона удаление прежнего приходит не сразу.
+    for _ in 0..500 {
         if o.tg.calls().iter().skip(mark).any(|c| {
             c.method == "deleteMessage"
                 && c.chat() == Some(OWNER)

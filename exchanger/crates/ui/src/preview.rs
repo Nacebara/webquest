@@ -314,7 +314,11 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
         one("Помощь", ui.help(&t)),
         PreviewScreen {
             title: "Поддержка",
-            messages: vec![ui.support(None), ui.support_sent(Some(ORDER))],
+            messages: vec![
+                ui.support(None),
+                ui.support_sent(Some(ORDER)),
+                ui.operator_answer("Анна", "деньги у нас, проверяем. Чек будет через 5 минут."),
+            ],
         },
         one("Без ссылки", ui.no_link()),
         // Выгодный курс встречного потока (Р15) — на утверждение владельцу, в макете B1 его нет.

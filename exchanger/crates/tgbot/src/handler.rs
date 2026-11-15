@@ -55,6 +55,17 @@ impl Inner {
         user: i64,
         screen: &Screen,
     ) -> Result<(), TgBotError> {
+        self.send_doc(chat, user, screen).await.map(|_| ())
+    }
+
+    /// То же, что [`Self::reply_doc`], и id отправленного сообщения (`None` — экран без
+    /// карточки ушёл обычным ответом).
+    async fn send_doc(
+        &self,
+        chat: i64,
+        user: i64,
+        screen: &Screen,
+    ) -> Result<Option<i32>, TgBotError> {
         let rich = match &screen.rich_html {
             Some(rich) if !self.prefers_plain(user) => rich,
             Some(_) => {
@@ -63,9 +74,9 @@ impl Inner {
                 let plain = self.ui().plain_screen(screen);
                 let message = self.api.send_html(chat, &plain).await?;
                 self.remember_rich(message.chat.id, message.message_id, screen);
-                return Ok(());
+                return Ok(Some(message.message_id));
             }
-            None => return self.reply(chat, screen).await,
+            None => return self.reply(chat, screen).await.map(|()| None),
         };
         let screen = &self.with_menu_button(chat, screen).await;
         let keyboard = self.ui().rich_keyboard(screen);
@@ -73,7 +84,7 @@ impl Inner {
         if sent_rich {
             self.remember_rich(message.chat.id, message.message_id, screen);
         }
-        Ok(())
+        Ok(Some(message.message_id))
     }
 
     /// Заменить экран навигации (выбор направления, инструкция) в том же сообщении. Сообщение
@@ -276,7 +287,11 @@ impl Inner {
         let screen = self
             .ui()
             .history(&rows, &nav, Some(&summary), chrono::Utc::now());
-        if let (Some(message), Some(rich)) = (edit, screen.rich_html.as_deref())
+        // Листание — правка того же сообщения «Истории»; «История» под итогом заявки или под
+        // ошибкой — новое сообщение (AUDIT-UI С1: итог не затирается).
+        let paging =
+            edit.filter(|m| self.memory(|mm| mm.history_messages.contains(&(chat, m.message_id))));
+        if let (Some(message), Some(rich)) = (paging, screen.rich_html.as_deref())
             && !self.prefers_plain(user)
         {
             match self
@@ -295,7 +310,15 @@ impl Inner {
                 Err(e) => return Err(e.into()),
             }
         }
-        self.reply_doc(chat, user, &screen).await
+        if let Some(id) = self.send_doc(chat, user, &screen).await? {
+            self.memory(|m| {
+                if m.history_messages.len() > 4096 {
+                    m.history_messages.clear();
+                }
+                m.history_messages.insert((chat, id));
+            });
+        }
+        Ok(())
     }
 
     async fn history(&self, chat: i64, user: i64, page: u32) -> Result<(), TgBotError> {

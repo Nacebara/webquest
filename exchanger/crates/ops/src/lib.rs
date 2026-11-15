@@ -856,13 +856,18 @@ impl Inner {
         if text.is_empty() {
             return Ok(Screen::new(self.texts.t("support.empty")).row(vec![home()]));
         }
-        let answer = self.texts.f(
-            "support.answer",
-            &[
-                ("name", &texts::esc(&staff.display_name)),
-                ("text", &texts::esc(text)),
-            ],
-        );
+        // Текст клиента — из ui/ru.toml (AUDIT-UI С3), вид — как в макете «Поддержка».
+        let answer = match ui::Ui::builtin(self.look().emoji().clone(), ui::UiConfig::default()) {
+            Ok(ui) => ui.operator_answer(&staff.display_name, text).html,
+            Err(e) => {
+                tracing::warn!(error = %e, "client texts are invalid");
+                return Ok(Screen::new(
+                    self.texts
+                        .f("support.failed", &[("error", &texts::esc(&e.to_string()))]),
+                )
+                .row(vec![home()]));
+            }
+        };
         match self
             .api
             .send_message(&SendMessage::html(client, answer))

@@ -47,7 +47,9 @@ impl Ui {
             ),
             None => self.fill(&t.checking, &[("icon", &icon)]),
         };
-        self.plain(self.with_slow(body, slow), Keyboard::None)
+        // Затянулось — только часы вместо значка: «Деньги у меня» здесь была бы неправдой, чек
+        // ещё не открыт (утверждённый макет: строка-успокоение — у «Отправляю»; AUDIT-UI Д2).
+        self.plain(body, Keyboard::None)
     }
 
     /// B1 «Отправляю 97.50 USDT в xRocket»: деньги клиента у нас, сумма выплаты не меняется.

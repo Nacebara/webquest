@@ -296,8 +296,9 @@ pub(crate) fn render(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Ext
         id: view.public_id.clone(),
         direction: view.direction,
     };
+    // «Дольше обычного» — от начала текущего шага (AUDIT-UI Д2); «вручную» — от начала заявки.
     let slow =
-        cfg.now - view.created_at >= chrono::Duration::from_std(SLOW_AFTER).unwrap_or_default();
+        cfg.now - view.state_since >= chrono::Duration::from_std(SLOW_AFTER).unwrap_or_default();
     let intake = money(view, view.intake_amount);
     let manual =
         cfg.now - view.created_at >= chrono::Duration::from_std(MANUAL_AFTER).unwrap_or_default();
@@ -587,14 +588,14 @@ pub(crate) async fn ensure_message(
             {
                 Ok(Edited::Done | Edited::NotModified) => {
                     inner.remember_rendered(&view, digest);
-                    // Оплата счёта началась: «Дольше обычного» и «Проверяю вручную» — по таймеру
-                    // от начала оплаты (у обмена таймеры ставит первое сообщение заявки).
-                    if view.direction.flow() == Flow::InvoicePayment
-                        && matches!(
-                            view.state,
-                            OrderState::Received | OrderState::InvoicePayPending
-                        )
-                    {
+                    // Новый шаг (деньги получены, идёт выплата или оплата счёта): «Дольше обычного»
+                    // и «Проверяю вручную» — по таймерам от начала шага.
+                    if matches!(
+                        view.state,
+                        OrderState::Received
+                            | OrderState::PayoutPending
+                            | OrderState::InvoicePayPending
+                    ) {
                         schedule_refreshes(inner, order_id);
                     }
                     tracing::debug!(

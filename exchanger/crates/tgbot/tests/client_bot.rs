@@ -1839,3 +1839,48 @@ async fn support_and_plain_view_survive_a_restart(pool: PgPool) {
     assert_eq!(terms.method, "sendMessage", "простой вид после перезапуска");
     bot.stop().await;
 }
+
+/// Шаг 6.5 (AUDIT-UI С1): «История» под итогом заявки — новым сообщением, итог не затирается;
+/// листание страниц «Истории» — в том же сообщении.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn history_from_a_result_comes_as_a_new_message(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot_with(true);
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    e.fake.client_writes(&url);
+    let (_, order_message, _) = e.order_message().await;
+    e.drain().await;
+    let payout_url = e.orders().await[0]
+        .4
+        .clone()
+        .expect("ссылка на чек выплаты");
+    e.fake
+        .wait_for("the result in the order message", |c| {
+            c.method == "editMessageText" && c.contains(&payout_url)
+        })
+        .await;
+    // «История» под сообщением заявки (как под «Счёт оплачен»).
+    let mark = e.fake.calls().len();
+    e.fake.client_taps(order_message, "history:0");
+    let history = e
+        .fake
+        .wait_for("history as a new message", |c| {
+            matches!(c.method.as_str(), "sendRichMessage" | "sendMessage") && c.contains("История")
+        })
+        .await;
+    let edited_result = e.fake.calls()[mark..]
+        .iter()
+        .any(|c| c.method == "editMessageText" && c.message_id() == Some(order_message));
+    assert!(!edited_result, "итог заявки не затёрт «Историей»");
+    // Листание той же «Истории» — правка этого сообщения.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let history_message = e.fake.lock().next_message;
+    e.fake.client_taps(history_message, "history:0");
+    e.fake
+        .wait_for("paging edits the history message", |c| {
+            c.method == "editMessageText" && c.message_id() == Some(history_message)
+        })
+        .await;
+    assert!(history.chat() == Some(CLIENT));
+    bot.stop().await;
+}

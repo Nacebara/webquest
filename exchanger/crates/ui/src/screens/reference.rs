@@ -1129,6 +1129,16 @@ impl Ui {
         self.plain(body, Keyboard::None)
     }
 
+    /// «Оператор Анна: деньги у нас, проверяем…» — ответ сотрудника клиенту (макет «Поддержка»).
+    /// Имя и текст — чужие: экранируются.
+    pub fn operator_answer(&self, name: &str, text: &str) -> Screen {
+        let body = self.fill(
+            &self.texts.support.answer,
+            &[("name", &Frag::text(name)), ("text", &Frag::text(text))],
+        );
+        self.plain(body, Keyboard::None)
+    }
+
     /// Вопрос передать не вышло: что делать клиенту.
     pub fn support_unavailable(&self, contact: Option<&str>) -> Screen {
         let t = &self.texts.support;

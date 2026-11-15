@@ -1,0 +1,13 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+<b>Оператор Анна &lt;b&gt;:</b> деньги у нас &amp; чек через 5 минут
+--- keyboard: none
+
+### premium
+--- html
+<b>Оператор Анна &lt;b&gt;:</b> деньги у нас &amp; чек через 5 минут
+--- keyboard: none
