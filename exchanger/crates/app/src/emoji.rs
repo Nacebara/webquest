@@ -211,87 +211,136 @@ async fn input(
     })
 }
 
-/// Установить или дописать один набор; вернуть id значков по порядку манифеста.
+/// Ключ значка у каждого стикера набора — по содержимому файла: Telegram отдаёт файл ровно
+/// таким, каким его загрузили (проверено 17.11 на живом наборе). Неизвестный файл — `None`.
+pub(crate) fn keys_by_content(
+    files: &[Vec<u8>],
+    ours: &std::collections::HashMap<Vec<u8>, String>,
+) -> Vec<Option<String>> {
+    files.iter().map(|f| ours.get(f).cloned()).collect()
+}
+
+/// Ключи стикеров набора (Ж-2: по ключу, а не по порядку манифеста). У статичного набора
+/// Telegram может перекодировать файлы — тогда ключи берутся по порядку анимированного набора
+/// того же вида: установщик всегда добавляет значки в оба набора в одном порядке.
+async fn set_keys(
+    bot: &BotApi,
+    set: &StickerSet,
+    dir: &Path,
+    icons: &[&ManifestIcon],
+    plan: &PackPlan,
+    animated: Option<&Vec<Option<String>>>,
+) -> anyhow::Result<Vec<Option<String>>> {
+    let mut ours = std::collections::HashMap::new();
+    for icon in icons {
+        let file = match plan.style {
+            EmojiStyle::Static => &icon.still,
+            _ => &icon.animated,
+        };
+        let bytes = std::fs::read(dir.join(file)).with_context(|| format!("read {file}"))?;
+        ours.insert(bytes, icon.key.clone());
+    }
+    let mut files = Vec::with_capacity(set.stickers.len());
+    for sticker in &set.stickers {
+        files.push(
+            with_retry(&format!("getFile {}", plan.name), || {
+                bot.download_file(&sticker.file_id)
+            })
+            .await?,
+        );
+    }
+    let mut keys = keys_by_content(&files, &ours);
+    if keys.iter().all(Option::is_none)
+        && let Some(order) = animated
+    {
+        keys = order.clone();
+        keys.resize(set.stickers.len(), None);
+    }
+    Ok(keys)
+}
+
+/// Установить или дописать один набор по ключам значков: добавляются только те, которых в
+/// наборе нет (где бы они ни стояли в манифесте). Вернуть пары «ключ → id» и ключи по порядку
+/// стикеров набора (для статичного набора того же вида).
 async fn install_pack(
     bot: &BotApi,
     owner: i64,
     dir: &Path,
     plan: &PackPlan,
     icons: &[&ManifestIcon],
-) -> anyhow::Result<Vec<String>> {
-    loop {
-        let set = current(bot, &plan.name).await?;
-        let have = set.as_ref().map_or(0, |s| s.stickers.len());
-        if have > icons.len() {
-            bail!(
-                "set {} has {have} stickers, the manifest only {}: delete the extra ones in @Stickers",
-                plan.name,
-                icons.len()
-            );
+    animated: Option<&Vec<Option<String>>>,
+) -> anyhow::Result<(Vec<(String, String)>, Vec<Option<String>>)> {
+    let Some(set) = current(bot, &plan.name).await? else {
+        // Новый набор: первые до 50 значков сразу, остальные — дописываются ниже.
+        let first: Vec<&ManifestIcon> = icons.iter().take(50).copied().collect();
+        let mut stickers = Vec::with_capacity(first.len());
+        for icon in first {
+            stickers.push(input(bot, owner, dir, icon, plan.style).await?);
+            tokio::time::sleep(STEP_PAUSE).await;
         }
-        if have == icons.len() {
-            let set = set.context("empty manifest")?;
-            return set
-                .stickers
-                .iter()
-                .map(|s| {
-                    s.custom_emoji_id
-                        .clone()
-                        .filter(|id| is_custom_emoji_id(id))
-                        .with_context(|| {
-                            format!("set {} has a sticker without custom_emoji_id", plan.name)
-                        })
-                })
-                .collect();
-        }
-        if set.is_none() {
-            // Новый набор: первые до 50 значков сразу.
-            let first: Vec<&ManifestIcon> = icons.iter().take(50).copied().collect();
-            let mut stickers = Vec::with_capacity(first.len());
-            for icon in first {
-                stickers.push(input(bot, owner, dir, icon, plan.style).await?);
-                tokio::time::sleep(STEP_PAUSE).await;
-            }
-            let request = CreateNewStickerSet::custom_emoji(
-                owner,
-                &plan.name,
-                &plan.title,
-                stickers,
-                plan.repaint,
-            );
-            with_retry(&format!("createNewStickerSet {}", plan.name), || {
-                bot.create_new_sticker_set(&request)
-            })
-            .await?;
-            eprintln!("  {}: создан", plan.name);
-            continue;
-        }
-        // Дописываем следующий по порядку. Перед каждым — свежий счёт стикеров: таймаут на
-        // прошлом добавлении не превратится в дубль.
-        let icon = icons[have];
+        let request = CreateNewStickerSet::custom_emoji(
+            owner,
+            &plan.name,
+            &plan.title,
+            stickers,
+            plan.repaint,
+        );
+        with_retry(&format!("createNewStickerSet {}", plan.name), || {
+            bot.create_new_sticker_set(&request)
+        })
+        .await?;
+        eprintln!("  {}: создан", plan.name);
+        return Box::pin(install_pack(bot, owner, dir, plan, icons, animated)).await;
+    };
+    let mut keys = set_keys(bot, &set, dir, icons, plan, animated).await?;
+    let missing: Vec<&ManifestIcon> = icons
+        .iter()
+        .filter(|i| !keys.iter().flatten().any(|k| k == &i.key))
+        .copied()
+        .collect();
+    for (n, icon) in missing.iter().enumerate() {
         let sticker = input(bot, owner, dir, icon, plan.style).await?;
         let request = AddStickerToSet {
             user_id: owner,
             name: plan.name.clone(),
             sticker,
         };
-        if let Err(e) = bot.add_sticker_to_set(&request).await {
-            match e.retry_after() {
-                Some(wait) => tokio::time::sleep(wait).await,
-                None => eprintln!("  {}: {} — проверю набор и продолжу", plan.name, e),
-            }
-        }
+        with_retry(&format!("addStickerToSet {}", plan.name), || {
+            bot.add_sticker_to_set(&request)
+        })
+        .await?;
+        keys.push(Some(icon.key.clone()));
         tokio::time::sleep(STEP_PAUSE).await;
-        if (have + 1) % 10 == 0 {
-            eprintln!("  {}: {} из {}", plan.name, have + 1, icons.len());
+        if (n + 1) % 10 == 0 {
+            eprintln!("  {}: дописано {} из {}", plan.name, n + 1, missing.len());
         }
     }
+    let set = if missing.is_empty() {
+        set
+    } else {
+        current(bot, &plan.name)
+            .await?
+            .with_context(|| format!("set {} disappeared", plan.name))?
+    };
+    let pairs = keys
+        .iter()
+        .zip(&set.stickers)
+        .filter_map(|(key, sticker)| {
+            let id = sticker
+                .custom_emoji_id
+                .clone()
+                .filter(|id| is_custom_emoji_id(id))?;
+            Some((key.clone()?, id))
+        })
+        .collect();
+    Ok((pairs, keys))
 }
 
 /// `exch emoji install`: все четыре набора; id сохраняются в `emoji_packs`.
 /// Взять уже установленные наборы exch другого бота (`@from`): значки — публичные, их id
-/// подходят любому боту, у владельца которого Telegram Premium. Ничего не загружает —
-/// только читает наборы и сопоставляет значки с `manifest.json` по порядку, как установщик.
+/// подходят любому боту, у владельца которого Telegram Premium. Ничего не загружает — читает
+/// наборы и сопоставляет стикеры со значками `manifest.json` по содержимому файла (Ж-2);
+/// чего в наборах нет — остаётся без id (обычный символ), пока не допишет `install`.
 pub async fn adopt(
     conn: &mut PgConnection,
     bot: &BotApi,
@@ -300,6 +349,7 @@ pub async fn adopt(
 ) -> anyhow::Result<EmojiPacks> {
     let manifest = read_manifest(dir)?;
     let mut packs = load(conn).await?.packs;
+    let mut animated: BTreeMap<&str, Vec<Option<String>>> = BTreeMap::new();
     for plan in plans(from) {
         let prefix = format!("{}/", plan.kind);
         let icons: Vec<&ManifestIcon> = manifest
@@ -307,37 +357,39 @@ pub async fn adopt(
             .iter()
             .filter(|i| i.key.starts_with(&prefix))
             .collect();
-        let set = with_retry(&format!("getStickerSet {}", plan.name), || {
-            bot.get_sticker_set(&plan.name)
-        })
-        .await?;
-        if set.stickers.len() != icons.len() {
-            bail!(
-                "set {} has {} stickers, the manifest {}: install it fully first",
-                plan.name,
-                set.stickers.len(),
-                icons.len()
-            );
-        }
+        // Ж-2: берём то, что есть. Набора нет — пропуск, а не отказ.
+        let Some(set) = current(bot, &plan.name).await? else {
+            eprintln!("{}: набора нет — пропускаю", plan.name);
+            continue;
+        };
+        let keys = set_keys(bot, &set, dir, &icons, &plan, animated.get(plan.kind)).await?;
         let pack = packs
             .of_mut(plan.style)
             .context("installable styles are animated and static")?;
-        for (icon, sticker) in icons.iter().zip(&set.stickers) {
-            let id = sticker
-                .custom_emoji_id
-                .clone()
-                .filter(|id| is_custom_emoji_id(id))
-                .with_context(|| {
-                    format!("set {} has a sticker without custom_emoji_id", plan.name)
-                })?;
-            pack.insert(icon.key.clone(), id);
+        let mut found = 0;
+        for (key, sticker) in keys.iter().zip(&set.stickers) {
+            if let (Some(key), Some(id)) = (
+                key,
+                sticker
+                    .custom_emoji_id
+                    .as_ref()
+                    .filter(|id| is_custom_emoji_id(id)),
+            ) {
+                pack.insert(key.clone(), id.clone());
+                found += 1;
+            }
         }
+        let missing = icons
+            .iter()
+            .filter(|i| !keys.iter().flatten().any(|k| k == &i.key))
+            .count();
         eprintln!(
-            "{} — {} значков: t.me/addemoji/{}",
-            plan.title,
-            icons.len(),
-            plan.name
+            "{} — {found} значков, нет в наборе {missing} (дописать: exch emoji install): t.me/addemoji/{}",
+            plan.title, plan.name
         );
+        if plan.style == EmojiStyle::Animated {
+            animated.insert(plan.kind, keys);
+        }
     }
     save(conn, PACKS_KEY, serde_json::to_value(&packs)?).await?;
     Ok(packs)
@@ -353,6 +405,8 @@ pub async fn install(
     let me = bot.get_me().await.context("getMe")?;
     let username = me.username.context("the bot has no username")?;
     let mut packs = load(conn).await?.packs;
+    // Порядок ключей анимированного набора каждого вида — для статичного того же вида.
+    let mut animated: BTreeMap<&str, Vec<Option<String>>> = BTreeMap::new();
     for plan in plans(&username) {
         let prefix = format!("{}/", plan.kind);
         let icons: Vec<&ManifestIcon> = manifest
@@ -361,12 +415,16 @@ pub async fn install(
             .filter(|i| i.key.starts_with(&prefix))
             .collect();
         eprintln!("{} — {} значков", plan.title, icons.len());
-        let ids = install_pack(bot, owner, dir, &plan, &icons).await?;
+        let (pairs, keys) =
+            install_pack(bot, owner, dir, &plan, &icons, animated.get(plan.kind)).await?;
+        if plan.style == EmojiStyle::Animated {
+            animated.insert(plan.kind, keys);
+        }
         let pack = packs
             .of_mut(plan.style)
             .context("installable styles are animated and static")?;
-        for (icon, id) in icons.iter().zip(ids) {
-            pack.insert(icon.key.clone(), id);
+        for (key, id) in pairs {
+            pack.insert(key, id);
         }
         // Сохраняем после каждого набора: прерванная установка не теряет готовое.
         save(conn, PACKS_KEY, serde_json::to_value(&packs)?).await?;
@@ -383,6 +441,28 @@ pub fn default_dir() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ж-2: стикер узнаётся по содержимому файла, а не по месту в наборе — значки, вставленные
+    /// в середину манифеста, не сдвигают роли; чужой файл — без ключа.
+    #[test]
+    fn stickers_are_matched_to_icons_by_file_content() {
+        let ours: std::collections::HashMap<Vec<u8>, String> = [
+            (b"done".to_vec(), "color/done".to_owned()),
+            (b"down".to_vec(), "color/down".to_owned()),
+            (b"wait".to_vec(), "color/wait".to_owned()),
+        ]
+        .into_iter()
+        .collect();
+        let set = vec![b"wait".to_vec(), b"done".to_vec(), b"alien".to_vec()];
+        assert_eq!(
+            keys_by_content(&set, &ours),
+            vec![
+                Some("color/wait".to_owned()),
+                Some("color/done".to_owned()),
+                None
+            ]
+        );
+    }
 
     #[test]
     fn set_names_follow_telegram_rules() {

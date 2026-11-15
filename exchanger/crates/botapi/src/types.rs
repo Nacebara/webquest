@@ -441,8 +441,10 @@ pub struct Sticker {
     pub custom_emoji_id: Option<String>,
 }
 
-/// Загруженный файл (`uploadStickerFile`).
+/// Файл (`uploadStickerFile`, `getFile`). `file_path` — для скачивания, есть у ответа `getFile`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct File {
     pub file_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
 }

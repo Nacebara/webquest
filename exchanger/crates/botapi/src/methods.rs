@@ -652,6 +652,17 @@ impl Method for GetStickerSet {
     type Response = crate::types::StickerSet;
 }
 
+/// `getFile`: путь для скачивания файла (стикер набора — сверить с нашим значком).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct GetFile {
+    pub file_id: String,
+}
+
+impl Method for GetFile {
+    const NAME: &'static str = "getFile";
+    type Response = crate::types::File;
+}
+
 /// `setMessageReaction` (Bot API 7.0): реакция бота на сообщение. Только эмодзи из списка
 /// реакций Telegram (например, «👀»).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

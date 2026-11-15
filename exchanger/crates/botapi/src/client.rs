@@ -563,6 +563,43 @@ impl BotApi {
         })
         .await
     }
+
+    /// Скачать файл по `file_id` (`getFile`, затем файл). Токен в ошибки не попадает.
+    pub async fn download_file(&self, file_id: &str) -> Result<Vec<u8>, Error> {
+        const METHOD: &str = "getFile";
+        let file = self
+            .execute(&crate::methods::GetFile {
+                file_id: file_id.to_owned(),
+            })
+            .await?;
+        let path = file.file_path.ok_or_else(|| Error::Decode {
+            method: METHOD.to_owned(),
+            status: 200,
+            detail: "no file_path".to_owned(),
+        })?;
+        let token = self.token.expose_secret();
+        let url = format!("{}/file/bot{token}/{path}", self.base_url);
+        let response = self
+            .http
+            .get(url)
+            .timeout(self.timeout)
+            .send()
+            .await
+            .map_err(|e| transport_error(METHOD, e, token))?;
+        let status = response.status().as_u16();
+        if status != 200 {
+            return Err(Error::Decode {
+                method: METHOD.to_owned(),
+                status,
+                detail: "file download failed".to_owned(),
+            });
+        }
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| transport_error(METHOD, e, token))?;
+        Ok(bytes.to_vec())
+    }
 }
 
 fn transport_error(method: &str, e: reqwest::Error, token: &str) -> Error {
