@@ -171,12 +171,13 @@ line_all = "Комиссия <s>{base}</s> <b>{fee}</b> — на любой че
 # Inline-режим (идея владельца 16.11): «@бот 100» в чате с другом — карточка курса.
 # Сообщение уходит от имени человека: без премиум-эмодзи, только текст и кнопка «Обменять».
 [inline]
-title = "{amount} USDT {src} → {payout} USDT {dst}"
-description = "Комиссия {pct} · обычно 10 секунд"
-card = "<b>{src} → {dst}</b>\nЧек на <code>{amount}</code>\u00A0USDT → чек на <b>{payout}\u00A0USDT</b>\n<i>Комиссия {pct} · обычно 10 секунд</i>"
-range_title = "{src} → {dst}: от {min} до {max} USDT"
-range_description = "{amount} USDT — вне лимита"
-range_card = "<b>{src} → {dst}</b>\nМеняю чеки от <code>{min}</code> до <code>{max}</code> USDT.\n<i>Обычно 10 секунд</i>"
+# Вариант 1 «Коротко» (выбор владельца 16.11): сколько отдаёте — сколько получите, комиссия.
+title = "{src} → {dst}"
+description = "{amount}\u00A0USDT → {payout}\u00A0USDT · комиссия {pct}"
+card = "<b>{amount}\u00A0USDT</b> {src} → <b>{payout}\u00A0USDT</b> {dst}\n<i>Комиссия {pct}</i>"
+range_title = "{src} → {dst}"
+range_description = "Меняю от {min} до {max}\u00A0USDT"
+range_card = "<b>{src} → {dst}</b>\nМеняю чеки от <code>{min}</code> до <code>{max}</code>\u00A0USDT."
 button = "Обменять в @{bot}"
 
 [exchange]

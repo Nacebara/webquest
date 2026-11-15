@@ -2000,7 +2000,8 @@ async fn inline_query_gets_rate_cards_for_a_friend(pool: PgPool) {
     for r in results {
         assert_eq!(r["type"], "article");
         let text = r["input_message_content"]["message_text"].as_str().unwrap();
-        assert!(text.contains("100.00"), "{text}");
+        assert!(text.contains("<b>100\u{a0}USDT</b>"), "{text}");
+        assert!(!text.contains("секунд"), "без «обычно 10 секунд»: {text}");
         let url = r["reply_markup"]["inline_keyboard"][0][0]["url"]
             .as_str()
             .unwrap();

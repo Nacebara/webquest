@@ -563,7 +563,8 @@ impl Ui {
             .map(|d| {
                 let src = self.wallet_name(d.direction.source());
                 let dst = self.wallet_name(d.direction.target());
-                let shown = fmt::amount(amount, domain::Asset::Usdt);
+                // Что ввёл человек — как ввёл («100», «55.5»); выплата — до цента.
+                let shown = fmt::bare_amount(amount);
                 let in_range = amount >= d.min && amount <= d.max;
                 let (title, description, card) = match example_quote(d, amount).filter(|_| in_range)
                 {
