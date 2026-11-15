@@ -148,6 +148,17 @@ pub async fn run(paths: &Paths) -> Report {
     if let Err(e) = from_database(&mut r, &cfg, &pool).await {
         r.fail("База данных", format!("не удалось прочитать: {e}"));
     }
+    if let Ok(newer) = storage::newer_migrations(&pool).await
+        && !newer.is_empty()
+    {
+        r.warn(
+            "Версия",
+            format!(
+                "база новее этой программы ({} незнакомых миграций) — это откат; если что-то не работает, восстановите копию, снятую до обновления",
+                newer.len()
+            ),
+        );
+    }
     backups(&mut r, paths, &pool).await;
     r
 }

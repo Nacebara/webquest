@@ -54,7 +54,25 @@ pub async fn connect(database_url: &str) -> Result<PgPool, StorageError> {
     Ok(pool)
 }
 
+/// Применить миграции. Миграции, которых эта версия exch не знает (база уже обновлена более
+/// новой версией), не мешают запуску: откат на прежний exch.exe после обновления работает без
+/// восстановления базы (веха 10). Новые миграции — только добавляют (схема — новыми миграциями,
+/// правило 23); если какая-то убирает то, чем пользуется прежняя версия, откат — через копию.
 pub async fn migrate(pool: &PgPool) -> Result<(), StorageError> {
-    MIGRATOR.run(pool).await?;
+    let mut m = sqlx::migrate!("../../migrations");
+    m.set_ignore_missing(true);
+    m.run(pool).await?;
     Ok(())
+}
+
+/// Миграции в базе, которых эта версия exch не знает.
+pub async fn newer_migrations(pool: &PgPool) -> Result<Vec<i64>, StorageError> {
+    let applied: Vec<i64> =
+        sqlx::query_scalar("SELECT version FROM _sqlx_migrations ORDER BY version")
+            .fetch_all(pool)
+            .await?;
+    Ok(applied
+        .into_iter()
+        .filter(|v| !MIGRATOR.iter().any(|m| m.version == *v))
+        .collect())
 }

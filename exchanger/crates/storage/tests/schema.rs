@@ -56,3 +56,24 @@ async fn seeded_directions_match_domain(pool: PgPool) {
         assert_eq!(target, d.target().db_name(), "{code}");
     }
 }
+
+/// Веха 10: откат на прежний exch после обновления. База уже знает миграцию, которой нет в
+/// этой версии, — запуск (`storage::migrate`) не падает, а лишняя миграция видна.
+#[sqlx::test(migrations = false)]
+async fn an_older_exch_starts_on_a_newer_database(pool: PgPool) {
+    storage::migrate(&pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time) \
+         VALUES (29991231000000, 'from a newer exch', true, '\\x00'::bytea, 1)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    // Без этого правила sqlx отказался бы: «миграция применена, но её нет среди известных».
+    assert!(storage::MIGRATOR.run(&pool).await.is_err());
+    storage::migrate(&pool).await.unwrap();
+    assert_eq!(
+        storage::newer_migrations(&pool).await.unwrap(),
+        vec![29_991_231_000_000]
+    );
+}

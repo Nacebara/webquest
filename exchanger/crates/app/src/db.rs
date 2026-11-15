@@ -26,6 +26,13 @@ pub async fn connect_and_migrate(url: &str) -> anyhow::Result<storage::PgPool> {
         .context("cannot connect to PostgreSQL")?;
     storage::migrate(&pool).await.context("migrations failed")?;
     tracing::info!("migrations applied");
+    let newer = storage::newer_migrations(&pool).await?;
+    if !newer.is_empty() {
+        tracing::warn!(
+            ?newer,
+            "the database has migrations this exch does not know: a rollback to an older exch; if something fails, restore the backup made before the update"
+        );
+    }
     Ok(pool)
 }
 
