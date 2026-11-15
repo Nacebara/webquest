@@ -25,8 +25,8 @@ body{margin:0;padding:8px 12px max(12px,var(--tg-content-safe-area-inset-bottom,
 .g s.a{background:var(--wa)}.g s.r{background:var(--bd)}
 .g u{position:absolute;top:-3px;bottom:-3px;left:66.6%;width:2px;background:var(--tg-theme-text-color);opacity:.5}
 .x{color:var(--bd);font-weight:600}
-.ft{display:flex;align-items:center;gap:6px;font-size:.78em;color:var(--h);padding-right:var(--tg-content-safe-area-corner-right,40px)}
-.ft i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+.nw{white-space:nowrap}.ft{display:flex;align-items:baseline;gap:6px;font-size:.78em;color:var(--h);padding-right:var(--tg-content-safe-area-corner-right,40px)}
+.ft i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none;transform:translateY(-1px)}
 .ft i.w{background:var(--wa)}.ft i.r{background:var(--bd)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -42,7 +42,7 @@ const ago=s=>s<60?'только что':s<3600?Math.floor(s/60)+' мин наз�
 function sp(v){const n=v.length-1,mx=Math.max(...v,1),pt=v.map((y,j)=>(j/n*100).toFixed(1)+','+(17-y/mx*15).toFixed(1));return '<svg viewBox="0 0 100 18" preserveAspectRatio="none"><path d="M'+pt.join('L')+'"/><path d="M0,18L'+pt.join('L')+'L100,18Z"/></svg>'}
 function set(x){if(!x)return;D=x;got=Date.now();draw()}
 function draw(){if(!D)return;
- $('q').innerHTML=D.r.length?D.r.map(r=>'<i class="'+(r[0]==1?'r':'')+'"></i><span>'+r[1]+'</span><span><b>'+r[2]+'</b> <small>'+r[3]+'</small></span>').join(''):'<p class=ok><b>●</b> Решать нечего. Выплаты идут, аккаунты на связи.</p>';
+ $('q').innerHTML=D.r.length?D.r.map(r=>'<i class="'+(r[0]==1?'r':'')+'"></i><span>'+r[1]+'</span><span><b>'+r[2]+'</b> <small>· '+r[3]+'</small></span>').join(''):'<p class=ok><b>●</b> Решать нечего. Выплаты идут, аккаунты на связи.</p>';
  $('q').className=D.r.length?'q':'';
  $('k').innerHTML=D.k.map(k=>'<div><small>'+k[0]+'</small><b>'+k[1]+'</b><em class="'+(k[2]<0?'m':'')+'">'+(k[2]<0?'▼ ':'▲ ')+Math.abs(k[2])+' %</em>'+sp(k[3])+'</div>').join('');
  $('w').innerHTML=D.w.map(w=>{const[n,a,p,l,re]=w,c=['','a','r'][l|0];
@@ -51,7 +51,7 @@ function draw(){if(!D)return;
 function foot(){if(!D)return;const age=Math.floor((Date.now()-got)/1e3),rc=D.u-D.s+age,f=$('fi'),t=$('ft'),bn=$('bn');
  let txt=D.f+' · сверка '+ago(rc);f.className=D.x?'r':rc>900?'w':'';
  if(off||age>180){const d=new Date(D.u*1e3);f.className='r';txt='Нет связи с ботом · данные на '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')}
- t.textContent=txt;
+ t.replaceChildren(...txt.split(' · ').flatMap((x,j)=>{const s=document.createElement('span');s.className='nw';s.textContent=x;return j?[' · ',s]:[s]}));
  bn.hidden=!(D.x||off);bn.className=off&&!D.x?'bn w':'bn';bn.textContent=D.x||'Бот не отвечает — цифры ниже могут быть старыми'}
 function pull(){if(!W.request||W.chatType!='private'||!W.isActive)return;
  W.request('dash').then(a=>{miss=0;off=0;try{set(JSON.parse(a.result))}catch(e){}},e=>{if(e.code!='BUSY'&&e.code!='RATE_LIMITED'&&++miss>1){off=1;foot()}})}

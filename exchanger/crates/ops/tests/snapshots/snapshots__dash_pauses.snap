@@ -3,7 +3,9 @@ source: crates/ops/tests/snapshots.rs
 expression: dump(&screen)
 ---
 --- rich
-<h3>🚨 Нужно решить · 3</h3>
+<p>
+<b>🚨 Нужно решить · 3</b>
+</p>
 <table compact>
 <tr>
 <td>🟠</td>

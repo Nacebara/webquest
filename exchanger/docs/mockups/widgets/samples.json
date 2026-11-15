@@ -7743,7 +7743,7 @@
   "states": [
    {
     "id": "promo_b",
-    "name": "Сейчас",
+    "name": "Было",
     "caption": "{cb} <b>CryptoBot</b> → {xr} <b>xRocket</b> {flame}",
     "keys": [
      [
@@ -7842,7 +7842,8 @@
      "m": "0.10",
      "u": "14:05",
      "f": 0
-    }
+    },
+    "w": "calc_b+old"
    },
    {
     "id": "promo_a",
@@ -7945,12 +7946,11 @@
      "m": "0.10",
      "u": "14:05",
      "f": 0
-    },
-    "w": "calc_b+pol"
+    }
    },
    {
     "id": "usual_b",
-    "name": "Сейчас",
+    "name": "Было",
     "caption": "{cb} <b>CryptoBot</b> → {xr} <b>xRocket</b>",
     "keys": [
      [
@@ -8049,7 +8049,8 @@
      "m": "0.10",
      "u": "14:05",
      "f": 0
-    }
+    },
+    "w": "calc_b+old"
    },
    {
     "id": "usual_a",
@@ -8152,8 +8153,7 @@
      "m": "0.10",
      "u": "14:05",
      "f": 0
-    },
-    "w": "calc_b+pol"
+    }
    }
   ]
  },
@@ -8164,7 +8164,7 @@
   "states": [
    {
     "id": "wait_b",
-    "name": "Сейчас",
+    "name": "Было",
     "caption": "{invoice} <b>Счёт CryptoBot</b> → {xr} <b>чек xRocket</b>",
     "keys": [
      [
@@ -8195,7 +8195,8 @@
      "t0": "@-40",
      "t1": 0,
      "st": "wait"
-    }
+    },
+    "w": "invoice+old"
    },
    {
     "id": "wait_a",
@@ -8230,12 +8231,11 @@
      "t0": "@-40",
      "t1": 0,
      "st": "wait"
-    },
-    "w": "invoice+pol"
+    }
    },
    {
     "id": "short_b",
-    "name": "Сейчас",
+    "name": "Было",
     "caption": "{warn} <b>Не хватает 1.25 USDT</b>",
     "keys": [
      [
@@ -8266,7 +8266,8 @@
      "t0": "@-40",
      "t1": 0,
      "st": "short"
-    }
+    },
+    "w": "invoice+old"
    },
    {
     "id": "short_a",
@@ -8301,8 +8302,7 @@
      "t0": "@-40",
      "t1": 0,
      "st": "short"
-    },
-    "w": "invoice+pol"
+    }
    }
   ]
  },
@@ -8313,7 +8313,7 @@
   "states": [
    {
     "id": "day_b",
-    "name": "Сейчас",
+    "name": "Было",
     "caption": "{alarm} <b>Нужно решить · 4</b>",
     "keys": [
      [
@@ -8450,7 +8450,8 @@
      "f": "Аккаунты 2/2 · выплаты идут",
      "s": "@-300",
      "u": "@-1"
-    }
+    },
+    "w": "dash+old"
    },
    {
     "id": "day_a",
@@ -8591,12 +8592,11 @@
      "f": "Аккаунты 2/2 · выплаты идут",
      "s": "@-300",
      "u": "@-1"
-    },
-    "w": "dash+pol"
+    }
    },
    {
     "id": "fire_b",
-    "name": "Сейчас",
+    "name": "Было",
     "caption": "{alarm} <b>Нужно решить · 6</b>",
     "keys": [
      [
@@ -8730,7 +8730,8 @@
      "f": "Аккаунты 1/2 · расхождение",
      "s": "@-60",
      "u": "@-1"
-    }
+    },
+    "w": "dash+old"
    },
    {
     "id": "fire_a",
@@ -8868,52 +8869,51 @@
      "f": "Аккаунты 1/2 · расхождение",
      "s": "@-60",
      "u": "@-1"
-    },
-    "w": "dash+pol"
+    }
    }
   ]
  },
  "_patches": {
-  "calc_b+pol": [
+  "calc_b+old": [
    [
-    ".pr{background:var(--t);border-radius:10px;padding:8px 12px 10px;font:.9em/1.5 ui-monospace,monospace}",
-    ".pr{background:var(--t);border-radius:10px;padding:8px 12px 10px;font-size:.92em;line-height:1.6}"
+    ".pr{background:var(--t);border-radius:10px;padding:8px 12px 10px;font-size:.92em;line-height:1.6}",
+    ".pr{background:var(--t);border-radius:10px;padding:8px 12px 10px;font:.9em/1.5 ui-monospace,monospace}"
    ],
    [
-    ".r b{font-weight:400}",
-    ".r b{font:500 1em ui-monospace,monospace}.r s{color:var(--h);margin-right:4px}"
+    ".r b{font:500 1em ui-monospace,monospace}.r s{color:var(--h);margin-right:4px}",
+    ".r b{font-weight:400}"
    ],
    [
-    "f.textContent='Комиссия '+(pr?'🔥 ':'')+rate;",
-    "f.textContent='Комиссия ';if(pr&&r[3]){const o=document.createElement('s');o.textContent=r[3];f.append(o)}f.append(rate);"
+    "f.textContent='Комиссия ';if(pr&&r[3]){const o=document.createElement('s');o.textContent=r[3];f.append(o)}f.append(rate);",
+    "f.textContent='Комиссия '+(pr?'🔥 ':'')+rate;"
    ]
   ],
-  "invoice+pol": [
+  "invoice+old": [
    [
-    ".pr{margin-top:10px;background:var(--t);border-radius:10px;padding:7px 12px;font:.88em/1.55 ui-monospace,monospace}",
-    ".pr{margin-top:10px;background:var(--t);border-radius:10px;padding:7px 12px;font-size:.9em;line-height:1.6}.pr b{font:600 1em ui-monospace,monospace}"
+    ".pr{margin-top:10px;background:var(--t);border-radius:10px;padding:7px 12px;font-size:.9em;line-height:1.6}.pr b{font:600 1em ui-monospace,monospace}",
+    ".pr{margin-top:10px;background:var(--t);border-radius:10px;padding:7px 12px;font:.88em/1.55 ui-monospace,monospace}"
    ],
    [
-    "const mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');",
-    "const mm=s=>s>=60?Math.ceil(s/60)+' мин':s+' с';"
+    "const mm=s=>s>=60?Math.ceil(s/60)+' мин':s+' с';",
+    "const mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');"
    ]
   ],
-  "dash+pol": [
+  "dash+old": [
    [
-    "<b>'+r[2]+'</b> <small>'+r[3]+'</small>",
-    "<b>'+r[2]+'</b> <small>· '+r[3]+'</small>"
+    "<b>'+r[2]+'</b> <small>· '+r[3]+'</small>",
+    "<b>'+r[2]+'</b> <small>'+r[3]+'</small>"
    ],
    [
-    ".ft{display:flex;align-items:center;",
-    ".nw{white-space:nowrap}.ft{display:flex;align-items:baseline;"
+    ".nw{white-space:nowrap}.ft{display:flex;align-items:baseline;",
+    ".ft{display:flex;align-items:center;"
    ],
    [
-    ".ft i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}",
-    ".ft i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none;transform:translateY(-1px)}"
+    ".ft i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none;transform:translateY(-1px)}",
+    ".ft i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}"
    ],
    [
-    " t.textContent=txt;",
-    " t.replaceChildren(...txt.split(' · ').flatMap((x,j)=>{const s=document.createElement('span');s.className='nw';s.textContent=x;return j?[' · ',s]:[s]}));"
+    " t.replaceChildren(...txt.split(' · ').flatMap((x,j)=>{const s=document.createElement('span');s.className='nw';s.textContent=x;return j?[' · ',s]:[s]}));",
+    " t.textContent=txt;"
    ]
   ]
  },

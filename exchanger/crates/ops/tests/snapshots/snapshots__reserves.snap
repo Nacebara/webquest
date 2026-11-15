@@ -3,7 +3,9 @@ source: crates/ops/tests/snapshots.rs
 expression: dump(&reserves)
 ---
 --- rich
-<h3>🏦 Резервы</h3>
+<p>
+<b>🏦 Резервы</b>
+</p>
 <table striped compact>
 <tr>
 <th>

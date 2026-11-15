@@ -3,8 +3,10 @@ source: crates/ops/tests/snapshots.rs
 expression: dump(&card)
 ---
 --- rich
-<h3>Заявка <code>K7M2Q9XR4T</code>
-</h3>
+<p>
+<b>Заявка <code>K7M2Q9XR4T</code>
+</b>
+</p>
 <p>🔎 <b>Ручной разбор</b> · 6 мин · CB → xR · ub-1</p>
 <table compact>
 <tr>

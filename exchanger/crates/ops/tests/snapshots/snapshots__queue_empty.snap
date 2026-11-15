@@ -3,7 +3,9 @@ source: crates/ops/tests/snapshots.rs
 expression: dump(&empty)
 ---
 --- rich
-<h3>📋 Разбор</h3>
+<p>
+<b>📋 Разбор</b>
+</p>
 <p>Очередь пуста — решать нечего.</p>
 --- html
 <b>📋 Разбор</b>

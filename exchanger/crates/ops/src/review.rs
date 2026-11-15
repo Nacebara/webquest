@@ -66,7 +66,7 @@ impl QueueData {
         if n == 0 {
             let title = t.t("queue.title_empty");
             return Screen::card(
-                format!("<h3>{title}</h3><p>{}</p>", t.t("queue.empty")),
+                format!("<p><b>{title}</b></p><p>{}</p>", t.t("queue.empty")),
                 format!("<b>{title}</b>\n{}", t.t("queue.empty")),
             )
             .row(vec![btn(t.t("queue.b_refresh"), &Cb::Queue)])
@@ -101,12 +101,12 @@ impl QueueData {
             (html, plain.join("\n"))
         };
         let (items_html, items_plain) = table(&self.items[range], true);
-        let mut rich = format!("<h3>{title}</h3>{items_html}");
+        let mut rich = format!("<p><b>{title}</b></p>{items_html}");
         let mut plain = format!("<b>{title}</b>\n<blockquote>{items_plain}</blockquote>");
         if !self.invoices.is_empty() {
             let sub = t.f("queue.invoices", &[("n", &self.invoices.len())]);
             let (html, text) = table(&self.invoices, false);
-            rich.push_str(&format!("<h4>{sub}</h4>{html}"));
+            rich.push_str(&format!("<p><b>{sub}</b></p>{html}"));
             plain.push_str(&format!("\n<b>{sub}</b>\n<blockquote>{text}</blockquote>"));
         }
         rich.push_str(&format!("<footer>{}</footer>", t.t("queue.hint")));
@@ -276,7 +276,7 @@ impl OrderView {
             rows.push((t.t("order.r_reason"), esc(r)));
         }
 
-        let mut rich = format!("<h3>{title}</h3><p>{head}</p>");
+        let mut rich = format!("<p><b>{title}</b></p><p>{head}</p>");
         let mut plain = format!("<b>{title}</b>\n{head}\n");
         if let Some(h) = &self.reconcile {
             let line = h.line(t);

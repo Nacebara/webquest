@@ -534,23 +534,23 @@ G.update({
 # Виджеты: «после» — тот же виджет с правкой (_patches); старое — как утверждено.
 def _wba(key, sid, name, wname):
     b = _st(key, sid); a = _st(key, sid)
-    b.update(id=sid + "_b", name="Сейчас"); a.update(id=sid + "_a", name=name, w=wname)
+    b.update(id=sid + "_b", name="Было", w=key + "+old"); a.update(id=sid + "_a", name=name)
     return [b, a]
 G.update({
  "pol_w_calc": {"bot": C, "user": S["calc_b"].get("user", ""), "w": "calc_b", "states": _wba("calc_b", "promo", "Квитанция: выгодный курс", "calc_b+pol") + _wba("calc_b", "usual", "Квитанция: обычный курс", "calc_b+pol")},
  "pol_w_invoice": {"bot": C, "user": S["invoice"].get("user", ""), "w": "invoice", "states": _wba("invoice", "wait", "Живой счёт: к оплате", "invoice+pol") + _wba("invoice", "short", "Живой счёт: не хватает", "invoice+pol")},
  "pol_w_dash": {"bot": P, "user": S["dash"].get("user", ""), "w": "dash", "states": _wba("dash", "day", "Живой пульт: обычный день", "dash+pol") + _wba("dash", "fire", "Живой пульт: пожар", "dash+pol")},
  "_patches": {
-  "calc_b+pol": [
+  "calc_b+old": [
    [".pr{background:var(--t);border-radius:10px;padding:8px 12px 10px;font:.9em/1.5 ui-monospace,monospace}", ".pr{background:var(--t);border-radius:10px;padding:8px 12px 10px;font-size:.92em;line-height:1.6}"],
    [".r b{font-weight:400}", ".r b{font:500 1em ui-monospace,monospace}.r s{color:var(--h);margin-right:4px}"],
    ["f.textContent='Комиссия '+(pr?'🔥 ':'')+rate;", "f.textContent='Комиссия ';if(pr&&r[3]){const o=document.createElement('s');o.textContent=r[3];f.append(o)}f.append(rate);"],
   ],
-  "invoice+pol": [
+  "invoice+old": [
    [".pr{margin-top:10px;background:var(--t);border-radius:10px;padding:7px 12px;font:.88em/1.55 ui-monospace,monospace}", ".pr{margin-top:10px;background:var(--t);border-radius:10px;padding:7px 12px;font-size:.9em;line-height:1.6}.pr b{font:600 1em ui-monospace,monospace}"],
    ["const mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');", "const mm=s=>s>=60?Math.ceil(s/60)+' мин':s+' с';"],
   ],
-  "dash+pol": [
+  "dash+old": [
    ["<b>'+r[2]+'</b> <small>'+r[3]+'</small>", "<b>'+r[2]+'</b> <small>· '+r[3]+'</small>"],
    [".ft{display:flex;align-items:center;", ".nw{white-space:nowrap}.ft{display:flex;align-items:baseline;"],
    [".ft i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}", ".ft i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none;transform:translateY(-1px)}"],
@@ -558,6 +558,9 @@ G.update({
   ],
  },
 })
+# Принято 16.11: правки виджетов перенесены в assets/widgets; страница показывает «было» обратной правкой.
+for _k in list(G["_patches"]):
+    G["_patches"][_k] = [[_n, _o] for _o, _n in G["_patches"][_k]]
 # Значки: «после» — те же значки с правкой из emoji-polish-15-11.diff (ключи *_pol собирает страница).
 _TXT = ('{sending} Отправляю <b>97.50</b> USDT в xRocket\n{with_me} <b>Деньги у меня</b> · <code>100.00</code> USDT\n'
         '{shield} <b>Защищено</b> · вход по коду')

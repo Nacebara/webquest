@@ -148,7 +148,7 @@ impl Inner {
         };
         if list.is_empty() {
             let rich = format!(
-                "<h3>{}</h3><p>{}</p>",
+                "<p><b>{}</b></p><p>{}</p>",
                 t.t("support.inbox_empty_title"),
                 t.t("support.inbox_empty")
             );
@@ -164,7 +164,7 @@ impl Inner {
         let (page, range) = nav::window(list.len(), page);
         let title = t.f("support.inbox_title", &[("n", &list.len())]);
         let mut rich = format!(
-            "<h3>{title}</h3><table striped compact><tr><th>{}</th><th>{}</th><th align=\"right\">{}</th></tr>",
+            "<p><b>{title}</b></p><table striped compact><tr><th>{}</th><th>{}</th><th align=\"right\">{}</th></tr>",
             t.t("support.c_client"),
             t.t("support.c_text"),
             t.t("support.c_wait"),
@@ -330,7 +330,7 @@ impl Inner {
             rows.push((dot, esc(&b.label), value));
         }
         let title = t.t("system.title");
-        let mut rich = format!("<h3>{title}</h3><table compact>");
+        let mut rich = format!("<p><b>{title}</b></p><table compact>");
         let mut plain = format!("<b>{title}</b>\n<blockquote>");
         let mut lines = Vec::new();
         for (dot, label, value) in &rows {
@@ -367,7 +367,7 @@ impl Inner {
     pub(crate) fn broadcast(&self) -> Screen {
         let t = &self.texts;
         let rich = format!(
-            "<h3>{}</h3><p>{}</p>",
+            "<p><b>{}</b></p><p>{}</p>",
             t.t("broadcast.title"),
             t.t("broadcast.soon")
         );

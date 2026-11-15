@@ -8,7 +8,7 @@ body{margin:0;padding:10px 12px max(8px,var(--tg-content-safe-area-inset-bottom,
 .br i.n:after{content:"";position:absolute;top:0;bottom:0;left:0;width:45%;border-radius:3px;background:var(--a);animation:m 1.3s ease-in-out infinite}
 .br i.s{background:var(--wa)}
 @keyframes m{from{transform:translateX(-100%)}to{transform:translateX(230%)}}
-.pr{margin-top:10px;background:var(--t);border-radius:10px;padding:7px 12px;font:.88em/1.55 ui-monospace,monospace}
+.pr{margin-top:10px;background:var(--t);border-radius:10px;padding:7px 12px;font-size:.9em;line-height:1.6}.pr b{font:600 1em ui-monospace,monospace}
 .r{display:flex;justify-content:space-between;gap:8px}
 hr{border:0;border-top:1px solid var(--ln);margin:3px 0}
 .r.t b{font-size:1.08em}
@@ -24,7 +24,7 @@ hr{border:0;border-top:1px solid var(--ln);margin:3px 0}
 const W=window.TelegramWidget||{},$=s=>document.getElementById(s);
 let D=null;
 const now=()=>Math.floor(Date.now()/1e3);
-const mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+const mm=s=>s>=60?Math.ceil(s/60)+' мин':s+' с';
 const pl=(n,f)=>{n%=100;const m=n%10;return f[n>10&&n<20?2:m==1?0:m>1&&m<5?1:2]};
 const R=(a,b,c)=>'<div class="r '+(c||'')+'"><span>'+a+'</span><b>'+b+'</b></div>';
 function draw(){let x=null;try{x=JSON.parse(W.chatData)}catch(e){}D=x;if(!D)return;const st=D.st;

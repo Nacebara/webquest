@@ -12,7 +12,7 @@ expression: "both(p, q)"
 🟡 16:15 · CB → xR · в работе</blockquote>
 <i>Всего 23 обмена · 2 310 USDT</i>
 --- rich
-<h3>📜 История</h3>
+<p><b>📜 История</b></p>
 <table striped compact>
 <tr><th></th><th>Когда</th><th>Обмен</th><th align="right">Итог</th></tr>
 <tr><td>🟢</td><td>12:15</td><td>CB → xR</td><td align="right">97.50</td></tr>
@@ -38,7 +38,7 @@ expression: "both(p, q)"
 <tg-emoji emoji-id="5368000000000000030">🟡</tg-emoji> 16:15 · CB → xR · в работе</blockquote>
 <i>Всего 23 обмена · 2 310 USDT</i>
 --- rich
-<h3><tg-emoji emoji-id="5368000000000000016">📜</tg-emoji> История</h3>
+<p><b><tg-emoji emoji-id="5368000000000000016">📜</tg-emoji> История</b></p>
 <table striped compact>
 <tr><th></th><th>Когда</th><th>Обмен</th><th align="right">Итог</th></tr>
 <tr><td><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji></td><td>12:15</td><td>CB → xR</td><td align="right">97.50</td></tr>

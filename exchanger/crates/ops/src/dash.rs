@@ -439,7 +439,7 @@ impl DashData {
         } else {
             t.f("dash.title_need", &[("n", &total)])
         };
-        let mut rich = format!("<h3>{title}</h3>");
+        let mut rich = format!("<p><b>{title}</b></p>");
         let mut plain = format!("<b>{title}</b>\n");
 
         // Пожар: что горит — первой строкой.

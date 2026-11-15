@@ -12,7 +12,7 @@ expression: "both(p, q)"
 Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.
 <i>Обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></i>
 --- rich
-<h3>📈 Курс и лимиты</h3>
+<p><b>📈 Курс и лимиты</b></p>
 <table striped compact>
 <tr><th></th><th>Куда</th><th align="right">Комиссия</th><th align="right">USDT</th></tr>
 <tr><td>🟢</td><td>CryptoBot → xRocket</td><td align="right">2.5 %</td><td align="right">2–500</td></tr>
@@ -35,7 +35,7 @@ expression: "both(p, q)"
 Комиссия не меньше <code>0.10</code> USDT. Первые обмены — до <code>100</code> USDT.
 <i>Обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></i>
 --- rich
-<h3><tg-emoji emoji-id="5368000000000000015">📈</tg-emoji> Курс и лимиты</h3>
+<p><b><tg-emoji emoji-id="5368000000000000015">📈</tg-emoji> Курс и лимиты</b></p>
 <table striped compact>
 <tr><th></th><th>Куда</th><th align="right">Комиссия</th><th align="right">USDT</th></tr>
 <tr><td><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji></td><td>CryptoBot → xRocket</td><td align="right">2.5 %</td><td align="right">2–500</td></tr>

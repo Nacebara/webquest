@@ -3,7 +3,9 @@ source: crates/ops/tests/snapshots.rs
 expression: dump(&queue)
 ---
 --- rich
-<h3>📋 Разбор · 2</h3>
+<p>
+<b>📋 Разбор · 2</b>
+</p>
 <table striped compact>
 <tr>
 <th>Заявка</th>
@@ -25,7 +27,9 @@ expression: dump(&queue)
 <td align="right">2 мин</td>
 </tr>
 </table>
-<h4>Оплатить вручную · 1</h4>
+<p>
+<b>Оплатить вручную · 1</b>
+</p>
 <table striped compact>
 <tr>
 <td>

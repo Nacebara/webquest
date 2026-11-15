@@ -1799,6 +1799,24 @@ async fn history_from_a_result_comes_as_a_new_message(pool: PgPool) {
             c.method == "editMessageText" && c.contains(&payout_url)
         })
         .await;
+    // Под нагрузкой итог может прийти двумя правками (текст, затем кнопки): ждём, пока сообщение
+    // заявки перестанет меняться, — иначе вторая правка итога попадёт после метки.
+    let edits = || {
+        e.fake
+            .calls()
+            .iter()
+            .filter(|c| c.method == "editMessageText" && c.message_id() == Some(order_message))
+            .count()
+    };
+    let mut seen = edits();
+    loop {
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let now = edits();
+        if now == seen {
+            break;
+        }
+        seen = now;
+    }
     // «История» под сообщением заявки (как под «Счёт оплачен»).
     let mark = e.fake.calls().len();
     e.fake.client_taps(order_message, "history:0");

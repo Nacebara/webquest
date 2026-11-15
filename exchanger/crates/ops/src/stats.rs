@@ -88,7 +88,7 @@ impl StatsData {
             legend: t.t("stats.legend"),
         };
         let mut html = format!(
-            "<h3>{}</h3><img src=\"tg://photo?id=chart\"/>",
+            "<p><b>{}</b></p><img src=\"tg://photo?id=chart\"/>",
             esc(&self.title)
         );
         html.push_str(&format!(
@@ -344,7 +344,7 @@ mod tests {
         let card = sample_card().unwrap();
         assert!(
             card.html
-                .starts_with("<h3>{e:chart} 7 дней · 29 окт – 4 ноя</h3>"),
+                .starts_with("<p><b>{e:chart} 7 дней · 29 окт – 4 ноя</b></p>"),
             "{}",
             card.html
         );
