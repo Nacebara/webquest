@@ -27,3 +27,11 @@ PNG 640×640 — для BotFather.
 Анимированная аватарка (Bot API 9.4, `setMyProfilePhoto` + `InputProfilePhotoAnimated`, MPEG4) —
 после выбора концепции. Пересобрать: `node render.js` (Playwright; шрифт — `@fontsource/manrope`
 в `node_modules` рядом).
+
+## Анимированная аватарка (18.11)
+
+`avatar.mp4` — живая версия знака В для аватарки бота (Bot API `setMyProfilePhoto` +
+`InputProfilePhotoAnimated`): 800×800, 3 с, H.264, петля. Стрелки делают пол-оборота, монета чуть
+«вдыхает», по фону проходит блик; неподвижный кадр — первый. Лист кадров — `avatar-sheet.png`.
+Пересобрать: `node avatar-render.js <папка кадров>` (кадры из `avatar.html`), затем
+`ffmpeg -framerate 30 -i f%03d.png -c:v libx264 -pix_fmt yuv420p -crf 18 -movflags +faststart -an avatar.mp4`.

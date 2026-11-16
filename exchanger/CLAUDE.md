@@ -1,6 +1,6 @@
 # CLAUDE.md — бот-обменник xRocket ⇄ CryptoBot (exch)
 
-Корень проекта — каталог `exchanger/`. Начни с `docs/PLAN-v1.md` (текущий план и приёмка), затем `docs/HANDOVER.md`.
+Корень проекта — каталог `exchanger/`. Начни с `docs/NEXT.md` (где мы и что дальше), затем `docs/PLAN-v2.md` (план до запуска); приёмка экранов — `docs/PLAN-v1.md`. `docs/HANDOVER.md` — архив (состояние на 10 октября).
 
 Источники правды, по старшинству:
 1. `docs/DESIGN-v0.2.md` — решения владельца (только юзербот, основной поток CryptoBot → xRocket, без паролей).
@@ -106,7 +106,7 @@ app (бинарник exch) ← всё
 
 ## Как работать
 
-1. Прочитай `docs/HANDOVER.md`, `docs/DESIGN-v0.2.md`, этот файл, `docs/PROGRESS.md`, `git log --oneline -30`.
+1. Прочитай `docs/NEXT.md`, `docs/DESIGN-v0.2.md`, этот файл, `docs/PROGRESS.md`, `git log --oneline -30`.
 2. Прогони проверки — должны быть зелёными до начала работы.
 3. Делай маленькими шагами; каждый законченный шаг — коммит с понятным сообщением (`userbot: issue checks through the bot menu`).
 4. Не трогай то, что не относится к задаче.
@@ -118,7 +118,9 @@ app (бинарник exch) ← всё
 |---|---|
 | Текущий план, фазы, приёмка экранов владельцем | `docs/PLAN-v1.md` |
 | Как должен выглядеть каждый экран | `docs/mockups/template.html` (собрать: `docs/mockups/build.py`) |
-| Состояние проекта, что осталось, порядок работ | `docs/HANDOVER.md` |
+| Состояние проекта, что осталось, порядок работ | `docs/NEXT.md`, `docs/PLAN-v2.md` |
+| Запуск на сервере Windows, служба, копии | `docs/DEPLOY.md` |
+| Что делать, если… (сбои, блокировка аккаунта, откат) | `docs/RUNBOOK.md` |
 | Решения владельца v0.2 | `docs/DESIGN-v0.2.md` |
 | Как работает ловец lovec: активация, ответы ботов, FLOOD, grammers | `docs/LOVEC-PORTING.md` |
 | Форматы ссылок, словари ответов | `crates/parsers/src/links.rs`, `replies.rs`, фикстуры |
