@@ -121,6 +121,9 @@ pub struct Reserve {
     pub ledger: Decimal,
     /// Реально в кошельке по последней сверке.
     pub actual: Option<Decimal>,
+    /// Открыта недостача по сверке (П-26): только тогда «Реально» красное. Сравнивать старую
+    /// сверку с текущим леджером нельзя — после каждого приёма между сверками было бы красно.
+    pub short: bool,
     pub thresholds: Option<Thresholds>,
 }
 
@@ -531,7 +534,7 @@ impl DashData {
                 );
                 if fire {
                     let actual = match r.actual {
-                        Some(a) if a < r.ledger => format!("{{e:dot_act}} {}", amount(a)),
+                        Some(a) if r.short => format!("{{e:dot_act}} {}", amount(a)),
                         Some(a) => amount(a),
                         None => t.t("dash.no_target"),
                     };
@@ -616,6 +619,7 @@ pub fn sample_dash() -> [(&'static str, DashData); 4] {
         available: Decimal::from(available),
         ledger: Decimal::from(available),
         actual: actual.map(Decimal::from),
+        short: actual.is_some_and(|a| a < available),
         thresholds: Some(th),
     };
     let kpis = Kpis {
@@ -872,6 +876,7 @@ impl Inner {
             };
             let thresholds =
                 storage::admin::thresholds(&mut conn, w.wallet_id, Asset::Usdt).await?;
+            let short = shortage_open(&mut conn, w.platform).await?;
             reserves.push(Reserve {
                 platform: w.platform,
                 available: b.available,
@@ -880,6 +885,7 @@ impl Inner {
                     .iter()
                     .find(|r| r.wallet_account_id == w.wallet_id)
                     .map(|r| r.actual),
+                short,
                 thresholds,
             });
         }
@@ -1016,4 +1022,20 @@ mod tests {
         assert_eq!(delta(Decimal::from(148), Decimal::from(136)), Some(9));
         assert_eq!(delta(Decimal::ONE, Decimal::ZERO), None);
     }
+}
+
+/// Открыта недостача по сверке кошелька `platform` (событие `balance_mismatch` с минусом).
+pub(crate) async fn shortage_open(
+    conn: &mut sqlx::PgConnection,
+    platform: Platform,
+) -> Result<bool, crate::OpsError> {
+    let key = engine::reconcile::mismatch_key(platform);
+    Ok(storage::alerts::open_by_key(conn, &key)
+        .await?
+        .and_then(|a| {
+            a.payload["diff"]
+                .as_str()
+                .and_then(|d| d.parse::<Decimal>().ok())
+        })
+        .is_some_and(|d| d < Decimal::ZERO))
 }

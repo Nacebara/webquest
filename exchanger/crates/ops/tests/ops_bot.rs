@@ -1112,6 +1112,35 @@ async fn a_foreign_login_is_shown_and_ended_from_the_panel(pool: PgPool) {
     assert_eq!(o.audit("userbot.end_session").await.len(), 1);
 }
 
+/// П-26 (аудит 16.11): «Реально» красное только при открытой недостаче. Раньше сверку
+/// десятиминутной давности сравнивали с текущим леджером — после каждого приёма между сверками
+/// загоралась красная точка, будто денег меньше.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn reserves_turn_red_only_on_a_real_shortage(pool: PgPool) {
+    let o = ops(pool).await;
+    o.engine.reconcile_balances().await.unwrap();
+    // Клиент поменял 100 CB → xR: леджер CryptoBot вырос, новой сверки ещё не было.
+    let url = o.world.client_check(CB, usdt(dec!(100))).unwrap();
+    accepted(
+        o.engine
+            .submit_check(common::CLIENT, &parsers::links::parse_url(&url).unwrap())
+            .await
+            .unwrap(),
+    );
+    o.drain().await;
+    let dash = o.say(OWNER, "/dash", "Резервы").await;
+    let reserves = o.press(OWNER, &dash, "Резервы", "Цель · порог").await;
+    assert!(!reserves.text().contains("🔴"), "{}", reserves.text());
+    // Настоящая недостача — красное.
+    o.world
+        .set_balance(o.ub, XR, Asset::Usdt, dec!(500))
+        .unwrap();
+    o.engine.reconcile_balances().await.unwrap();
+    let dash = o.say(OWNER, "/dash", "Резервы").await;
+    let reserves = o.press(OWNER, &dash, "Резервы", "Цель · порог").await;
+    assert!(reserves.text().contains("🔴"), "{}", reserves.text());
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn client_card_sets_a_personal_fee(pool: PgPool) {
     let o = ops(pool).await;

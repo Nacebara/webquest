@@ -21,6 +21,8 @@ pub struct WalletReserve {
     pub ledger: Decimal,
     /// По последней сверке.
     pub actual: Option<Decimal>,
+    /// Открыта недостача по сверке (П-26): только тогда «Реально» красное.
+    pub short: bool,
     /// Выплаты, которые уходят прямо сейчас.
     pub in_flight: Decimal,
     /// Удержано под принятые заявки.
@@ -81,7 +83,7 @@ impl ReservesData {
             (
                 t.t("reserves.r_actual"),
                 cell(&|w| match w.actual {
-                    Some(a) if a < w.ledger => format!("{{e:dot_act}} {}", amount(a)),
+                    Some(a) if w.short => format!("{{e:dot_act}} {}", amount(a)),
                     Some(a) => amount(a),
                     None => t.t("reserves.unknown"),
                 }),
@@ -203,6 +205,7 @@ pub fn sample_reserves(t: &Texts) -> ReservesData {
         platform,
         ledger: Decimal::from(ledger),
         actual: Some(Decimal::from(ledger)),
+        short: false,
         in_flight,
         held: Decimal::from(held),
         target: Some((Decimal::from(1500), Decimal::from(600))),
@@ -264,6 +267,7 @@ impl Inner {
                     .iter()
                     .find(|r| r.wallet_account_id == w.wallet_id)
                     .map(|r| r.actual),
+                short: crate::dash::shortage_open(&mut conn, w.platform).await?,
                 in_flight: flying
                     .iter()
                     .find(|(id, _)| *id == w.wallet_id)
