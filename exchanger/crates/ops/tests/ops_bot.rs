@@ -678,6 +678,45 @@ async fn settings_toggle_the_newcomer_limit_and_the_kill_switch(pool: PgPool) {
     assert!(open.is_none(), "{open:?}");
 }
 
+/// П-13 (аудит 16.11): тревога «Стоп-кран» говорит «Выключит владелец: введите ПОДТВЕРЖДАЮ» —
+/// пульт ждёт это слово от владельца без кнопок. Админу то же слово — отказ; без стоп-крана
+/// слово остаётся пульту, а не уходит клиентскому боту («Пришлите чек»).
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn the_owner_lifts_the_kill_switch_by_typing_the_word(pool: PgPool) {
+    let o = ops(pool).await;
+    let calm = o.say(OWNER, "ПОДТВЕРЖДАЮ", "Подтверждать нечего").await;
+    assert!(calm.text().contains("<b>Пульт</b>"), "{}", calm.text());
+    let settings = o.say(ADMIN, "/settings", "Настройки").await;
+    let preview = o
+        .press(ADMIN, &settings, "Включить стоп-кран", "Стоп-кран выплат")
+        .await;
+    let mark = o.tg.mark();
+    o.press(ADMIN, &preview, "Подтвердить", "Сохранено").await;
+    let alert = o.tg.screen(mark, OWNER, "Выплаты остановлены").await;
+    assert!(alert.text().contains("ПОДТВЕРЖДАЮ"), "{}", alert.text());
+    let kill_on = || async {
+        let mut conn = o.pool.acquire().await.unwrap();
+        storage::settings::flag(&mut conn, "kill_switch_payouts", false)
+            .await
+            .unwrap()
+    };
+    o.say(ADMIN, "ПОДТВЕРЖДАЮ", "роли «Владелец»").await;
+    assert!(kill_on().await, "админ стоп-кран не снимает");
+    o.say(OWNER, " подтверждаю ", "Сохранено").await;
+    assert!(!kill_on().await, "владелец снял словом");
+    let mut conn = o.pool.acquire().await.unwrap();
+    assert!(
+        storage::alerts::open_by_key(&mut conn, "kill_switch")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    drop(conn);
+    let flags = o.audit("settings.flag").await;
+    assert_eq!(flags.len(), 2, "включил админ, снял владелец");
+    assert!(flags.iter().all(|a| a.double_confirmed));
+}
+
 /// Шаг 2.8: движок не проходит круг дольше `engine_down_after` — тревога «Движок не работает»
 /// с последней ошибкой; ведёт в «Систему».
 #[sqlx::test(migrator = "storage::MIGRATOR")]

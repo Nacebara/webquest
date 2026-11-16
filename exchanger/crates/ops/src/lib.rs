@@ -481,7 +481,11 @@ impl Inner {
         }
         let ours = match command {
             Some(name) => Self::COMMANDS.contains(&name),
-            None => text == self.texts.t("menu.open") || self.has_awaiting(staff.tg_user_id),
+            None => {
+                text == self.texts.t("menu.open")
+                    || self.has_awaiting(staff.tg_user_id)
+                    || actions::is_control_word(text)
+            }
         };
         if !ours {
             // Ссылка на чек или счёт от сотрудника — всегда пульту (П-4).
@@ -818,6 +822,7 @@ impl Inner {
         }
         match self.take_awaiting(staff.tg_user_id) {
             Some(input) => self.on_input(staff, input, message).await,
+            None if actions::is_control_word(text) => self.bare_control_word(staff).await,
             None => self.menu(staff).await,
         }
     }

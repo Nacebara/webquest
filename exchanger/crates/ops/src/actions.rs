@@ -291,6 +291,11 @@ pub(crate) enum Control {
 /// Слово контрольной строки.
 pub(crate) const CONTROL_WORD: &str = "ПОДТВЕРЖДАЮ";
 
+/// Сообщение — слово контрольной строки (в любом регистре, с пробелами по краям).
+pub(crate) fn is_control_word(text: &str) -> bool {
+    text.trim().to_uppercase() == CONTROL_WORD
+}
+
 impl Action {
     /// Самые опасные действия — с контрольной строкой: закрыть без выплаты, «прежней попытки
     /// не было» (неясный исход), снять стоп-кран.
@@ -491,6 +496,31 @@ impl Inner {
             return Ok(denied);
         }
         self.apply(&staff, action, previous_failed).await
+    }
+
+    /// П-13: тревога «Стоп-кран» говорит «Выключит владелец: введите ПОДТВЕРЖДАЮ» — слово без
+    /// вопроса пульта снимает стоп-кран (только владелец; аудит — с двойным подтверждением).
+    /// Стоп-кран не включён — подтверждать нечего: меню с пометкой.
+    pub(crate) async fn bare_control_word(
+        self: &Arc<Self>,
+        staff: &StaffMember,
+    ) -> Result<Screen, OpsError> {
+        let on = {
+            let mut conn = self.pool.acquire().await?;
+            storage::settings::flag(&mut conn, Flag::KillSwitch.key(), false).await?
+        };
+        if !on {
+            let notice = self.texts.t("common.nothing_to_confirm");
+            return Ok(self.menu(staff).await?.notice(&notice));
+        }
+        let action = Action::Flag {
+            flag: Flag::KillSwitch,
+            on: false,
+        };
+        if let Some(denied) = self.deny(staff, action.min_role()) {
+            return Ok(denied);
+        }
+        self.apply(staff, action, false).await
     }
 
     /// Шаг «введите …» перед самым опасным действием; не нужен — `None`.
