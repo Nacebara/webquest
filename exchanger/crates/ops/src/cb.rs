@@ -169,6 +169,8 @@ pub enum Cb {
     AsClient,
     /// «Позвать админа» по заявке на разборе (П-3).
     CallAdmin(i64),
+    /// «Завершить сессию» из тревоги «Новый вход» (id тревоги).
+    EndSession(i64),
     Decide(i64, DecisionKind),
     UserAsk,
     User(i64),
@@ -331,6 +333,7 @@ impl Cb {
             Cb::TakeOver(id) => format!("ow:{id}"),
             Cb::AsClient => "asc".into(),
             Cb::CallAdmin(id) => format!("cad:{id}"),
+            Cb::EndSession(id) => format!("es:{id}"),
             Cb::Decide(id, k) => format!("od:{id}:{}", k.code()),
             Cb::UserAsk => "ua".into(),
             Cb::User(id) => format!("u:{id}"),
@@ -432,6 +435,7 @@ impl Cb {
             ["ow", _] => Cb::TakeOver(id(1)?),
             ["asc"] => Cb::AsClient,
             ["cad", _] => Cb::CallAdmin(id(1)?),
+            ["es", _] => Cb::EndSession(id(1)?),
             ["od", _, k] => Cb::Decide(
                 id(1)?,
                 DecisionKind::ALL.into_iter().find(|x| x.code() == *k)?,
@@ -586,6 +590,7 @@ mod tests {
         all.push(Cb::TakeOver(big));
         all.push(Cb::AsClient);
         all.push(Cb::CallAdmin(big));
+        all.push(Cb::EndSession(big));
         all.extend(Flag::ALL.map(Cb::Toggle));
         all.extend(EmojiStyle::ALL.map(Cb::EmojiStyle));
         all.extend(Emoji::ALL.map(Cb::EmojiRole));

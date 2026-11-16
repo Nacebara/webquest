@@ -193,6 +193,8 @@ pub(crate) struct AccountState {
     pub random_ids: HashSet<i64>,
     pub dialogs: HashMap<Platform, Dialog>,
     faults: Vec<FaultRule>,
+    /// Сеансы аккаунта (Настройки → Устройства); пусто — транспорт «не умеет».
+    pub sessions: Vec<crate::Session>,
     pub tx: broadcast::Sender<RawMessage>,
 }
 
@@ -280,6 +282,7 @@ impl WorldState {
                 random_ids: HashSet::new(),
                 dialogs: HashMap::new(),
                 faults: Vec::new(),
+                sessions: Vec::new(),
                 tx,
             },
         );

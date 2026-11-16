@@ -1059,6 +1059,59 @@ async fn an_operator_calls_an_admin_instead_of_silencing_everyone(pool: PgPool) 
     assert_eq!(o.audit("order.call_admin").await.len(), 1);
 }
 
+/// Веха 10 (макет «Новая авторизация»): чужой вход в аккаунт юзербота — тревога «Новый вход» с
+/// устройством и скрытым IP; админ нажимает «Завершить сессию» — устройство выкинуто, тревога
+/// закрыта, действие в журнале.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_foreign_login_is_shown_and_ended_from_the_panel(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
+    let s = |hash, current, device: &str| userbot::Session {
+        hash,
+        current,
+        device: device.to_owned(),
+        app: "Telegram iOS 11.2".to_owned(),
+        country: "NL".to_owned(),
+        ip: "185.12.34.41".to_owned(),
+        created: 1_763_300_000,
+    };
+    o.world.set_sessions(o.ub, vec![s(1, true, "exch")]);
+    o.engine.watch_sessions().await.unwrap();
+    o.world
+        .set_sessions(o.ub, vec![s(1, true, "exch"), s(7, false, "iPhone 15")]);
+    o.engine.watch_sessions().await.unwrap();
+    let mark = o.tg.mark();
+    o.bot.deliver_alerts().await.unwrap();
+    let alert = o.tg.screen(mark, ADMIN, "Новый вход").await;
+    let text = alert.text();
+    assert!(
+        text.contains("ub-1") && text.contains("iPhone 15") && text.contains("185.…41"),
+        "{text}"
+    );
+    assert!(!text.contains("185.12.34.41"), "IP скрыт: {text}");
+    assert!(alert.button("Это я").is_some(), "{:?}", alert.buttons());
+    o.press(
+        ADMIN,
+        &alert,
+        "Завершить сессию",
+        "Чужая сессия на ub-1 завершена",
+    )
+    .await;
+    let left: Vec<i64> = o.world.sessions(o.ub).iter().map(|x| x.hash).collect();
+    assert_eq!(left, vec![1]);
+    let mut conn = o.pool.acquire().await.unwrap();
+    assert!(
+        storage::alerts::open_by_key(&mut conn, "new_login:ub-1:7")
+            .await
+            .unwrap()
+            .is_none(),
+        "тревога закрыта"
+    );
+    drop(conn);
+    assert_eq!(o.audit("userbot.end_session").await.len(), 1);
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn client_card_sets_a_personal_fee(pool: PgPool) {
     let o = ops(pool).await;

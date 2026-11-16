@@ -473,6 +473,60 @@ impl Inner {
         Ok(())
     }
 
+    /// «Завершить сессию» из тревоги «Новый вход» (веха 10): выкинуть чужое устройство и
+    /// закрыть тревогу. Админ и выше.
+    pub(crate) async fn end_session(
+        &self,
+        staff: &StaffMember,
+        id: i64,
+    ) -> Result<String, OpsError> {
+        let t = &self.texts;
+        if staff.role < Role::Admin {
+            return Ok(t.f(
+                "common.not_allowed",
+                &[("role", &self.role_name(Role::Admin))],
+            ));
+        }
+        let alert = {
+            let mut conn = self.pool.acquire().await?;
+            storage::alerts::get(&mut conn, id).await?
+        };
+        let Some(a) = alert.filter(|a| a.title == "new_login") else {
+            return Ok(t.t("alert.session_gone"));
+        };
+        let account = s(&a.payload, "account");
+        let Ok(hash) = s(&a.payload, "hash").parse::<i64>() else {
+            return Ok(t.t("alert.session_gone"));
+        };
+        if let Err(e) = self.engine.end_session(&account, hash).await {
+            tracing::warn!(error = %e, "foreign session not ended");
+            return Ok(t.f(
+                "alert.session_not_ended",
+                &[("error", &esc(&e.to_string()))],
+            ));
+        }
+        {
+            let mut conn = self.pool.acquire().await?;
+            let target = account.clone();
+            storage::audit::record(
+                &mut conn,
+                &storage::audit::NewAudit {
+                    staff_id: staff.tg_user_id,
+                    action: "userbot.end_session",
+                    target_type: Some("userbot"),
+                    target_id: Some(&target),
+                    before: Some(a.payload.clone()),
+                    after: None,
+                    reason: None,
+                    double_confirmed: false,
+                },
+            )
+            .await?;
+        }
+        self.ack(staff, id).await?;
+        Ok(t.f("alert.session_ended", &[("account", &esc(&account))]))
+    }
+
     /// «Позвать админа» (П-3, аудит 16.11): сотрудник без права решить заявку на разборе. Его
     /// копия тревоги затихает, админам и владельцу — сразу сообщение со звуком; сама тревога
     /// остаётся открытой и повторяется у них, пока её не примет тот, кто решает. Возвращает имена
@@ -597,6 +651,32 @@ pub fn critical_screen(
     first_at: chrono::DateTime<chrono::Utc>,
 ) -> Option<Screen> {
     let screen = match title {
+        // Макет «Новая авторизация»: «Это я» закрывает тихо, «Завершить» выкидывает устройство.
+        "new_login" => {
+            let at = s(p, "at")
+                .parse::<chrono::DateTime<chrono::Utc>>()
+                .map(crate::dash::hhmm)
+                .unwrap_or_default();
+            let place: Vec<String> = ["device", "app", "country", "ip"]
+                .iter()
+                .map(|k| s(p, k))
+                .filter(|v| !v.is_empty())
+                .map(|v| esc(&v))
+                .chain(std::iter::once(at))
+                .collect();
+            Screen::new(t.f(
+                "alert.new_login",
+                &[
+                    ("account", &esc(&s(p, "account"))),
+                    ("where", &place.join(" · ")),
+                ],
+            ))
+            .row(vec![
+                btn(t.t("alert.b_end_session"), &Cb::EndSession(id))
+                    .style(botapi::ButtonStyle::Danger),
+            ])
+            .row(vec![btn(t.t("alert.b_its_me"), &Cb::Ack(id))])
+        }
         "login_lost" | "account_restricted" | "flood_long" => {
             let account = esc(&s(p, "account"));
             let platforms = p["platforms"]

@@ -892,6 +892,10 @@ impl Inner {
                 self.ack(staff, id).await?;
                 return Ok(None);
             }
+            Cb::EndSession(id) => {
+                let text = self.end_session(staff, id).await?;
+                Screen::new(text).row(vec![btn(self.texts.t("common.home"), &Cb::Menu)])
+            }
             Cb::Fixture(id) => {
                 self.fixture(chat, id).await?;
                 return Ok(None);
@@ -1136,6 +1140,7 @@ mod tests {
         let audit = [
             "order.take",
             "order.call_admin",
+            "userbot.end_session",
             "direction.set",
             "direction.open",
             "direction.close",

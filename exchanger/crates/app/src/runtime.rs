@@ -176,5 +176,9 @@ pub fn engine(pool: &PgPool, userbots: &[Userbot]) -> engine::Engine {
     for w in userbots.iter().flat_map(|u| u.wallets.iter()) {
         engine = engine.with_wallet(w.clone());
     }
+    // Чужие входы в аккаунты юзерботов — тревога (веха 10).
+    for u in userbots {
+        engine = engine.with_account(&u.label, u.transport.clone());
+    }
     engine
 }

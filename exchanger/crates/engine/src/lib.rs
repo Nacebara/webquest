@@ -22,6 +22,7 @@ pub mod invest;
 mod invoice;
 pub mod operator;
 pub mod reconcile;
+pub mod sessions;
 mod settle;
 mod submit;
 mod worker;
@@ -84,6 +85,8 @@ pub struct EngineConfig {
     /// Траты кошелька CryptoBot держим ниже него с запасом — бот не спросит код никогда.
     /// `None` — не ограничивать (только если в CryptoBot код-пароль выключен совсем).
     pub cb_passcode_free_limit: Option<Decimal>,
+    /// Как часто читать сеансы аккаунтов юзерботов: новый чужой вход — тревога (веха 10).
+    pub sessions_every: Duration,
 }
 
 impl Default for EngineConfig {
@@ -101,6 +104,7 @@ impl Default for EngineConfig {
             invest_accrual_every: Duration::from_secs(3600),
             // Значение CryptoBot по умолчанию.
             cb_passcode_free_limit: Some(Decimal::from(500)),
+            sessions_every: Duration::from_secs(600),
         }
     }
 }
@@ -141,6 +145,8 @@ pub enum EngineError {
 pub struct Engine {
     pool: PgPool,
     wallets: HashMap<Platform, Arc<dyn WalletBot>>,
+    /// Аккаунты юзерботов: метка и транспорт — для наблюдения за сеансами.
+    accounts: Vec<(String, Arc<dyn userbot::Transport>)>,
     cfg: EngineConfig,
     updates: broadcast::Sender<OrderUpdate>,
     /// Движения инвесторов (пополнения, выводы) — для бота.
@@ -170,6 +176,7 @@ impl Engine {
         Self {
             pool,
             wallets: HashMap::new(),
+            accounts: Vec::new(),
             cfg,
             updates,
             invest_updates,
@@ -182,6 +189,12 @@ impl Engine {
     /// Кошелёк платформы (юзербот этой платформы).
     pub fn with_wallet(mut self, wallet: Arc<dyn WalletBot>) -> Self {
         self.wallets.insert(wallet.platform(), wallet);
+        self
+    }
+
+    /// Аккаунт юзербота для наблюдения за его сеансами (чужой вход — тревога).
+    pub fn with_account(mut self, label: &str, transport: Arc<dyn userbot::Transport>) -> Self {
+        self.accounts.push((label.to_owned(), transport));
         self
     }
 
@@ -316,6 +329,7 @@ impl Engine {
         reconcile.tick().await;
         let mut accrual = tokio::time::interval(self.cfg.invest_accrual_every);
         accrual.tick().await;
+        let mut sessions = tokio::time::interval(self.cfg.sessions_every);
         loop {
             while self.process_due().await? > 0 {}
             self.beat.store(
@@ -341,6 +355,11 @@ impl Engine {
                 _ = accrual.tick() => {
                     if let Err(e) = self.invest_accrue().await {
                         tracing::warn!(error = %e, "investor profit accrual failed");
+                    }
+                }
+                _ = sessions.tick() => {
+                    if let Err(e) = self.watch_sessions().await {
+                        tracing::warn!(error = %e, "userbot session check failed");
                     }
                 }
                 note = listener.recv() => {

@@ -194,6 +194,13 @@ fn critical_alerts() {
             "kill_switch",
             serde_json::json!({"by": "Олег", "at": "2026-11-14T11:20:00+00:00"}),
         ),
+        // Макет «Новая авторизация»: «Новый вход · ub-1 / iPhone 15 · Telegram iOS · NL · 185.…41 · 13:58».
+        (
+            "new_login",
+            serde_json::json!({"account": "ub-1", "hash": "7", "device": "iPhone 15",
+                "app": "Telegram iOS", "country": "NL", "ip": "185.…41",
+                "at": "2026-11-14T10:58:00+00:00"}),
+        ),
     ];
     for (title, payload) in cases {
         let screen = ops::critical_screen(&t, title, &payload, 9, first).unwrap();

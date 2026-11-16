@@ -128,6 +128,23 @@ impl TransportError {
     }
 }
 
+/// Сеанс аккаунта Telegram (Настройки → Устройства): наблюдение за чужими входами (веха 10).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Session {
+    /// Ключ сеанса — им же сеанс завершают.
+    pub hash: i64,
+    /// Этот сеанс — сам exch.
+    pub current: bool,
+    /// Устройство: «iPhone 15».
+    pub device: String,
+    /// Приложение и версия: «Telegram iOS 11.2».
+    pub app: String,
+    pub country: String,
+    pub ip: String,
+    /// Когда вошли, Unix-время.
+    pub created: i64,
+}
+
 #[async_trait]
 pub trait Transport: Send + Sync + 'static {
     /// Отправить текст. `random_id` обязателен и уникален для операции: повтор с ним безопасен.
@@ -160,4 +177,16 @@ pub trait Transport: Send + Sync + 'static {
 
     /// Поток новых и отредактированных сообщений в чатах с ботами кошельков и в «Избранном».
     fn subscribe(&self) -> broadcast::Receiver<RawMessage>;
+
+    /// Сеансы аккаунта. Пустой список — транспорт этого не умеет (наблюдение пропускается).
+    async fn sessions(&self) -> Result<Vec<Session>, TransportError> {
+        Ok(Vec::new())
+    }
+
+    /// Завершить чужой сеанс (кнопка «Завершить сессию» в тревоге «Новый вход»).
+    async fn end_session(&self, _hash: i64) -> Result<(), TransportError> {
+        Err(TransportError::Other(
+            "ending sessions is not supported".into(),
+        ))
+    }
 }

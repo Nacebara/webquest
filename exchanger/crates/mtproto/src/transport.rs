@@ -743,6 +743,44 @@ impl Transport for GrammersTransport {
     fn subscribe(&self) -> broadcast::Receiver<RawMessage> {
         self.shared.tx.subscribe()
     }
+
+    async fn sessions(&self) -> Result<Vec<userbot::Session>, TransportError> {
+        let tl::enums::account::Authorizations::Authorizations(list) = self
+            .call(
+                Lane::Read,
+                &tl::functions::account::GetAuthorizations {},
+                "account.getAuthorizations",
+            )
+            .await?;
+        Ok(list
+            .authorizations
+            .into_iter()
+            .map(|a| {
+                let tl::enums::Authorization::Authorization(a) = a;
+                userbot::Session {
+                    hash: a.hash,
+                    current: a.current,
+                    device: a.device_model,
+                    app: format!("{} {}", a.app_name, a.app_version)
+                        .trim()
+                        .to_owned(),
+                    country: a.country,
+                    ip: a.ip,
+                    created: i64::from(a.date_created),
+                }
+            })
+            .collect())
+    }
+
+    async fn end_session(&self, hash: i64) -> Result<(), TransportError> {
+        self.call(
+            Lane::Action,
+            &tl::functions::account::ResetAuthorization { hash },
+            "account.resetAuthorization",
+        )
+        .await?;
+        Ok(())
+    }
 }
 
 /// Цикл соединения: держит текущий пул, пересоздаёт его при сбоях.

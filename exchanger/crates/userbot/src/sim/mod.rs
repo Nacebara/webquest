@@ -391,6 +391,22 @@ impl SimWorld {
         self.lock().inject(account, on, fault, times);
     }
 
+    /// Сеансы аккаунта (Настройки → Устройства) — для наблюдения за чужими входами.
+    pub fn set_sessions(&self, account: AccountId, sessions: Vec<crate::Session>) {
+        if let Some(a) = self.lock().accounts.get_mut(&account) {
+            a.sessions = sessions;
+        }
+    }
+
+    /// Сеансы аккаунта сейчас.
+    pub fn sessions(&self, account: AccountId) -> Vec<crate::Session> {
+        self.lock()
+            .accounts
+            .get(&account)
+            .map(|a| a.sessions.clone())
+            .unwrap_or_default()
+    }
+
     pub fn clear_faults(&self, account: AccountId) {
         self.lock().clear_faults(account);
     }

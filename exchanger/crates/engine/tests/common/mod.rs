@@ -151,6 +151,7 @@ async fn build(pool: PgPool, flow: FlowConfig) -> Env {
         engine = engine.with_wallet(w.clone() as Arc<dyn WalletBot>);
         wallets.insert(platform, w);
     }
+    let engine = engine.with_account("ub-1", transport.clone());
     Env {
         pool,
         world,

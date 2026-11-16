@@ -187,4 +187,30 @@ impl Transport for SimTransport {
     fn subscribe(&self) -> broadcast::Receiver<RawMessage> {
         self.tx.subscribe()
     }
+
+    async fn sessions(&self) -> Result<Vec<crate::Session>, TransportError> {
+        let st = self.world.lock();
+        let account = st
+            .accounts
+            .get(&self.account)
+            .ok_or(TransportError::NotAuthorized)?;
+        Ok(account.sessions.clone())
+    }
+
+    async fn end_session(&self, hash: i64) -> Result<(), TransportError> {
+        let mut st = self.world.lock();
+        let account = st
+            .accounts
+            .get_mut(&self.account)
+            .ok_or(TransportError::NotAuthorized)?;
+        let before = account.sessions.len();
+        account.sessions.retain(|s| s.hash != hash || s.current);
+        if account.sessions.len() == before {
+            return Err(TransportError::Rpc {
+                code: 400,
+                name: "HASH_INVALID".into(),
+            });
+        }
+        Ok(())
+    }
 }

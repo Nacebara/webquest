@@ -1,0 +1,12 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&text)
+---
+--- rich
+
+--- html
+🛡 <b>Новый вход</b> · ub-1
+iPhone 15 · Telegram iOS · NL · 185.…41 · <tg-time unix="1794653880" format="t">13:58</tg-time>
+--- keyboard
+[{"text":"🚫 Завершить сессию","style":"danger","callback_data":"a:es:9"}]
+[{"text":"👍 Это я","callback_data":"a:ack:9"}]

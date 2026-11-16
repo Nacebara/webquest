@@ -12,7 +12,7 @@ pub mod transport;
 pub mod wallet;
 
 pub use flows::{AccountGate, FlowConfig, MessageLog, UserbotWallet};
-pub use transport::{Chat, RawMessage, Transport, TransportError};
+pub use transport::{Chat, RawMessage, Session, Transport, TransportError};
 pub use wallet::{
     ActivationOutcome, BotError, IssueMethod, IssueOutcome, IssuedCheck, OpTag, PayDue, PayOutcome,
     RejectReason, WalletBot,

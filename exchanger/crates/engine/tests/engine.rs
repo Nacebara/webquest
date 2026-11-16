@@ -1012,6 +1012,59 @@ async fn a_lost_login_marks_the_account_until_the_wallet_answers(pool: PgPool) {
     assert!(resolved);
 }
 
+fn session(hash: i64, current: bool, device: &str) -> userbot::Session {
+    userbot::Session {
+        hash,
+        current,
+        device: device.to_owned(),
+        app: "Telegram iOS 11.2".to_owned(),
+        country: "NL".to_owned(),
+        ip: "185.12.34.41".to_owned(),
+        created: 1_763_300_000,
+    }
+}
+
+/// Веха 10 (макет «Новая авторизация»): первый проход запоминает сеансы аккаунта; новый чужой
+/// вход — критичная тревога «Новый вход» с устройством, приложением, страной и скрытым IP;
+/// «Завершить сессию» выкидывает устройство, сам exch не трогается.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_new_login_to_a_userbot_account_alerts_staff(pool: PgPool) {
+    let e = env(pool).await;
+    e.world.set_sessions(
+        e.ub,
+        vec![
+            session(1, true, "exch"),
+            session(2, false, "Pixel 8 (владелец)"),
+        ],
+    );
+    assert_eq!(
+        e.engine.watch_sessions().await.unwrap(),
+        0,
+        "первый проход — без тревог"
+    );
+    assert!(alert(&e, "new_login").await.is_none());
+    // Ничего нового — тишина.
+    assert_eq!(e.engine.watch_sessions().await.unwrap(), 0);
+
+    let mut now = e.world.sessions(e.ub);
+    now.push(session(3, false, "iPhone 15"));
+    e.world.set_sessions(e.ub, now);
+    assert_eq!(e.engine.watch_sessions().await.unwrap(), 1);
+    let (key, level, payload, _) = alert(&e, "new_login").await.expect("alert");
+    assert_eq!(level, "critical");
+    assert_eq!(key, "new_login:ub-1:3");
+    assert_eq!(payload["device"], "iPhone 15");
+    assert_eq!(payload["ip"], "185.…41", "IP скрыт");
+    // Повторный проход ту же тревогу не множит.
+    assert_eq!(e.engine.watch_sessions().await.unwrap(), 0);
+
+    e.engine.end_session("ub-1", 3).await.unwrap();
+    let left: Vec<i64> = e.world.sessions(e.ub).iter().map(|s| s.hash).collect();
+    assert_eq!(left, vec![1, 2]);
+    // Свой сеанс exch завершить нельзя.
+    assert!(e.engine.end_session("ub-1", 1).await.is_err());
+}
+
 /// Шаг 2.8: Telegram просит паузу дольше 5 минут — критичная тревога с минутами и временем конца.
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn a_long_flood_wait_alerts_staff(pool: PgPool) {
