@@ -76,3 +76,4 @@ xRocket v3, 14:04:04 — нет ответа</blockquote>
 [{"text":"✋ Взять","style":"primary","callback_data":"a:ot:15"},{"text":"💬 Написать","callback_data":"a:sq:51234567"}]
 [{"text":"🔄 Повторить выплату","callback_data":"a:od:15:rp"}]
 [{"text":"↩️ Вернуть","callback_data":"a:od:15:rf"}]
+[{"text":"👤 Позвать админа","callback_data":"a:cad:15"}]

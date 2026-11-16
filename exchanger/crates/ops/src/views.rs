@@ -1479,6 +1479,16 @@ impl Inner {
                 )),
                 Claim::Taken(name) => self.taken_by_other(staff, id, &name).await,
             },
+            Cb::CallAdmin(id) => {
+                let names = self.call_admin(staff, id).await?;
+                let notice = if names.is_empty() {
+                    self.texts.t("order.called_nobody")
+                } else {
+                    self.texts
+                        .f("order.called_admin", &[("names", &esc(&names.join(", ")))])
+                };
+                Ok(self.order(Some(staff), id).await?.notice(&notice))
+            }
             Cb::TakeOver(id) => {
                 let previous = match self.claim(staff, id, true).await? {
                     Claim::Mine { from } => from,

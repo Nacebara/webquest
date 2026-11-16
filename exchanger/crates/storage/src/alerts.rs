@@ -363,19 +363,41 @@ pub async fn ensure_condition(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Copy {
     pub chat_id: i64,
+    /// 0 — сообщения нет (отметка «позвал админа» без копии).
     pub message_id: i32,
     pub sent_at: DateTime<Utc>,
+    /// Сотрудник позвал админа (П-3): его копию не правим и не повторяем.
+    pub muted_at: Option<DateTime<Utc>>,
 }
 
 /// Копии тревоги у сотрудников.
 pub async fn copies(conn: &mut PgConnection, alert_id: i64) -> Result<Vec<Copy>, StorageError> {
     Ok(sqlx::query_as!(
         Copy,
-        "SELECT chat_id, message_id, sent_at FROM alert_copies WHERE alert_id = $1 ORDER BY chat_id",
+        "SELECT chat_id, message_id, sent_at, muted_at FROM alert_copies WHERE alert_id = $1 ORDER BY chat_id",
         alert_id
     )
     .fetch_all(conn)
     .await?)
+}
+
+/// Сотрудник позвал админа (П-3): повторы тревоги ему больше не приходят.
+pub async fn mute_copy(
+    conn: &mut PgConnection,
+    alert_id: i64,
+    chat_id: i64,
+) -> Result<(), StorageError> {
+    sqlx::query!(
+        r#"
+        INSERT INTO alert_copies (alert_id, chat_id, message_id, muted_at) VALUES ($1, $2, 0, now())
+        ON CONFLICT (alert_id, chat_id) DO UPDATE SET muted_at = COALESCE(alert_copies.muted_at, now())
+        "#,
+        alert_id,
+        chat_id,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
 }
 
 /// Запомнить копию: новое сообщение (или новое вместо прежнего при повторе).

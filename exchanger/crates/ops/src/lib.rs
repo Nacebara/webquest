@@ -1135,6 +1135,7 @@ mod tests {
         // Действия журнала (`admin_audit.action`) похожи на ключи, но это не тексты.
         let audit = [
             "order.take",
+            "order.call_admin",
             "direction.set",
             "direction.open",
             "direction.close",

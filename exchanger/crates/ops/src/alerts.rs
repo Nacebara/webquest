@@ -12,7 +12,7 @@ use botapi::{EditMessageText, ReplyMarkup, SendMessage};
 use domain::Direction;
 use serde_json::{Value, json};
 use storage::alerts::{AlertRow, Level, NewAlert, Topic};
-use storage::staff::StaffMember;
+use storage::staff::{Role, StaffMember};
 
 use crate::cb::Cb;
 use crate::texts::esc;
@@ -158,9 +158,16 @@ impl Inner {
         let mut first = None;
         for m in recipients {
             let chat = m.tg_user_id;
+            // Позвал админа (П-3): его копию не трогаем и не повторяем.
+            if copies
+                .iter()
+                .any(|c| c.chat_id == chat && c.muted_at.is_some())
+            {
+                continue;
+            }
             let previous = copies
                 .iter()
-                .find(|c| c.chat_id == chat)
+                .find(|c| c.chat_id == chat && c.message_id != 0)
                 .map(|c| c.message_id);
             if let (Some(message_id), false) = (previous, repeat) {
                 let mut request = EditMessageText::html(chat, message_id, screen.text.clone());
@@ -398,6 +405,18 @@ impl Inner {
 
     /// «Принял»: событие закрыто, у всех копий — отметка и без кнопки «Принял».
     pub(crate) async fn ack(&self, staff: &StaffMember, id: i64) -> Result<(), OpsError> {
+        // «Принял» на «Нужен разбор» от того, кто решить не может, — «Позвать админа» (П-3):
+        // повторы стихают у него, а не у всех.
+        let peek = {
+            let mut conn = self.pool.acquire().await?;
+            storage::alerts::get(&mut conn, id).await?
+        };
+        if let Some(a) = peek.filter(|a| a.title == "manual_review" && staff.role < Role::Admin)
+            && let Some(order) = a.payload["id"].as_i64()
+        {
+            self.call_admin(staff, order).await?;
+            return Ok(());
+        }
         let _turn = self.alert_turn.lock().await;
         let alert = {
             let mut conn = self.pool.acquire().await?;
@@ -439,7 +458,10 @@ impl Inner {
             let mut conn = self.pool.acquire().await?;
             storage::alerts::copies(&mut conn, id).await?
         };
-        for c in copies {
+        for c in copies
+            .iter()
+            .filter(|c| c.message_id != 0 && c.muted_at.is_none())
+        {
             let mut request = EditMessageText::html(c.chat_id, c.message_id, screen.text.clone());
             request.reply_markup = screen.markup();
             if let Err(e) = self.api.edit_message_text(&request).await
@@ -449,6 +471,118 @@ impl Inner {
             }
         }
         Ok(())
+    }
+
+    /// «Позвать админа» (П-3, аудит 16.11): сотрудник без права решить заявку на разборе. Его
+    /// копия тревоги затихает, админам и владельцу — сразу сообщение со звуком; сама тревога
+    /// остаётся открытой и повторяется у них, пока её не примет тот, кто решает. Возвращает имена
+    /// тех, кого позвали.
+    pub(crate) async fn call_admin(
+        &self,
+        staff: &StaffMember,
+        order: i64,
+    ) -> Result<Vec<String>, OpsError> {
+        let _turn = self.alert_turn.lock().await;
+        let (alert, deciders, card) = {
+            let mut conn = self.pool.acquire().await?;
+            let alert =
+                storage::alerts::open_by_key(&mut conn, &format!("manual_review:{order}")).await?;
+            let deciders: Vec<StaffMember> = storage::staff::list(&mut conn)
+                .await?
+                .into_iter()
+                .filter(|m| m.active() && m.role >= Role::Admin)
+                .collect();
+            let card = storage::admin::order_card(&mut conn, order).await?;
+            let target = order.to_string();
+            storage::audit::record(
+                &mut conn,
+                &storage::audit::NewAudit {
+                    staff_id: staff.tg_user_id,
+                    action: "order.call_admin",
+                    target_type: Some("order"),
+                    target_id: Some(&target),
+                    before: None,
+                    after: None,
+                    reason: None,
+                    double_confirmed: false,
+                },
+            )
+            .await?;
+            if let Some(a) = &alert {
+                storage::alerts::mute_copy(&mut conn, a.id, staff.tg_user_id).await?;
+            }
+            (alert, deciders, card)
+        };
+        let t = &self.texts;
+        // Его копия тревоги: «Позвал(а) админа · время — повторы для вас остановлены».
+        if let Some(a) = &alert {
+            let copies = {
+                let mut conn = self.pool.acquire().await?;
+                storage::alerts::copies(&mut conn, a.id).await?
+            };
+            if let Some(c) = copies
+                .iter()
+                .find(|c| c.chat_id == staff.tg_user_id && c.message_id != 0)
+            {
+                let full = self.render_alert(a);
+                let head = full.text.lines().next().unwrap_or_default();
+                let head = head
+                    .strip_prefix("{e:")
+                    .and_then(|r| r.split_once("} "))
+                    .map_or(head, |(_, rest)| rest);
+                let mut screen = Screen::new(t.f(
+                    "alert.called",
+                    &[
+                        ("head", &head),
+                        ("name", &esc(&staff.display_name)),
+                        ("at", &crate::dash::hhmm(chrono::Utc::now())),
+                    ],
+                ));
+                screen = screen.row(vec![btn(t.t("alert.b_open"), &Cb::Order(order))]);
+                let screen = self.look().screen(&screen);
+                let mut request =
+                    EditMessageText::html(c.chat_id, c.message_id, screen.text.clone());
+                request.reply_markup = screen.markup();
+                if let Err(e) = self.api.edit_message_text(&request).await
+                    && !e.is_not_modified()
+                {
+                    tracing::debug!(error = %e, "call-admin edit failed");
+                }
+            }
+        }
+        let reason = card
+            .manual_reason
+            .as_deref()
+            .map_or_else(|| t.t("common.none"), esc);
+        let text = t.f(
+            "order.call_admin_notice",
+            &[
+                ("name", &esc(&staff.display_name)),
+                ("public", &esc(&card.public_id)),
+                ("reason", &reason),
+            ],
+        );
+        let screen = self.look().screen(&Screen::new(text).row(vec![
+            btn(t.t("alert.b_open"), &Cb::Order(order)).style(botapi::ButtonStyle::Primary),
+        ]));
+        let mut names = Vec::new();
+        for m in &deciders {
+            let mut request = SendMessage::html(m.tg_user_id, screen.text.clone());
+            request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
+            match self.api.send_message(&request).await {
+                Ok(_) => names.push(m.display_name.clone()),
+                Err(e) => {
+                    tracing::info!(chat = m.tg_user_id, error = %e, "call-admin not delivered")
+                }
+            }
+        }
+        tracing::info!(
+            order,
+            staff = staff.tg_user_id,
+            called = names.len(),
+            "staff called an admin"
+        );
+        Ok(names)
     }
 }
 

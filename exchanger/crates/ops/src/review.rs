@@ -398,6 +398,15 @@ impl OrderView {
             ));
         }
 
+        // Неясный исход: повтор и возврат — только админ (таблица прав, шаг 3). Оператору — строка
+        // «решает админ» и «Позвать админа» вместо кнопок, которые он нажать не может (П-3).
+        let unknown = c.operations.iter().any(|o| o.status == "unknown");
+        let operator_blocked = c.state == OrderState::ManualReview && role < Role::Admin && unknown;
+        if operator_blocked {
+            let hint = t.t("order.admin_decides");
+            rich.push_str(&format!("<blockquote>{hint}</blockquote>"));
+            plain.push_str(&format!("{hint}\n"));
+        }
         let mut s = Screen::card(rich, plain.trim_end().to_owned());
         let write = btn(t.t("order.b_write"), &Cb::SupportReply(c.user_id));
         if c.state != OrderState::ManualReview {
@@ -436,7 +445,7 @@ impl OrderView {
                         .style(botapi::ButtonStyle::Primary),
                 ]);
             }
-        } else if posted {
+        } else if posted && !operator_blocked {
             s = s.row(vec![match c.direction.flow() {
                 Flow::CheckExchange => decide(DecisionKind::RetryPayout, "order.b_retry"),
                 Flow::InvoicePayment => decide(DecisionKind::RetryInvoice, "order.b_retry_invoice"),
@@ -451,6 +460,15 @@ impl OrderView {
             s = s.row(vec![
                 decide(DecisionKind::Close, "order.b_close").style(botapi::ButtonStyle::Danger),
             ]);
+        }
+        // Оператор: позвать того, кто решает (П-3). Главная кнопка, когда сам он решить не может.
+        if role < Role::Admin {
+            let call = btn(t.t("order.b_call_admin"), &Cb::CallAdmin(c.id));
+            s = s.row(vec![if operator_blocked {
+                call.style(botapi::ButtonStyle::Primary)
+            } else {
+                call
+            }]);
         }
         s
     }

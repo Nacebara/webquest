@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO alert_copies (alert_id, chat_id, message_id, muted_at) VALUES ($1, $2, 0, now())\n        ON CONFLICT (alert_id, chat_id) DO UPDATE SET muted_at = COALESCE(alert_copies.muted_at, now())\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "832e9ad9f324b2199dddbbd1fc1ac5b13d4af663e1ec9ae215f141a125741014"
+}

@@ -207,3 +207,30 @@ fn critical_alerts() {
     }
     assert!(ops::critical_screen(&t, "manual_review", &serde_json::json!({}), 1, first).is_none());
 }
+
+/// П-3 (аудит 16.11, картинка принята): у оператора при неясном исходе — «решает админ» и
+/// «Позвать админа» вместо повтора и возврата, которые ему недоступны.
+#[test]
+fn order_card_operator_unknown_outcome() {
+    let t = Texts::builtin().unwrap();
+    let links = ops::Links::new(Some("exch_bot".into()));
+    let mut v = ops::sample_order();
+    for op in &mut v.card.operations {
+        if op.key.ends_with("payout") {
+            op.status = "unknown".into();
+        }
+    }
+    let card = Look::plain().screen(&v.screen(
+        &t,
+        storage::staff::Role::Operator,
+        ops::sample_now(),
+        &links,
+    ));
+    let dump = dump(&card);
+    assert!(dump.contains("решает админ"), "{dump}");
+    assert!(
+        !dump.contains("Повторить") && !dump.contains("Вернуть"),
+        "{dump}"
+    );
+    insta::assert_snapshot!("order_card_operator_unknown", dump);
+}

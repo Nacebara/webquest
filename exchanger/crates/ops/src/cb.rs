@@ -167,6 +167,8 @@ pub enum Cb {
     TakeOver(i64),
     /// «Обменять как клиент» (П-4): следующая ссылка сотрудника — в обычный обмен.
     AsClient,
+    /// «Позвать админа» по заявке на разборе (П-3).
+    CallAdmin(i64),
     Decide(i64, DecisionKind),
     UserAsk,
     User(i64),
@@ -328,6 +330,7 @@ impl Cb {
             Cb::Take(id) => format!("ot:{id}"),
             Cb::TakeOver(id) => format!("ow:{id}"),
             Cb::AsClient => "asc".into(),
+            Cb::CallAdmin(id) => format!("cad:{id}"),
             Cb::Decide(id, k) => format!("od:{id}:{}", k.code()),
             Cb::UserAsk => "ua".into(),
             Cb::User(id) => format!("u:{id}"),
@@ -428,6 +431,7 @@ impl Cb {
             ["ot", _] => Cb::Take(id(1)?),
             ["ow", _] => Cb::TakeOver(id(1)?),
             ["asc"] => Cb::AsClient,
+            ["cad", _] => Cb::CallAdmin(id(1)?),
             ["od", _, k] => Cb::Decide(
                 id(1)?,
                 DecisionKind::ALL.into_iter().find(|x| x.code() == *k)?,
@@ -581,6 +585,7 @@ mod tests {
         all.extend(DecisionKind::ALL.map(|k| Cb::Decide(big, k)));
         all.push(Cb::TakeOver(big));
         all.push(Cb::AsClient);
+        all.push(Cb::CallAdmin(big));
         all.extend(Flag::ALL.map(Cb::Toggle));
         all.extend(EmojiStyle::ALL.map(Cb::EmojiStyle));
         all.extend(Emoji::ALL.map(Cb::EmojiRole));

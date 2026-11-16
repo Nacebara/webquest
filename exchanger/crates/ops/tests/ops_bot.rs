@@ -978,6 +978,87 @@ async fn a_check_link_from_staff_never_starts_a_client_exchange(pool: PgPool) {
     assert_eq!(orders_count(&o).await, 2);
 }
 
+const OPERATOR: i64 = 503;
+
+/// П-3 (аудит 16.11): оператор, который не может решить заявку с неясным исходом, видит «решает
+/// админ» и «Позвать админа» вместо кнопок, которые ему недоступны. Его «Принял» на «Нужен
+/// разбор» — тоже «Позвать админа»: повторы стихают у него, а у админа и владельца тревога
+/// остаётся открытой и повторяется.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn an_operator_calls_an_admin_instead_of_silencing_everyone(pool: PgPool) {
+    let o = ops_with(pool, |c| c.repeat_every = Duration::from_millis(300)).await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        storage::staff::add(&mut conn, OPERATOR, Role::Operator, "Олег", OWNER)
+            .await
+            .unwrap();
+    }
+    for who in [OWNER, ADMIN, OPERATOR] {
+        o.say(who, "/menu", "<b>Пульт</b>").await;
+    }
+    // Активация без ответа кошелька: исход неясен, заявка на разборе.
+    let url = o.world.client_check(XR, usdt(dec!(3))).unwrap();
+    let order = accepted(
+        o.engine
+            .submit_check(common::CLIENT, &parsers::links::parse_url(&url).unwrap())
+            .await
+            .unwrap(),
+    );
+    o.world.inject(
+        o.ub,
+        userbot::sim::Call::SendText,
+        userbot::sim::Fault::NoReply,
+        1,
+    );
+    let mark = o.tg.mark();
+    o.drain().await;
+    o.bot.deliver_alerts().await.unwrap();
+    let alert = o.tg.screen(mark, OPERATOR, "Нужен разбор").await;
+    o.tg.screen(mark, ADMIN, "Нужен разбор").await;
+
+    // Карточка у оператора.
+    let card = o
+        .press(OPERATOR, &alert, "Открыть заявку", "Ручной разбор")
+        .await;
+    assert!(card.text().contains("решает админ"), "{}", card.text());
+    assert!(
+        card.button("Позвать админа").is_some(),
+        "{:?}",
+        card.buttons()
+    );
+    assert!(card.button("Повторить").is_none() && card.button("Вернуть").is_none());
+
+    // «Принял» оператора: его копия — «Позвал(а) админа», админу и владельцу — вызов.
+    let alert = o.tg.screen(mark, OPERATOR, "Нужен разбор").await;
+    let mark = o.tg.mark();
+    let data = alert.button("Принял").expect("ack button");
+    o.tg.presses(OPERATOR, alert.message_id.unwrap(), &data);
+    o.tg.screen(mark, OPERATOR, "Позвал(а) админа Олег").await;
+    let call = o.tg.screen(mark, ADMIN, "Олег зовёт админа").await;
+    assert!(call.text().contains(&order.public_id), "{}", call.text());
+    o.tg.screen(mark, OWNER, "Олег зовёт админа").await;
+    let mut conn = o.pool.acquire().await.unwrap();
+    let open = storage::alerts::open_by_key(&mut conn, &format!("manual_review:{}", order.id))
+        .await
+        .unwrap();
+    assert!(open.is_some(), "тревога не погашена у всех");
+    drop(conn);
+
+    // Повтор: админу — да, оператору — нет.
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    let mark = o.tg.mark();
+    o.bot.deliver_alerts().await.unwrap();
+    o.tg.screen(mark, ADMIN, "Нужен разбор").await;
+    let to_operator =
+        o.tg.calls()
+            .into_iter()
+            .skip(mark)
+            .filter(|c| c.chat() == Some(OPERATOR) && c.text().contains("Нужен разбор"))
+            .count();
+    assert_eq!(to_operator, 0, "оператору повторов больше нет");
+    assert_eq!(o.audit("order.call_admin").await.len(), 1);
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn client_card_sets_a_personal_fee(pool: PgPool) {
     let o = ops(pool).await;
