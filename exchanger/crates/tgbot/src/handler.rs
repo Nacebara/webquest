@@ -725,6 +725,11 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
             inner.menu(chat, user, MenuAction::Support).await
         }
         Callback::Cancel(None) => {
+            // «Отмена» под приглашением в поддержку (К-2): следующий текст — уже не вопрос.
+            let waited = inner.memory(|m| m.support_wait.remove(&user)).is_some();
+            if waited {
+                inner.save_support_wait(user, None).await;
+            }
             inner
                 .replace(chat, message, &inner.ui().cancelled(None))
                 .await

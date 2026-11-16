@@ -1812,6 +1812,48 @@ async fn support_survives_a_restart(pool: PgPool) {
     bot.stop().await;
 }
 
+/// Д7/С3 (аудит 16.11, К-2): передумал писать в поддержку — «Отмена» под приглашением, и
+/// следующий текст уже не вопрос оператору, а обычная подсказка. Раньше любой текст 15 минут
+/// уходил оператору, даже «ой, не надо».
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn support_can_be_cancelled(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot_with(true);
+    e.fake.client_writes("/terms");
+    e.fake
+        .wait_for("rich terms", |c| {
+            c.method == "sendRichMessage" && c.contains("Курс")
+        })
+        .await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let message = e.fake.lock().next_message;
+    e.fake.client_presses(message, "support");
+    let prompt = e
+        .fake
+        .wait_for("support screen", |c| c.contains("Напишите вопрос"))
+        .await;
+    assert!(
+        prompt.contains("\"cancel\""),
+        "«Отмена» под приглашением: {}",
+        prompt.body
+    );
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let prompt_id = e.fake.lock().next_message;
+    e.fake.client_presses(prompt_id, "cancel");
+    e.fake
+        .wait_for("cancelled", |c| c.contains("Отменил"))
+        .await;
+    e.fake.client_writes("ой, не надо");
+    let hint = e
+        .fake
+        .wait_for("no-link hint", |c| {
+            c.method == "sendMessage" && c.contains("Пришлите чек")
+        })
+        .await;
+    assert!(!hint.contains("передать вопрос"), "{}", hint.body);
+    bot.stop().await;
+}
+
 /// Шаг 6.5 (AUDIT-UI С1): «История» под итогом заявки — новым сообщением, итог не затирается;
 /// листание страниц «Истории» — в том же сообщении.
 #[sqlx::test(migrator = "storage::MIGRATOR")]

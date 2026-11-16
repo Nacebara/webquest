@@ -75,6 +75,14 @@ impl Inner {
     }
 
     /// Закрыть обращение клиента (ответили или закрыли без ответа).
+    /// Заявка открытого вопроса клиента (публичный номер), если вопрос был по заявке.
+    pub(crate) async fn question_order(&self, client: i64) -> Result<Option<String>, OpsError> {
+        let mut conn = self.pool.acquire().await?;
+        Ok(storage::alerts::open_by_key(&mut conn, &key(client))
+            .await?
+            .and_then(|a| a.payload["order"].as_str().map(str::to_owned)))
+    }
+
     pub(crate) async fn close_question(&self, client: i64, staff: i64) -> Result<(), OpsError> {
         let mut conn = self.pool.acquire().await?;
         if let Some(a) = storage::alerts::open_by_key(&mut conn, &key(client)).await? {

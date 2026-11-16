@@ -5,13 +5,13 @@ expression: "both(p, q)"
 ### plain
 --- html
 ⏸ <b>xRocket → CryptoBot на паузе</b>
-Чек не открывал — деньги в нём. Нажмите кнопку — напишу, когда заработает.
+Чек не открывал — деньги в нём. Пришлите его чуть позже — статус виден в «Курсе».
 --- keyboard: inline
 [{"callback_data":"exchange","text":"💱 Обменять"},{"callback_data":"terms","text":"📈 Курс"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> <b>xRocket → CryptoBot на паузе</b>
-Чек не открывал — деньги в нём. Нажмите кнопку — напишу, когда заработает.
+Чек не открывал — деньги в нём. Пришлите его чуть позже — статус виден в «Курсе».
 --- keyboard: inline
 [{"callback_data":"exchange","icon_custom_emoji_id":"5368000000000000014","text":"Обменять"},{"callback_data":"terms","icon_custom_emoji_id":"5368000000000000015","text":"Курс"}]

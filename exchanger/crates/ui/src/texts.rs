@@ -188,6 +188,8 @@ pub struct ButtonTexts {
     pub order_question: String,
     pub open_order: String,
     pub notify: String,
+    /// «Ответить» под ответом оператора (Д7/С3, К-2).
+    pub reply: String,
     pub more: String,
     pub open_wallet: String,
     /// «Простой вид» — в «Курс и лимиты» (макет B1).

@@ -1419,8 +1419,21 @@ async fn support_question_reaches_staff_and_the_answer_reaches_the_client(pool: 
         "Отправлено клиенту · Анна",
     )
     .await;
-    let answer = o.tg.screen(mark, 4242, "Оператор Анна:").await;
+    // Вид — «Ответ поддержки» (полировка 16.11); «Ответить» снова открывает поддержку по
+    // той же заявке (Д7/С3, К-2): раньше ответ клиента получал «Пришлите чек…».
+    let answer = o.tg.screen(mark, 4242, "Ответ поддержки").await;
     assert!(answer.text().contains("деньги у нас"), "{}", answer.text());
+    assert!(
+        answer.text().contains("Анна, оператор"),
+        "{}",
+        answer.text()
+    );
+    assert_eq!(
+        answer.button("Ответить").as_deref(),
+        Some("support:K7M2Q9XR4T"),
+        "{:?}",
+        answer.buttons()
+    );
     // Ответили — обращение закрыто, счётчика больше нет.
     let menu = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
     assert!(menu.button("Обращения · ").is_none(), "{:?}", menu.body);

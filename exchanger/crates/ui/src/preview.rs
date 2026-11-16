@@ -317,7 +317,11 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
             messages: vec![
                 ui.support(None),
                 ui.support_sent(Some(ORDER)),
-                ui.operator_answer("Анна", "деньги у нас, проверяем. Чек будет через 5 минут."),
+                ui.operator_answer(
+                    "Анна",
+                    "Деньги у нас, проверяем. Чек будет через 5 минут.",
+                    Some("K7M2Q9XR4T"),
+                ),
             ],
         },
         one("Без ссылки", ui.no_link()),

@@ -674,7 +674,11 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
         ("support_without_contact", ui.support(None)),
         (
             "operator_answer",
-            ui.operator_answer("Анна <b>", "деньги у нас & чек через 5 минут"),
+            ui.operator_answer(
+                "Анна <b>",
+                "деньги у нас & чек через 5 минут",
+                Some("K7M2Q9XR4T"),
+            ),
         ),
         ("no_link", ui.no_link()),
         ("cancelled_order", ui.cancelled(Some(ORDER))),

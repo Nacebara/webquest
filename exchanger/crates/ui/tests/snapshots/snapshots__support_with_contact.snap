@@ -7,11 +7,13 @@ expression: "both(p, q)"
 💬 <b>Поддержка</b>
 Напишите вопрос одним сообщением — передам оператору.
 Или напрямую: @exch_support
---- keyboard: none
+--- keyboard: inline
+[{"callback_data":"cancel","text":"✖️ Отмена"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000010">💬</tg-emoji> <b>Поддержка</b>
 Напишите вопрос одним сообщением — передам оператору.
 Или напрямую: @exch_support
---- keyboard: none
+--- keyboard: inline
+[{"callback_data":"cancel","icon_custom_emoji_id":"5368000000000000025","text":"Отмена"}]

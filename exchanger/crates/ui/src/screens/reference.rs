@@ -1195,7 +1195,13 @@ impl Ui {
             body.push(&Frag::trusted("\n"));
             body.push(&self.fill(&t.contact, &[("contact", &Frag::text(&format!("@{name}")))]));
         }
-        self.plain(body, Keyboard::None)
+        // Д7/С3 (К-2): передумал — «Отмена», следующий текст уже не уйдёт оператору.
+        let keyboard = Keyboard::inline_rows(vec![vec![self.cb_button(
+            Some(Emoji::Hide),
+            &self.texts.buttons.cancel,
+            &Callback::Cancel(None),
+        )]]);
+        self.plain(body, keyboard)
     }
 
     /// «Передал оператору · заявка K7M2Q9XR4T» (макет B1).
@@ -1210,12 +1216,20 @@ impl Ui {
 
     /// «Оператор Анна: деньги у нас, проверяем…» — ответ сотрудника клиенту (макет «Поддержка»).
     /// Имя и текст — чужие: экранируются.
-    pub fn operator_answer(&self, name: &str, text: &str) -> Screen {
+    /// Ответ оператора. «Ответить» снова открывает поддержку по той же заявке (Д7/С3, К-2):
+    /// раньше ответ клиента получал «Пришлите чек…».
+    pub fn operator_answer(&self, name: &str, text: &str, order: Option<&str>) -> Screen {
         let body = self.fill(
             &self.texts.support.answer,
             &[("name", &Frag::text(name)), ("text", &Frag::text(text))],
         );
-        self.plain(body, Keyboard::None)
+        let order = order.filter(|o| order_id_ok(o)).map(str::to_owned);
+        let keyboard = Keyboard::inline_rows(vec![vec![self.cb_button(
+            Some(Emoji::Reply),
+            &self.texts.buttons.reply,
+            &Callback::Support(order),
+        )]]);
+        self.plain(body, keyboard)
     }
 
     /// Вопрос передать не вышло: что делать клиенту.

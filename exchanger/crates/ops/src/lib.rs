@@ -1030,9 +1030,10 @@ impl Inner {
         if text.is_empty() {
             return Ok(Screen::new(self.texts.t("support.empty")).row(vec![home()]));
         }
-        // Текст клиента — из ui/ru.toml (AUDIT-UI С3), вид — как в макете «Поддержка».
+        // Текст клиента — из ui/ru.toml (AUDIT-UI С3), вид — «Ответ поддержки» с «Ответить».
+        let order = self.question_order(client).await?;
         let answer = match ui::Ui::builtin(self.look().emoji().clone(), ui::UiConfig::default()) {
-            Ok(ui) => ui.operator_answer(&staff.display_name, text).html,
+            Ok(ui) => ui.operator_answer(&staff.display_name, text, order.as_deref()),
             Err(e) => {
                 tracing::warn!(error = %e, "client texts are invalid");
                 return Ok(Screen::new(
@@ -1042,11 +1043,9 @@ impl Inner {
                 .row(vec![home()]));
             }
         };
-        match self
-            .api
-            .send_message(&SendMessage::html(client, answer))
-            .await
-        {
+        let mut request = SendMessage::html(client, answer.html);
+        request.reply_markup = answer.keyboard.reply_markup();
+        match self.api.send_message(&request).await {
             Ok(_) => {
                 self.close_question(client, staff.tg_user_id).await?;
                 Ok(Screen::new(self.texts.f(

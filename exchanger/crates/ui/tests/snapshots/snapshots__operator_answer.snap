@@ -4,10 +4,16 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-<b>Оператор Анна &lt;b&gt;:</b> деньги у нас &amp; чек через 5 минут
---- keyboard: none
+💬 <b>Ответ поддержки</b>
+<blockquote>деньги у нас &amp; чек через 5 минут
+<i>Анна &lt;b&gt;, оператор</i></blockquote>
+--- keyboard: inline
+[{"callback_data":"support:K7M2Q9XR4T","text":"↩️ Ответить"}]
 
 ### premium
 --- html
-<b>Оператор Анна &lt;b&gt;:</b> деньги у нас &amp; чек через 5 минут
---- keyboard: none
+<tg-emoji emoji-id="5368000000000000010">💬</tg-emoji> <b>Ответ поддержки</b>
+<blockquote>деньги у нас &amp; чек через 5 минут
+<i>Анна &lt;b&gt;, оператор</i></blockquote>
+--- keyboard: inline
+[{"callback_data":"support:K7M2Q9XR4T","icon_custom_emoji_id":"5368000000000000043","text":"Ответить"}]
