@@ -28,13 +28,15 @@ pub enum StopSignal {
     Logoff,
     /// Компьютер выключается или перезагружается.
     SystemShutdown,
+    /// Службу Windows остановили (`exch service stop`, «Службы», перезагрузка).
+    ServiceStop,
 }
 
 impl StopSignal {
     /// Сколько есть времени на мягкую остановку.
     pub fn grace(self) -> Duration {
         match self {
-            StopSignal::Interrupt | StopSignal::Terminate => GRACE,
+            StopSignal::Interrupt | StopSignal::Terminate | StopSignal::ServiceStop => GRACE,
             StopSignal::ConsoleClosed | StopSignal::Logoff | StopSignal::SystemShutdown => {
                 WINDOWS_GRACE
             }
@@ -49,12 +51,34 @@ impl StopSignal {
             StopSignal::ConsoleClosed => "console closed",
             StopSignal::Logoff => "logoff",
             StopSignal::SystemShutdown => "system shutdown",
+            StopSignal::ServiceStop => "service stop",
         }
     }
 }
 
-/// Дождаться сигнала остановки. Не удалось подписаться на сигнал — остаётся Ctrl+C.
+/// Остановка службы Windows: обработчик команд службы работает в своём потоке и только
+/// отмечает просьбу, а [`wait`] её видит.
+fn service_stop() -> &'static tokio_util::sync::CancellationToken {
+    static STOP: std::sync::OnceLock<tokio_util::sync::CancellationToken> =
+        std::sync::OnceLock::new();
+    STOP.get_or_init(tokio_util::sync::CancellationToken::new)
+}
+
+/// Попросить exch остановиться так же мягко, как по Ctrl+C (команда «стоп» службы Windows).
+pub fn request_service_stop() {
+    service_stop().cancel();
+}
+
+/// Дождаться сигнала остановки (или остановки службы Windows).
 pub async fn wait() -> StopSignal {
+    tokio::select! {
+        signal = wait_signal() => signal,
+        () = service_stop().cancelled() => StopSignal::ServiceStop,
+    }
+}
+
+/// Сигналы ОС. Не удалось подписаться на сигнал — остаётся Ctrl+C.
+async fn wait_signal() -> StopSignal {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{SignalKind, signal};
@@ -129,7 +153,11 @@ mod tests {
     #[test]
     fn a_service_stop_gets_the_full_grace_period() {
         // Таймаут службы — не меньше 70 с: задачи успевают закончить начатое.
-        for s in [StopSignal::Interrupt, StopSignal::Terminate] {
+        for s in [
+            StopSignal::Interrupt,
+            StopSignal::Terminate,
+            StopSignal::ServiceStop,
+        ] {
             assert_eq!(s.grace(), GRACE);
             assert!(s.grace() < Duration::from_secs(70));
         }

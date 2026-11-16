@@ -69,6 +69,13 @@ enum Command {
     /// Восстановить базу из копии (компьютер сломался): только в пустую или новую базу из
     /// DATABASE_URL, копия сначала проверяется. Нужен тот же SESSION_KEY, что был при копии.
     Restore { file: PathBuf },
+    /// Служба Windows: install (автозапуск после PostgreSQL, перезапуск при сбое), uninstall,
+    /// start, stop, status. install и uninstall — из PowerShell от имени администратора.
+    #[command(subcommand)]
+    Service(ServiceCommand),
+    /// Запуск службой Windows (вызывает диспетчер служб, не человек).
+    #[command(hide = true)]
+    ServiceRun,
     /// Войти аккаунтом юзербота и привязать его к кошельку платформы. Телефон, код и пароль
     /// 2FA спрашиваются в терминале и никуда не сохраняются, сессия — только зашифрованной.
     Login {
@@ -116,6 +123,21 @@ enum Command {
     /// подхватывает изменения в течение минуты.
     #[command(subcommand)]
     Emoji(EmojiCommand),
+}
+
+#[derive(Debug, Subcommand)]
+enum ServiceCommand {
+    /// Зарегистрировать exch службой Windows.
+    Install {
+        /// Имя службы PostgreSQL, если не находится само (postgresql-x64-16 и т. п.).
+        #[arg(long)]
+        postgres: Option<String>,
+    },
+    /// Остановить и удалить службу.
+    Uninstall,
+    Start,
+    Stop,
+    Status,
 }
 
 #[derive(Debug, Subcommand)]
@@ -194,6 +216,17 @@ fn main() -> ExitCode {
         } else {
             Command::Setup
         });
+    if matches!(command, Command::ServiceRun) {
+        // Диспетчер служб Windows вызывает `service_main`, а та — обычный запуск.
+        SERVICE_PATHS.get_or_init(|| paths.clone());
+        return match app::service::dispatch(run_as_service) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("{e:#}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     let code = start(command, &paths, has_env, bare);
     // Служба и планировщик запускают `exch run` (с командой), поэтому паузы у них нет; а если
     // запустили без команды, но не в живом окне — пауза не ждёт.
@@ -201,6 +234,18 @@ fn main() -> ExitCode {
         app::prompt::pause();
     }
     code
+}
+
+/// Папки проекта для запуска службой (диспетчер вызывает функцию без аргументов).
+static SERVICE_PATHS: std::sync::OnceLock<app::project::Paths> = std::sync::OnceLock::new();
+
+/// `exch run` внутри службы Windows; код выхода — службе.
+fn run_as_service() -> i32 {
+    let Some(paths) = SERVICE_PATHS.get() else {
+        return 1;
+    };
+    let code = start(Command::Run, paths, paths.env.is_file(), false);
+    i32::from(code != ExitCode::SUCCESS)
 }
 
 fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: bool) -> ExitCode {
@@ -230,6 +275,7 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
             | Command::Check
             | Command::Backup { .. }
             | Command::Restore { .. }
+            | Command::Service(_)
     );
     // LOG_FORMAT=text — обычный текст, json — для сервера; не задан — текст в окне программы,
     // JSON, когда вывод идёт в файл или журнал сервера.
@@ -278,6 +324,8 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
             Command::Migrate => migrate().await,
             Command::Backup { check } => backup(paths, check).await,
             Command::Restore { file } => restore(paths, file).await,
+            Command::Service(cmd) => service(paths, cmd),
+            Command::ServiceRun => anyhow::bail!("exch service-run запускает только служба"),
             Command::Selftest { amount } => selftest(amount).await,
             Command::GenSessionKey => {
                 use base64::Engine as _;
@@ -745,6 +793,41 @@ async fn backup(paths: &app::project::Paths, check_only: bool) -> anyhow::Result
         o.bytes / 1024,
         rows_text(&o.checked.rows)
     );
+    Ok(())
+}
+
+/// `exch service …`: служба Windows.
+fn service(paths: &app::project::Paths, cmd: ServiceCommand) -> anyhow::Result<()> {
+    match cmd {
+        ServiceCommand::Install { postgres } => {
+            let env = std::path::absolute(&paths.env).unwrap_or_else(|_| paths.env.clone());
+            if !env.is_file() {
+                anyhow::bail!(
+                    "нет {} — сначала exch setup, потом установка службы",
+                    env.display()
+                );
+            }
+            let pg = app::service::install(&env, postgres.as_deref())?;
+            println!(
+                "✅ Служба «{}» установлена: запуск вместе с компьютером после {pg}, перезапуск при сбое, настройки — {}.\nЗапустить сейчас: exch service start",
+                app::service::NAME,
+                env.display()
+            );
+        }
+        ServiceCommand::Uninstall => {
+            app::service::uninstall()?;
+            println!("✅ Служба удалена. Начатые заявки exch доведёт при следующем запуске.");
+        }
+        ServiceCommand::Start => {
+            app::service::start()?;
+            println!("✅ Служба запускается. Журнал — папка logs; проверка — exch check.");
+        }
+        ServiceCommand::Stop => {
+            app::service::stop()?;
+            println!("✅ Служба останавливается: начатые заявки доводятся, до минуты.");
+        }
+        ServiceCommand::Status => println!("Служба exch: {}", app::service::status()?),
+    }
     Ok(())
 }
 

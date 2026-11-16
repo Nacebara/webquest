@@ -26,6 +26,7 @@ pub mod project;
 pub mod prompt;
 pub mod record;
 pub mod runtime;
+pub mod service;
 pub mod session_store;
 pub mod settings_file;
 pub mod setup;

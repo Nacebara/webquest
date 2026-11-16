@@ -51,6 +51,12 @@ ui = { path = "../ui" }
 # `sim` — симулятор ботов кошельков для `exch demo` (экраны на пробу без денег, PLAN-v1 фаза 1).
 userbot = { path = "../userbot", features = ["sim"] }
 
+# Служба Windows (веха 10, решение владельца 17.11): `exch service install` регистрирует exch
+# настоящей службой с автозапуском, зависимостью от PostgreSQL и перезапуском при сбое — без
+# сторонних программ. Только под Windows.
+[target.'cfg(windows)'.dependencies]
+windows-service = "=0.8.1"
+
 [dev-dependencies]
 rust_decimal_macros.workspace = true
 tokio = { workspace = true, features = ["test-util", "net"] }

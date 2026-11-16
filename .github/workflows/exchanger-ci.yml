@@ -135,6 +135,28 @@ jobs:
       - name: exch --help (бинарник запускается)
         run: target/release/exch.exe --help
 
+      # Веха 10: служба Windows регистрируется как задумано — автозапуск (отложенный), зависимость
+      # от PostgreSQL, перезапуск при сбое, запуск с полным путём к .env; удаляется без следов.
+      - name: Служба Windows — установка, проверка, удаление
+        shell: pwsh
+        run: |
+          New-Item -ItemType File -Force -Path .env | Out-Null
+          $pg = (Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue | Select-Object -First 1).Name
+          if (-not $pg) { $pg = "Dnscache" }
+          target/release/exch.exe service install --postgres $pg
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $qc = sc.exe qc exch | Out-String
+          Write-Output $qc
+          if ($qc -notmatch "AUTO_START" -or $qc -notmatch [regex]::Escape($pg) -or $qc -notmatch "service-run" -or $qc -notmatch "\.env") { Write-Error "unexpected service config"; exit 1 }
+          $fail = sc.exe qfailure exch | Out-String
+          Write-Output $fail
+          if ($fail -notmatch "RESTART") { Write-Error "no restart on failure"; exit 1 }
+          target/release/exch.exe service status
+          target/release/exch.exe service uninstall
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $left = target/release/exch.exe service status | Out-String
+          if ($left -notmatch "не установлена") { Write-Error "service still registered"; exit 1 }
+
       - uses: actions/upload-artifact@v4
         with:
           name: exch-windows
