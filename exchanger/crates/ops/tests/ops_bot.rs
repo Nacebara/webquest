@@ -158,6 +158,24 @@ impl FakeTelegram {
         }));
     }
 
+    /// Сотрудник (или кошелёк через инлайн-режим) правит своё сообщение `message_id`.
+    fn edits(&self, user: i64, message_id: i64, text: &str) {
+        let mut s = self.lock();
+        let id = s.next_update;
+        s.next_update += 1;
+        s.updates.push(json!({
+            "update_id": id,
+            "edited_message": {
+                "message_id": message_id,
+                "date": 1,
+                "edit_date": 2,
+                "chat": { "id": user, "type": "private" },
+                "from": { "id": user, "is_bot": false, "first_name": "Staff" },
+                "text": text,
+            }
+        }));
+    }
+
     fn presses(&self, user: i64, message_id: i64, data: &str) {
         let mut s = self.lock();
         let id = s.next_update;
@@ -877,6 +895,87 @@ async fn a_decision_confirmed_after_a_take_over_is_refused(pool: PgPool) {
     o.press(ADMIN, &preview, "Вернуть", "уже взял(а)").await;
     o.drain().await;
     assert_eq!(order_state(&o, order.id).await, OrderState::ManualReview);
+}
+
+async fn orders_count(o: &Ops) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM orders")
+        .fetch_one(&o.pool)
+        .await
+        .unwrap()
+}
+
+/// П-4 (аудит 16.11): ссылку на чек, которую сотрудник вставил в чат с ботом, обрабатывает пульт,
+/// а не клиентский обмен — иначе юзербот открыл бы чек клиента и выплатил сотруднику. Любым
+/// путём: текстом, голым кодом, `/start <код>`, правкой из инлайн-режима кошелька. Обмен как
+/// клиент — только после кнопки, ровно одной ссылкой.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_check_link_from_staff_never_starts_a_client_exchange(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
+    let url = o.world.client_check(CB, usdt(dec!(25))).unwrap();
+    let code = parsers::links::parse_url(&url).unwrap().param;
+    let unknown = o.say(ADMIN, &url, "Такого чека в заявках нет").await;
+    o.say(ADMIN, &code, "Такого чека в заявках нет").await;
+    o.say(
+        ADMIN,
+        &format!("/start {code}"),
+        "Такого чека в заявках нет",
+    )
+    .await;
+    // Сообщение «через @send»: ссылка приходит правкой — тоже пульту.
+    let mark = o.tg.mark();
+    o.tg.writes(ADMIN, "чек создаётся…");
+    let message_id = {
+        let s = o.tg.state.lock().unwrap();
+        s.next_update - 1
+    };
+    o.tg.edits(ADMIN, message_id, &url);
+    o.tg.screen(mark, ADMIN, "Такого чека в заявках нет").await;
+    o.drain().await;
+    assert_eq!(orders_count(&o).await, 0, "чек сотрудника не стал заявкой");
+    assert!(
+        o.world
+            .check(&code)
+            .is_some_and(|c| c.claimed_by.is_empty()),
+        "чек никто не открывал"
+    );
+
+    // Чек из заявки клиента — её карточка.
+    let client_url = o.world.client_check(CB, usdt(dec!(30))).unwrap();
+    let order = accepted(
+        o.engine
+            .submit_check(
+                common::CLIENT,
+                &parsers::links::parse_url(&client_url).unwrap(),
+            )
+            .await
+            .unwrap(),
+    );
+    let card = o.say(ADMIN, &client_url, "из заявки").await;
+    assert!(card.text().contains(&order.public_id), "{}", card.text());
+    // И поиск понимает ссылку.
+    o.say(ADMIN, "/find", "Номер заявки").await;
+    o.say(ADMIN, &client_url, &order.public_id).await;
+
+    // «Обменять как клиент»: одна следующая ссылка уходит в обмен, следующая — снова пульту.
+    o.press(
+        ADMIN,
+        &unknown,
+        "Обменять как клиент",
+        "Пришлите ссылку ещё раз",
+    )
+    .await;
+    o.tg.writes(ADMIN, &url);
+    for _ in 0..150 {
+        if orders_count(&o).await == 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(orders_count(&o).await, 2, "по кнопке — обычный обмен");
+    let other = o.world.client_check(XR, usdt(dec!(5))).unwrap();
+    o.say(ADMIN, &other, "Такого чека в заявках нет").await;
+    assert_eq!(orders_count(&o).await, 2);
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]

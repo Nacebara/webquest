@@ -194,7 +194,23 @@ pub(crate) struct State {
     windows: HashMap<i64, i32>,
     /// Последний открытый список сотрудника — куда ведёт «‹ Назад» из карточки.
     last_list: HashMap<i64, Cb>,
+    /// «Обменять как клиент» (П-4): следующая ссылка сотрудника уходит в обычный обмен.
+    as_client: HashMap<i64, AsClient>,
+    /// Ссылки из правок, на которые пульт уже ответил: (чат, сообщение, параметр).
+    seen_edits: std::collections::HashSet<(i64, i32, String)>,
 }
+
+/// Разовый пропуск в клиентский обмен для сотрудника (П-4, аудит 16.11).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AsClient {
+    /// До какого времени действует.
+    pub until: std::time::Instant,
+    /// Сообщение, которым пропуск использован: его правки (инлайн-режим кошелька) — тоже клиенту.
+    pub message: Option<i32>,
+}
+
+/// Сколько действует «Обменять как клиент».
+pub(crate) const AS_CLIENT_FOR: std::time::Duration = std::time::Duration::from_secs(120);
 
 /// Пульт. Дешёвый `Clone`.
 #[derive(Clone)]
@@ -414,6 +430,19 @@ impl Inner {
                 .await?;
             return Ok(true);
         }
+        // Правка сообщения сотрудника: ссылка из инлайн-режима кошелька приходит правкой (П-4).
+        if let Some(message) = &update.edited_message {
+            if message.chat.kind != botapi::ChatType::Private {
+                return Ok(false);
+            }
+            let Some(from) = message.from.as_ref() else {
+                return Ok(false);
+            };
+            let Some(staff) = self.staff(from.id).await? else {
+                return Ok(false);
+            };
+            return self.staff_link(&staff, message, true).await;
+        }
         let Some(message) = &update.message else {
             return Ok(false);
         };
@@ -455,7 +484,8 @@ impl Inner {
             None => text == self.texts.t("menu.open") || self.has_awaiting(staff.tg_user_id),
         };
         if !ours {
-            return Ok(false);
+            // Ссылка на чек или счёт от сотрудника — всегда пульту (П-4).
+            return self.staff_link(&staff, message, false).await;
         }
         let screen = self.on_message(&staff, message).await?;
         let sent = self.send(message.chat.id, &screen).await?;
@@ -465,6 +495,127 @@ impl Inner {
             self.remember_dash(sent.chat.id, sent.message_id).await?;
         }
         Ok(true)
+    }
+
+    /// Ссылки на чеки и счета в сообщении сотрудника (П-4, аудит 16.11): текст, сущности,
+    /// кнопки, голый код, `/start <код>`. Сообщение «через @send» без ссылки — ссылка придёт
+    /// правкой.
+    fn staff_links(message: &Message) -> (Vec<parsers::links::WalletLink>, bool) {
+        let text = message.text_and_entities().map_or("", |(t, _)| t);
+        let mut found: Vec<parsers::links::WalletLink> = parsers::links::extract_from_message(
+            text,
+            &message.entity_urls(),
+            &message.button_urls(),
+        )
+        .into_iter()
+        .flatten()
+        .collect();
+        if found.is_empty() {
+            let bare = text.strip_prefix("/start ").map_or(text, str::trim).trim();
+            if let Some(Ok(link)) = parsers::links::parse_bare_code(bare) {
+                found.push(link);
+            }
+        }
+        let via_wallet = message
+            .via_bot
+            .as_ref()
+            .and_then(|b| b.username.as_deref())
+            .and_then(parsers::links::official_platform)
+            .is_some();
+        (found, via_wallet)
+    }
+
+    /// Сотрудник прислал ссылку на чек или счёт: карточка заявки или «такого чека нет» — но
+    /// не клиентский обмен (иначе юзербот откроет чек клиента и выплатит сотруднику). Обмен как
+    /// клиент — только после кнопки «Обменять как клиент». `false` — не ссылка, не моё.
+    async fn staff_link(
+        self: &Arc<Self>,
+        staff: &StaffMember,
+        message: &Message,
+        edited: bool,
+    ) -> Result<bool, OpsError> {
+        let (links, via_wallet) = Self::staff_links(message);
+        if links.is_empty() && !via_wallet {
+            return Ok(false);
+        }
+        let chat = message.chat.id;
+        let now = std::time::Instant::now();
+        let pass = self.state(|s| {
+            let Some(p) = s.as_client.get_mut(&staff.tg_user_id) else {
+                return false;
+            };
+            match p.message {
+                None if now < p.until => {
+                    p.message = Some(message.message_id);
+                    p.until = now + AS_CLIENT_FOR;
+                    true
+                }
+                Some(m) if m == message.message_id && now < p.until => true,
+                _ => {
+                    s.as_client.remove(&staff.tg_user_id);
+                    false
+                }
+            }
+        });
+        if pass {
+            tracing::info!(
+                staff = staff.tg_user_id,
+                "staff link goes to the client exchange by the button"
+            );
+            return Ok(false);
+        }
+        // Сообщение «через @send» без ссылки: ждём правку со ссылкой, клиенту не отдаём.
+        let Some(link) = links.first() else {
+            return Ok(true);
+        };
+        if edited {
+            let fresh = self.state(|s| {
+                s.seen_edits
+                    .insert((chat, message.message_id, link.param.clone()))
+            });
+            if !fresh {
+                return Ok(true);
+            }
+        }
+        let screen = self.link_screen(staff, link).await?;
+        self.send(chat, &screen).await?;
+        Ok(true)
+    }
+
+    /// Карточка заявки по ссылке или «такого чека в заявках нет».
+    pub(crate) async fn link_screen(
+        &self,
+        staff: &StaffMember,
+        link: &parsers::links::WalletLink,
+    ) -> Result<Screen, OpsError> {
+        let id = {
+            let mut conn = self.pool.acquire().await?;
+            storage::admin::find_order(&mut conn, &link.param).await?
+        };
+        let t = &self.texts;
+        let what = match link.kind {
+            parsers::links::LinkKind::Invoice => t.t("order.what_invoice"),
+            _ => t.t("order.what_check"),
+        };
+        match id {
+            Some(id) => {
+                let public = self.public_id(id).await?;
+                let notice = t.f(
+                    "order.link_found",
+                    &[("what", &what), ("public", &crate::texts::esc(&public))],
+                );
+                Ok(self.order(Some(staff), id).await?.notice(&notice))
+            }
+            None => Ok(Screen::new(t.t(match link.kind {
+                parsers::links::LinkKind::Invoice => "order.link_unknown_invoice",
+                _ => "order.link_unknown_check",
+            }))
+            .row(vec![btn(t.t("order.b_as_client"), &Cb::AsClient)])
+            .row(vec![
+                btn(t.t("order.b_search_more"), &Cb::OrderAsk),
+                btn(t.t("common.home"), &Cb::Menu),
+            ])),
+        }
     }
 
     /// Открыть экран по кнопке или ссылке в сообщении `message_id`: та же правка окна, а
@@ -714,8 +865,23 @@ impl Inner {
                 return Ok(None);
             }
             Cb::Menu => self.menu(staff).await?,
+            Cb::AsClient => {
+                let until = std::time::Instant::now() + AS_CLIENT_FOR;
+                self.state(|s| {
+                    s.as_client.insert(
+                        staff.tg_user_id,
+                        AsClient {
+                            until,
+                            message: None,
+                        },
+                    )
+                });
+                Screen::new(self.texts.t("order.as_client"))
+                    .row(vec![btn(self.texts.t("common.cancel"), &Cb::Cancel)])
+            }
             Cb::Cancel => {
                 self.clear_awaiting(staff.tg_user_id);
+                self.state(|s| s.as_client.remove(&staff.tg_user_id));
                 Screen::new(self.texts.t("common.cancelled"))
                     .row(vec![btn(self.texts.t("common.home"), &Cb::Menu)])
             }

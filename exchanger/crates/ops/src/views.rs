@@ -818,14 +818,22 @@ impl Inner {
     // Разбор
 
     pub(crate) async fn find_order(&self, query: &str) -> Result<Screen, OpsError> {
+        // Вставили ссылку на чек или счёт (П-4) — ищем по её коду.
+        let link = parsers::links::extract_from_message(query, &[], &[])
+            .into_iter()
+            .flatten()
+            .next();
+        let query = link.as_ref().map_or(query, |l| l.param.as_str());
         let id = {
             let mut conn = self.pool.acquire().await?;
             storage::admin::find_order(&mut conn, query).await?
         };
         match id {
             Some(id) => self.order(None, id).await,
-            None => Ok(Screen::new(self.texts.t("order.not_found"))
-                .row(vec![btn(self.texts.t("common.home"), &Cb::Menu)])),
+            None => Ok(Screen::new(self.texts.t("order.not_found")).row(vec![
+                btn(self.texts.t("order.b_search_more"), &Cb::OrderAsk),
+                btn(self.texts.t("common.home"), &Cb::Menu),
+            ])),
         }
     }
 
