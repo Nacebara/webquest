@@ -266,6 +266,15 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
                 ),
             ],
         },
+        // Д9 (аудит 16.11, К-4; «Концепция Б», принято): заявку закрыл человек — где деньги.
+        PreviewScreen {
+            title: "Закрыта оператором · выплачена",
+            messages: vec![ui.closed_by_operator(&o, &usdt(9750, 2), true)],
+        },
+        PreviewScreen {
+            title: "Закрыта оператором · без выплаты",
+            messages: vec![ui.closed_by_operator(&o, &usdt(100, 0), false)],
+        },
         one("Мульти-чек xRocket", ui.error(&UiError::MultiCheck)),
         one("Чек уже открыт", ui.error(&UiError::AlreadyActivated)),
         one("Чек не подошёл", ui.error(&UiError::NeedsSubscription)),

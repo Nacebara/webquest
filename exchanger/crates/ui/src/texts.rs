@@ -410,6 +410,10 @@ pub struct ManualTexts {
     pub review_unknown: String,
     pub with_me: String,
     pub below: String,
+    /// Оператор отметил: деньги клиент получил вне бота (Д9, аудит 16.11 К-4).
+    pub closed_paid: String,
+    /// Оператор закрыл без выплаты: деньги остаются у сервиса (Д9, К-4).
+    pub closed_kept: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

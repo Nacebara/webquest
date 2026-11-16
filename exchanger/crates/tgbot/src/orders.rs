@@ -349,6 +349,13 @@ pub(crate) fn render(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Ext
                 let took = (finished - view.created_at).num_seconds();
                 ui.order_done(&order, &b, url, took, cfg.details)
             }
+            // «Отметить выплаченной» без чека бота: оператор отметил выплату вне бота (Д9, К-4).
+            (_, None) if view.direction.flow() == domain::Flow::CheckExchange => {
+                match money(view, view.payout_amount) {
+                    Some(p) => ui.closed_by_operator(&order, &p, true),
+                    None => card_plain(ui, view),
+                }
+            }
             _ => card_plain(ui, view),
         },
         OrderState::RefundPending => match money(view, view.refund_amount) {
@@ -376,11 +383,15 @@ pub(crate) fn render(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Ext
             cfg.bind_username,
         )),
         OrderState::Rejected => ui.error(&reject_error(view, extra)),
+        // «Закрыть без выплаты» (только владелец): деньги клиента остались у сервиса (Д9, К-4).
+        OrderState::ClosedManual => match money(view, view.intake_amount) {
+            Some(amount) => ui.closed_by_operator(&order, &amount, false),
+            None => card_plain(ui, view),
+        },
         OrderState::AwaitingFunds
         | OrderState::InvoicePayPending
         | OrderState::Expired
-        | OrderState::Cancelled
-        | OrderState::ClosedManual => card_plain(ui, view),
+        | OrderState::Cancelled => card_plain(ui, view),
     }
 }
 
@@ -1007,6 +1018,33 @@ mod tests {
                     ui::Keyboard::Inline(_) | ui::Keyboard::None
                 ),
                 "{state:?}: править можно только с инлайн-клавиатурой"
+            );
+        }
+    }
+
+    /// Д9 (аудит 16.11, К-4): заявку закрыл человек — клиент видит, где деньги, и «Поддержку».
+    #[test]
+    fn operator_closes_say_where_the_money_is() {
+        let ui = ui();
+        // «Отметить выплаченной»: «Готово» без чека бота.
+        let paid = render(&ui, &cfg(), &view(OrderState::Completed), &Extra::default());
+        assert!(paid.html.contains("Заявка закрыта"), "{}", paid.html);
+        assert!(paid.html.contains("97.50"), "{}", paid.html);
+        assert!(paid.html.contains("вне бота"), "{}", paid.html);
+        // «Закрыть без выплаты»: деньги у сервиса.
+        let kept = render(
+            &ui,
+            &cfg(),
+            &view(OrderState::ClosedManual),
+            &Extra::default(),
+        );
+        assert!(kept.html.contains("без выплаты"), "{}", kept.html);
+        assert!(kept.html.contains("100.00"), "{}", kept.html);
+        for s in [&paid, &kept] {
+            assert!(
+                format!("{:?}", s.keyboard).contains("support:A1B2C3D4E5"),
+                "{:?}",
+                s.keyboard
             );
         }
     }

@@ -608,6 +608,15 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
             "manual_review",
             ui.manual_review(&order(cb), Some(&usdt(dec!(100))), 15),
         ),
+        // Д9 (аудит 16.11, К-4): заявку закрыл человек — где деньги.
+        (
+            "closed_by_operator_paid",
+            ui.closed_by_operator(&order(cb), &usdt(dec!(97.5)), true),
+        ),
+        (
+            "closed_by_operator_kept",
+            ui.closed_by_operator(&order(cb), &usdt(dec!(100)), false),
+        ),
         // Шаг 6.1: итог ушёл новым сообщением — прежнее сообщение заявки.
         (
             "result_below",

@@ -452,6 +452,35 @@ impl Ui {
         self.plain(body, keyboard)
     }
 
+    /// Заявку закрыл оператор (Д9, К-4): `paid` — выплачено вне бота (сумма выплаты), иначе —
+    /// без выплаты (сумма, оставшаяся у сервиса). Под — «Поддержка» по этой заявке.
+    pub fn closed_by_operator(&self, order: &OrderRef, money: &Money, paid: bool) -> Screen {
+        let t = &self.texts.manual;
+        let body = if paid {
+            self.fill(
+                &t.closed_paid,
+                &[
+                    ("order", &self.order_id(&order.id)),
+                    ("payout", &self.money(money)),
+                ],
+            )
+        } else {
+            self.fill(
+                &t.closed_kept,
+                &[
+                    ("order", &self.order_id(&order.id)),
+                    ("amount", &self.money(money)),
+                ],
+            )
+        };
+        let keyboard = Keyboard::inline_rows(vec![vec![self.cb_button(
+            Some(Emoji::Support),
+            &self.texts.buttons.support,
+            &Callback::Support(Some(order.id.clone())),
+        )]]);
+        self.plain(body, keyboard)
+    }
+
     /// Прежнее сообщение заявки, когда итог ушёл новым сообщением (шаг 6.1, макет принят 14.11):
     /// первая строка прежнего шага (`step` — его экран), деньги у сервиса и «Итог — ниже ⬇️».
     /// Кнопок нет: нажимать устаревшее незачем.

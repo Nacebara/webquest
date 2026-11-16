@@ -1,0 +1,19 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+📮 <b>Заявка закрыта без выплаты</b> · <code>A1B2C3D4E5</code>
+<code>100.00</code> USDT остаются у сервиса по правилам.
+<i>Не согласны — напишите в поддержку.</i>
+--- keyboard: inline
+[{"callback_data":"support:A1B2C3D4E5","text":"💬 Поддержка"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000041">📮</tg-emoji> <b>Заявка закрыта без выплаты</b> · <code>A1B2C3D4E5</code>
+<code>100.00</code> USDT остаются у сервиса по правилам.
+<i>Не согласны — напишите в поддержку.</i>
+--- keyboard: inline
+[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
