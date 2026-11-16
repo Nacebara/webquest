@@ -39,6 +39,28 @@ fn dec(v: &Value, key: &str) -> domain::Decimal {
     s(v, key).parse().unwrap_or_default()
 }
 
+/// П-10 (картинка принята владельцем 18.11): кому тревога и со звуком ли. `None` — роли не
+/// приходит вовсе: решить её она не может (П-11). Правила в коде, без настроек; экран «Алерты»
+/// из макета (тихие часы, темы) — потом.
+pub(crate) fn audience(title: &str, level: Level, role: Role) -> Option<bool> {
+    let admin = role >= Role::Admin;
+    match title {
+        // Разбор и то, что останавливает всё: всем, со звуком.
+        "manual_review" | "unknown_reply" | "engine_down" | "kill_switch" | "second_instance" => {
+            Some(true)
+        }
+        // Деньги и аккаунты: админу и владельцу, со звуком.
+        "balance_mismatch" | "reconcile_stalled" | "balance_unreadable" | "login_lost"
+        | "account_restricted" | "flood_long" | "new_login" | "backup_failed" => {
+            admin.then_some(true)
+        }
+        t if t.starts_with("invest_") => admin.then_some(true),
+        // Выгодный курс и перекос резерва: админу и владельцу, тихо.
+        "promo_hint" | "promo_started" | "promo_stopped" => admin.then_some(false),
+        _ => Some(level >= Level::Warn),
+    }
+}
+
 impl Inner {
     pub(crate) async fn alerts_once(&self) -> Result<(), OpsError> {
         let mut conn = self.pool.acquire().await?;
@@ -169,6 +191,9 @@ impl Inner {
         let mut first = None;
         for m in recipients {
             let chat = m.tg_user_id;
+            let Some(sound) = audience(&alert.title, alert.level, m.role) else {
+                continue;
+            };
             // Позвал админа (П-3): его копию не трогаем и не повторяем.
             if copies
                 .iter()
@@ -202,8 +227,8 @@ impl Inner {
             }
             let mut request = SendMessage::html(chat, screen.text.clone());
             request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
-            // Важное — со звуком, остальное — тихо.
-            request.disable_notification = Some(alert.level < Level::Warn);
+            // Звук — по роли (П-10).
+            request.disable_notification = Some(!sound);
             match self.api.send_message(&request).await {
                 Ok(sent) => {
                     first.get_or_insert(sent.message_id);
@@ -1135,4 +1160,52 @@ pub fn stalled_screen(t: &crate::Texts, p: &Value, id: i64) -> Screen {
             btn(t.t("alert.b_recheck"), &Cb::Reconcile),
         ])
         .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
+}
+
+#[cfg(test)]
+mod audience_tests {
+    use super::*;
+
+    /// Таблица «звук по роли» с картинки П-10 (принята 18.11).
+    #[test]
+    fn sound_by_role_table() {
+        let all = [Role::Operator, Role::Admin, Role::Owner];
+        for title in [
+            "manual_review",
+            "unknown_reply",
+            "engine_down",
+            "kill_switch",
+            "second_instance",
+        ] {
+            for r in all {
+                assert_eq!(audience(title, Level::Critical, r), Some(true), "{title}");
+            }
+        }
+        for title in [
+            "balance_mismatch",
+            "reconcile_stalled",
+            "login_lost",
+            "new_login",
+            "invest_withdrawal",
+            "invest_manual",
+            "backup_failed",
+        ] {
+            assert_eq!(
+                audience(title, Level::Critical, Role::Operator),
+                None,
+                "{title}"
+            );
+            assert_eq!(audience(title, Level::Critical, Role::Admin), Some(true));
+            assert_eq!(audience(title, Level::Critical, Role::Owner), Some(true));
+        }
+        for title in ["promo_hint", "promo_started", "promo_stopped"] {
+            assert_eq!(audience(title, Level::Warn, Role::Operator), None);
+            assert_eq!(audience(title, Level::Warn, Role::Owner), Some(false));
+        }
+        // Остальное — как раньше: звук от Warn.
+        assert_eq!(
+            audience("check_link_missing", Level::Notice, Role::Operator),
+            Some(false)
+        );
+    }
 }

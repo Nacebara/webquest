@@ -1015,6 +1015,65 @@ async fn a_button_in_an_alert_opens_a_new_message_and_the_alert_stays(pool: PgPo
     assert!(acked.button("Открыть").is_some());
 }
 
+/// П-10 (картинка принята 18.11): звук по роли. Недостача оператору не приходит (решить её он
+/// не может), админу и владельцу — со звуком; «Перекос резерва» — им же, но тихо; разбор —
+/// всем со звуком.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn alerts_reach_roles_that_can_act_with_sound_by_role(pool: PgPool) {
+    let o = ops(pool).await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        storage::staff::add(&mut conn, OPERATOR, Role::Operator, "Олег", OWNER)
+            .await
+            .unwrap();
+        for (key, title, level) in [
+            (
+                "balance_mismatch:xrocket",
+                "balance_mismatch",
+                storage::alerts::Level::Critical,
+            ),
+            (
+                "promo_hint:xr_to_cb_check",
+                "promo_hint",
+                storage::alerts::Level::Warn,
+            ),
+        ] {
+            storage::alerts::raise(
+                &mut conn,
+                &storage::alerts::NewAlert {
+                    level,
+                    topic: storage::alerts::Topic::Errors,
+                    dedup_key: key,
+                    title,
+                    payload: serde_json::json!({"platform": "xrocket", "diff": "-12",
+                        "expected": "640", "actual": "628", "direction": "xr_to_cb_check"}),
+                },
+            )
+            .await
+            .unwrap();
+        }
+    }
+    let mark = o.tg.mark();
+    o.bot.deliver_alerts().await.unwrap();
+    let sent = |chat: i64, needle: &str| {
+        o.tg.calls()
+            .into_iter()
+            .skip(mark)
+            .filter(|c| c.method == "sendMessage" && c.chat() == Some(chat))
+            .find(|c| c.text().contains(needle))
+    };
+    let short = sent(ADMIN, "меньше на").expect("недостача админу");
+    assert_eq!(short.body["disable_notification"], false, "со звуком");
+    assert!(sent(OWNER, "меньше на").is_some());
+    assert!(
+        sent(OPERATOR, "меньше на").is_none(),
+        "оператору не приходит"
+    );
+    let hint = sent(ADMIN, "Перекос резерва").expect("перекос админу");
+    assert_eq!(hint.body["disable_notification"], true, "тихо");
+    assert!(sent(OPERATOR, "Перекос резерва").is_none());
+}
+
 /// Заявка на разборе после неудачной выплаты; владелец и админ открыли её карточку.
 async fn review_cards(o: &Ops) -> (storage::orders::OrderRow, Call, Call) {
     o.say(OWNER, "/menu", "<b>Пульт</b>").await;
@@ -1646,6 +1705,9 @@ async fn support_question_reaches_staff_and_the_answer_reaches_the_client(pool: 
     );
     assert!(question.text().contains("K7M2Q9XR4T"));
     let owner_copy = o.tg.screen(mark, OWNER, "Обращение").await;
+    // П-10: обращения отвечают операторы и админы; владельцу — тихо.
+    assert_eq!(owner_copy.body["disable_notification"], true);
+    assert!(question.body["disable_notification"].is_null());
     // В меню — счётчик и синяя кнопка: ждут человека (макет «Меню пульта»).
     let menu = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
     assert!(menu.button("Обращения · 1").is_some(), "{:?}", menu.body);

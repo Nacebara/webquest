@@ -645,7 +645,8 @@ impl Inner {
         let beside = matches!(cb, Cb::SupportReply(_));
         if let Some(screen) = self.on_callback(staff, chat, message, cb).await? {
             if beside {
-                self.send_with(chat, &screen, Some(message_id)).await?;
+                self.send_with(chat, &screen, Some(message_id), false)
+                    .await?;
                 return Ok(());
             }
             if from_alert {
@@ -667,20 +668,23 @@ impl Inner {
 
     /// Отправить экран: карточку — `sendRichMessage` (Telegram отказал — обычным HTML).
     pub(crate) async fn send(&self, chat: i64, screen: &Screen) -> Result<Message, OpsError> {
-        self.send_with(chat, screen, None).await
+        self.send_with(chat, screen, None, false).await
     }
 
-    /// То же, ответом на сообщение `reply_to` (его нет — просто новым сообщением).
+    /// То же, ответом на сообщение `reply_to` (его нет — просто новым сообщением); `silent` —
+    /// без звука.
     async fn send_with(
         &self,
         chat: i64,
         screen: &Screen,
         reply_to: Option<i32>,
+        silent: bool,
     ) -> Result<Message, OpsError> {
         let screen = self.look().screen(screen);
         if let Some(rich) = &screen.rich {
             let mut request = botapi::SendRichMessage::new(chat, rich.clone());
             request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
+            request.disable_notification = silent.then_some(true);
             match self.api.send_rich_message(&request).await {
                 Ok(m) => {
                     self.set_window(chat, m.message_id);
@@ -697,6 +701,7 @@ impl Inner {
         if let Some(id) = reply_to {
             request = request.reply_to(id);
         }
+        request.disable_notification = silent.then_some(true);
         let m = self.api.send_message(&request).await?;
         self.set_window(chat, m.message_id);
         Ok(m)
@@ -1044,7 +1049,12 @@ impl Inner {
             .await?;
         let mut delivered = 0;
         for member in staff.iter().filter(|m| m.disabled_at.is_none()) {
-            match self.send(member.tg_user_id, &screen).await {
+            // П-10: обращения отвечают операторы и админы; владельцу — тихо.
+            let silent = member.role >= Role::Owner;
+            match self
+                .send_with(member.tg_user_id, &screen, None, silent)
+                .await
+            {
                 Ok(m) => {
                     delivered += 1;
                     // П-8: копии запоминаются — после ответа их правят у всех.
