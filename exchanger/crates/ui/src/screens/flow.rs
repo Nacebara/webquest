@@ -452,6 +452,20 @@ impl Ui {
         self.plain(body, keyboard)
     }
 
+    /// Чек не в USDT (К-3): монеты у сервиса, вернёт оператор. `amount` — как пришло.
+    pub fn other_coin_review(&self, order: &OrderRef, amount: &str, coin: &str) -> Screen {
+        let body = self.fill(
+            &self.texts.manual.other_coin,
+            &[("amount", &Frag::code(amount)), ("coin", &Frag::text(coin))],
+        );
+        let keyboard = Keyboard::inline_rows(vec![vec![self.cb_button(
+            Some(Emoji::Support),
+            &self.texts.buttons.support,
+            &Callback::Support(Some(order.id.clone())),
+        )]]);
+        self.plain(body, keyboard)
+    }
+
     /// Заявку закрыл оператор (Д9, К-4): `paid` — выплачено вне бота (сумма выплаты), иначе —
     /// без выплаты (сумма, оставшаяся у сервиса). Под — «Поддержка» по этой заявке.
     pub fn closed_by_operator(&self, order: &OrderRef, money: &Money, paid: bool) -> Screen {

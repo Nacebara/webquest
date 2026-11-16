@@ -608,6 +608,11 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
             "manual_review",
             ui.manual_review(&order(cb), Some(&usdt(dec!(100))), 15),
         ),
+        // К-3 (аудит 16.11): чек не в USDT.
+        (
+            "other_coin_review",
+            ui.other_coin_review(&order(cb), "0.01", "TON"),
+        ),
         // Д9 (аудит 16.11, К-4): заявку закрыл человек — где деньги.
         (
             "closed_by_operator_paid",

@@ -624,3 +624,20 @@ pub async fn postpone(
         Err(StorageError::OperationState(id))
     }
 }
+
+/// Чек не в USDT (аудит 16.11, К-3): сколько и какой монеты пришло по активации заявки —
+/// из ответа операции (`received_other`, `code`).
+pub async fn received_other(
+    conn: &mut PgConnection,
+    order_id: i64,
+) -> Result<Option<(String, String)>, StorageError> {
+    let row: Option<(Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT response->>'received_other', response->>'code' FROM operations \
+          WHERE order_id = $1 AND kind = 'activate_check' AND response ? 'received_other' \
+          ORDER BY id DESC LIMIT 1",
+    )
+    .bind(order_id)
+    .fetch_optional(conn)
+    .await?;
+    Ok(row.and_then(|(a, c)| Some((a?, c?))))
+}

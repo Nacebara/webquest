@@ -266,6 +266,11 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
                 ),
             ],
         },
+        // К-3 (аудит 16.11; «Концепция Б · Не та монета», принято): чек не в USDT.
+        PreviewScreen {
+            title: "Не та монета",
+            messages: vec![ui.other_coin_review(&o, "0.01", "TON")],
+        },
         // Д9 (аудит 16.11, К-4; «Концепция Б», принято): заявку закрыл человек — где деньги.
         PreviewScreen {
             title: "Закрыта оператором · выплачена",

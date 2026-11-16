@@ -414,6 +414,8 @@ pub struct ManualTexts {
     pub closed_paid: String,
     /// Оператор закрыл без выплаты: деньги остаются у сервиса (Д9, К-4).
     pub closed_kept: String,
+    /// Чек не в USDT: монеты у сервиса, вернёт оператор (К-3, «Концепция Б · Не та монета»).
+    pub other_coin: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

@@ -632,8 +632,11 @@ impl Engine {
                     "клиент прислал чек в {code}, а не в USDT: {amount} {code} в кошельке, но не в \
                      леджере; верните их клиенту вручную"
                 );
+                // Клиенту — правда (аудит 16.11, К-3): «у меня 0.01 TON — оператор вернёт», а не
+                // «кошелёк не ответил». Сумма и монета — в ответе операции активации.
                 let patch = OrderPatch {
                     manual_reason: Some(&reason),
+                    failure_code: Some("unsupported_asset"),
                     ..OrderPatch::default()
                 };
                 let (order, _) = transit(

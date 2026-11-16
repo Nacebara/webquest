@@ -257,6 +257,21 @@ async fn check_in_another_coin_goes_to_a_human_without_pausing(pool: PgPool) {
     assert_eq!(order.state, OrderState::ManualReview);
     let reason = d.manual_reason.unwrap();
     assert!(reason.contains("XROCK"), "{reason}");
+    // Клиенту — правда (аудит 16.11, К-3): код заявки и что именно пришло.
+    let code: Option<String> = sqlx::query_scalar("SELECT failure_code FROM orders WHERE id = $1")
+        .bind(order.id)
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    assert_eq!(code.as_deref(), Some("unsupported_asset"));
+    let mut conn = e.pool.acquire().await.unwrap();
+    assert_eq!(
+        storage::operations::received_other(&mut conn, order.id)
+            .await
+            .unwrap(),
+        Some(("3".to_owned(), "XROCK".to_owned()))
+    );
+    drop(conn);
     assert!(e.world.checks_created_by(e.ub).is_empty(), "выплаты нет");
     let mut conn = e.pool.acquire().await.unwrap();
     let dir = storage::directions::get(&mut conn, Direction::XrToCbCheck)

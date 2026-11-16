@@ -47,6 +47,8 @@ pub(crate) struct Extra {
     pub room: Option<Decimal>,
     /// Меньше этой переплаты по счёту не возвращаем (`settings.min_refund_amount`).
     pub min_refund: Option<Decimal>,
+    /// Чек не в USDT (К-3): сколько и какой монеты пришло — из ответа операции активации.
+    pub other_coin: Option<(String, String)>,
 }
 
 /// Настройки рендера, не зависящие от заявки.
@@ -373,11 +375,15 @@ pub(crate) fn render(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Ext
                 _ => card_plain(ui, view),
             }
         }
-        OrderState::ManualReview => ui.manual_review(
-            &order,
-            money(view, view.intake_amount).as_ref(),
-            cfg.sla.num_minutes(),
-        ),
+        OrderState::ManualReview => match &extra.other_coin {
+            // Чек не в USDT (К-3): монеты у сервиса, вернёт оператор — а не «кошелёк не ответил».
+            Some((amount, coin)) => ui.other_coin_review(&order, amount, coin),
+            None => ui.manual_review(
+                &order,
+                money(view, view.intake_amount).as_ref(),
+                cfg.sla.num_minutes(),
+            ),
+        },
         OrderState::IntakeFailed => ui.error(&intake_failure(
             view.failure_code.as_deref(),
             cfg.bind_username,
@@ -407,6 +413,12 @@ impl Inner {
     /// Данные для экранов возврата и отказа «нет резерва».
     async fn extra(&self, view: &OrderView) -> Result<Extra, TgBotError> {
         let mut extra = Extra::default();
+        if view.state == OrderState::ManualReview
+            && view.failure_code.as_deref() == Some("unsupported_asset")
+        {
+            let mut conn = self.pool.acquire().await?;
+            extra.other_coin = storage::operations::received_other(&mut conn, view.id).await?;
+        }
         match view.state {
             OrderState::RefundPending => {
                 let mut conn = self.pool.acquire().await?;
@@ -1020,6 +1032,24 @@ mod tests {
                 "{state:?}: править можно только с инлайн-клавиатурой"
             );
         }
+    }
+
+    /// К-3 (аудит 16.11): чек не в USDT — «у меня 3 XROCK, оператор вернёт», а не «кошелёк не
+    /// ответил вовремя».
+    #[test]
+    fn a_check_in_another_coin_says_the_coins_are_with_me() {
+        let ui = ui();
+        let mut v = view(OrderState::ManualReview);
+        v.intake_amount = None;
+        v.failure_code = Some("unsupported_asset".into());
+        let extra = Extra {
+            other_coin: Some(("3".into(), "XROCK".into())),
+            ..Extra::default()
+        };
+        let s = render(&ui, &cfg(), &v, &extra);
+        assert!(s.html.contains("Меняю только USDT"), "{}", s.html);
+        assert!(s.html.contains("<code>3</code> XROCK"), "{}", s.html);
+        assert!(!s.html.contains("не ответил"), "{}", s.html);
     }
 
     /// Д9 (аудит 16.11, К-4): заявку закрыл человек — клиент видит, где деньги, и «Поддержку».
