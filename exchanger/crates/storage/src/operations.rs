@@ -641,3 +641,46 @@ pub async fn received_other(
     .await?;
     Ok(row.and_then(|(a, c)| Some((a?, c?))))
 }
+
+/// Уведомление «ваш чек забрали» (кошелёк `platform`, сумма `amount`): отметить операцию, чей
+/// чек это был, — созданный нами чек выплаты, возврата или переплаты за последние 14 дней, ещё не
+/// отмеченный. Уведомление не называет чек, поэтому отмечаем, только если подходит ровно одна
+/// операция; две с той же суммой — не трогаем ничего. Возвращает заявку отмеченной операции.
+pub async fn mark_claimed(
+    conn: &mut PgConnection,
+    platform: domain::Platform,
+    amount: Decimal,
+    asset: domain::Asset,
+) -> Result<Option<i64>, StorageError> {
+    let found: Vec<(i64, Option<i64>)> = sqlx::query_as(
+        "SELECT id, order_id FROM operations \
+          WHERE platform = $1 AND asset = $3 AND amount = $2 AND status = 'succeeded' \
+            AND kind IN ('create_payout_check', 'create_refund_check', 'create_excess_check') \
+            AND claimed_at IS NULL AND finished_at > now() - interval '14 days' \
+          LIMIT 2",
+    )
+    .bind(platform.db_name())
+    .bind(amount)
+    .bind(asset.code())
+    .fetch_all(&mut *conn)
+    .await?;
+    let [(id, order_id)] = found.as_slice() else {
+        return Ok(None);
+    };
+    sqlx::query("UPDATE operations SET claimed_at = now() WHERE id = $1 AND claimed_at IS NULL")
+        .bind(id)
+        .execute(conn)
+        .await?;
+    Ok(*order_id)
+}
+
+/// Чек расчёта заявки (выплата или возврат) уже забрали.
+pub async fn settle_claimed(conn: &mut PgConnection, order_id: i64) -> Result<bool, StorageError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM operations WHERE order_id = $1 AND money_role = 'settle' \
+                          AND claimed_at IS NOT NULL)",
+    )
+    .bind(order_id)
+    .fetch_one(conn)
+    .await?)
+}

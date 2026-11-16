@@ -337,3 +337,63 @@ async fn a_wallet_with_money_in_flight_cannot_move(pool: PgPool) {
             .any(|b| b.contains("(unknown)"))
     );
 }
+
+/// Аудит 16.11 («Забрать» гаснет): уведомление «ваш чек забрали» не называет чек — отмечаем,
+/// только если подходит ровно одна наша выплата той же платформы и суммы.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_claim_notice_marks_only_an_unambiguous_check(pool: PgPool) {
+    setup(&pool).await;
+    let xr = wallet(&pool, XR).await;
+    let mut ids = Vec::new();
+    for (n, check) in ["CQclaim1", "CQclaim2"].iter().enumerate() {
+        let order_id = order(&pool, check).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let key = format!("ord-claim-{n}-payout");
+        let op_id = storage::operations::insert(
+            &mut conn,
+            &op(order_id, OpKind::CreatePayoutCheck, &key, xr),
+        )
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE operations SET status = 'succeeded', finished_at = now() WHERE id = $1",
+        )
+        .bind(op_id)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+        ids.push(order_id);
+    }
+    let mut conn = pool.acquire().await.unwrap();
+    // Две выплаты по 97.5 — какая забрана, неизвестно: не трогаем ни одну.
+    assert_eq!(
+        storage::operations::mark_claimed(&mut conn, XR, dec!(97.5), Asset::Usdt)
+            .await
+            .unwrap(),
+        None
+    );
+    // Другая сумма — ничего.
+    assert_eq!(
+        storage::operations::mark_claimed(&mut conn, XR, dec!(10), Asset::Usdt)
+            .await
+            .unwrap(),
+        None
+    );
+    // Одну уже отметили (например, прошлое уведомление) — оставшаяся однозначна.
+    sqlx::query("UPDATE operations SET claimed_at = now() WHERE order_id = $1")
+        .bind(ids[0])
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    assert_eq!(
+        storage::operations::mark_claimed(&mut conn, XR, dec!(97.5), Asset::Usdt)
+            .await
+            .unwrap(),
+        Some(ids[1])
+    );
+    assert!(
+        storage::operations::settle_claimed(&mut conn, ids[1])
+            .await
+            .unwrap()
+    );
+}

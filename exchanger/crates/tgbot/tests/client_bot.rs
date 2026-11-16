@@ -1854,6 +1854,67 @@ async fn support_can_be_cancelled(pool: PgPool) {
     bot.stop().await;
 }
 
+/// Аудит 16.11: зелёная «Забрать» горела вечно, даже когда чек давно забран. Клиент забирает
+/// чек — кошелёк присылает «… активировал(а) ваш чек …» — сообщение заявки и карточка в
+/// «Истории» остаются без «Забрать» (утверждённое состояние «Чек забран»).
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_claimed_check_loses_its_claim_button(pool: PgPool) {
+    let e = env(pool).await;
+    let _claims = e.engine.watch_claims();
+    let bot = e.start_bot_with(true);
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    e.fake.client_writes(&url);
+    let (_, order_message, _) = e.order_message().await;
+    e.drain().await;
+    let (order_id, _, _, _, payout) = e.orders().await[0].clone();
+    let payout_url = payout.expect("ссылка на чек выплаты");
+    let button = format!("\"url\":\"{payout_url}\"");
+    e.fake
+        .wait_for("the result with the claim button", |c| {
+            c.method == "editMessageText"
+                && c.message_id() == Some(order_message)
+                && c.contains(&button)
+        })
+        .await;
+    let before = e.fake.calls().len();
+    e.world.claim_check(e.client, &payout_url).unwrap();
+    let mut claimed = false;
+    for _ in 0..100 {
+        claimed = sqlx::query_scalar(
+            "SELECT claimed_at IS NOT NULL FROM operations WHERE order_id = $1 AND money_role = 'settle'",
+        )
+        .bind(order_id)
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+        if claimed {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(30)).await;
+    }
+    assert!(claimed, "уведомление кошелька отметило чек забранным");
+    // Ждём правку сообщения заявки именно после уведомления.
+    let mut edits = Vec::new();
+    for _ in 0..100 {
+        edits = e
+            .fake
+            .calls()
+            .into_iter()
+            .skip(before)
+            .filter(|c| c.method == "editMessageText" && c.message_id() == Some(order_message))
+            .collect();
+        if !edits.is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(30)).await;
+    }
+    let last = edits
+        .last()
+        .expect("сообщение заявки поправлено после уведомления");
+    assert!(!last.contains(&button), "{}", last.body);
+    bot.stop().await;
+}
+
 /// Шаг 6.5 (AUDIT-UI С1): «История» под итогом заявки — новым сообщением, итог не затирается;
 /// листание страниц «Истории» — в том же сообщении.
 #[sqlx::test(migrator = "storage::MIGRATOR")]

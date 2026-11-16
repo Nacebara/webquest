@@ -49,6 +49,25 @@ pub(crate) struct Extra {
     pub min_refund: Option<Decimal>,
     /// Чек не в USDT (К-3): сколько и какой монеты пришло — из ответа операции активации.
     pub other_coin: Option<(String, String)>,
+    /// Чек выплаты или возврата уже забрали (уведомление кошелька): без «Забрать».
+    pub claimed: bool,
+}
+
+/// Убрать кнопку-ссылку на чек: его уже забрали (аудит 16.11; утверждённое «Чек забран»).
+fn without_claim(mut screen: Screen, url: Option<&str>) -> Screen {
+    let Some(url) = url else {
+        return screen;
+    };
+    if let ui::Keyboard::Inline(markup) = &mut screen.keyboard {
+        for row in &mut markup.inline_keyboard {
+            row.retain(|b| !matches!(&b.action, botapi::InlineButtonAction::Url(u) if u == url));
+        }
+        markup.inline_keyboard.retain(|r| !r.is_empty());
+        if markup.inline_keyboard.is_empty() {
+            screen.keyboard = ui::Keyboard::None;
+        }
+    }
+    screen
 }
 
 /// Настройки рендера, не зависящие от заявки.
@@ -310,6 +329,15 @@ fn render_invoice(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Extra)
 /// Экран сообщения заявки для текущего состояния. Только обычный HTML и инлайн-кнопки:
 /// сообщение правится `editMessageText`.
 pub(crate) fn render(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Extra) -> Screen {
+    let screen = render_state(ui, cfg, view, extra);
+    if extra.claimed {
+        without_claim(screen, view.payout_check_url.as_deref())
+    } else {
+        screen
+    }
+}
+
+fn render_state(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Extra) -> Screen {
     if view.direction.flow() == Flow::InvoicePayment
         && let Some(screen) = render_invoice(ui, cfg, view, extra)
     {
@@ -413,6 +441,12 @@ impl Inner {
     /// Данные для экранов возврата и отказа «нет резерва».
     async fn extra(&self, view: &OrderView) -> Result<Extra, TgBotError> {
         let mut extra = Extra::default();
+        if matches!(view.state, OrderState::Completed | OrderState::Refunded)
+            && view.payout_check_url.is_some()
+        {
+            let mut conn = self.pool.acquire().await?;
+            extra.claimed = storage::operations::settle_claimed(&mut conn, view.id).await?;
+        }
         if view.state == OrderState::ManualReview
             && view.failure_code.as_deref() == Some("unsupported_asset")
         {

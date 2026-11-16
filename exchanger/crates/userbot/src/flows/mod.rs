@@ -190,6 +190,39 @@ impl<T: Transport> WalletBot for UserbotWallet<T> {
         self.platform
     }
 
+    fn claim_notices(&self) -> Option<tokio::sync::broadcast::Receiver<Money>> {
+        let (tx, rx) = tokio::sync::broadcast::channel(64);
+        let mut messages = self.transport.subscribe();
+        let platform = self.platform;
+        tokio::spawn(async move {
+            loop {
+                let m = match messages.recv().await {
+                    Ok(m) => m,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                };
+                if m.out
+                    || m.edit_date.is_some()
+                    || m.chat != crate::transport::Chat::WalletBot(platform)
+                    || parsers::replies::classify_activation(platform, &m.text)
+                        != parsers::replies::ActivationReply::ClaimNotice
+                {
+                    continue;
+                }
+                let Some(money) = parsers::amount::parse_money(&m.text, platform)
+                    .and_then(|(amount, asset)| Money::new(amount, asset).ok())
+                else {
+                    continue;
+                };
+                // Никто не слушает — движок остановлен; уведомление не важнее жизни задачи.
+                if tx.send(money).is_err() && tx.receiver_count() == 0 {
+                    return;
+                }
+            }
+        });
+        Some(rx)
+    }
+
     async fn activate_check(
         &self,
         param: &str,

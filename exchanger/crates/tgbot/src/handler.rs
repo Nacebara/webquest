@@ -361,7 +361,14 @@ impl Inner {
         let Some(view) = view else {
             return Ok(());
         };
-        let card = crate::orders::card(&view);
+        let mut card = crate::orders::card(&view);
+        // Чек уже забрали — карточка без «Забрать» (утверждённое состояние «Чек забран»).
+        if card.check_url.is_some() {
+            let mut conn = self.pool.acquire().await?;
+            if storage::operations::settle_claimed(&mut conn, view.id).await? {
+                card.check_url = None;
+            }
+        }
         self.reply_doc(chat, user, &self.ui().order_card(&card, chrono::Utc::now()))
             .await
     }

@@ -198,6 +198,32 @@ impl Engine {
         self
     }
 
+    /// Слушать уведомления кошельков «ваш чек забрали» и отмечать операции (аудит 16.11:
+    /// «Забрать» гаснет). Задачи живут, пока жив возвращённый набор.
+    pub fn watch_claims(&self) -> tokio::task::JoinSet<()> {
+        let mut claims = tokio::task::JoinSet::new();
+        for wallet in self.wallets.values() {
+            if let Some(mut rx) = wallet.claim_notices() {
+                let pool = self.pool.clone();
+                let updates = self.updates.clone();
+                let platform = wallet.platform();
+                claims.spawn(async move {
+                    loop {
+                        let money = match rx.recv().await {
+                            Ok(m) => m,
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                        };
+                        if let Err(e) = claim_seen(&pool, &updates, platform, &money).await {
+                            tracing::warn!(error = %e, "check claim notice not recorded");
+                        }
+                    }
+                });
+            }
+        }
+        claims
+    }
+
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -330,6 +356,8 @@ impl Engine {
         let mut accrual = tokio::time::interval(self.cfg.invest_accrual_every);
         accrual.tick().await;
         let mut sessions = tokio::time::interval(self.cfg.sessions_every);
+        // «Ваш чек забрали» из кошельков: заявка — без «Забрать» (аудит 16.11).
+        let _claims = self.watch_claims();
         loop {
             while self.process_due().await? > 0 {}
             self.beat.store(
@@ -371,6 +399,30 @@ impl Engine {
         }
         Ok(())
     }
+}
+
+/// Уведомление «ваш чек забрали»: отметить операцию и обновить сообщение заявки клиента.
+async fn claim_seen(
+    pool: &PgPool,
+    updates: &broadcast::Sender<OrderUpdate>,
+    platform: Platform,
+    money: &domain::Money,
+) -> Result<(), EngineError> {
+    let mut conn = pool.acquire().await?;
+    let Some(order_id) =
+        storage::operations::mark_claimed(&mut conn, platform, money.amount(), money.asset())
+            .await?
+    else {
+        return Ok(());
+    };
+    let order = storage::orders::get(&mut conn, order_id, false).await?;
+    tracing::info!(order = order_id, "payout check claimed by the client");
+    let _ = updates.send(OrderUpdate {
+        order_id,
+        user_id: order.user_id,
+        state: order.state,
+    });
+    Ok(())
 }
 
 /// Ключ advisory-блокировки лидера движка.
