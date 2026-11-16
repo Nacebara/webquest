@@ -138,6 +138,9 @@ pub enum TxKind {
     InvestDeposit,
     InvestAccrual,
     InvestWithdrawal,
+    /// Деньги потеряны: недостача без причины, остаток на заблокированном аккаунте (решение
+    /// владельца 17.11 — вычитается из прибыли инвесторов, `docs/INVEST-LOSSES.md`).
+    Loss,
 }
 
 impl TxKind {
@@ -155,6 +158,7 @@ impl TxKind {
             TxKind::InvestDeposit => "invest_deposit",
             TxKind::InvestAccrual => "invest_accrual",
             TxKind::InvestWithdrawal => "invest_withdrawal",
+            TxKind::Loss => "loss",
         }
     }
 }
@@ -433,6 +437,19 @@ pub fn capital_out(
     )
 }
 
+/// Деньги кошелька признаны потерянными: Дт expense:loss / Кт кошелёк. Только владелец, с
+/// причиной (`memo` обязателен для этого вида).
+pub fn loss(platform: Platform, asset: Asset, amount: Decimal) -> Result<Posting, PostingError> {
+    let a = positive(amount)?;
+    Posting::new(
+        TxKind::Loss,
+        vec![
+            line(AccountCode::expense(Expense::Loss, asset), asset, a),
+            line(AccountCode::wallet(platform, asset), asset, -a),
+        ],
+    )
+}
+
 /// Взнос оборотного капитала: Дт кошелёк / Кт equity:capital.
 pub fn capital_in(
     platform: Platform,
@@ -447,6 +464,15 @@ pub fn capital_in(
             line(AccountCode::equity(Equity::Capital, asset), asset, -a),
         ],
     )
+}
+
+/// Прибыль окна для доли инвесторов (шаг 5.1, решение владельца 17.11): доходы − потери +
+/// перенесённый убыток. Возвращает (прибыль ≥ 0, убыток на следующее окно ≤ 0): пока прошлые
+/// потери не покрыты, прибыли нет; сумма прибыли за все окна плюс последний перенос всегда равна
+/// сумме (доходы − потери) — ничего не теряется и не возникает из ниоткуда.
+pub fn period_profit(revenue: Decimal, losses: Decimal, carried: Decimal) -> (Decimal, Decimal) {
+    let net = revenue - losses + carried.min(Decimal::ZERO);
+    (net.max(Decimal::ZERO), net.min(Decimal::ZERO))
 }
 
 #[cfg(test)]
@@ -600,6 +626,34 @@ mod tests {
             let p = payout(XR, Asset::Usdt, amount_in, amount_in - fee, fee).unwrap();
             let payable = AccountCode::payable(Asset::Usdt);
             prop_assert_eq!(i.net(&payable) + p.net(&payable), Decimal::ZERO);
+        }
+    }
+
+    proptest! {
+        /// Шаг 5.1: убыточное окно ничего не даёт, убыток переносится, а за любую
+        /// последовательность окон прибыль + последний перенос = доходы − потери.
+        #[test]
+        fn profit_carries_losses_forward_and_conserves_money(
+            windows in proptest::collection::vec((0i64..5_000, 0i64..5_000), 1..40)
+        ) {
+            let mut carry = Decimal::ZERO;
+            let mut paid = Decimal::ZERO;
+            let mut net_total = Decimal::ZERO;
+            for (rev, loss) in windows {
+                let (rev, loss) = (Decimal::new(rev, 2), Decimal::new(loss, 2));
+                let (profit, next) = period_profit(rev, loss, carry);
+                prop_assert!(profit >= Decimal::ZERO && next <= Decimal::ZERO);
+                prop_assert!(profit.is_zero() || next.is_zero());
+                if rev - loss + carry <= Decimal::ZERO {
+                    prop_assert!(profit.is_zero());
+                }
+                paid += profit;
+                net_total += rev - loss;
+                carry = next;
+                // Ничего не теряется и не берётся из ниоткуда. Уже начисленное назад не
+                // забирается: убыток после прибыли переносится вперёд (решение владельца).
+                prop_assert_eq!(paid + carry, net_total);
+            }
         }
     }
 }

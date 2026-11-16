@@ -9,9 +9,11 @@
 //!   иначе решение владельца; одобрено — удержание резерва и `create_payout_check` с одной
 //!   попыткой; чек создан — проводка `invest_withdrawal`; неясный исход — сверка
 //!   `find_issued_check`, затем человек, **никогда** не повтор;
-//! - прибыль: раз в `invest_accrual_every` выручка комиссий с прошлого начисления делится
-//!   по долям капитала: инвестору — `выручка × его баланс на начало окна / весь капитал на
-//!   кошельках × его % / 100`, вниз до 6 знаков. Проводка `invest_accrual`
+//! - прибыль: раз в `invest_accrual_every` прибыль с прошлого начисления (комиссии и оставленные
+//!   переплаты минус комиссии сети и кошельков, списанные потери и рефералы; убыток переносится
+//!   вперёд — решение владельца 17.11, `docs/INVEST-LOSSES.md`) делится по долям капитала:
+//!   инвестору — `прибыль × его баланс на начало окна / весь капитал на кошельках × его % / 100`,
+//!   вниз до 6 знаков. Проводка `invest_accrual`
 //!   (Дт expense:investor_share / Кт долг инвестору) — прибыль капитализируется. Деньги,
 //!   внесённые внутри окна, в нём не участвуют.
 
@@ -118,8 +120,15 @@ impl From<domain::ledger::PostingError> for InvestError {
 /// Итог начисления прибыли.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Accrual {
-    /// Выручка комиссий в окне.
+    /// Доходы в окне: комиссии и оставленные переплаты.
     pub revenue: Decimal,
+    /// Потери в окне: комиссии сети и кошельков, списанные недостачи, рефералы.
+    pub losses: Decimal,
+    /// Убыток прошлых окон, ещё не покрытый (≤ 0).
+    pub carried: Decimal,
+    /// Прибыль, от которой считается доля: доходы − потери + перенесённый убыток. Не больше
+    /// нуля — начислений нет, убыток переносится дальше.
+    pub profit: Decimal,
     /// Весь капитал на кошельках на начало окна (знаменатель доли).
     pub capital: Decimal,
     /// Кому сколько начислено.
@@ -1144,7 +1153,8 @@ impl Engine {
     // -----------------------------------------------------------------------------------------
     // Прибыль
 
-    /// Начислить инвесторам их долю выручки комиссий с прошлого начисления.
+    /// Начислить инвесторам их долю прибыли с прошлого начисления (доходы − потери, убыток
+    /// переносится; решение владельца 17.11).
     pub async fn invest_accrue(&self) -> Result<Accrual, EngineError> {
         let mut tx = self.pool.begin().await?;
         sqlx::query("SELECT pg_advisory_xact_lock($1, $2)")
@@ -1152,20 +1162,47 @@ impl Engine {
             .bind(ACCRUAL_LOCK.1)
             .execute(&mut *tx)
             .await?;
-        let last: i64 = storage::settings::get(&mut tx, ACCRUAL_KEY)
+        let state = storage::settings::get(&mut tx, ACCRUAL_KEY)
             .await?
-            .and_then(|v| v.get("last_tx").and_then(serde_json::Value::as_i64))
+            .unwrap_or_default();
+        let last: i64 = state
+            .get("last_tx")
+            .and_then(serde_json::Value::as_i64)
             .unwrap_or(0);
         let upto = storage::invest::last_tx_id(&mut tx).await?;
         let mut out = Accrual::default();
         if upto <= last {
             return Ok(out);
         }
-        let revenue_code = AccountCode::revenue(Revenue::Fee, ASSET);
-        out.revenue =
-            storage::invest::credit_turnover(&mut tx, revenue_code.as_str(), last, upto).await?;
+        // Прибыль окна (решение владельца 17.11, `docs/INVEST-LOSSES.md`): комиссии и оставленные
+        // переплаты минус комиссии сети и кошельков, списанные потери и рефералы. «Закрыто без
+        // выплаты» — не доход; ошибки сотрудников — на владельце (их проводки сюда не входят).
+        for code in [Revenue::Fee, Revenue::Excess].map(|r| AccountCode::revenue(r, ASSET)) {
+            out.revenue +=
+                storage::invest::credit_turnover(&mut tx, code.as_str(), last, upto).await?;
+        }
+        for code in [
+            Expense::NetworkFee,
+            Expense::PlatformFee,
+            Expense::Loss,
+            Expense::Referral,
+        ]
+        .map(|x| AccountCode::expense(x, ASSET))
+        {
+            out.losses -=
+                storage::invest::credit_turnover(&mut tx, code.as_str(), last, upto).await?;
+        }
+        // Убыток переносится: пока прошлые потери не покрыты, инвесторам не начисляется.
+        out.carried = state
+            .get("carry")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|v| v.parse::<Decimal>().ok())
+            .unwrap_or_default()
+            .min(Decimal::ZERO);
+        let (profit, carry) = ledger::period_profit(out.revenue, out.losses, out.carried);
+        out.profit = profit;
         out.capital = storage::invest::wallets_usdt_at(&mut tx, last).await?;
-        if out.revenue > Decimal::ZERO && out.capital > Decimal::ZERO {
+        if out.profit > Decimal::ZERO && out.capital > Decimal::ZERO {
             let memo = format!("прибыль инвестора за проводки {}–{upto}", last + 1);
             for inv in storage::invest::list(&mut tx).await? {
                 if !inv.is_active || inv.share_pct <= Decimal::ZERO {
@@ -1174,7 +1211,7 @@ impl Engine {
                 let code = AccountCode::investor(inv.user_id, ASSET);
                 let balance =
                     storage::invest::credit_balance_at(&mut tx, code.as_str(), last).await?;
-                let amount = investor_share(out.revenue, balance, out.capital, inv.share_pct);
+                let amount = investor_share(out.profit, balance, out.capital, inv.share_pct);
                 if amount <= Decimal::ZERO {
                     continue;
                 }
@@ -1193,10 +1230,16 @@ impl Engine {
         }
         // Курсор — на последнюю проводку до начисления. Проводки начисления выручку не
         // трогают: следующее окно их не посчитает.
-        storage::settings::set(&mut tx, ACCRUAL_KEY, &json!({ "last_tx": upto }), None).await?;
+        storage::settings::set(
+            &mut tx,
+            ACCRUAL_KEY,
+            &json!({ "last_tx": upto, "carry": carry.to_string() }),
+            None,
+        )
+        .await?;
         tx.commit().await?;
         if !out.credited.is_empty() {
-            tracing::info!(revenue = %out.revenue, capital = %out.capital, investors = out.credited.len(), "investor profit accrued");
+            tracing::info!(revenue = %out.revenue, losses = %out.losses, profit = %out.profit, capital = %out.capital, investors = out.credited.len(), "investor profit accrued");
         }
         Ok(out)
     }

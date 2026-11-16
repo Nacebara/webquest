@@ -240,6 +240,7 @@ impl Engine {
                 AccountCode::equity(domain::ledger::Equity::Capital, asset),
                 AccountCode::equity(domain::ledger::Equity::OwnerWithdrawals, asset),
                 AccountCode::expense(domain::ledger::Expense::InvestorShare, asset),
+                AccountCode::expense(domain::ledger::Expense::Loss, asset),
             ] {
                 storage::ledger::ensure_account(&mut tx, &code, asset, None).await?;
             }

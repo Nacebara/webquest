@@ -407,3 +407,71 @@ async fn a_deposit_confirmed_by_hand_cannot_exceed_the_wallet(pool: PgPool) {
     assert_eq!(get_move(&e, id).await.status, MoveStatus::Done);
     e.assert_books_match().await;
 }
+
+/// Шаг 5.1 (М-8, решение владельца 17.11): доля — от прибыли, а не от выручки. Потеря больше
+/// комиссий — ничего не начислено, убыток переносится; следующие комиссии сначала покрывают его.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn profit_is_income_minus_losses_and_a_loss_carries_forward(pool: PgPool) {
+    let e = env(pool).await;
+    grant(&e, 0, dec!(0)).await;
+    deposit(&e, CB, dec!(1000)).await;
+    e.engine.invest_accrue().await.unwrap();
+
+    // Комиссия заявки и потеря 30 в одном окне: прибыли нет.
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    accepted(e.submit(&url).await);
+    e.drain().await;
+    let fee = -e.ledger("revenue:fee:USDT").await;
+    assert!(fee > Decimal::ZERO && fee < dec!(10), "{fee}");
+    let mut conn = e.pool.acquire().await.unwrap();
+    storage::ledger::post(
+        &mut conn,
+        &domain::ledger::loss(XR, domain::Asset::Usdt, dec!(10)).unwrap(),
+        storage::ledger::PostingRefs {
+            memo: Some("аккаунт ub-2 заблокирован, деньги признаны потерянными"),
+            created_by: Some("staff:1"),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    // Потерю списали — в кошельке её действительно нет (иначе сверка нашла бы излишек).
+    let have = e.world.balance(e.ub, XR, domain::Asset::Usdt);
+    e.world
+        .set_balance(e.ub, XR, domain::Asset::Usdt, have - dec!(10))
+        .unwrap();
+    let acc = e.engine.invest_accrue().await.unwrap();
+    assert_eq!(acc.revenue, fee);
+    assert_eq!(acc.losses, dec!(10));
+    assert_eq!(acc.profit, Decimal::ZERO);
+    assert!(
+        acc.credited.is_empty(),
+        "убыточное окно ничего не начисляет"
+    );
+    assert_eq!(balance(&e).await, dec!(1000));
+
+    // Следующие комиссии сначала покрывают перенесённый убыток.
+    let mut earned = Decimal::ZERO;
+    let mut credited = Decimal::ZERO;
+    for _ in 0..8 {
+        let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+        accepted(e.submit(&url).await);
+        e.drain().await;
+        let before = -e.ledger("revenue:fee:USDT").await;
+        let acc = e.engine.invest_accrue().await.unwrap();
+        earned = before;
+        credited += acc.credited.iter().map(|(_, a)| *a).sum::<Decimal>();
+        assert!(acc.carried <= Decimal::ZERO);
+        // Начисление никогда не больше прибыли окна × доля.
+        assert!(
+            acc.credited.iter().map(|(_, a)| *a).sum::<Decimal>()
+                <= acc.profit * dec!(50) / dec!(100)
+        );
+    }
+    // Всего начислено не больше (все комиссии − потеря) × доля капитала × 50 %.
+    let ceiling = (earned - dec!(10)).max(Decimal::ZERO) * dec!(50) / dec!(100);
+    assert!(credited <= ceiling, "{credited} > {ceiling}");
+    assert!(credited > Decimal::ZERO, "убыток покрыт — начисления пошли");
+    e.assert_books_match().await;
+}
