@@ -1607,8 +1607,24 @@ async fn support_question_reaches_staff_and_the_answer_reaches_the_client(pool: 
         .await;
     assert!(inbox.text().contains("4242"), "{}", inbox.text());
 
-    o.press(ADMIN, &question, "Ответить", "Ответ клиенту 4242")
+    // П-8: вопрос не пропадает с экрана — просьба написать ответ приходит новым сообщением
+    // ответом на карточку обращения, сама карточка цела.
+    let prompt = o
+        .press(ADMIN, &question, "Ответить", "Ответ клиенту 4242")
         .await;
+    assert_eq!(prompt.method, "sendMessage");
+    assert_eq!(
+        prompt.body["reply_parameters"]["message_id"].as_i64(),
+        question.message_id,
+        "{}",
+        prompt.body
+    );
+    let edited =
+        o.tg.calls()
+            .into_iter()
+            .filter(|c| c.method.starts_with("edit") && c.chat() == Some(ADMIN))
+            .any(|c| c.body["message_id"].as_i64() == question.message_id);
+    assert!(!edited, "карточку обращения не правили");
     o.say(
         ADMIN,
         "деньги у нас, чек будет через 5 минут",

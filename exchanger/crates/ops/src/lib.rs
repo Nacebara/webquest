@@ -639,7 +639,14 @@ impl Inner {
             let mut conn = self.pool.acquire().await?;
             storage::alerts::is_copy(&mut conn, chat, message_id).await?
         };
+        // П-8: «Ответить» — просьба написать ответ новым сообщением ответом на карточку
+        // обращения: вопрос клиента остаётся на экране, отвечать не по памяти.
+        let beside = matches!(cb, Cb::SupportReply(_));
         if let Some(screen) = self.on_callback(staff, chat, message, cb).await? {
+            if beside {
+                self.send_with(chat, &screen, Some(message_id)).await?;
+                return Ok(());
+            }
             if from_alert {
                 let sent = self.send(chat, &screen).await?;
                 if dash {
@@ -659,6 +666,16 @@ impl Inner {
 
     /// Отправить экран: карточку — `sendRichMessage` (Telegram отказал — обычным HTML).
     pub(crate) async fn send(&self, chat: i64, screen: &Screen) -> Result<Message, OpsError> {
+        self.send_with(chat, screen, None).await
+    }
+
+    /// То же, ответом на сообщение `reply_to` (его нет — просто новым сообщением).
+    async fn send_with(
+        &self,
+        chat: i64,
+        screen: &Screen,
+        reply_to: Option<i32>,
+    ) -> Result<Message, OpsError> {
         let screen = self.look().screen(screen);
         if let Some(rich) = &screen.rich {
             let mut request = botapi::SendRichMessage::new(chat, rich.clone());
@@ -676,6 +693,9 @@ impl Inner {
         }
         let mut request = SendMessage::html(chat, screen.text.clone());
         request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
+        if let Some(id) = reply_to {
+            request = request.reply_to(id);
+        }
         let m = self.api.send_message(&request).await?;
         self.set_window(chat, m.message_id);
         Ok(m)
