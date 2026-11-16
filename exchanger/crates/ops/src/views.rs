@@ -1303,19 +1303,27 @@ impl Inner {
                 .filter(|u| *u > Utc::now())
                 .map(|u| t.f("bots.flood", &[("until", &when(u))]))
                 .unwrap_or_default();
-            lines.push(t.f(
-                "bots.item",
-                &[
-                    ("label", &esc(&b.label)),
-                    ("status", &esc(&b.status)),
-                    ("flood", &flood),
-                    (
-                        "last",
-                        &b.last_ok_at.map_or_else(|| t.t("common.none"), when),
-                    ),
-                    ("n", &b.in_flight),
-                ],
-            ));
+            lines.push(
+                t.f(
+                    "bots.item",
+                    &[
+                        ("label", &esc(&b.label)),
+                        // П-14: статус словами; незнакомый (новая версия базы) — как есть.
+                        (
+                            "status",
+                            &Some(format!("bots.status_{}", b.status))
+                                .filter(|k| t.has(k))
+                                .map_or_else(|| esc(&b.status), |k| t.t(&k)),
+                        ),
+                        ("flood", &flood),
+                        (
+                            "last",
+                            &b.last_ok_at.map_or_else(|| t.t("common.none"), when),
+                        ),
+                        ("n", &b.in_flight),
+                    ],
+                ),
+            );
             let paused = b.status == "disabled";
             s = s.row(vec![btn(
                 t.f(

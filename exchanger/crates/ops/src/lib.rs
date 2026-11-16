@@ -1245,6 +1245,17 @@ mod tests {
         for e in Emoji::ALL {
             assert!(t.has(&format!("emoji_roles.{}", e.key())), "{e:?}");
         }
+        // Все статусы аккаунта из CHECK в схеме — словами (П-14).
+        for s in [
+            "new",
+            "active",
+            "flood_wait",
+            "logged_out",
+            "banned",
+            "disabled",
+        ] {
+            assert!(t.has(&format!("bots.status_{s}")), "{s}");
+        }
         for step in ["balance", "issue", "claim", "balance_after"] {
             assert!(t.has(&format!("selftest.s_{step}")));
         }

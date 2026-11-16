@@ -712,7 +712,9 @@ empty = "Выплаты закончились"
 reply = "Кнопка «Ответить»"
 
 [bots]
+# П-14: статус аккаунта словами (все значения `userbot_accounts.status`).
 status_new = "ещё не вошёл"
+status_active = "работает"
 status_logged_out = "вход сброшен"
 status_banned = "заблокирован"
 status_disabled = "на паузе"

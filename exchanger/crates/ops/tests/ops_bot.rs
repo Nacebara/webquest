@@ -1028,7 +1028,11 @@ async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
         o.tg.calls()
             .into_iter()
             .skip(mark2)
-            .filter(|c| c.method.starts_with("edit"))
+            .filter(|c| {
+                c.method.starts_with("edit")
+                    && c.chat() == Some(OWNER)
+                    && c.body["message_id"].as_i64() == alert.message_id
+            })
             .count();
     assert_eq!(again, 0, "решённую копию правят один раз");
 }
@@ -1635,6 +1639,12 @@ async fn selftest_from_the_panel_reports_every_step(pool: PgPool) {
     // Макет убрал самопроверку с главного экрана: она — в «Аккаунтах».
     let dash = o.say(OWNER, "/dash", "Всё спокойно").await;
     let bots = o.press(OWNER, &dash, "Аккаунты", "Юзерботы").await;
+    // П-14: статус аккаунта — словами, а не кодом из базы.
+    assert!(
+        bots.text().contains("ub-1: ещё не вошёл") && !bots.text().contains(": new"),
+        "{}",
+        bots.text()
+    );
     let preview = o
         .press(OWNER, &bots, "Самопроверка", "сам же его активирует")
         .await;
