@@ -60,7 +60,7 @@ pub use review::{
     OrderView, QueueData, QueueRow, ReconcileHint, sample_now, sample_order, sample_queue,
 };
 pub use texts::Texts;
-pub use views::{MenuCounts, menu_screen};
+pub use views::{MenuCounts, maintenance_screen, menu_screen};
 
 use crate::actions::{Action, Input};
 

@@ -1306,6 +1306,48 @@ async fn paused_direction_tells_the_client_why(pool: PgPool) {
     bot.stop().await;
 }
 
+/// П-13: «Обслуживание 30 мин» — клиент видит, до какого времени (макет «Обслуживание»: «Обновляемся
+/// до 15:30»), чек не открыт. Срок вышел — обслуживание кончилось само, чек принимается.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn maintenance_with_a_term_tells_the_client_until_when_and_ends_itself(pool: PgPool) {
+    let e = env(pool).await;
+    let until = chrono::Utc::now() + chrono::Duration::minutes(30);
+    let set = |until: chrono::DateTime<chrono::Utc>| {
+        let pool = e.pool.clone();
+        async move {
+            let mut conn = pool.acquire().await.unwrap();
+            storage::settings::set(
+                &mut conn,
+                "maintenance",
+                &json!({ "on": true, "until": until.to_rfc3339() }),
+                None,
+            )
+            .await
+            .unwrap();
+        }
+    };
+    set(until).await;
+    let bot = e.start_bot();
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    e.fake.client_writes(&format!("Вот чек: {url}"));
+    e.fake
+        .wait_for("maintenance with the time", |c| {
+            c.method == "sendMessage" && c.contains("Обновляемся до")
+        })
+        .await;
+    assert!(e.orders().await.is_empty(), "чек не открыт");
+
+    set(chrono::Utc::now() - chrono::Duration::minutes(1)).await;
+    e.fake.client_writes(&format!("Вот чек: {url}"));
+    e.fake
+        .wait_for("order message", |c| {
+            c.method == "sendMessage" && c.chat() == Some(CLIENT) && !c.contains("Обновляемся")
+        })
+        .await;
+    assert_eq!(e.orders().await.len(), 1, "срок вышел — чек принят");
+    bot.stop().await;
+}
+
 /// Telegram правку боту не доставил: бот сам перечитывает сообщение с чеком ответом-цитатой
 /// и берёт ссылку, клиент ничего не делает.
 #[sqlx::test(migrator = "storage::MIGRATOR")]

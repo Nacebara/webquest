@@ -132,6 +132,12 @@ pub(crate) enum Action {
         flag: Flag,
         on: bool,
     },
+    /// Обслуживание со сроком (П-13): «Обслуживание 30 мин», «+15 мин». Было — для предпросмотра.
+    Maintain {
+        before_on: bool,
+        before_until: Option<chrono::DateTime<chrono::Utc>>,
+        until: chrono::DateTime<chrono::Utc>,
+    },
     EmojiStyle {
         before: EmojiStyle,
         after: EmojiStyle,
@@ -1492,6 +1498,18 @@ impl Inner {
                 }
                 text
             }
+            Action::Maintain {
+                before_on,
+                before_until,
+                until,
+            } => t.f(
+                "settings.preview_toggle",
+                &[
+                    ("name", &t.t("settings.n_maint")),
+                    ("before", &self.maint_state(*before_on, *before_until)),
+                    ("after", &self.maint_state(true, Some(*until))),
+                ],
+            ),
             Action::EmojiStyle { before, after } => t.f(
                 "settings.preview_toggle",
                 &[
@@ -1905,6 +1923,11 @@ impl Inner {
                     .filter(Value::is_object)
                     .unwrap_or_else(|| json!({}));
                 value["on"] = json!(on);
+                // Переключатель — без срока: и «вкл», и «выкл» снимают «Обслуживание 30 мин».
+                if let Some(o) = value.as_object_mut() {
+                    o.remove("until");
+                    o.remove("since");
+                }
                 storage::settings::set(&mut tx, key, &value, Some(staff_id)).await?;
                 // Стоп-кран — критичная тревога всему персоналу, пока его не снимут (шаг 2.8).
                 if *flag == Flag::KillSwitch {
@@ -1934,6 +1957,32 @@ impl Inner {
                     Some(json!({ "on": !on })),
                     Some(json!({ "on": on })),
                     Cb::Settings,
+                )
+            }
+            Action::Maintain {
+                before_on,
+                before_until,
+                until,
+            } => {
+                let key = Flag::Maintenance.key();
+                // «С 15:00» на главном экране продление не сдвигает.
+                let since = match storage::settings::on_since(&mut tx, key).await? {
+                    Some(since) if *before_on => since,
+                    _ => chrono::Utc::now(),
+                };
+                let value = json!({
+                    "on": true,
+                    "until": until.to_rfc3339(),
+                    "since": since.to_rfc3339(),
+                });
+                storage::settings::set(&mut tx, key, &value, Some(staff_id)).await?;
+                (
+                    "settings.flag",
+                    "settings",
+                    key.to_owned(),
+                    Some(json!({ "on": before_on, "until": before_until.map(|u| u.to_rfc3339()) })),
+                    Some(json!({ "on": true, "until": until.to_rfc3339() })),
+                    Cb::Maintenance,
                 )
             }
             Action::EmojiStyle { before, after } => {
@@ -2146,6 +2195,7 @@ impl Inner {
             Cb::UserDir(id, d) => self.user_dir(id, d).await?,
             Cb::User(id) => self.user(Some(staff), id).await?,
             Cb::Settings => self.settings().await?,
+            Cb::Maintenance => self.maintenance().await?,
             Cb::Emoji => self.emoji().await?,
             Cb::Bots => self.bots().await?,
             Cb::Staff => self.staff_list(staff).await?,

@@ -810,10 +810,7 @@ pub fn critical_screen(
                 "alert.kill_switch",
                 &[("by", &esc(&s(p, "by"))), ("at", &at)],
             ))
-            .row(vec![btn(
-                t.t("alert.b_maint"),
-                &Cb::Toggle(crate::cb::Flag::Maintenance),
-            )])
+            .row(vec![btn(t.t("alert.b_maint"), &Cb::MaintFor(30))])
             .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
         }
         _ => return None,

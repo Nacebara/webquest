@@ -1,0 +1,11 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&screen)
+---
+--- rich
+
+--- html
+🛠 <b>Обслуживание · до <tg-time unix="1794659400" format="t">15:30</tg-time></b>
+Новые чеки не принимаю, 3 заявки довожу.
+--- keyboard
+[{"text":"+15 мин","callback_data":"a:mm:15"},{"text":"▶️ Закончить","style":"primary","callback_data":"a:st:m"}]

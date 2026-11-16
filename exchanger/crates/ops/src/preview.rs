@@ -468,6 +468,14 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
             send_card(api, chat, &look.screen(&screen)).await;
         }
     }
+    // Макет «Обслуживание» (П-13): срок и сколько начатых заявок довожу.
+    let maintenance = crate::maintenance_screen(
+        &texts,
+        Some(now + chrono::Duration::minutes(30)),
+        Some(now),
+        3,
+    );
+    send_card(api, chat, &sample(look.screen(&maintenance))).await;
     // Пульт: «Статистика» на данных макета — плитки и график одной картинкой.
     let _ = api
         .send_message(

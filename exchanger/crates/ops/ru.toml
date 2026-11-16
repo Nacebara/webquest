@@ -787,7 +787,7 @@ b_system = "{m:server} Система"
 b_fixture = "{m:export} Сохранить фикстуру"
 b_unpause = "{m:play} Снять паузу"
 b_order = "{m:order} Заявка"
-b_maint = "{m:maint} Обслуживание"
+b_maint = "{m:maint} Обслуживание 30 мин"
 unacked = "\n<i>Повтор {n} · с {since} никто не принял</i>"
 # «Недостача» — макет: реально меньше леджера, выплаты встали сами; владельцу — «это вы?».
 balance_short = "{e:alarm} <b>{name}: меньше на <code>{amount}</code></b>\nЛеджер {expected} · реально {actual}{account}\n{paused}Это вы выводили?"
@@ -1052,3 +1052,14 @@ updated = "Обновлено {time} · по закрытым заявкам"
 b_today = "{m:calendar} Сегодня"
 b_7 = "{m:chart} 7 дней"
 b_30 = "{m:chart} 30 дней"
+
+# Макет «Обслуживание» (П-13): срок, сколько начатых заявок довожу, «+15 мин» и «Закончить».
+[maint]
+until = "{e:maint} <b>Обслуживание · до {time}</b>"
+since = "{e:maint} <b>Обслуживание · с {time}</b>"
+on = "{e:maint} <b>Обслуживание</b>"
+finishing = "Новые чеки не принимаю, {n} довожу."
+idle = "Новые чеки не принимаю, начатых заявок нет."
+state_until = "до {time}"
+b_more = "+15 мин"
+b_end = "{m:play} Закончить"

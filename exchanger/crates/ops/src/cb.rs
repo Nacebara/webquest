@@ -187,6 +187,12 @@ pub enum Cb {
     UserNote(i64),
     Settings,
     Toggle(Flag),
+    /// Экран «Обслуживание · до 15:30» (П-13).
+    Maintenance,
+    /// Обслуживание на столько минут от сейчас («Обслуживание 30 мин» в тревоге «Стоп-кран»).
+    MaintFor(u16),
+    /// Продлить обслуживание на столько минут («+15 мин»).
+    MaintMore(u16),
     Emoji,
     EmojiStyle(EmojiStyle),
     EmojiRole(Emoji),
@@ -351,6 +357,9 @@ impl Cb {
             Cb::UserNote(id) => format!("un:{id}"),
             Cb::Settings => "s".into(),
             Cb::Toggle(f) => format!("st:{}", f.code()),
+            Cb::Maintenance => "mt".into(),
+            Cb::MaintFor(m) => format!("mf:{m}"),
+            Cb::MaintMore(m) => format!("mm:{m}"),
             Cb::Emoji => "se".into(),
             Cb::EmojiStyle(s) => format!("ss:{}", s.key()),
             Cb::EmojiRole(r) => format!("sr:{}", r.key()),
@@ -461,6 +470,9 @@ impl Cb {
             ["un", _] => Cb::UserNote(id(1)?),
             ["s"] => Cb::Settings,
             ["st", f] => Cb::Toggle(Flag::ALL.into_iter().find(|x| x.code() == *f)?),
+            ["mt"] => Cb::Maintenance,
+            ["mf", m] => Cb::MaintFor(m.parse().ok()?),
+            ["mm", m] => Cb::MaintMore(m.parse().ok()?),
             ["se"] => Cb::Emoji,
             ["ss", k] => Cb::EmojiStyle(EmojiStyle::from_key(k)?),
             ["sr", k] => Cb::EmojiRole(Emoji::from_key(k)?),
@@ -597,6 +609,7 @@ mod tests {
         all.push(Cb::EndSession(big));
         all.push(Cb::WriteOff(big));
         all.extend(Flag::ALL.map(Cb::Toggle));
+        all.extend([Cb::Maintenance, Cb::MaintFor(30), Cb::MaintMore(u16::MAX)]);
         all.extend(EmojiStyle::ALL.map(Cb::EmojiStyle));
         all.extend(Emoji::ALL.map(Cb::EmojiRole));
         all.extend(Role::ALL.map(|r| Cb::MemberRole(big, r)));

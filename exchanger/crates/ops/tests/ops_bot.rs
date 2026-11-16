@@ -717,6 +717,85 @@ async fn the_owner_lifts_the_kill_switch_by_typing_the_word(pool: PgPool) {
     assert!(flags.iter().all(|a| a.double_confirmed));
 }
 
+/// П-13: в тревоге «Стоп-кран» — «Обслуживание 30 мин» (макет), дальше экран «Обслуживание · до
+/// 15:30» с «+15 мин» и «Закончить». Срок вышел — обслуживание кончилось само.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn maintenance_for_30_minutes_from_the_kill_switch_alert(pool: PgPool) {
+    let o = ops(pool).await;
+    let settings = o.say(ADMIN, "/settings", "Настройки").await;
+    let preview = o
+        .press(ADMIN, &settings, "Включить стоп-кран", "Стоп-кран выплат")
+        .await;
+    let mark = o.tg.mark();
+    o.press(ADMIN, &preview, "Подтвердить", "Сохранено").await;
+    let alert = o.tg.screen(mark, ADMIN, "Выплаты остановлены").await;
+    let maint = |p: &PgPool| {
+        let p = p.clone();
+        async move {
+            let mut conn = p.acquire().await.unwrap();
+            (
+                storage::settings::flag_on(&mut conn, "maintenance")
+                    .await
+                    .unwrap(),
+                storage::settings::on_until(&mut conn, "maintenance")
+                    .await
+                    .unwrap(),
+            )
+        }
+    };
+    let preview = o
+        .press(ADMIN, &alert, "Обслуживание 30 мин", "Режим обслуживания")
+        .await;
+    let card = o
+        .press(ADMIN, &preview, "Подтвердить", "Обслуживание · до")
+        .await;
+    assert!(
+        card.text().contains("Новые чеки не принимаю"),
+        "{}",
+        card.text()
+    );
+    let (on, until) = maint(&o.pool).await;
+    let left = until.expect("срок") - chrono::Utc::now();
+    assert!(on && left > chrono::Duration::minutes(29) && left <= chrono::Duration::minutes(30));
+
+    let preview = o.press(ADMIN, &card, "+15 мин", "Режим обслуживания").await;
+    let card = o
+        .press(ADMIN, &preview, "Подтвердить", "Обслуживание · до")
+        .await;
+    let left = maint(&o.pool).await.1.expect("срок") - chrono::Utc::now();
+    assert!(left > chrono::Duration::minutes(44), "+15 к сроку: {left}");
+
+    let preview = o
+        .press(ADMIN, &card, "Закончить", "Режим обслуживания")
+        .await;
+    o.press(ADMIN, &preview, "Подтвердить", "Сохранено").await;
+    assert_eq!(maint(&o.pool).await, (false, None));
+    assert_eq!(o.audit("settings.flag").await.len(), 4);
+
+    // Срок вышел — обслуживание выключено для всех, хотя запись ещё «вкл».
+    let mut conn = o.pool.acquire().await.unwrap();
+    let past = chrono::Utc::now() - chrono::Duration::seconds(1);
+    storage::settings::set(
+        &mut conn,
+        "maintenance",
+        &serde_json::json!({ "on": true, "until": past.to_rfc3339() }),
+        None,
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    assert_eq!(maint(&o.pool).await, (false, None));
+    let settings = o.say(ADMIN, "/settings", "Настройки").await;
+    let preview = o
+        .press(ADMIN, &settings, "Обслуживание", "Режим обслуживания")
+        .await;
+    assert!(
+        preview.text().contains("выкл → <b>вкл</b>"),
+        "{}",
+        preview.text()
+    );
+}
+
 /// Шаг 2.8: движок не проходит круг дольше `engine_down_after` — тревога «Движок не работает»
 /// с последней ошибкой; ведёт в «Систему».
 #[sqlx::test(migrator = "storage::MIGRATOR")]

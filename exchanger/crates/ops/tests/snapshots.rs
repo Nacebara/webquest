@@ -215,6 +215,22 @@ fn critical_alerts() {
     assert!(ops::critical_screen(&t, "manual_review", &serde_json::json!({}), 1, first).is_none());
 }
 
+/// П-13: макет «Обслуживание» — «до 15:30», «3 заявки довожу», «+15 мин» и синяя «Закончить»;
+/// без срока — «с 15:00», без начатых заявок — так и сказано.
+#[test]
+fn maintenance_card() {
+    let t = Texts::builtin().unwrap();
+    let at = |s: &str| s.parse::<chrono::DateTime<chrono::Utc>>().unwrap();
+    let since = Some(at("2026-11-14T12:00:00Z"));
+    for (name, until, live) in [
+        ("maintenance_until", Some(at("2026-11-14T12:30:00Z")), 3),
+        ("maintenance_since_idle", None, 0),
+    ] {
+        let screen = Look::plain().screen(&ops::maintenance_screen(&t, until, since, live));
+        insta::assert_snapshot!(name, dump(&screen));
+    }
+}
+
 /// П-3 (аудит 16.11, картинка принята): у оператора при неясном исходе — «решает админ» и
 /// «Позвать админа» вместо повтора и возврата, которые ему недоступны.
 #[test]

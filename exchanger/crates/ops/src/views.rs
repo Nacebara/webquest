@@ -75,6 +75,39 @@ pub struct MenuCounts {
     pub maint: bool,
 }
 
+/// Экран «Обслуживание» (П-13, макет): срок или «с 15:00», сколько начатых заявок довожу.
+pub fn maintenance_screen(
+    t: &crate::Texts,
+    until: Option<DateTime<Utc>>,
+    since: Option<DateTime<Utc>>,
+    live: i64,
+) -> Screen {
+    use botapi::ButtonStyle::Primary;
+    let head = match (until, since) {
+        (Some(u), _) => t.f("maint.until", &[("time", &crate::dash::hhmm(u))]),
+        (None, Some(s)) => t.f("maint.since", &[("time", &crate::dash::hhmm(s))]),
+        (None, None) => t.t("maint.on"),
+    };
+    let body = if live > 0 {
+        t.f(
+            "maint.finishing",
+            &[(
+                "n",
+                &format!(
+                    "{live} {}",
+                    ui::fmt::plural(live, ["заявку", "заявки", "заявок"])
+                ),
+            )],
+        )
+    } else {
+        t.t("maint.idle")
+    };
+    Screen::new(format!("{head}\n{body}")).row(vec![
+        btn(t.t("maint.b_more"), &Cb::MaintMore(15)),
+        btn(t.t("maint.b_end"), &Cb::Toggle(Flag::Maintenance)).style(Primary),
+    ])
+}
+
 /// Меню пульта для роли (макет «Меню пульта»). «Персонал» — только владельцу.
 pub fn menu_screen(t: &crate::Texts, role: Role, c: &MenuCounts) -> Screen {
     use botapi::ButtonStyle::{Danger, Primary};
@@ -1069,6 +1102,39 @@ impl Inner {
         self.texts.t(if on { "common.on" } else { "common.off" })
     }
 
+    /// Состояние обслуживания для предпросмотра: «выкл», «вкл» или «до 15:30».
+    pub(crate) fn maint_state(&self, on: bool, until: Option<DateTime<Utc>>) -> String {
+        match until {
+            Some(u) if on => self
+                .texts
+                .f("maint.state_until", &[("time", &crate::dash::hhmm(u))]),
+            _ => self.onoff(on),
+        }
+    }
+
+    /// Макет «Обслуживание» (П-13): «Обслуживание · до 15:30 / Новые чеки не принимаю, 3 заявки
+    /// довожу», «+15 мин» и синяя «Закончить». Обслуживание уже кончилось — «Настройки».
+    pub(crate) async fn maintenance(&self) -> Result<Screen, OpsError> {
+        let key = Flag::Maintenance.key();
+        let (on, until, since, live) = {
+            let mut conn = self.pool.acquire().await?;
+            (
+                storage::settings::flag(&mut conn, key, false).await?,
+                storage::settings::on_until(&mut conn, key).await?,
+                storage::settings::on_since(&mut conn, key).await?,
+                storage::admin::live_by_state(&mut conn)
+                    .await?
+                    .iter()
+                    .map(|s| s.count)
+                    .sum::<i64>(),
+            )
+        };
+        if !on {
+            return self.settings().await;
+        }
+        Ok(maintenance_screen(&self.texts, until, since, live))
+    }
+
     pub(crate) fn style_name(&self, s: EmojiStyle) -> String {
         self.texts.t(match s {
             EmojiStyle::Animated => "settings.style_animated",
@@ -1424,6 +1490,7 @@ impl Inner {
             Cb::UserTerms(id) => self.user_terms(id).await,
             Cb::UserDir(id, d) => self.user_dir(id, d).await,
             Cb::Settings => self.settings().await,
+            Cb::Maintenance => self.maintenance().await,
             Cb::Emoji => self.emoji().await,
             Cb::Bots => self.bots().await,
             Cb::Staff => self.staff_list(staff).await,
@@ -1792,6 +1859,21 @@ impl Inner {
             Cb::UserBan(id) => return Ok(self.prompt(staff, Input::Ban(id), "user.ask_ban")),
             Cb::UserUnban(id) => return Ok(self.prompt(staff, Input::Unban(id), "user.ask_unban")),
             Cb::UserNote(id) => return Ok(self.prompt(staff, Input::Note(id), "user.ask_note")),
+            Cb::MaintFor(minutes) | Cb::MaintMore(minutes) => {
+                let key = Flag::Maintenance.key();
+                let before_on = storage::settings::flag(&mut conn, key, false).await?;
+                let before_until = storage::settings::on_until(&mut conn, key).await?;
+                let now = chrono::Utc::now();
+                let from = match cb {
+                    Cb::MaintMore(_) => before_until.unwrap_or(now),
+                    _ => now,
+                };
+                Action::Maintain {
+                    before_on,
+                    before_until,
+                    until: from + chrono::Duration::minutes(i64::from(minutes)),
+                }
+            }
             Cb::Toggle(flag) => {
                 let on = storage::settings::flag(&mut conn, flag.key(), flag.default_on()).await?;
                 if flag == Flag::KillSwitch && on {

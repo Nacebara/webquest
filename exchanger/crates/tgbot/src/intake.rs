@@ -53,8 +53,9 @@ pub(crate) async fn process(
         storage::settings::flag_on(&mut conn, "maintenance").await?
     };
     if maintenance {
+        let until = maintenance_until(inner).await?;
         return inner
-            .reply_error(chat, &UiError::Maintenance { until: None })
+            .reply_error(chat, &UiError::Maintenance { until })
             .await;
     }
 
@@ -291,7 +292,9 @@ async fn submit(
                 SubmitReject::NoReserve => UiError::NoReserve {
                     max: domain::Money::zero(domain::Asset::Usdt),
                 },
-                SubmitReject::ServicePaused => UiError::Maintenance { until: None },
+                SubmitReject::ServicePaused => UiError::Maintenance {
+                    until: maintenance_until(inner).await?,
+                },
                 SubmitReject::DailyLimit => UiError::DailyLimit,
                 SubmitReject::QuoteExpired => UiError::QuoteExpired,
                 SubmitReject::InvoiceBusy => UiError::InvoiceCheckBusy,
@@ -302,6 +305,15 @@ async fn submit(
             inner.reply_error(chat, &error).await
         }
     }
+}
+
+/// До какого времени обслуживание («Обслуживание 30 мин» в пульте, П-13): клиенту — «Обновляемся
+/// до 15:30». Без срока — `None` («Пришлите его чуть позже»).
+async fn maintenance_until(
+    inner: &Inner,
+) -> Result<Option<chrono::DateTime<chrono::Utc>>, TgBotError> {
+    let mut conn = inner.pool.acquire().await?;
+    Ok(storage::settings::on_until(&mut conn, "maintenance").await?)
 }
 
 #[cfg(test)]
