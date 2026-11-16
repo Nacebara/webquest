@@ -150,14 +150,17 @@ pub fn menu_screen(t: &crate::Texts, role: Role, c: &MenuCounts) -> Screen {
     for pair in items.chunks(2) {
         s = s.row(pair.to_vec());
     }
-    let kill_label = if c.kill {
-        "menu.b_kill_off"
-    } else {
-        "menu.b_kill"
-    };
-    s.row(vec![
-        btn(t.t(kill_label), &Cb::Toggle(Flag::KillSwitch)).style(Danger),
-    ])
+    // П-11: снять стоп-кран может только владелец — остальным кнопка, которая откажет, не нужна
+    // (в тревоге сказано: «Выключит владелец»). Включить может любой.
+    match (c.kill, role) {
+        (true, Role::Owner) => s.row(vec![
+            btn(t.t("menu.b_kill_off"), &Cb::Toggle(Flag::KillSwitch)).style(Danger),
+        ]),
+        (true, _) => s,
+        (false, _) => s.row(vec![
+            btn(t.t("menu.b_kill"), &Cb::Toggle(Flag::KillSwitch)).style(Danger),
+        ]),
+    }
 }
 
 /// Итог «Взять» (П-2): заявка моя (`from` — у кого забрал(а), если забрал(а)) или её держит
@@ -852,7 +855,12 @@ impl Inner {
     // -----------------------------------------------------------------------------------------
     // Разбор
 
-    pub(crate) async fn find_order(&self, query: &str) -> Result<Screen, OpsError> {
+    /// Поиск заявки; карточка — с кнопками роли того, кто ищет (П-12).
+    pub(crate) async fn find_order(
+        &self,
+        staff: &StaffMember,
+        query: &str,
+    ) -> Result<Screen, OpsError> {
         // Вставили ссылку на чек или счёт (П-4) — ищем по её коду.
         let link = parsers::links::extract_from_message(query, &[], &[])
             .into_iter()
@@ -864,7 +872,7 @@ impl Inner {
             storage::admin::find_order(&mut conn, query).await?
         };
         match id {
-            Some(id) => self.order(None, id).await,
+            Some(id) => self.order(Some(staff), id).await,
             None => Ok(Screen::new(self.texts.t("order.not_found")).row(vec![
                 btn(self.texts.t("order.b_search_more"), &Cb::OrderAsk),
                 btn(self.texts.t("common.home"), &Cb::Menu),
@@ -875,13 +883,18 @@ impl Inner {
     // -----------------------------------------------------------------------------------------
     // Клиенты
 
-    pub(crate) async fn find_user(&self, query: &str) -> Result<Screen, OpsError> {
+    /// Поиск клиента; карточка — с кнопками роли того, кто ищет (П-12).
+    pub(crate) async fn find_user(
+        &self,
+        staff: &StaffMember,
+        query: &str,
+    ) -> Result<Screen, OpsError> {
         let id = {
             let mut conn = self.pool.acquire().await?;
             storage::admin::find_user(&mut conn, query).await?
         };
         match id {
-            Some(id) => self.user(None, id).await,
+            Some(id) => self.user(Some(staff), id).await,
             None => Ok(Screen::new(self.texts.t("user.not_found"))
                 .row(vec![btn(self.texts.t("common.home"), &Cb::Menu)])),
         }

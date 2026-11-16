@@ -1161,6 +1161,49 @@ async fn review_cards(o: &Ops) -> (storage::orders::OrderRow, Call, Call) {
     (order, owner, admin)
 }
 
+/// П-12 (аудит 16.11): найденная поиском карточка — с кнопками роли того, кто ищет. Раньше
+/// владелец находил заявку без «Закрыть без выплаты», а оператор видел у клиента «Бан» и
+/// «Инвестиции», которые ему откажут.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn search_shows_the_searchers_buttons(pool: PgPool) {
+    let o = ops(pool).await;
+    let (order, _, _) = review_cards(&o).await;
+    let found = o
+        .say(
+            OWNER,
+            &format!("/find {}", order.public_id),
+            "Ручной разбор",
+        )
+        .await;
+    assert!(
+        found.button("Закрыть без выплаты").is_some() && found.button("Выплачено").is_some(),
+        "{:?}",
+        found.buttons()
+    );
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        storage::staff::add(&mut conn, OPERATOR, Role::Operator, "Олег", OWNER)
+            .await
+            .unwrap();
+    }
+    let client = o
+        .say(OPERATOR, &format!("/user {}", common::CLIENT), "Клиент")
+        .await;
+    let labels: Vec<String> = client.body["reply_markup"]["inline_keyboard"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|r| r.as_array().cloned().unwrap_or_default())
+        .filter_map(|b| b["text"].as_str().map(str::to_owned))
+        .collect();
+    assert!(
+        !labels
+            .iter()
+            .any(|l| l.contains("Бан") || l.contains("Инвестиции")),
+        "{labels:?}"
+    );
+}
+
 async fn order_state(o: &Ops, id: i64) -> OrderState {
     let mut conn = o.pool.acquire().await.unwrap();
     storage::orders::get(&mut conn, id, false)

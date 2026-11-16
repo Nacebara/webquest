@@ -852,9 +852,9 @@ impl Inner {
                 "bots" => self.bots().await,
                 "staff" => self.staff_list(staff).await,
                 "audit" => self.audit(staff, 0).await,
-                "order" | "find" if !arg.is_empty() => self.find_order(arg).await,
+                "order" | "find" if !arg.is_empty() => self.find_order(staff, arg).await,
                 "order" | "find" => Ok(self.prompt(staff, Input::OrderSearch, "order.ask")),
-                "user" if !arg.is_empty() => self.find_user(arg).await,
+                "user" if !arg.is_empty() => self.find_user(staff, arg).await,
                 "user" => Ok(self.prompt(staff, Input::UserSearch, "user.ask")),
                 _ => self.menu(staff).await,
             };

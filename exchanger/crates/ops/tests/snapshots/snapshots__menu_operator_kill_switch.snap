@@ -16,4 +16,3 @@ expression: dump(&operator)
 [{"text":"📊 Статистика","callback_data":"a:sx:7"},{"text":"📓 Журнал","callback_data":"a:au"}]
 [{"text":"⚙️ Настройки","callback_data":"a:s"},{"text":"🖥 Система","callback_data":"a:sy"}]
 [{"text":"😊 Эмодзи","callback_data":"a:se"}]
-[{"text":"🛑 Снять стоп-кран","style":"danger","callback_data":"a:st:k"}]

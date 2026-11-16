@@ -656,8 +656,8 @@ impl Inner {
             }
             Input::Invest(i) => return self.invest_input(staff, i, &text).await,
             Input::SupportReply(client) => return self.support_reply(staff, client, &text).await,
-            Input::OrderSearch => return self.find_order(&text).await,
-            Input::UserSearch => return self.find_user(&text).await,
+            Input::OrderSearch => return self.find_order(staff, &text).await,
+            Input::UserSearch => return self.find_user(staff, &text).await,
             Input::Dir(d, field) => {
                 let before = {
                     let mut conn = self.pool.acquire().await?;
