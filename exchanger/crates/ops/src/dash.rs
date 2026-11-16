@@ -978,6 +978,22 @@ async fn dash_messages(conn: &mut sqlx::PgConnection) -> Result<Vec<(i64, i32)>,
         .unwrap_or_default())
 }
 
+/// Открыта недостача по сверке кошелька `platform` (событие `balance_mismatch` с минусом).
+pub(crate) async fn shortage_open(
+    conn: &mut sqlx::PgConnection,
+    platform: Platform,
+) -> Result<bool, crate::OpsError> {
+    let key = engine::reconcile::mismatch_key(platform);
+    Ok(storage::alerts::open_by_key(conn, &key)
+        .await?
+        .and_then(|a| {
+            a.payload["diff"]
+                .as_str()
+                .and_then(|d| d.parse::<Decimal>().ok())
+        })
+        .is_some_and(|d| d < Decimal::ZERO))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1022,20 +1038,4 @@ mod tests {
         assert_eq!(delta(Decimal::from(148), Decimal::from(136)), Some(9));
         assert_eq!(delta(Decimal::ONE, Decimal::ZERO), None);
     }
-}
-
-/// Открыта недостача по сверке кошелька `platform` (событие `balance_mismatch` с минусом).
-pub(crate) async fn shortage_open(
-    conn: &mut sqlx::PgConnection,
-    platform: Platform,
-) -> Result<bool, crate::OpsError> {
-    let key = engine::reconcile::mismatch_key(platform);
-    Ok(storage::alerts::open_by_key(conn, &key)
-        .await?
-        .and_then(|a| {
-            a.payload["diff"]
-                .as_str()
-                .and_then(|d| d.parse::<Decimal>().ok())
-        })
-        .is_some_and(|d| d < Decimal::ZERO))
 }
