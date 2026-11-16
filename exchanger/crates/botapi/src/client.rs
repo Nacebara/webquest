@@ -515,12 +515,12 @@ impl BotApi {
     }
 
     /// `setMyProfilePhoto` с живой аватаркой (`InputProfilePhotoAnimated`): MP4 (H.264),
-    /// квадрат, до 10 с; `main_frame` — секунда неподвижного кадра. Через @BotFather живую
+    /// квадрат, до 10 с; `main_frame_secs` — секунда неподвижного кадра. Через @BotFather живую
     /// аватарку не поставить, через Bot API — можно (проверено на тестовом боте 18.11).
     pub async fn set_my_animated_profile_photo(
         &self,
         mp4: Vec<u8>,
-        main_frame: f64,
+        main_frame_secs: u32,
     ) -> Result<bool, Error> {
         const METHOD: &str = "setMyProfilePhoto";
         let token = self.token.expose_secret();
@@ -528,7 +528,7 @@ impl BotApi {
         let photo = serde_json::json!({
             "type": "animated",
             "animation": "attach://animation",
-            "main_frame_timestamp": main_frame,
+            "main_frame_timestamp": main_frame_secs,
         });
         let form = reqwest::multipart::Form::new()
             .text("photo", photo.to_string())

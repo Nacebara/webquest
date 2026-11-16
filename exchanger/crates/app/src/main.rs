@@ -813,7 +813,7 @@ async fn avatar(file: PathBuf) -> anyhow::Result<()> {
     if mp4.len() > 10 * 1024 * 1024 {
         anyhow::bail!("файл больше 10 МБ — Telegram такой не примет");
     }
-    api.set_my_animated_profile_photo(mp4, 0.0)
+    api.set_my_animated_profile_photo(mp4, 0)
         .await
         .map_err(|e| anyhow::anyhow!(app::setup::explain_bot_error(&e)))?;
     println!("✅ Живая аватарка поставлена. В Telegram она обновится в течение минуты.");
