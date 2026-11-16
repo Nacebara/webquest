@@ -1238,6 +1238,22 @@ mod tests {
         }
     }
 
+    /// П-30: в текстах пульта — значки ролей (`{e:…}`, `{m:…}`), а не обычные эмодзи. Исключение —
+    /// кнопка нижней клавиатуры «🛠 Админ-панель»: её текст приходит обратно сообщением.
+    #[test]
+    fn console_texts_use_role_emoji() {
+        let plain = |c: char| {
+            matches!(u32::from(c), 0x1F300..=0x1FAFF | 0x2600..=0x27BF | 0x2B00..=0x2BFF)
+                || matches!(c, '\u{23E9}'..='\u{23FA}')
+        };
+        for line in include_str!("../ru.toml").lines() {
+            if line.starts_with('#') || line.starts_with("open = ") {
+                continue;
+            }
+            assert!(!line.chars().any(plain), "обычный эмодзи: {line}");
+        }
+    }
+
     #[test]
     fn nonces_are_distinct() {
         let mut seen = std::collections::HashSet::new();

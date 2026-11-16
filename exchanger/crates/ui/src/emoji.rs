@@ -498,6 +498,8 @@ pub fn fallback_char(name: &str) -> &'static str {
         "ticket" => "🎫",
         "spin" => "🌀",
         "play" | "resume" => "▶️",
+        "plus" => "➕",
+        "minus" => "➖",
         _ => "•",
     }
 }
