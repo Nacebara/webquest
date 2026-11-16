@@ -397,6 +397,45 @@ pub async fn is_copy(
     .await?)
 }
 
+/// Копии решённых тревог, ещё не поправленные на «Решено» (П-10): (тревога, копия).
+pub async fn resolved_open_copies(
+    conn: &mut PgConnection,
+    limit: i64,
+) -> Result<Vec<(i64, i64, i32)>, StorageError> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT c.alert_id, c.chat_id, c.message_id
+          FROM alert_copies c JOIN alerts a ON a.id = c.alert_id
+         WHERE a.resolved_at IS NOT NULL AND c.closed_at IS NULL AND c.message_id <> 0
+         ORDER BY c.alert_id
+         LIMIT $1
+        "#,
+        limit
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.alert_id, r.chat_id, r.message_id))
+        .collect())
+}
+
+/// Копия поправлена на «Решено» — больше не трогать.
+pub async fn close_copy(
+    conn: &mut PgConnection,
+    alert_id: i64,
+    chat_id: i64,
+) -> Result<(), StorageError> {
+    sqlx::query!(
+        "UPDATE alert_copies SET closed_at = now() WHERE alert_id = $1 AND chat_id = $2",
+        alert_id,
+        chat_id
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 /// Сотрудник позвал админа (П-3): повторы тревоги ему больше не приходят.
 pub async fn mute_copy(
     conn: &mut PgConnection,

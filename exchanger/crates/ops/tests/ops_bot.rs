@@ -731,6 +731,14 @@ async fn the_owner_lifts_the_kill_switch_by_typing_the_word(pool: PgPool) {
     assert!(kill_on().await, "админ стоп-кран не снимает");
     o.say(OWNER, " подтверждаю ", "Сохранено").await;
     assert!(!kill_on().await, "владелец снял словом");
+    // П-10: тревога у всех — серая, кто снял.
+    o.bot.deliver_alerts().await.unwrap();
+    let done = o.edit_of(0, OWNER, alert.message_id).await;
+    assert!(
+        done.text().contains("Решено: Игнат") && done.text().contains("Стоп-кран выплат: выкл"),
+        "{}",
+        done.text()
+    );
     let mut conn = o.pool.acquire().await.unwrap();
     assert!(
         storage::alerts::open_by_key(&mut conn, "kill_switch")
@@ -968,6 +976,30 @@ async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
             .iter()
             .all(|a| a.title != "manual_review")
     );
+    drop(conn);
+    // П-10 (картинка принята 18.11): решённое — правкой у всех: серое, кто и что, без кнопок.
+    // Копию мог поправить и фоновый круг тревог — смотрим все правки с начала.
+    let done = o.edit_of(0, OWNER, alert.message_id).await;
+    let text = done.text();
+    assert!(
+        text.contains("Решено: Игнат") && text.contains("вернул(а) деньги"),
+        "{text}"
+    );
+    assert!(
+        text.contains(&order.public_id) && !text.contains("🚨"),
+        "{text}"
+    );
+    assert!(done.buttons().is_empty(), "{:?}", done.buttons());
+    let mark2 = o.tg.mark();
+    o.bot.deliver_alerts().await.unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let again =
+        o.tg.calls()
+            .into_iter()
+            .skip(mark2)
+            .filter(|c| c.method.starts_with("edit"))
+            .count();
+    assert_eq!(again, 0, "решённую копию правят один раз");
 }
 
 /// П-5 (аудит 16.11): кнопка в тревоге открывает экран новым сообщением, тревога остаётся

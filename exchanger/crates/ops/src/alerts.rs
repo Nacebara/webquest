@@ -143,6 +143,12 @@ impl Inner {
         } else if quiet < after {
             storage::alerts::resolve(&mut conn, "engine_down").await?;
         }
+        drop(conn);
+        // 1в. П-10: решённое — правкой всех копий («Решено: Игнат — вернул(а) деньги»).
+        if let Err(e) = self.close_resolved().await {
+            tracing::warn!(error = %e, "resolved alert copies not updated");
+        }
+        let mut conn = self.pool.acquire().await?;
         // 2. Доставка: новые и изменившиеся — новым сообщением или правкой копии; критичные,
         // которые никто не принял 15 минут, — повтор новым сообщением со звуком вместо прежнего.
         let pending = storage::alerts::pending(&mut conn, 20).await?;
@@ -413,6 +419,134 @@ impl Inner {
         self.api
             .send_message(&SendMessage::html(chat, text))
             .await?;
+        Ok(())
+    }
+
+    /// Первая строка тревоги без значка — заголовок серой копии («Принял», «Решено»).
+    fn alert_head(&self, a: &AlertRow) -> String {
+        if a.title == "manual_review"
+            && let Some(public) = a.payload["public"].as_str()
+        {
+            return self
+                .texts
+                .f("alert.review_head", &[("public", &esc(public))]);
+        }
+        let full = self.render_alert(a);
+        let head = full.text.lines().next().unwrap_or_default();
+        head.strip_prefix("{e:")
+            .and_then(|r| r.split_once("} "))
+            .map_or(head, |(_, rest)| rest)
+            .to_owned()
+    }
+
+    /// Кто решил тревогу: последнее действие персонала по её предмету после её появления
+    /// (заявка — решение по ней, кошелёк — взнос, вывод или списание).
+    async fn resolution(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        a: &AlertRow,
+    ) -> Result<Option<storage::audit::AuditRow>, OpsError> {
+        let (target, prefix) = match a.title.as_str() {
+            "manual_review" => match a.payload["id"].as_i64() {
+                Some(id) => (("order", id.to_string()), "order."),
+                None => return Ok(None),
+            },
+            "balance_mismatch" => match a.payload["platform"].as_str() {
+                Some(p) => (("wallet", p.to_owned()), "capital."),
+                None => return Ok(None),
+            },
+            "kill_switch" => (("settings", "kill_switch_payouts".to_owned()), "settings."),
+            "new_login" => match a.payload["account"].as_str() {
+                Some(account) => (("userbot", account.to_owned()), "userbot."),
+                None => return Ok(None),
+            },
+            _ => return Ok(None),
+        };
+        Ok(
+            storage::audit::recent(conn, 20, None, Some((target.0, &target.1)))
+                .await?
+                .into_iter()
+                .find(|r| {
+                    r.at >= a.first_at
+                        && r.action.starts_with(prefix)
+                        && !matches!(r.action.as_str(), "order.take" | "order.call_admin")
+                }),
+        )
+    }
+
+    /// П-10: копии решённых тревог — серые, без кнопок, с тем, кто и что сделал. Каждая копия
+    /// правится один раз (`alert_copies.closed_at`).
+    pub(crate) async fn close_resolved(&self) -> Result<(), OpsError> {
+        let _turn = self.alert_turn.lock().await;
+        let mut conn = self.pool.acquire().await?;
+        let copies = storage::alerts::resolved_open_copies(&mut conn, 50).await?;
+        let mut current: Option<(i64, Screen)> = None;
+        let names: std::collections::HashMap<i64, String> = storage::admin::userbots(&mut conn)
+            .await?
+            .into_iter()
+            .map(|b| (i64::from(b.id), b.label))
+            .collect();
+        for (alert_id, chat, message_id) in copies {
+            if current.as_ref().is_none_or(|(id, _)| *id != alert_id) {
+                let Some(a) = storage::alerts::get(&mut conn, alert_id).await? else {
+                    continue;
+                };
+                let t = &self.texts;
+                let line = match self.resolution(&mut conn, &a).await? {
+                    Some(r) => {
+                        let mut journal = crate::journal::Names {
+                            userbots: names.clone(),
+                            ..Default::default()
+                        };
+                        if let Some(public) = a.payload["public"].as_str()
+                            && let Some(id) = a.payload["id"].as_i64()
+                        {
+                            journal.orders.insert(id, public.to_owned());
+                        }
+                        t.f(
+                            "alert.resolved_by",
+                            &[
+                                (
+                                    "who",
+                                    &esc(r
+                                        .staff_name
+                                        .as_deref()
+                                        .unwrap_or(&r.staff_id.to_string())),
+                                ),
+                                (
+                                    "what",
+                                    &crate::journal::what(t, &self.links(), &journal, &r),
+                                ),
+                                ("at", &crate::dash::hhmm(r.at)),
+                            ],
+                        )
+                    }
+                    None => t.f(
+                        "alert.resolved_at",
+                        &[("at", &crate::dash::hhmm(chrono::Utc::now()))],
+                    ),
+                };
+                let screen = Screen::new(t.f(
+                    "alert.resolved",
+                    &[("head", &self.alert_head(&a)), ("line", &line)],
+                ));
+                current = Some((alert_id, self.look().screen(&screen)));
+            }
+            let Some((_, screen)) = &current else {
+                continue;
+            };
+            let mut request = EditMessageText::html(chat, message_id, screen.text.clone());
+            request.reply_markup = Some(botapi::InlineKeyboardMarkup::new(Vec::new()));
+            match self.api.edit_message_text(&request).await {
+                Ok(_) => {}
+                Err(e) if e.is_not_modified() || e.is_message_gone() => {}
+                Err(e) => {
+                    tracing::info!(chat, error = %e, "resolved alert copy not updated");
+                    continue;
+                }
+            }
+            storage::alerts::close_copy(&mut conn, alert_id, chat).await?;
+        }
         Ok(())
     }
 

@@ -832,6 +832,10 @@ b_open = "{m:order} Открыть"
 b_ack = "{m:ack} Принял"
 b_promo_on = "{m:fire} Включить"
 acked = "{e:dot_closed} {head}\nПринял {name} · {at} — повторы остановлены"
+# П-10 (картинка принята 18.11): причина ушла — у всех серая копия без кнопок, кто и что сделал.
+resolved = "{e:dot_closed} {head}\n{line}"
+resolved_by = "Решено: {who} — {what} · {at}"
+resolved_at = "Решено · {at}"
 # Макет «Новая авторизация» (веха 10): новый чужой вход в аккаунт юзербота.
 new_login = "{e:shield} <b>Новый вход</b> · {account}\n{where}"
 b_end_session = "{m:ban} Завершить сессию"
