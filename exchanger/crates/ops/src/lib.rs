@@ -952,12 +952,8 @@ impl Inner {
                 Screen::new(self.texts.t("system.preview_sent"))
                     .row(vec![btn(self.texts.t("common.home"), &Cb::Menu)])
             }
-            Cb::SupportReply(client) => self.prompt_with(
-                staff,
-                actions::Input::SupportReply(client),
-                self.texts
-                    .f("support.reply_prompt", &[("client", &client.to_string())]),
-            ),
+            Cb::SupportReply(client) => self.support_reply_entry(staff, client).await?,
+            Cb::SupportReplyAgain(client) => self.support_reply_prompt(staff, client),
             other => self.navigate(staff, other).await?,
         };
         Ok(Some(screen))
@@ -1042,14 +1038,20 @@ impl Inner {
             let mut conn = self.pool.acquire().await?;
             storage::staff::list(&mut conn).await?
         };
-        self.store_question(from, text, order).await?;
+        let alert = self.store_question(from, text, order).await?;
         let screen = self
             .question_card(from.id, from.username.as_deref(), text, order)
             .await?;
         let mut delivered = 0;
         for member in staff.iter().filter(|m| m.disabled_at.is_none()) {
             match self.send(member.tg_user_id, &screen).await {
-                Ok(_) => delivered += 1,
+                Ok(m) => {
+                    delivered += 1;
+                    // П-8: копии запоминаются — после ответа их правят у всех.
+                    let mut conn = self.pool.acquire().await?;
+                    storage::alerts::save_copy(&mut conn, alert, member.tg_user_id, m.message_id)
+                        .await?;
+                }
                 Err(e) => {
                     tracing::warn!(staff = member.tg_user_id, error = %e, "support question not sent")
                 }
@@ -1086,7 +1088,7 @@ impl Inner {
         request.reply_markup = answer.keyboard.reply_markup();
         match self.api.send_message(&request).await {
             Ok(_) => {
-                self.close_question(client, staff.tg_user_id).await?;
+                self.close_question(client, staff, Some(text)).await?;
                 Ok(Screen::new(self.texts.f(
                     "support.sent",
                     &[("name", &texts::esc(&staff.display_name))],

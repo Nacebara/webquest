@@ -1065,6 +1065,14 @@ sent = "{e:done} Отправлено клиенту · {name}"
 failed = "{e:err} Не отправилось: {error}"
 empty = "Пустой ответ не отправляю."
 closed = "{e:done} Обращение закрыто · {name}"
+# П-8 (картинка принята 18.11): копия обращения у всех после ответа — кто и что ответил, без
+# «Ответить»; «Ответить» на закрытое — показать ответ и спросить.
+question_done = "{e:dot_closed} <b>Обращение</b> · {who}\n<blockquote>{text}</blockquote>"
+answered = "\n{e:done} Ответил(а) <b>{name}</b> · {at}\n<blockquote>{answer}</blockquote>"
+closed_by = "\n{e:done} Закрыл(а) без ответа <b>{name}</b> · {at}"
+already = "{e:warn} Клиенту {client} уже ответил(а) <b>{name}</b> · {at}:\n<blockquote>{answer}</blockquote>\nОтветить ещё раз? Клиент получит второе сообщение."
+closed_before = "{e:warn} Обращение клиента {client} закрыл(а) без ответа <b>{name}</b> · {at}.\nОтветить всё же? Клиент получит сообщение."
+b_reply_again = "{m:support} Ответить ещё раз"
 # Список «Обращения».
 inbox_title = "{m:inbox} Обращения · {n}"
 inbox_empty_title = "{m:inbox} Обращения"

@@ -476,6 +476,42 @@ pub async fn bump_repeat(conn: &mut PgConnection, id: i64) -> Result<Option<i32>
     .await?)
 }
 
+/// Последнее событие с ключом — открытое или уже закрытое (П-8: «Ответить» на отвеченное
+/// обращение показывает, кто и что ответил).
+pub async fn latest_by_key(
+    conn: &mut PgConnection,
+    dedup_key: &str,
+) -> Result<Option<AlertRow>, StorageError> {
+    let row = sqlx::query_as!(
+        Raw,
+        r#"
+        SELECT id, level, topic, dedup_key, title, payload, count, first_at, last_at,
+               sent_message_id, acked_by, acked_at, repeats
+          FROM alerts WHERE dedup_key = $1 ORDER BY id DESC LIMIT 1
+        "#,
+        dedup_key
+    )
+    .fetch_optional(conn)
+    .await?;
+    row.map(TryInto::try_into).transpose()
+}
+
+/// Дописать поля в данные события (кто ответил на обращение и что).
+pub async fn merge_payload(
+    conn: &mut PgConnection,
+    id: i64,
+    patch: &Value,
+) -> Result<(), StorageError> {
+    sqlx::query!(
+        "UPDATE alerts SET payload = payload || $2 WHERE id = $1",
+        id,
+        patch
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 /// Открытое событие по ключу (`balance_mismatch:xrocket` …).
 pub async fn open_by_key(
     conn: &mut PgConnection,

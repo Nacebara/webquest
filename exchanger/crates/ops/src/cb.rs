@@ -221,6 +221,8 @@ pub enum Cb {
     Capital(i64),
     /// Ответить клиенту на вопрос из «Поддержки» (макет: «Обращение · Ответить»).
     SupportReply(i64),
+    /// «Ответить ещё раз»: обращение уже закрыто, сотрудник подтвердил второй ответ (П-8).
+    SupportReplyAgain(i64),
     /// «Статистика» за 1, 7 или 30 дней (макет: карточка с графиком).
     Stats(u8),
     /// «Обращения»: вопросы клиентов, ждущие ответа.
@@ -383,6 +385,7 @@ impl Cb {
             Cb::Capital(id) => format!("cap:{id}"),
             Cb::Investors => "iv".into(),
             Cb::SupportReply(id) => format!("sq:{id}"),
+            Cb::SupportReplyAgain(id) => format!("sqa:{id}"),
             Cb::Stats(days) => format!("sx:{days}"),
             Cb::Inbox => "ib".into(),
             Cb::SupportClose(id) => format!("sc:{id}"),
@@ -496,6 +499,7 @@ impl Cb {
             ["cap", _] => Cb::Capital(id(1)?),
             ["iv"] => Cb::Investors,
             ["sq", _] => Cb::SupportReply(id(1)?),
+            ["sqa", _] => Cb::SupportReplyAgain(id(1)?),
             ["sx", d] => Cb::Stats(d.parse().ok().filter(|d| matches!(d, 1 | 7 | 30))?),
             ["ib"] => Cb::Inbox,
             ["sc", _] => Cb::SupportClose(id(1)?),
@@ -571,6 +575,7 @@ mod tests {
             Cb::PromoTarget(Platform::XRocket),
             Cb::Investors,
             Cb::SupportReply(big),
+            Cb::SupportReplyAgain(big),
             Cb::Stats(7),
             Cb::Inbox,
             Cb::SupportClose(big),

@@ -435,6 +435,26 @@ impl Ops {
         self.tg.screen(mark, user, needle).await
     }
 
+    /// Последняя правка сообщения `message_id` в чате `chat` после `mark`; ждёт до 5 с.
+    async fn edit_of(&self, mark: usize, chat: i64, message_id: Option<i64>) -> Call {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let found = self.tg.calls().into_iter().skip(mark).rfind(|c| {
+                c.method.starts_with("edit")
+                    && c.chat() == Some(chat)
+                    && c.body["message_id"].as_i64() == message_id
+            });
+            if let Some(c) = found {
+                return c;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "no edit of message {message_id:?} in chat {chat}"
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    }
+
     async fn audit(&self, action: &str) -> Vec<storage::audit::AuditRow> {
         let mut conn = self.pool.acquire().await.unwrap();
         storage::audit::recent(&mut conn, 50, None, None)
@@ -971,35 +991,21 @@ async fn a_button_in_an_alert_opens_a_new_message_and_the_alert_stays(pool: PgPo
     let mark = o.tg.mark();
     o.press(ADMIN, &admin_alert, "Принял", "Принял").await;
     // Правка копии владельца идёт после ответа админу — ждём её.
-    let touched = loop {
-        let touched: Vec<i64> =
-            o.tg.calls()
-                .into_iter()
-                .skip(mark)
-                .filter(|c| c.method.starts_with("edit") && c.chat() == Some(OWNER))
-                .filter_map(|c| c.body["message_id"].as_i64())
-                .collect();
-        if touched.contains(&alert.message_id.unwrap()) {
-            break touched;
-        }
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    };
+    o.edit_of(mark, OWNER, alert.message_id).await;
+    let touched: Vec<i64> =
+        o.tg.calls()
+            .into_iter()
+            .skip(mark)
+            .filter(|c| c.method.starts_with("edit") && c.chat() == Some(OWNER))
+            .filter_map(|c| c.body["message_id"].as_i64())
+            .collect();
     assert!(
         !touched.contains(&card.message_id.unwrap()),
         "карточку не тронули: {touched:?}"
     );
     // Макет «Алерт и „Принял“»: «⚪ Разбор · K7M2Q9XR4T / Принял Анна · 14:07 — повторы
     // остановлены» и одна «Открыть».
-    let acked =
-        o.tg.calls()
-            .into_iter()
-            .skip(mark)
-            .rfind(|c| {
-                c.method.starts_with("edit")
-                    && c.chat() == Some(OWNER)
-                    && c.body["message_id"].as_i64() == alert.message_id
-            })
-            .unwrap();
+    let acked = o.edit_of(mark, OWNER, alert.message_id).await;
     let text = acked.text();
     assert!(
         text.contains("<b>Разбор</b>") && text.contains("Принял Анна") && !text.contains("🚨"),
@@ -1639,7 +1645,7 @@ async fn support_question_reaches_staff_and_the_answer_reaches_the_client(pool: 
         "чужой текст экранирован"
     );
     assert!(question.text().contains("K7M2Q9XR4T"));
-    o.tg.screen(mark, OWNER, "Обращение").await;
+    let owner_copy = o.tg.screen(mark, OWNER, "Обращение").await;
     // В меню — счётчик и синяя кнопка: ждут человека (макет «Меню пульта»).
     let menu = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
     assert!(menu.button("Обращения · 1").is_some(), "{:?}", menu.body);
@@ -1691,6 +1697,38 @@ async fn support_question_reaches_staff_and_the_answer_reaches_the_client(pool: 
     let menu = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
     assert!(menu.button("Обращения · ").is_none(), "{:?}", menu.body);
     assert!(menu.button("Обращения").is_some());
+    // П-8 (картинка принята 18.11): копия обращения у владельца поправлена — кто ответил и что,
+    // «Ответить» больше нет.
+    let edited = o.edit_of(0, OWNER, owner_copy.message_id).await;
+    let text = edited.text();
+    assert!(
+        text.contains("Ответил(а) <b>Анна</b>") && text.contains("деньги у нас"),
+        "{text}"
+    );
+    assert!(text.contains("чек не пришёл"), "вопрос на месте: {text}");
+    assert!(
+        edited.button("Ответить").is_none(),
+        "{:?}",
+        edited.buttons()
+    );
+    // «Ответить» на старой копии: бот показывает ответ и спрашивает, клиенту — ничего.
+    let mark = o.tg.mark();
+    let again = o
+        .press(ADMIN, &question, "Ответить", "уже ответил(а) <b>Анна</b>")
+        .await;
+    assert!(again.text().contains("деньги у нас"), "{}", again.text());
+    let to_client =
+        o.tg.calls()
+            .into_iter()
+            .skip(mark)
+            .filter(|c| c.chat() == Some(4242))
+            .count();
+    assert_eq!(to_client, 0);
+    o.press(ADMIN, &again, "Ответить ещё раз", "Ответ клиенту 4242")
+        .await;
+    o.say(ADMIN, "и ещё: чек уже ушёл", "Отправлено клиенту")
+        .await;
+    o.tg.screen(mark, 4242, "чек уже ушёл").await;
 }
 
 /// «Система» по макету: версия, база, очередь, Bot API, аккаунты; «Предпросмотр экранов»
