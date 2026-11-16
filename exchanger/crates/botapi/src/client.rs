@@ -514,6 +514,51 @@ impl BotApi {
         decode_response(METHOD, status, &bytes).map_err(|e| e.scrub(token))
     }
 
+    /// `setMyProfilePhoto` с живой аватаркой (`InputProfilePhotoAnimated`): MP4 (H.264),
+    /// квадрат, до 10 с; `main_frame` — секунда неподвижного кадра. Через @BotFather живую
+    /// аватарку не поставить, через Bot API — можно (проверено на тестовом боте 18.11).
+    pub async fn set_my_animated_profile_photo(
+        &self,
+        mp4: Vec<u8>,
+        main_frame: f64,
+    ) -> Result<bool, Error> {
+        const METHOD: &str = "setMyProfilePhoto";
+        let token = self.token.expose_secret();
+        let url = format!("{}/bot{token}/{METHOD}", self.base_url);
+        let photo = serde_json::json!({
+            "type": "animated",
+            "animation": "attach://animation",
+            "main_frame_timestamp": main_frame,
+        });
+        let form = reqwest::multipart::Form::new()
+            .text("photo", photo.to_string())
+            .part(
+                "animation",
+                reqwest::multipart::Part::bytes(mp4)
+                    .file_name("avatar.mp4")
+                    .mime_str("video/mp4")
+                    .map_err(|e| Error::Encode {
+                        method: METHOD.to_owned(),
+                        detail: e.to_string(),
+                    })?,
+            );
+        tracing::debug!(method = METHOD, "Bot API: живая аватарка бота");
+        let response = self
+            .http
+            .post(url)
+            .multipart(form)
+            .timeout(self.timeout)
+            .send()
+            .await
+            .map_err(|e| transport_error(METHOD, e, token))?;
+        let status = response.status().as_u16();
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| transport_error(METHOD, e, token))?;
+        decode_response(METHOD, status, &bytes).map_err(|e| e.scrub(token))
+    }
+
     pub async fn upload_sticker_file(
         &self,
         user_id: i64,

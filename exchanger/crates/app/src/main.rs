@@ -69,6 +69,9 @@ enum Command {
     /// Восстановить базу из копии (компьютер сломался): только в пустую или новую базу из
     /// DATABASE_URL, копия сначала проверяется. Нужен тот же SESSION_KEY, что был при копии.
     Restore { file: PathBuf },
+    /// Живая аватарка бота (MP4, квадрат, до 10 с): `exch avatar docs/mockups/logo/avatar.mp4`.
+    /// Через @BotFather живую не поставить, через Bot API — можно.
+    Avatar { file: PathBuf },
     /// Служба Windows: install (автозапуск после PostgreSQL, перезапуск при сбое), uninstall,
     /// start, stop, status. install и uninstall — из PowerShell от имени администратора.
     #[command(subcommand)]
@@ -276,6 +279,7 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
             | Command::Backup { .. }
             | Command::Restore { .. }
             | Command::Service(_)
+            | Command::Avatar { .. }
     );
     // LOG_FORMAT=text — обычный текст, json — для сервера; не задан — текст в окне программы,
     // JSON, когда вывод идёт в файл или журнал сервера.
@@ -325,6 +329,7 @@ fn start(command: Command, paths: &app::project::Paths, has_env: bool, bare: boo
             Command::Backup { check } => backup(paths, check).await,
             Command::Restore { file } => restore(paths, file).await,
             Command::Service(cmd) => service(paths, cmd),
+            Command::Avatar { file } => avatar(file).await,
             Command::ServiceRun => anyhow::bail!("exch service-run запускает только служба"),
             Command::Selftest { amount } => selftest(amount).await,
             Command::GenSessionKey => {
@@ -793,6 +798,25 @@ async fn backup(paths: &app::project::Paths, check_only: bool) -> anyhow::Result
         o.bytes / 1024,
         rows_text(&o.checked.rows)
     );
+    Ok(())
+}
+
+/// `exch avatar <файл.mp4>`: живая аватарка клиентского бота.
+async fn avatar(file: PathBuf) -> anyhow::Result<()> {
+    let cfg = load_config()?;
+    let token = cfg
+        .client_bot_token
+        .clone()
+        .context("нет CLIENT_BOT_TOKEN — сначала exch setup")?;
+    let api = app::telegram::bot_api(token)?;
+    let mp4 = std::fs::read(&file).with_context(|| format!("не прочитать {}", file.display()))?;
+    if mp4.len() > 10 * 1024 * 1024 {
+        anyhow::bail!("файл больше 10 МБ — Telegram такой не примет");
+    }
+    api.set_my_animated_profile_photo(mp4, 0.0)
+        .await
+        .map_err(|e| anyhow::anyhow!(app::setup::explain_bot_error(&e)))?;
+    println!("✅ Живая аватарка поставлена. В Telegram она обновится в течение минуты.");
     Ok(())
 }
 
