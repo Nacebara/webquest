@@ -7,9 +7,10 @@ mod common;
 
 use ui::Keyboard;
 
-const ONLY_WAIT: [&str; 4] = [
+const ONLY_WAIT: [&str; 5] = [
     "maintenance",
     "maintenance_until",
+    "maintenance_note",
     "rate_limited",
     "invoice_check_busy",
 ];

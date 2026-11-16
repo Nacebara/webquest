@@ -235,13 +235,20 @@ impl Ui {
                 self.fill(&e.no_reserve, &[("max", &self.money(max))]),
                 self.err_keys(&[ErrKey::Rates]),
             ),
-            UiError::Maintenance { until } => {
+            UiError::Maintenance { until, note } => {
+                let note = Frag::text(
+                    &note
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|n| !n.is_empty())
+                        .map_or_else(String::new, |n| format!("\n{n}")),
+                );
                 let body = match until {
                     Some(at) => self.fill(
                         &e.maintenance_until,
-                        &[("until", &self.at(*at, TimeFormat::Time))],
+                        &[("until", &self.at(*at, TimeFormat::Time)), ("note", &note)],
                     ),
-                    None => self.fill(&e.maintenance, &[]),
+                    None => self.fill(&e.maintenance, &[("note", &note)]),
                 };
                 (body, Keyboard::None)
             }

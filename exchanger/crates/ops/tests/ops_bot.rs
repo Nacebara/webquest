@@ -800,12 +800,43 @@ async fn maintenance_for_30_minutes_from_the_kill_switch_alert(pool: PgPool) {
     let left = maint(&o.pool).await.1.expect("срок") - chrono::Utc::now();
     assert!(left > chrono::Duration::minutes(44), "+15 к сроку: {left}");
 
+    // «Текст для клиентов» (решение владельца 18.11, вариант «а»): строка под «Обновляемся до…».
+    let ask = o
+        .press(ADMIN, &card, "Текст для клиентов", "Текст для клиентов")
+        .await;
+    assert!(ask.button("Отмена").is_some());
+    let preview = o
+        .say(ADMIN, "Меняем сервер — вернёмся вовремя", "Меняем сервер")
+        .await;
+    let card = o
+        .press(ADMIN, &preview, "Подтвердить", "Обслуживание · до")
+        .await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        assert_eq!(
+            storage::settings::on_note(&mut conn, "maintenance")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("Меняем сервер — вернёмся вовремя")
+        );
+    }
+    assert_eq!(o.audit("settings.maint_text").await.len(), 1);
     let preview = o
         .press(ADMIN, &card, "Закончить", "Режим обслуживания")
         .await;
     o.press(ADMIN, &preview, "Подтвердить", "Сохранено").await;
     assert_eq!(maint(&o.pool).await, (false, None));
     assert_eq!(o.audit("settings.flag").await.len(), 4);
+    {
+        // Закончили — текст для клиентов снят: в следующий раз не всплывёт старый.
+        let mut conn = o.pool.acquire().await.unwrap();
+        let v = storage::settings::get(&mut conn, "maintenance")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(v.get("text").is_none(), "{v}");
+    }
 
     // Срок вышел — обслуживание выключено для всех, хотя запись ещё «вкл».
     let mut conn = o.pool.acquire().await.unwrap();

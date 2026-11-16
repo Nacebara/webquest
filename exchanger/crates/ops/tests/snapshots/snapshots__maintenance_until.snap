@@ -9,3 +9,4 @@ expression: dump(&screen)
 Новые чеки не принимаю, 3 заявки довожу.
 --- keyboard
 [{"text":"+15 мин","callback_data":"a:mm:15"},{"text":"▶️ Закончить","style":"primary","callback_data":"a:st:m"}]
+[{"text":"✏️ Текст для клиентов","callback_data":"a:mx"}]

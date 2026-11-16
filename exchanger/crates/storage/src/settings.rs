@@ -56,6 +56,15 @@ pub async fn on_until(
         .and_then(|v| until_of(&v)))
 }
 
+/// Текст при включённом флаге (`{"on": true, "text": "…"}`): клиентам на время обслуживания.
+pub async fn on_note(conn: &mut PgConnection, key: &str) -> Result<Option<String>, StorageError> {
+    Ok(get(conn, key)
+        .await?
+        .filter(|v| on_of(v) == Some(true))
+        .and_then(|v| v.get("text").and_then(Value::as_str).map(str::to_owned))
+        .filter(|t| !t.trim().is_empty()))
+}
+
 /// С какого времени флаг вида `{"on": true}` включён: `since` в значении (продление срока его не
 /// сдвигает), иначе время последней записи настройки. Флаг выключен, срок вышел или настройки
 /// нет — `None` (главный экран пульта: «Обслуживание · с 14:20»).

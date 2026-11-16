@@ -1319,7 +1319,7 @@ async fn maintenance_with_a_term_tells_the_client_until_when_and_ends_itself(poo
             storage::settings::set(
                 &mut conn,
                 "maintenance",
-                &json!({ "on": true, "until": until.to_rfc3339() }),
+                &json!({ "on": true, "until": until.to_rfc3339(), "text": "Меняем <сервер>" }),
                 None,
             )
             .await
@@ -1335,6 +1335,14 @@ async fn maintenance_with_a_term_tells_the_client_until_when_and_ends_itself(poo
             c.method == "sendMessage" && c.contains("Обновляемся до")
         })
         .await;
+    // Текст владельца — строкой под заголовком, экранирован.
+    let shown = e
+        .fake
+        .calls_of("sendMessage")
+        .into_iter()
+        .find(|c| c.contains("Обновляемся до"))
+        .unwrap();
+    assert!(shown.contains("Меняем &lt;сервер&gt;"), "{shown:?}");
     assert!(e.orders().await.is_empty(), "чек не открыт");
 
     set(chrono::Utc::now() - chrono::Duration::minutes(1)).await;

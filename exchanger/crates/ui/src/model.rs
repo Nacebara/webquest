@@ -256,6 +256,8 @@ pub enum UiError {
     /// E13.
     Maintenance {
         until: Option<DateTime<Utc>>,
+        /// Текст владельца строкой под «Обновляемся до 15:30» (решение 18.11, вариант «а»).
+        note: Option<String>,
     },
     /// Суточный лимит обменов клиента исчерпан (`settings.daily_limit_usd`).
     DailyLimit,

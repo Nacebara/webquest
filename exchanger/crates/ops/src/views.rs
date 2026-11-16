@@ -102,10 +102,12 @@ pub fn maintenance_screen(
     } else {
         t.t("maint.idle")
     };
-    Screen::new(format!("{head}\n{body}")).row(vec![
-        btn(t.t("maint.b_more"), &Cb::MaintMore(15)),
-        btn(t.t("maint.b_end"), &Cb::Toggle(Flag::Maintenance)).style(Primary),
-    ])
+    Screen::new(format!("{head}\n{body}"))
+        .row(vec![
+            btn(t.t("maint.b_more"), &Cb::MaintMore(15)),
+            btn(t.t("maint.b_end"), &Cb::Toggle(Flag::Maintenance)).style(Primary),
+        ])
+        .row(vec![btn(t.t("maint.b_text"), &Cb::MaintText)])
 }
 
 /// Меню пульта для роли (макет «Меню пульта»). «Персонал» — только владельцу.
@@ -1132,7 +1134,15 @@ impl Inner {
         if !on {
             return self.settings().await;
         }
-        Ok(maintenance_screen(&self.texts, until, since, live))
+        let note = {
+            let mut conn = self.pool.acquire().await?;
+            storage::settings::on_note(&mut conn, key).await?
+        };
+        let mut screen = maintenance_screen(&self.texts, until, since, live);
+        if let Some(n) = note {
+            screen = screen.notice(&self.texts.f("maint.note", &[("text", &esc(&n))]));
+        }
+        Ok(screen)
     }
 
     pub(crate) fn style_name(&self, s: EmojiStyle) -> String {
@@ -1892,6 +1902,9 @@ impl Inner {
             Cb::UserBan(id) => return Ok(self.prompt(staff, Input::Ban(id), "user.ask_ban")),
             Cb::UserUnban(id) => return Ok(self.prompt(staff, Input::Unban(id), "user.ask_unban")),
             Cb::UserNote(id) => return Ok(self.prompt(staff, Input::Note(id), "user.ask_note")),
+            Cb::MaintText => {
+                return Ok(self.prompt(staff, Input::MaintText, "maint.ask_text"));
+            }
             Cb::MaintFor(minutes) | Cb::MaintMore(minutes) => {
                 let key = Flag::Maintenance.key();
                 let before_on = storage::settings::flag(&mut conn, key, false).await?;

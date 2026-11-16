@@ -24,7 +24,7 @@ pub struct Names {
 /// Действия, у которых есть фраза (`journal.<действие с _ вместо .>`). Новое действие журнала —
 /// сюда и в `ru.toml`; тест проверяет, что фраза есть.
 #[cfg(test)]
-pub(crate) const ACTIONS: [&str; 38] = [
+pub(crate) const ACTIONS: [&str; 39] = [
     "order.take",
     "order.call_admin",
     "order.retry_payout",
@@ -53,6 +53,7 @@ pub(crate) const ACTIONS: [&str; 38] = [
     "settings.flag",
     "settings.emoji_style",
     "settings.custom_emoji",
+    "settings.maint_text",
     "staff.add",
     "staff.role",
     "staff.disable",

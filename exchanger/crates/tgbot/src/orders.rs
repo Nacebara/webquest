@@ -187,7 +187,10 @@ fn reject_error(view: &OrderView, extra: &Extra) -> UiError {
         // Аудит 16.11, К-5: лимит на сутки и остановленные выплаты — свои экраны, а не «что-то
         // пошло не так, попробуйте через минуту» (клиент пробовал бы снова и снова).
         Some("daily_limit") => UiError::DailyLimit,
-        Some("service_paused") => UiError::Maintenance { until: None },
+        Some("service_paused") => UiError::Maintenance {
+            until: None,
+            note: None,
+        },
         _ => UiError::Internal,
     }
 }
@@ -1178,7 +1181,10 @@ mod tests {
             (
                 OrderState::Rejected,
                 "service_paused",
-                UiError::Maintenance { until: None },
+                UiError::Maintenance {
+                    until: None,
+                    note: None,
+                },
             ),
         ];
         for (state, code, expected) in cases {

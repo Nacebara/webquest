@@ -32,6 +32,8 @@ pub(crate) enum Input {
         previous_failed: bool,
     },
     OrderSearch,
+    /// «Текст для клиентов» на время обслуживания (решение владельца 18.11, вариант «а»).
+    MaintText,
     UserSearch,
     Dir(Direction, DirField),
     PromoRate,
@@ -131,6 +133,11 @@ pub(crate) enum Action {
     Flag {
         flag: Flag,
         on: bool,
+    },
+    /// «Текст для клиентов» на время обслуживания: строка под «Обновляемся до 15:30».
+    MaintText {
+        before: Option<String>,
+        after: Option<String>,
     },
     /// Обслуживание со сроком (П-13): «Обслуживание 30 мин», «+15 мин». Было — для предпросмотра.
     Maintain {
@@ -771,6 +778,15 @@ impl Inner {
                     return Ok(self.retry_number(staff, input));
                 };
                 return self.intake_reason(staff, order, amount).await;
+            }
+            Input::MaintText => {
+                let before = {
+                    let mut conn = self.pool.acquire().await?;
+                    storage::settings::on_note(&mut conn, Flag::Maintenance.key()).await?
+                };
+                let after: String = text.chars().take(200).collect();
+                let after = (after != "-" && !after.is_empty()).then_some(after);
+                Action::MaintText { before, after }
             }
             Input::WriteOffReason(alert) => {
                 if text.chars().count() < 3 {
@@ -1537,6 +1553,19 @@ impl Inner {
                 }
                 text
             }
+            Action::MaintText { before, after } => t.f(
+                "maint.preview_text",
+                &[
+                    (
+                        "before",
+                        &before.as_deref().map_or_else(|| t.t("common.none"), esc),
+                    ),
+                    (
+                        "after",
+                        &after.as_deref().map_or_else(|| t.t("common.none"), esc),
+                    ),
+                ],
+            ),
             Action::Maintain {
                 before_on,
                 before_until,
@@ -1963,10 +1992,14 @@ impl Inner {
                     .filter(Value::is_object)
                     .unwrap_or_else(|| json!({}));
                 value["on"] = json!(on);
-                // Переключатель — без срока: и «вкл», и «выкл» снимают «Обслуживание 30 мин».
+                // Переключатель — без срока: и «вкл», и «выкл» снимают «Обслуживание 30 мин»; конец
+                // обслуживания снимает и текст для клиентов — в следующий раз не всплывёт старый.
                 if let Some(o) = value.as_object_mut() {
                     o.remove("until");
                     o.remove("since");
+                    if !on {
+                        o.remove("text");
+                    }
                 }
                 storage::settings::set(&mut tx, key, &value, Some(staff_id)).await?;
                 // Стоп-кран — критичная тревога всему персоналу, пока его не снимут (шаг 2.8).
@@ -1999,6 +2032,23 @@ impl Inner {
                     Cb::Settings,
                 )
             }
+            Action::MaintText { before, after } => {
+                let key = Flag::Maintenance.key();
+                let mut value = storage::settings::get(&mut tx, key)
+                    .await?
+                    .filter(Value::is_object)
+                    .unwrap_or_else(|| json!({}));
+                value["text"] = json!(after);
+                storage::settings::set(&mut tx, key, &value, Some(staff_id)).await?;
+                (
+                    "settings.maint_text",
+                    "settings",
+                    key.to_owned(),
+                    Some(json!({ "text": before })),
+                    Some(json!({ "text": after })),
+                    Cb::Maintenance,
+                )
+            }
             Action::Maintain {
                 before_on,
                 before_until,
@@ -2010,10 +2060,17 @@ impl Inner {
                     Some(since) if *before_on => since,
                     _ => chrono::Utc::now(),
                 };
+                // Текст для клиентов остаётся при продлении; новое обслуживание — без старого.
+                let text = if *before_on {
+                    storage::settings::on_note(&mut tx, key).await?
+                } else {
+                    None
+                };
                 let value = json!({
                     "on": true,
                     "until": until.to_rfc3339(),
                     "since": since.to_rfc3339(),
+                    "text": text,
                 });
                 storage::settings::set(&mut tx, key, &value, Some(staff_id)).await?;
                 (

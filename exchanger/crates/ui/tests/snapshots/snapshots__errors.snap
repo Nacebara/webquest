@@ -283,6 +283,21 @@ expression: errors.trim_end()
 Чек не открывал — деньги в нём. Пришлите его после <tg-time unix="1791379800" format="t">16:30 МСК</tg-time>.
 --- keyboard: none
 
+## maintenance_note
+### plain
+--- html
+🛠 <b>Обновляемся до <tg-time unix="1791379800" format="t">16:30 МСК</tg-time></b>
+Меняем сервер — вернёмся вовремя
+Чек не открывал — деньги в нём. Пришлите его после <tg-time unix="1791379800" format="t">16:30 МСК</tg-time>.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000008">🛠</tg-emoji> <b>Обновляемся до <tg-time unix="1791379800" format="t">16:30 МСК</tg-time></b>
+Меняем сервер — вернёмся вовремя
+Чек не открывал — деньги в нём. Пришлите его после <tg-time unix="1791379800" format="t">16:30 МСК</tg-time>.
+--- keyboard: none
+
 ## daily_limit
 ### plain
 --- html

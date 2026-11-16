@@ -305,6 +305,7 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
             "Обслуживание",
             ui.error(&UiError::Maintenance {
                 until: Some(msk(5, 15, 30)),
+                note: None,
             }),
         ),
         one(

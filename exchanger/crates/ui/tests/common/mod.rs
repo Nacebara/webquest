@@ -315,11 +315,26 @@ pub fn all_errors() -> Vec<(&'static str, UiError)> {
                 max: usdt(dec!(120)),
             },
         ),
-        ("maintenance", UiError::Maintenance { until: None }),
+        (
+            "maintenance",
+            UiError::Maintenance {
+                until: None,
+                note: None,
+            },
+        ),
         (
             "maintenance_until",
             UiError::Maintenance {
                 until: Some(at(13, 30)),
+                note: None,
+            },
+        ),
+        // Текст владельца строкой под заголовком (решение 18.11, вариант «а»).
+        (
+            "maintenance_note",
+            UiError::Maintenance {
+                until: Some(at(13, 30)),
+                note: Some("Меняем сервер — вернёмся вовремя".into()),
             },
         ),
         ("daily_limit", UiError::DailyLimit),

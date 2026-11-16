@@ -193,6 +193,8 @@ pub enum Cb {
     MaintFor(u16),
     /// Продлить обслуживание на столько минут («+15 мин»).
     MaintMore(u16),
+    /// «Текст для клиентов» на время обслуживания.
+    MaintText,
     Emoji,
     EmojiStyle(EmojiStyle),
     EmojiRole(Emoji),
@@ -362,6 +364,7 @@ impl Cb {
             Cb::Maintenance => "mt".into(),
             Cb::MaintFor(m) => format!("mf:{m}"),
             Cb::MaintMore(m) => format!("mm:{m}"),
+            Cb::MaintText => "mx".into(),
             Cb::Emoji => "se".into(),
             Cb::EmojiStyle(s) => format!("ss:{}", s.key()),
             Cb::EmojiRole(r) => format!("sr:{}", r.key()),
@@ -476,6 +479,7 @@ impl Cb {
             ["mt"] => Cb::Maintenance,
             ["mf", m] => Cb::MaintFor(m.parse().ok()?),
             ["mm", m] => Cb::MaintMore(m.parse().ok()?),
+            ["mx"] => Cb::MaintText,
             ["se"] => Cb::Emoji,
             ["ss", k] => Cb::EmojiStyle(EmojiStyle::from_key(k)?),
             ["sr", k] => Cb::EmojiRole(Emoji::from_key(k)?),
@@ -614,7 +618,12 @@ mod tests {
         all.push(Cb::EndSession(big));
         all.push(Cb::WriteOff(big));
         all.extend(Flag::ALL.map(Cb::Toggle));
-        all.extend([Cb::Maintenance, Cb::MaintFor(30), Cb::MaintMore(u16::MAX)]);
+        all.extend([
+            Cb::Maintenance,
+            Cb::MaintFor(30),
+            Cb::MaintMore(u16::MAX),
+            Cb::MaintText,
+        ]);
         all.extend(EmojiStyle::ALL.map(Cb::EmojiStyle));
         all.extend(Emoji::ALL.map(Cb::EmojiRole));
         all.extend(Role::ALL.map(|r| Cb::MemberRole(big, r)));

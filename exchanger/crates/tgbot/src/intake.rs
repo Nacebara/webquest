@@ -53,9 +53,9 @@ pub(crate) async fn process(
         storage::settings::flag_on(&mut conn, "maintenance").await?
     };
     if maintenance {
-        let until = maintenance_until(inner).await?;
+        let (until, note) = maintenance_until(inner).await?;
         return inner
-            .reply_error(chat, &UiError::Maintenance { until })
+            .reply_error(chat, &UiError::Maintenance { until, note })
             .await;
     }
 
@@ -292,9 +292,10 @@ async fn submit(
                 SubmitReject::NoReserve => UiError::NoReserve {
                     max: domain::Money::zero(domain::Asset::Usdt),
                 },
-                SubmitReject::ServicePaused => UiError::Maintenance {
-                    until: maintenance_until(inner).await?,
-                },
+                SubmitReject::ServicePaused => {
+                    let (until, note) = maintenance_until(inner).await?;
+                    UiError::Maintenance { until, note }
+                }
                 SubmitReject::DailyLimit => UiError::DailyLimit,
                 SubmitReject::QuoteExpired => UiError::QuoteExpired,
                 SubmitReject::InvoiceBusy => UiError::InvoiceCheckBusy,
@@ -308,12 +309,16 @@ async fn submit(
 }
 
 /// До какого времени обслуживание («Обслуживание 30 мин» в пульте, П-13): клиенту — «Обновляемся
-/// до 15:30». Без срока — `None` («Пришлите его чуть позже»).
+/// до 15:30». Без срока — `None` («Пришлите его чуть позже»). Второе — текст владельца для
+/// клиентов строкой под заголовком (решение 18.11, вариант «а»).
 async fn maintenance_until(
     inner: &Inner,
-) -> Result<Option<chrono::DateTime<chrono::Utc>>, TgBotError> {
+) -> Result<(Option<chrono::DateTime<chrono::Utc>>, Option<String>), TgBotError> {
     let mut conn = inner.pool.acquire().await?;
-    Ok(storage::settings::on_until(&mut conn, "maintenance").await?)
+    Ok((
+        storage::settings::on_until(&mut conn, "maintenance").await?,
+        storage::settings::on_note(&mut conn, "maintenance").await?,
+    ))
 }
 
 #[cfg(test)]
