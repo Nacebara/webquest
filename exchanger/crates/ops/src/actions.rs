@@ -598,16 +598,23 @@ impl Inner {
     }
 
     /// Вопрос причины «Деньги пришли» с уже известной суммой.
-    pub(crate) fn intake_reason(&self, staff: &StaffMember, order: i64, amount: Decimal) -> Screen {
+    pub(crate) async fn intake_reason(
+        &self,
+        staff: &StaffMember,
+        order: i64,
+        amount: Decimal,
+    ) -> Result<Screen, OpsError> {
         let t = &self.texts;
+        // П-7: везде публичный номер — его называет клиент; внутренний id в тексте не нужен.
+        let public = esc(&self.public_id(order).await?);
         let text = t.f(
             "order.ask_reason",
             &[
                 ("action", &self.decision_name(DecisionKind::Intake)),
-                ("id", &order),
+                ("public", &public),
             ],
         );
-        self.prompt_with(
+        Ok(self.prompt_with(
             staff,
             Input::DecisionReason {
                 order,
@@ -615,7 +622,7 @@ impl Inner {
                 amount: Some(amount),
             },
             text,
-        )
+        ))
     }
 
     fn retry_number(&self, staff: &StaffMember, input: Input) -> Screen {
@@ -763,7 +770,7 @@ impl Inner {
                 let Some(amount) = num(&text).filter(|v| *v > Decimal::ZERO) else {
                     return Ok(self.retry_number(staff, input));
                 };
-                return Ok(self.intake_reason(staff, order, amount));
+                return self.intake_reason(staff, order, amount).await;
             }
             Input::WriteOffReason(alert) => {
                 if text.chars().count() < 3 {
@@ -1735,11 +1742,12 @@ impl Inner {
                     double_confirmed: true,
                 })
                 .await;
+            let public = esc(&self.public_id(*order).await?);
             let head = match result {
                 Ok(o) => t.f(
                     "order.done",
                     &[
-                        ("id", order),
+                        ("public", &public),
                         ("state", &self.state_name(o.state.as_db_str())),
                     ],
                 ),

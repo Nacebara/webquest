@@ -894,7 +894,8 @@ async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
     assert!(card.text().contains("Принято"), "{}", card.text());
     assert!(!card.text().contains("не проведено"), "{}", card.text());
     assert!(card.text().contains("Ход · "), "{}", card.text());
-    o.press(OWNER, &card, "Вернуть", "Коротко причина").await;
+    let ask = o.press(OWNER, &card, "Вернуть", "Коротко причина").await;
+    assert!(ask.text().contains(&order.public_id), "{}", ask.text());
     o.say(OWNER, "ок", "короче 3 символов").await;
     // Макет «Подтверждение» (шаг 3): вопрос, публичный номер, что произойдёт, «Необратимо»,
     // 60 с; кнопка — красная, с действием и суммой.
@@ -914,7 +915,14 @@ async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
     );
     assert_eq!(confirm["style"], "danger", "{confirm}");
     let done = o.press(OWNER, &preview, "Вернуть", "возврат").await;
-    assert!(done.text().contains(&format!("Заявка №{}", order.id)));
+    // П-7: итог — с публичным номером, без внутреннего «№15».
+    assert!(
+        done.text()
+            .contains(&format!("Заявка <code>{}</code>", order.public_id)),
+        "{}",
+        done.text()
+    );
+    assert!(!done.text().contains(&format!("№{}", order.id)));
     o.drain().await;
     let mut conn = o.pool.acquire().await.unwrap();
     let after = storage::orders::get(&mut conn, order.id, false)

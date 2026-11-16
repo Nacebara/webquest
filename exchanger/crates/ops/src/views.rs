@@ -1594,7 +1594,7 @@ impl Inner {
                     return Ok(denied);
                 }
                 return Ok(match self.check_amount(id).await? {
-                    Some(check) => self.intake_reason(staff, id, check),
+                    Some(check) => self.intake_reason(staff, id, check).await?,
                     None => self.prompt(
                         staff,
                         Input::DecisionAmount { order: id },
@@ -1661,9 +1661,10 @@ impl Inner {
                     );
                     return Ok(s);
                 }
+                let public = esc(&self.public_id(id).await?);
                 let text = t.f(
                     "order.ask_reason",
-                    &[("action", &self.decision_name(kind)), ("id", &id)],
+                    &[("action", &self.decision_name(kind)), ("public", &public)],
                 );
                 Ok(self.prompt_with(staff, input, text))
             }
