@@ -59,6 +59,8 @@ pub(crate) enum Input {
     Invest(crate::invest::InvestInput),
     /// Ответ клиенту из «Поддержки».
     SupportReply(i64),
+    /// Причина «Списать как потерю» по событию недостачи (id события).
+    WriteOffReason(i64),
 }
 
 /// Изменение, ждущее подтверждения.
@@ -165,6 +167,14 @@ pub(crate) enum Action {
         deposit: bool,
         alert: i64,
     },
+    /// Недостачу признать потерей (решение владельца 17.11, `docs/INVEST-LOSSES.md`, строки 6–7):
+    /// проводка `loss`, событие закрывается.
+    WriteOff {
+        platform: Platform,
+        amount: Decimal,
+        alert: i64,
+        reason: String,
+    },
     Selftest {
         amount: Decimal,
     },
@@ -260,6 +270,7 @@ impl Action {
             | Action::StaffRole { .. }
             | Action::StaffDisable { .. }
             | Action::Capital { .. }
+            | Action::WriteOff { .. }
             | Action::PromoBroadcast { .. }
             | Action::Selftest { .. } => Role::Owner,
             Action::Invest(op) => op.min_role(),
@@ -305,6 +316,7 @@ impl Action {
             self,
             Action::Decide { .. }
                 | Action::Capital { .. }
+                | Action::WriteOff { .. }
                 | Action::StaffDisable { .. }
                 | Action::Flag {
                     flag: Flag::KillSwitch,
@@ -312,6 +324,27 @@ impl Action {
                 }
         )
     }
+}
+
+/// Недостача по событию сверки, ещё не закрытому: кошелёк и сколько не хватает.
+pub(crate) async fn shortage_of(
+    conn: &mut sqlx::PgConnection,
+    alert: i64,
+) -> Result<Option<(Platform, Decimal)>, OpsError> {
+    let Some(a) = storage::alerts::get(conn, alert)
+        .await?
+        .filter(|a| a.acked_at.is_none() && a.title == "balance_mismatch")
+    else {
+        return Ok(None);
+    };
+    let platform = a.payload["platform"]
+        .as_str()
+        .and_then(Platform::from_db_name);
+    let diff: Option<Decimal> = a.payload["diff"].as_str().and_then(|d| d.parse().ok());
+    Ok(match (platform, diff) {
+        (Some(p), Some(d)) if d < Decimal::ZERO => Some((p, -d)),
+        _ => None,
+    })
 }
 
 /// Число из ответа: «2,5», «2.5 %», «10 USDT».
@@ -667,6 +700,22 @@ impl Inner {
                     return Ok(self.retry_number(staff, input));
                 };
                 return Ok(self.intake_reason(staff, order, amount));
+            }
+            Input::WriteOffReason(alert) => {
+                if text.chars().count() < 3 {
+                    return Ok(self.prompt_with(staff, input, t.t("refusal.reason_short")));
+                }
+                let mut conn = self.pool.acquire().await?;
+                let Some((platform, amount)) = shortage_of(&mut conn, alert).await? else {
+                    return Ok(Screen::new(t.t("capital.gone"))
+                        .row(vec![btn(t.t("common.home"), &Cb::Menu)]));
+                };
+                Action::WriteOff {
+                    platform,
+                    amount,
+                    alert,
+                    reason: text,
+                }
             }
             Input::DecisionReason {
                 order,
@@ -1490,6 +1539,22 @@ impl Inner {
                     ("name", &self.platform_name(*platform)),
                 ],
             ),
+            Action::WriteOff {
+                platform,
+                amount,
+                reason,
+                ..
+            } => {
+                confirm_label = Some(t.f("capital.b_write_off", &[("amount", &usdt(*amount))]));
+                t.f(
+                    "capital.preview_write_off",
+                    &[
+                        ("amount", &usdt(*amount)),
+                        ("name", &self.platform_name(*platform)),
+                        ("reason", &esc(reason)),
+                    ],
+                )
+            }
             Action::Selftest { amount } => t.f("selftest.preview", &[("amount", &usdt(*amount))]),
             Action::Invest(op) => self.invest_preview(op),
         };
@@ -1983,6 +2048,44 @@ impl Inner {
                     platform.db_name().to_owned(),
                     None,
                     Some(json!({ "amount": amount.to_string() })),
+                    Cb::Dash,
+                )
+            }
+            Action::WriteOff {
+                platform,
+                amount,
+                alert,
+                reason,
+            } => {
+                let open = storage::alerts::get(&mut tx, *alert)
+                    .await?
+                    .is_some_and(|a| a.acked_at.is_none());
+                if !open {
+                    return Ok(Screen::new(t.t("capital.gone"))
+                        .row(vec![btn(t.t("common.home"), &Cb::Menu)]));
+                }
+                let Ok(posting) = domain::ledger::loss(*platform, Asset::Usdt, *amount) else {
+                    return Ok(Screen::new(t.t("refusal.bad_amount"))
+                        .row(vec![btn(t.t("common.home"), &Cb::Menu)]));
+                };
+                let created_by = format!("staff:{staff_id}");
+                storage::ledger::post(
+                    &mut tx,
+                    &posting,
+                    storage::ledger::PostingRefs {
+                        memo: Some(reason),
+                        created_by: Some(&created_by),
+                        ..Default::default()
+                    },
+                )
+                .await?;
+                storage::alerts::ack(&mut tx, *alert, staff_id).await?;
+                (
+                    "capital.loss",
+                    "wallet",
+                    platform.db_name().to_owned(),
+                    None,
+                    Some(json!({ "amount": amount.to_string(), "reason": reason })),
                     Cb::Dash,
                 )
             }

@@ -11,3 +11,4 @@ expression: dump(&short)
 --- keyboard
 [{"text":"👍 Да, это я","callback_data":"a:cap:1"}]
 [{"text":"🔎 Нет, разбираться","style":"danger","callback_data":"a:iq:1"}]
+[{"text":"🗑 Списать как потерю","callback_data":"a:wo:1"}]

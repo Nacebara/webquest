@@ -1168,6 +1168,59 @@ async fn owner_top_up_is_posted_from_the_reconciliation_alert(pool: PgPool) {
     assert_eq!(o.audit("capital.in").await.len(), 1);
 }
 
+/// Картинка «Списать как потерю» (принята 18.11): недостачу, которую не объяснить, владелец
+/// признаёт потерей — проводка `loss` с причиной, событие закрыто, сверка сходится, прибыль
+/// инвесторов за период уменьшится (решение 17.11). Админу — нельзя.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn an_unexplained_shortage_is_written_off_as_a_loss(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
+    o.world
+        .set_balance(o.ub, XR, Asset::Usdt, dec!(970))
+        .unwrap();
+    let mark = o.tg.mark();
+    o.engine.reconcile_balances().await.unwrap();
+    let alert = o.tg.screen(mark, OWNER, "меньше на").await;
+    let admin_alert = o.tg.screen(mark, ADMIN, "меньше на").await;
+    o.press(ADMIN, &admin_alert, "Списать как потерю", "роли «Владелец»")
+        .await;
+    o.press(OWNER, &alert, "Списать как потерю", "Коротко причина")
+        .await;
+    let preview = o
+        .say(
+            OWNER,
+            "аккаунт заблокирован, деньги не вернуть",
+            "как потерю?",
+        )
+        .await;
+    assert!(preview.text().contains("30.00"), "{}", preview.text());
+    let confirm = preview.body["reply_markup"]["inline_keyboard"][0][0].clone();
+    assert_eq!(confirm["style"], "danger", "{confirm}");
+    assert!(
+        confirm["text"].as_str().unwrap().contains("Списать 30.00"),
+        "{confirm}"
+    );
+    o.press(OWNER, &preview, "Списать 30.00", "Сохранено").await;
+    let mut conn = o.pool.acquire().await.unwrap();
+    let loss: domain::Decimal = sqlx::query_scalar(
+        "SELECT COALESCE(sum(e.amount), 0) FROM ledger_entries e \
+           JOIN ledger_accounts a ON a.id = e.account_id WHERE a.code = 'expense:loss:USDT'",
+    )
+    .fetch_one(&mut *conn)
+    .await
+    .unwrap();
+    assert_eq!(loss, dec!(30));
+    drop(conn);
+    let r = o.engine.reconcile_balances().await.unwrap();
+    assert!(
+        r.iter()
+            .all(|x| x.verdict == engine::reconcile::Verdict::Ok),
+        "{r:?}"
+    );
+    assert_eq!(o.audit("capital.loss").await.len(), 1);
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn selftest_from_the_panel_reports_every_step(pool: PgPool) {
     let o = ops(pool).await;

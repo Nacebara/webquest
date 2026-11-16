@@ -1164,6 +1164,7 @@ mod tests {
             "staff.disable",
             "capital.in",
             "capital.out",
+            "capital.loss",
         ];
         let mut keys = Vec::new();
         for src in sources {

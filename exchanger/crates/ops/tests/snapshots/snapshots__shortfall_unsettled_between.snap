@@ -12,3 +12,4 @@ expression: dump(&between)
 --- keyboard
 [{"text":"👍 Да, это я","callback_data":"a:cap:2"}]
 [{"text":"🔎 Нет, разбираться","style":"danger","callback_data":"a:iq:2"}]
+[{"text":"🗑 Списать как потерю","callback_data":"a:wo:2"}]

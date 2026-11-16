@@ -881,13 +881,19 @@ pub fn mismatch_screen(t: &crate::Texts, p: &serde_json::Value, id: i64) -> Scre
         }
     };
     let no = btn(t.t("alert.b_no"), &Cb::Investigate(id));
-    Screen::new(text)
+    let screen = Screen::new(text)
         .row(vec![btn(t.t("alert.b_yes"), &Cb::Capital(id))])
         .row(vec![if short {
             no.style(botapi::ButtonStyle::Danger)
         } else {
             no
-        }])
+        }]);
+    // Недостачу, которую не объяснить, владелец признаёт потерей (решение 17.11).
+    if short {
+        screen.row(vec![btn(t.t("alert.b_write_off"), &Cb::WriteOff(id))])
+    } else {
+        screen
+    }
 }
 
 /// Название операции в тексте события: `prefix` — `op` («выплата») или `opc` («чек выплаты»).

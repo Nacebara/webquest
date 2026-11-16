@@ -1600,6 +1600,27 @@ impl Inner {
                 );
                 Ok(self.prompt_with(staff, input, text))
             }
+            Cb::WriteOff(alert) => {
+                if let Some(denied) = self.deny(staff, Role::Owner) {
+                    return Ok(denied);
+                }
+                let shortage = {
+                    let mut conn = self.pool.acquire().await?;
+                    crate::actions::shortage_of(&mut conn, alert).await?
+                };
+                let Some((platform, amount)) = shortage else {
+                    return Ok(Screen::new(self.texts.t("capital.gone"))
+                        .row(vec![btn(self.texts.t("common.home"), &Cb::Menu)]));
+                };
+                let text = self.texts.f(
+                    "capital.ask_write_off",
+                    &[
+                        ("name", &self.platform_name(platform)),
+                        ("amount", &usdt(amount)),
+                    ],
+                );
+                Ok(self.prompt_with(staff, Input::WriteOffReason(alert), text))
+            }
             cb => self.edit_entry(staff, cb).await,
         }
     }
