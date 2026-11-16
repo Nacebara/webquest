@@ -936,6 +936,48 @@ async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
     );
 }
 
+/// П-5 (аудит 16.11): кнопка в тревоге открывает экран новым сообщением, тревога остаётся
+/// тревогой. «Принял» коллеги правит копии тревоги, а карточку, в которой работают, не трогает.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_button_in_an_alert_opens_a_new_message_and_the_alert_stays(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
+    o.world.set_balance(o.ub, XR, Asset::Usdt, dec!(5)).unwrap();
+    let url = o.world.client_check(CB, usdt(dec!(100))).unwrap();
+    let link = parsers::links::parse_url(&url).unwrap();
+    accepted(o.engine.submit_check(common::CLIENT, &link).await.unwrap());
+    let mark = o.tg.mark();
+    o.drain().await;
+    let alert = o.tg.screen(mark, OWNER, "Нужен разбор").await;
+    let admin_alert = o.tg.screen(mark, ADMIN, "Нужен разбор").await;
+    let card = o
+        .press(OWNER, &alert, "Открыть заявку", "Ручной разбор")
+        .await;
+    assert!(card.method.starts_with("send"), "{}", card.method);
+    assert_ne!(card.message_id, alert.message_id);
+    let mark = o.tg.mark();
+    o.press(ADMIN, &admin_alert, "Принял", "Принял").await;
+    // Правка копии владельца идёт после ответа админу — ждём её.
+    let touched = loop {
+        let touched: Vec<i64> =
+            o.tg.calls()
+                .into_iter()
+                .skip(mark)
+                .filter(|c| c.method.starts_with("edit") && c.chat() == Some(OWNER))
+                .filter_map(|c| c.body["message_id"].as_i64())
+                .collect();
+        if touched.contains(&alert.message_id.unwrap()) {
+            break touched;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    };
+    assert!(
+        !touched.contains(&card.message_id.unwrap()),
+        "карточку не тронули: {touched:?}"
+    );
+}
+
 /// Заявка на разборе после неудачной выплаты; владелец и админ открыли её карточку.
 async fn review_cards(o: &Ops) -> (storage::orders::OrderRow, Call, Call) {
     o.say(OWNER, "/menu", "<b>Пульт</b>").await;

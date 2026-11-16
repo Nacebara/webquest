@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM alert_copies WHERE chat_id = $1 AND message_id = $2) AS \"copy!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "copy!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "77b7d382d92d610f6cb0a9d3cf3672cc87dae6a2dc647de004087c3e26664890"
+}

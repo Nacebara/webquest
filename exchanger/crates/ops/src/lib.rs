@@ -633,7 +633,20 @@ impl Inner {
         cb: Cb,
     ) -> Result<(), OpsError> {
         let dash = cb == Cb::Dash;
+        // П-5: нажато в тревоге — экран новым сообщением, тревога остаётся тревогой (её правят
+        // повтор и «Принял» — иначе они правили бы карточку, в которой работают).
+        let from_alert = {
+            let mut conn = self.pool.acquire().await?;
+            storage::alerts::is_copy(&mut conn, chat, message_id).await?
+        };
         if let Some(screen) = self.on_callback(staff, chat, message, cb).await? {
+            if from_alert {
+                let sent = self.send(chat, &screen).await?;
+                if dash {
+                    self.remember_dash(chat, sent.message_id).await?;
+                }
+                return Ok(());
+            }
             self.edit(chat, message_id, &screen).await?;
             if dash {
                 self.remember_dash(chat, message_id).await?;

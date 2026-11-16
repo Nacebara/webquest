@@ -381,6 +381,22 @@ pub async fn copies(conn: &mut PgConnection, alert_id: i64) -> Result<Vec<Copy>,
     .await?)
 }
 
+/// Сообщение `message_id` в чате `chat_id` — копия тревоги (П-5: переход из тревоги — новым
+/// сообщением, тревога остаётся тревогой).
+pub async fn is_copy(
+    conn: &mut PgConnection,
+    chat_id: i64,
+    message_id: i32,
+) -> Result<bool, StorageError> {
+    Ok(sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM alert_copies WHERE chat_id = $1 AND message_id = $2) AS "copy!""#,
+        chat_id,
+        message_id
+    )
+    .fetch_one(conn)
+    .await?)
+}
+
 /// Сотрудник позвал админа (П-3): повторы тревоги ему больше не приходят.
 pub async fn mute_copy(
     conn: &mut PgConnection,
