@@ -468,6 +468,16 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
             send_card(api, chat, &look.screen(&screen)).await;
         }
     }
+    // Макет «Алерт и „Принял“» (П-6, П-7): «Нужен разбор» с номером, суммами и ответом кошелька.
+    let review = serde_json::json!({"id": 15, "public": "K7M2Q9XR4T", "user": 51234567,
+        "direction": "cb_to_xr_check", "amount_in": "100", "amount_out": "97.5",
+        "reason": "Выплата: нет ответа 30 с, чек не найден", "since": now.to_rfc3339()});
+    send_card(
+        api,
+        chat,
+        &sample(look.screen(&crate::review_alert_screen(&texts, &review, 0))),
+    )
+    .await;
     // Макет «Обслуживание» (П-13): срок и сколько начатых заявок довожу.
     let maintenance = crate::maintenance_screen(
         &texts,

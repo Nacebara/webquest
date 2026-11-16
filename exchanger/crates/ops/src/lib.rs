@@ -22,7 +22,7 @@
 
 mod actions;
 mod alerts;
-pub use alerts::{critical_screen, mismatch_screen, stalled_screen};
+pub use alerts::{critical_screen, mismatch_screen, review_alert_screen, stalled_screen};
 mod cb;
 pub mod chart;
 mod dash;

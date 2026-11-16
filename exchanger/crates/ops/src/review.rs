@@ -173,7 +173,7 @@ pub struct OrderView {
     pub reconcile: Option<ReconcileHint>,
 }
 
-fn wallet(p: Platform) -> &'static str {
+pub(crate) fn wallet(p: Platform) -> &'static str {
     match p {
         Platform::CryptoBot => "CryptoBot",
         Platform::XRocket => "xRocket",
@@ -181,7 +181,7 @@ fn wallet(p: Platform) -> &'static str {
 }
 
 /// Время шага: `14:04:02` по Москве (технический ход заявки).
-fn hms(at: DateTime<Utc>) -> String {
+pub(crate) fn hms(at: DateTime<Utc>) -> String {
     (at + Duration::hours(3)).format("%H:%M:%S").to_string()
 }
 

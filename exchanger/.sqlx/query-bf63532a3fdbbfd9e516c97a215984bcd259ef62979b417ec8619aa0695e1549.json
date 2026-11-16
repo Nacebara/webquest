@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT DISTINCT ON (op.order_id)\n               op.order_id AS \"order_id!\", m.entities->>'via_bot' AS via_bot, m.text, m.received_at\n          FROM wallet_messages m JOIN operations op ON op.id = m.operation_id\n         WHERE op.order_id = ANY($1) AND NOT m.is_outgoing\n         ORDER BY op.order_id, m.id DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "order_id!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "order_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "via_bot",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "text",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "wallet_messages",
+            "name": "text"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "received_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "wallet_messages",
+            "name": "received_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      true,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "bf63532a3fdbbfd9e516c97a215984bcd259ef62979b417ec8619aa0695e1549"
+}

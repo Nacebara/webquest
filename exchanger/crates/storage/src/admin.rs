@@ -197,6 +197,40 @@ impl OrderCard {
     }
 }
 
+/// Последний входящий ответ кошелька по каждой заявке из `orders` (тревога «Нужен разбор»,
+/// П-6: ответ кошелька цитатой). Одним запросом на всю очередь разбора.
+pub async fn last_wallet_replies(
+    conn: &mut PgConnection,
+    orders: &[i64],
+) -> Result<Vec<(i64, WalletMessageLine)>, StorageError> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT DISTINCT ON (op.order_id)
+               op.order_id AS "order_id!", m.entities->>'via_bot' AS via_bot, m.text, m.received_at
+          FROM wallet_messages m JOIN operations op ON op.id = m.operation_id
+         WHERE op.order_id = ANY($1) AND NOT m.is_outgoing
+         ORDER BY op.order_id, m.id DESC
+        "#,
+        orders
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| {
+            (
+                r.order_id,
+                WalletMessageLine {
+                    platform: r.via_bot,
+                    outgoing: false,
+                    text: r.text,
+                    at: r.received_at,
+                },
+            )
+        })
+        .collect())
+}
+
 pub async fn order_card(conn: &mut PgConnection, id: i64) -> Result<OrderCard, StorageError> {
     let o = sqlx::query!(
         r#"

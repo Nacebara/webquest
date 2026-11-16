@@ -1,0 +1,14 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&screen)
+---
+--- rich
+
+--- html
+🚨 <b>Нужен разбор</b> · <code>K7M2Q9XR4T</code>
+CB → xR · 100.00 → 97.50 · клиент 51234567
+Выплата: нет ответа 30 с, чек не найден
+<blockquote expandable>xRocket · 14:04:04 · ответа нет</blockquote>
+--- keyboard
+[{"text":"🔖 Открыть","callback_data":"a:o:15"},{"text":"✋ Взять","style":"primary","callback_data":"a:ot:15"}]
+[{"text":"👍 Принял","callback_data":"a:ack:9"}]

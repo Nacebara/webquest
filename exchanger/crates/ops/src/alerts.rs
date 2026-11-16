@@ -44,8 +44,13 @@ impl Inner {
         let mut conn = self.pool.acquire().await?;
         // 1. Ручной разбор: событие на каждую заявку в очереди.
         let queue = storage::admin::review_queue(&mut conn).await?;
+        let ids: Vec<i64> = queue.iter().map(|q| q.id).collect();
+        let replies = storage::admin::last_wallet_replies(&mut conn, &ids).await?;
         for item in &queue {
             let key = format!("manual_review:{}", item.id);
+            let reply = replies.iter().find(|(id, _)| *id == item.id).map(
+                |(_, m)| json!({ "who": m.platform, "at": m.at.to_rfc3339(), "text": m.text }),
+            );
             storage::alerts::ensure_condition(
                 &mut conn,
                 &NewAlert {
@@ -55,9 +60,15 @@ impl Inner {
                     title: "manual_review",
                     payload: json!({
                         "id": item.id,
+                        "public": item.public_id,
+                        "user": item.user_id,
                         "direction": item.direction.code(),
                         "amount": item.intake_amount.or(item.payout_amount).map(|a| a.to_string()),
+                        "amount_in": item.intake_amount.map(|a| a.to_string()),
+                        "amount_out": item.payout_amount.map(|a| a.to_string()),
                         "reason": item.manual_reason,
+                        "since": item.since.to_rfc3339(),
+                        "reply": reply,
                     }),
                 },
             )
@@ -225,30 +236,7 @@ impl Inner {
         let critical = critical_screen(t, &a.title, p, a.id, a.first_at);
         let mut screen = match a.title.as_str() {
             _ if critical.is_some() => critical.unwrap_or_default(),
-            "manual_review" => {
-                let id = p["id"].as_i64().unwrap_or_default();
-                let amount = s(p, "amount");
-                Screen::new(t.f(
-                    "alert.manual_review",
-                    &[
-                        ("id", &id),
-                        ("direction", &dir_name("direction")),
-                        (
-                            "amount",
-                            &if amount.is_empty() {
-                                t.t("common.none")
-                            } else {
-                                usdt(dec(p, "amount"))
-                            },
-                        ),
-                        ("reason", &esc(&s(p, "reason"))),
-                    ],
-                ))
-                .row(vec![
-                    btn(t.t("alert.b_open"), &Cb::Order(id)),
-                    btn(t.t("alert.b_ack"), &Cb::Ack(a.id)),
-                ])
-            }
+            "manual_review" => review_alert_screen(t, p, a.id),
             "promo_hint" => {
                 let d = s(p, "direction").parse::<Direction>().ok();
                 let (source, target) = d.map_or((String::new(), String::new()), |d| {
@@ -434,7 +422,26 @@ impl Inner {
             .strip_prefix("{e:")
             .and_then(|r| r.split_once("} "))
             .map_or(head, |(_, rest)| rest);
+        // «Разбор · K7M2Q9XR4T» и одна «Открыть» (макет): взять заявку — из её карточки.
+        let review_head = (alert.title == "manual_review").then(|| {
+            self.texts.f(
+                "alert.review_head",
+                &[(
+                    "public",
+                    &esc(alert.payload["public"].as_str().unwrap_or_default()),
+                )],
+            )
+        });
+        let head = match &review_head {
+            Some(h) if alert.payload["public"].is_string() => h.as_str(),
+            _ => head,
+        };
         let mut screen = full.clone();
+        if alert.title == "manual_review"
+            && let Some(order) = alert.payload["id"].as_i64()
+        {
+            screen.keyboard = vec![vec![btn(self.texts.t("alert.b_open"), &Cb::Order(order))]];
+        }
         screen.text = self.texts.f(
             "alert.acked",
             &[
@@ -816,6 +823,95 @@ pub fn critical_screen(
         _ => return None,
     };
     Some(screen)
+}
+
+/// Макет «Алерт и „Принял“» (П-6, П-7): «Нужен разбор · K7M2Q9XR4T / CB → xR · 100.00 → 97.50 ·
+/// клиент 51234567 / причина / ответ кошелька цитатой», [Открыть] [Взять] / [Принял]. Старые
+/// тревоги без новых полей — с тем, что есть.
+pub fn review_alert_screen(t: &crate::Texts, p: &Value, id: i64) -> Screen {
+    let order = p["id"].as_i64().unwrap_or_default();
+    let direction = s(p, "direction").parse::<Direction>().ok();
+    let route = direction.map_or_else(
+        || esc(&s(p, "direction")),
+        |d| t.t(&format!("dash.short_{}", d.code())),
+    );
+    let money = |k: &str| {
+        p[k].as_str()
+            .and_then(|v| v.parse::<domain::Decimal>().ok())
+    };
+    let amounts = match (money("amount_in").or(money("amount")), money("amount_out")) {
+        (Some(a), Some(b)) => format!("{} → {}", crate::dash::amount(a), crate::dash::amount(b)),
+        (Some(a), None) | (None, Some(a)) => crate::dash::amount(a),
+        (None, None) => t.t("common.none"),
+    };
+    let public = p["public"]
+        .as_str()
+        .map_or_else(|| order.to_string(), str::to_owned);
+    let reason = s(p, "reason");
+    let reason = if reason.is_empty() {
+        String::new()
+    } else {
+        t.f("alert.review_reason", &[("reason", &esc(&reason))])
+    };
+    let wallet = direction.map(|d| crate::review::wallet(d.target()));
+    let reply = match &p["reply"] {
+        Value::Object(m) => {
+            let at = m
+                .get("at")
+                .and_then(Value::as_str)
+                .and_then(|a| a.parse::<chrono::DateTime<chrono::Utc>>().ok())
+                .map(crate::review::hms)
+                .unwrap_or_default();
+            let who = m
+                .get("who")
+                .and_then(Value::as_str)
+                .or(wallet)
+                .unwrap_or_default();
+            let text = m.get("text").and_then(Value::as_str).unwrap_or_default();
+            let text = crate::views::mask_links(&ui::html::clip(text, 300));
+            t.f(
+                "alert.review_reply",
+                &[("who", &esc(who)), ("at", &at), ("text", &esc(&text))],
+            )
+        }
+        _ => match (
+            wallet,
+            s(p, "since").parse::<chrono::DateTime<chrono::Utc>>(),
+        ) {
+            (Some(w), Ok(since)) => t.f(
+                "alert.review_reply",
+                &[
+                    ("who", &w),
+                    ("at", &crate::review::hms(since)),
+                    ("text", &t.t("alert.review_no_reply")),
+                ],
+            ),
+            _ => String::new(),
+        },
+    };
+    Screen::new(
+        t.f(
+            "alert.manual_review",
+            &[
+                ("public", &esc(&public)),
+                ("route", &route),
+                ("amounts", &amounts),
+                (
+                    "user",
+                    &p["user"]
+                        .as_i64()
+                        .map_or_else(String::new, |u| u.to_string()),
+                ),
+                ("reason", &reason),
+                ("reply", &reply),
+            ],
+        ),
+    )
+    .row(vec![
+        btn(t.t("alert.b_open"), &Cb::Order(order)),
+        btn(t.t("alert.b_take"), &Cb::Take(order)).style(botapi::ButtonStyle::Primary),
+    ])
+    .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
 }
 
 /// Макет «Недостача»: «xRocket: меньше на 12.00 · Леджер … · реально … · ub-1 · Выплаты в

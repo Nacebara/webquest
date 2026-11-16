@@ -215,6 +215,26 @@ fn critical_alerts() {
     assert!(ops::critical_screen(&t, "manual_review", &serde_json::json!({}), 1, first).is_none());
 }
 
+/// П-6, П-7: макет «Алерт и „Принял“» — публичный номер, путь, суммы, клиент, причина, ответ
+/// кошелька цитатой; без ответа — «ответа нет» со временем разбора.
+#[test]
+fn review_alert() {
+    let t = Texts::builtin().unwrap();
+    let base = serde_json::json!({"id": 15, "public": "K7M2Q9XR4T", "user": 51234567,
+        "direction": "cb_to_xr_check", "amount_in": "100", "amount_out": "97.5",
+        "reason": "Выплата: нет ответа 30 с, чек не найден", "since": "2026-11-14T11:04:04Z"});
+    let mut replied = base.clone();
+    replied["reply"] = serde_json::json!({"who": "xRocket", "at": "2026-11-14T11:04:04Z",
+        "text": "Чек CQ12…9F временно недоступен"});
+    for (name, p) in [
+        ("review_alert_no_reply", base),
+        ("review_alert_reply", replied),
+    ] {
+        let screen = Look::plain().screen(&ops::review_alert_screen(&t, &p, 9));
+        insta::assert_snapshot!(name, dump(&screen));
+    }
+}
+
 /// П-13: макет «Обслуживание» — «до 15:30», «3 заявки довожу», «+15 мин» и синяя «Закончить»;
 /// без срока — «с 15:00», без начатых заявок — так и сказано.
 #[test]

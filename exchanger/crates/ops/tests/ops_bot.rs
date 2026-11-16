@@ -875,15 +875,21 @@ async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
     let mark = o.tg.mark();
     o.drain().await;
     let alert = o.tg.screen(mark, OWNER, "Нужен разбор").await;
-    assert!(alert.text().contains(&format!("№{}", order.id)));
+    // Макет «Алерт и „Принял“» (П-6, П-7): публичный номер, путь, суммы, клиент; без «№15».
+    let text = alert.text();
+    assert!(text.contains(&order.public_id), "{text}");
+    assert!(!text.contains(&format!("№{}", order.id)), "{text}");
+    assert!(
+        text.contains("CB → xR") && text.contains("100.00") && text.contains("клиент 111"),
+        "{text}"
+    );
+    assert!(alert.button("Взять").is_some() && alert.button("Принял").is_some());
     // Админ тоже получил событие.
     o.tg.screen(mark, ADMIN, "Нужен разбор").await;
     o.world
         .set_balance(o.ub, XR, Asset::Usdt, dec!(1000))
         .unwrap();
-    let card = o
-        .press(OWNER, &alert, "Открыть заявку", "Ручной разбор")
-        .await;
+    let card = o.press(OWNER, &alert, "Открыть", "Ручной разбор").await;
     // Карточка по макету: деньги клиента проведены — «Принято» без «не проведено».
     assert!(card.text().contains("Принято"), "{}", card.text());
     assert!(!card.text().contains("не проведено"), "{}", card.text());
@@ -951,9 +957,7 @@ async fn a_button_in_an_alert_opens_a_new_message_and_the_alert_stays(pool: PgPo
     o.drain().await;
     let alert = o.tg.screen(mark, OWNER, "Нужен разбор").await;
     let admin_alert = o.tg.screen(mark, ADMIN, "Нужен разбор").await;
-    let card = o
-        .press(OWNER, &alert, "Открыть заявку", "Ручной разбор")
-        .await;
+    let card = o.press(OWNER, &alert, "Открыть", "Ручной разбор").await;
     assert!(card.method.starts_with("send"), "{}", card.method);
     assert_ne!(card.message_id, alert.message_id);
     let mark = o.tg.mark();
@@ -976,6 +980,25 @@ async fn a_button_in_an_alert_opens_a_new_message_and_the_alert_stays(pool: PgPo
         !touched.contains(&card.message_id.unwrap()),
         "карточку не тронули: {touched:?}"
     );
+    // Макет «Алерт и „Принял“»: «⚪ Разбор · K7M2Q9XR4T / Принял Анна · 14:07 — повторы
+    // остановлены» и одна «Открыть».
+    let acked =
+        o.tg.calls()
+            .into_iter()
+            .skip(mark)
+            .rfind(|c| {
+                c.method.starts_with("edit")
+                    && c.chat() == Some(OWNER)
+                    && c.body["message_id"].as_i64() == alert.message_id
+            })
+            .unwrap();
+    let text = acked.text();
+    assert!(
+        text.contains("<b>Разбор</b>") && text.contains("Принял Анна") && !text.contains("🚨"),
+        "{text}"
+    );
+    assert_eq!(acked.buttons().len(), 1, "{:?}", acked.buttons());
+    assert!(acked.button("Открыть").is_some());
 }
 
 /// Заявка на разборе после неудачной выплаты; владелец и админ открыли её карточку.
@@ -994,10 +1017,10 @@ async fn review_cards(o: &Ops) -> (storage::orders::OrderRow, Call, Call) {
         .set_balance(o.ub, XR, Asset::Usdt, dec!(1000))
         .unwrap();
     let owner = o
-        .press(OWNER, &owner_alert, "Открыть заявку", "Ручной разбор")
+        .press(OWNER, &owner_alert, "Открыть", "Ручной разбор")
         .await;
     let admin = o
-        .press(ADMIN, &admin_alert, "Открыть заявку", "Ручной разбор")
+        .press(ADMIN, &admin_alert, "Открыть", "Ручной разбор")
         .await;
     (order, owner, admin)
 }
@@ -1184,9 +1207,7 @@ async fn an_operator_calls_an_admin_instead_of_silencing_everyone(pool: PgPool) 
     o.tg.screen(mark, ADMIN, "Нужен разбор").await;
 
     // Карточка у оператора.
-    let card = o
-        .press(OPERATOR, &alert, "Открыть заявку", "Ручной разбор")
-        .await;
+    let card = o.press(OPERATOR, &alert, "Открыть", "Ручной разбор").await;
     assert!(card.text().contains("решает админ"), "{}", card.text());
     assert!(
         card.button("Позвать админа").is_some(),
