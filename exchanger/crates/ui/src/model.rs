@@ -398,6 +398,8 @@ pub struct InvestHome {
     pub balance: Decimal,
     pub profit: Decimal,
     pub profit_24h: Decimal,
+    /// Потери дела за 24 часа: строка видна, только если они были.
+    pub losses_24h: Decimal,
     /// Пополнения моложе срока блокировки.
     pub locked: Decimal,
     pub withdrawable: Decimal,

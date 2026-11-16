@@ -48,6 +48,7 @@ fn home(view: &InvestView) -> InvestHome {
         balance: f.balance,
         profit: f.profit,
         profit_24h: f.profit_24h,
+        losses_24h: f.losses_24h,
         locked: f.locked.min(f.balance),
         withdrawable: f.withdrawable(),
         moves: view.recent.iter().map(row).collect(),

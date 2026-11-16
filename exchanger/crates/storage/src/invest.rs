@@ -341,6 +341,10 @@ pub struct Figures {
     pub locked: Decimal,
     /// Прибыль за последние 24 часа.
     pub profit_24h: Decimal,
+    /// Потери дела за последние 24 часа (комиссии сети и кошельков, списанные потери,
+    /// рефералы): их сначала покрывают комиссии, потом снова начисляется прибыль (решение
+    /// владельца 17.11, `docs/INVEST-LOSSES.md`, вопрос Б).
+    pub losses_24h: Decimal,
 }
 
 impl Figures {
@@ -381,6 +385,16 @@ pub async fn figures(
         user_id,
         lock_days
     )
+    .fetch_one(&mut *conn)
+    .await?;
+    let losses_24h: Decimal = sqlx::query_scalar(
+        "SELECT COALESCE(sum(e.amount), 0) FROM ledger_entries e \
+           JOIN ledger_accounts a ON a.id = e.account_id \
+           JOIN ledger_transactions t ON t.id = e.tx_id \
+          WHERE a.code IN ('expense:network_fee:USDT', 'expense:platform_fee:USDT', \
+                           'expense:loss:USDT', 'expense:referral:USDT') \
+            AND t.created_at > now() - interval '24 hours'",
+    )
     .fetch_one(conn)
     .await?;
     Ok(Figures {
@@ -388,6 +402,7 @@ pub async fn figures(
         profit: r.profit,
         locked,
         profit_24h: r.profit_24h,
+        losses_24h: losses_24h.max(Decimal::ZERO),
     })
 }
 

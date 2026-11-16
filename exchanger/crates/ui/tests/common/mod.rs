@@ -720,6 +720,7 @@ pub fn investor() -> InvestHome {
         balance: dec!(1250.75),
         profit: dec!(50.75),
         profit_24h: dec!(2.5),
+        losses_24h: dec!(0),
         locked: dec!(300),
         withdrawable: dec!(950.75),
         moves: vec![
@@ -769,6 +770,7 @@ pub fn new_investor() -> InvestHome {
         balance: dec!(0),
         profit: dec!(0),
         profit_24h: dec!(0),
+        losses_24h: dec!(0),
         locked: dec!(0),
         withdrawable: dec!(0),
         moves: Vec::new(),
@@ -782,6 +784,14 @@ pub fn invest_gallery(ui: &Ui) -> Vec<(String, Screen)> {
     let screens = vec![
         ("invest_home", ui.invest_home(&i)),
         ("invest_home_new", ui.invest_home(&n)),
+        (
+            "invest_home_losses",
+            ui.invest_home(&InvestHome {
+                profit_24h: dec!(0),
+                losses_24h: dec!(30),
+                ..investor()
+            }),
+        ),
         ("invest_howto", ui.invest_howto(&i)),
         ("invest_howto_new", ui.invest_howto(&n)),
         ("invest_deposit", ui.invest_deposit_prompt(&i)),

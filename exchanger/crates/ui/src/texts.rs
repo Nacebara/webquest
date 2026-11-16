@@ -608,6 +608,7 @@ pub struct InvestTexts {
     pub title: String,
     pub balance: String,
     pub profit: String,
+    pub losses: String,
     pub terms: String,
     pub terms_no_lock: String,
     pub withdrawable: String,

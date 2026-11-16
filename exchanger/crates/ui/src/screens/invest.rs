@@ -98,6 +98,9 @@ impl Ui {
                 ],
             ),
         ];
+        if h.losses_24h > Decimal::ZERO {
+            lines.push(self.fill(&t.losses, &[("losses", &self.usd(h.losses_24h))]));
+        }
         let days = Frag::text(&h.lock_days.to_string());
         let share = self.pct(h.share_pct);
         lines.push(if h.lock_days > 0 {
