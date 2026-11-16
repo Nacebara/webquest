@@ -397,3 +397,48 @@ async fn a_claim_notice_marks_only_an_unambiguous_check(pool: PgPool) {
             .unwrap()
     );
 }
+
+/// П-13: предпросмотр стоп-крана говорит, сколько выплат встанет и на какую сумму. Считаются
+/// только не ушедшие (`pending`) выводящие деньги операции; приём чека и уже отправленная
+/// выплата — нет.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn queued_money_out_is_what_a_kill_switch_holds(pool: PgPool) {
+    setup(&pool).await;
+    let (cb, xr) = (wallet(&pool, CB).await, wallet(&pool, XR).await);
+    let a = order(&pool, "CQqueuedAAAA").await;
+    let b = order(&pool, "CQqueuedBBBB").await;
+    let c = order(&pool, "CQqueuedCCCC").await;
+    let mut conn = pool.acquire().await.unwrap();
+    assert!(
+        storage::operations::queued_money_out(&mut conn)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    let mut refund = op(b, OpKind::CreateRefundCheck, "ord-2-refund", xr);
+    refund.amount = Some(dec!(10));
+    refund.random_id = 2;
+    storage::operations::insert(&mut conn, &refund)
+        .await
+        .unwrap();
+    let mut intake = op(c, OpKind::ActivateCheck, "ord-3-intake-1", cb);
+    intake.start_param = Some("CQqueuedCCCC");
+    intake.random_id = 3;
+    storage::operations::insert(&mut conn, &intake)
+        .await
+        .unwrap();
+    // Уже отправленная выплата: стоп-кран её не остановит.
+    let mut sent = op(a, OpKind::CreatePayoutCheck, "ord-1-payout", xr);
+    sent.random_id = 1;
+    storage::operations::insert(&mut conn, &sent).await.unwrap();
+    let claimed = storage::operations::claim_due(&mut conn, 10).await.unwrap();
+    assert!(claimed.iter().any(|o| o.idempotency_key == "ord-1-payout"));
+    sqlx::query("UPDATE operations SET status = 'pending' WHERE idempotency_key <> 'ord-1-payout'")
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    let queued = storage::operations::queued_money_out(&mut conn)
+        .await
+        .unwrap();
+    assert_eq!(queued, vec![(Asset::Usdt, 1, dec!(10))]);
+}

@@ -337,6 +337,34 @@ impl Action {
     }
 }
 
+/// Строка предпросмотра стоп-крана (П-13): «В очереди 3 выплаты на 412.50 USDT — встанут…».
+fn kill_warn(t: &crate::Texts, queued: &[(domain::Asset, i64, Decimal)]) -> String {
+    if queued.is_empty() {
+        return t.t("settings.kill_warn_none");
+    }
+    let what = queued
+        .iter()
+        .map(|(asset, n, sum)| {
+            t.f(
+                "settings.kill_queued",
+                &[
+                    (
+                        "n",
+                        &format!(
+                            "{n} {}",
+                            ui::fmt::plural(*n, ["выплата", "выплаты", "выплат"])
+                        ),
+                    ),
+                    ("sum", &crate::dash::amount(*sum)),
+                    ("asset", &asset.code()),
+                ],
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    t.f("settings.kill_warn", &[("what", &what)])
+}
+
 /// Недостача по событию сверки, ещё не закрытому: кошелёк и сколько не хватает.
 pub(crate) async fn shortage_of(
     conn: &mut sqlx::PgConnection,
@@ -1494,7 +1522,11 @@ impl Inner {
                     ],
                 );
                 if *flag == Flag::KillSwitch && *on {
-                    text.push_str(&t.t("settings.kill_warn"));
+                    let queued = {
+                        let mut conn = self.pool.acquire().await?;
+                        storage::operations::queued_money_out(&mut conn).await?
+                    };
+                    text.push_str(&kill_warn(t, &queued));
                 }
                 text
             }
@@ -2249,6 +2281,21 @@ mod tests {
     use rust_decimal_macros::dec;
 
     use super::*;
+
+    /// П-13: предпросмотр стоп-крана — сколько выплат встанет, на какую сумму, без «random_id».
+    #[test]
+    fn kill_warn_counts_the_queued_payouts() {
+        let t = crate::Texts::builtin().unwrap();
+        let line = kill_warn(&t, &[(domain::Asset::Usdt, 3, dec!(412.5))]);
+        assert_eq!(
+            line,
+            "\nВ очереди 3 выплаты на <code>412.50</code> USDT — встанут, после снятия уйдут сами, \
+             без дублей. Новые заявки до снятия — в разбор."
+        );
+        let one = kill_warn(&t, &[(domain::Asset::Usdt, 1, dec!(10))]);
+        assert!(one.contains("1 выплата на"), "{one}");
+        assert!(kill_warn(&t, &[]).contains("Выплат в очереди нет"));
+    }
 
     /// Шаг 3: «Деньги пришли» дальше 1 % от чека, личная ставка ниже обычной больше чем на
     /// 1 п.п. — решает владелец.

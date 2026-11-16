@@ -159,6 +159,35 @@ impl TryFrom<RawRow> for OperationRow {
     }
 }
 
+/// Выплаты, которые ещё не ушли (`pending`), — их держит стоп-кран (П-13, предпросмотр:
+/// «В очереди 3 выплаты на 412.50 USDT»). По активу: сколько и на какую сумму. Те же виды, что
+/// останавливает движок (`engine::worker::is_money_out`).
+pub async fn queued_money_out(
+    conn: &mut PgConnection,
+) -> Result<Vec<(Asset, i64, Decimal)>, StorageError> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT asset AS "asset!", count(*) AS "n!", COALESCE(sum(amount), 0) AS "sum!"
+          FROM operations
+         WHERE status = 'pending' AND asset IS NOT NULL
+           AND kind IN ('create_payout_check', 'create_refund_check', 'create_excess_check',
+                        'pay_invoice')
+         GROUP BY asset ORDER BY asset
+        "#
+    )
+    .fetch_all(conn)
+    .await?;
+    rows.into_iter()
+        .map(|r| {
+            let asset = r
+                .asset
+                .parse()
+                .map_err(|_| StorageError::corrupt("operations.asset", &r.asset))?;
+            Ok((asset, r.n, r.sum))
+        })
+        .collect()
+}
+
 /// Вставить операцию (в транзакции перехода заявки). Выводящие деньги — одна попытка.
 pub async fn insert(conn: &mut PgConnection, op: &NewOperation<'_>) -> Result<i64, StorageError> {
     let max_attempts: i32 = if op.kind.retry_is_safe() { 8 } else { 1 };

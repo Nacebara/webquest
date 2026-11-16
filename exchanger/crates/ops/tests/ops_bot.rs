@@ -631,7 +631,14 @@ async fn settings_toggle_the_newcomer_limit_and_the_kill_switch(pool: PgPool) {
     let preview = o
         .press(OWNER, &settings, "Включить стоп-кран", "Стоп-кран выплат")
         .await;
-    assert!(preview.text().contains("random_id"));
+    // П-13: словами — сколько выплат встанет и что будет с новыми заявками.
+    assert!(
+        preview.text().contains("Выплат в очереди нет")
+            && preview.text().contains("в разбор")
+            && !preview.text().contains("random_id"),
+        "{}",
+        preview.text()
+    );
     let mark = o.tg.mark();
     o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
     assert!(

@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT asset AS \"asset!\", count(*) AS \"n!\", COALESCE(sum(amount), 0) AS \"sum!\"\n          FROM operations\n         WHERE status = 'pending' AND asset IS NOT NULL\n           AND kind IN ('create_payout_check', 'create_refund_check', 'create_excess_check',\n                        'pay_invoice')\n         GROUP BY asset ORDER BY asset\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "asset!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "asset"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "n!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "sum!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "b5be6fe016aabfeaea057e19f121eb1c09bb70c33886fdc19cc95a24cc449d85"
+}
