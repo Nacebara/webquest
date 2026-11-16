@@ -16,7 +16,7 @@ use ui::{Emoji, EmojiStyle};
 use crate::actions::{Action, Input};
 use crate::cb::{Cb, DecisionKind, DirField, Flag, TermField};
 use crate::nav::{self, List};
-use crate::texts::{code, esc};
+use crate::texts::esc;
 use crate::{Inner, OpsError, Screen, btn};
 
 pub(crate) const DIRECTIONS: [Direction; 4] = [
@@ -1387,7 +1387,9 @@ impl Inner {
     }
 
     /// «Журнал»: кто, что, когда — по [`nav::PAGE`] на странице; заявка и клиент — ссылки.
-    pub(crate) async fn audit(&self, page: u32) -> Result<Screen, OpsError> {
+    /// Макет «Журнал» (П-31): таблица «время · кто · что» словами — «взял(а) K7M2…», «комиссия
+    /// CB → xR 2.0 → 2.4», «бан 48812211 · спам»; свои действия — «Вы».
+    pub(crate) async fn audit(&self, staff: &StaffMember, page: u32) -> Result<Screen, OpsError> {
         let t = &self.texts;
         let mut conn = self.pool.acquire().await?;
         let total: i64 = sqlx::query_scalar("SELECT count(*) FROM admin_audit")
@@ -1399,46 +1401,76 @@ impl Inner {
             storage::audit::recent(&mut conn, i64::try_from(range.end).unwrap_or(0), None, None)
                 .await?;
         let rows = rows.get(range.start..).unwrap_or(&[]);
+        let order_ids: Vec<i64> = rows
+            .iter()
+            .filter(|r| r.target_type.as_deref() == Some("order"))
+            .filter_map(|r| r.target_id.as_deref()?.parse().ok())
+            .collect();
+        let names = crate::journal::Names {
+            orders: sqlx::query_as::<_, (i64, String)>(
+                "SELECT id, public_id FROM orders WHERE id = ANY($1)",
+            )
+            .bind(&order_ids)
+            .fetch_all(&mut *conn)
+            .await?
+            .into_iter()
+            .collect(),
+            userbots: storage::admin::userbots(&mut conn)
+                .await?
+                .into_iter()
+                .map(|b| (i64::from(b.id), b.label))
+                .collect(),
+            staff: storage::staff::list(&mut conn)
+                .await?
+                .into_iter()
+                .map(|m| (m.tg_user_id, m.display_name))
+                .collect(),
+        };
+        drop(conn);
+        let links = self.links();
         let title = t.f("audit.title", &[("n", &total)]);
+        let mut cells = String::new();
         let mut lines = Vec::new();
         for r in rows {
-            let target = match (r.target_type.as_deref(), r.target_id.as_deref()) {
-                (Some("order"), Some(id)) => match id.parse::<i64>() {
-                    Ok(n) => format!(" · {}", self.link(&format!("№{n}"), &Cb::Order(n))),
-                    Err(_) => format!(" · {}", esc(id)),
-                },
-                (Some("user"), Some(id)) => match id.parse::<i64>() {
-                    Ok(n) => format!(" · {}", self.link(&esc(id), &Cb::User(n))),
-                    Err(_) => format!(" · {}", esc(id)),
-                },
-                (Some(ty), Some(id)) => format!(" · {} {}", esc(ty), esc(id)),
-                _ => String::new(),
+            let at = format!(
+                "{} {}",
+                (r.at + chrono::Duration::hours(3)).format("%d.%m"),
+                crate::dash::hhmm(r.at)
+            );
+            let who = if r.staff_id == staff.tg_user_id {
+                t.t("audit.you")
+            } else {
+                esc(r.staff_name.as_deref().unwrap_or(&r.staff_id.to_string()))
             };
-            let reason = r
-                .reason
-                .as_deref()
-                .map(|x| format!(" · <i>{}</i>", esc(&ui::html::clip(x, 80))))
+            let what = crate::journal::what(t, &links, &names, r);
+            let reason = crate::journal::reason(r)
+                .map(|x| format!(" · <i>{}</i>", esc(&ui::html::clip(&x, 80))))
                 .unwrap_or_default();
+            cells.push_str(&format!(
+                "<tr><td>{at}</td><td>{who}</td><td>{what}{reason}</td></tr>"
+            ));
             lines.push(t.f(
                 "audit.item",
                 &[
-                    ("at", &when(r.at)),
-                    (
-                        "who",
-                        &esc(r.staff_name.as_deref().unwrap_or(&r.staff_id.to_string())),
-                    ),
-                    ("action", &code(&r.action)),
-                    ("target", &target),
+                    ("at", &at),
+                    ("who", &who),
+                    ("what", &what),
                     ("reason", &reason),
                 ],
             ));
         }
-        let body = if lines.is_empty() {
-            t.t("audit.empty")
+        let (rich, plain) = if lines.is_empty() {
+            (
+                format!("<p>{title}</p><p>{}</p>", t.t("audit.empty")),
+                format!("{title}\n\n{}", t.t("audit.empty")),
+            )
         } else {
-            lines.join("\n")
+            (
+                format!("<p>{title}</p><table striped compact>{cells}</table>"),
+                format!("{title}\n\n{}", lines.join("\n")),
+            )
         };
-        Ok(Screen::new(format!("{title}\n\n{body}"))
+        Ok(Screen::card(rich, plain)
             .row(nav::pager(t, List::Audit, page, total))
             .row(vec![btn(t.t("nav.refresh"), &Cb::Page(List::Audit, page))])
             .row(nav::back(t, &Cb::Menu)))
@@ -1473,7 +1505,7 @@ impl Inner {
                 self.users(staff, page).await
             }
             Cb::Page(List::Inbox, page) => self.inbox(page).await,
-            Cb::Page(List::Audit, page) => self.audit(page).await,
+            Cb::Page(List::Audit, page) => self.audit(staff, page).await,
             Cb::Page(List::Investors, page) => {
                 if let Some(denied) = self.deny(staff, Role::Admin) {
                     return Ok(denied);
@@ -1495,7 +1527,7 @@ impl Inner {
             Cb::Bots => self.bots().await,
             Cb::Staff => self.staff_list(staff).await,
             Cb::Member(id) => self.member(staff, id).await,
-            Cb::Audit => self.audit(0).await,
+            Cb::Audit => self.audit(staff, 0).await,
             Cb::Investors | Cb::Invest(_) | Cb::InvestMove(_) => {
                 if let Some(denied) = self.deny(staff, Role::Admin) {
                     return Ok(denied);

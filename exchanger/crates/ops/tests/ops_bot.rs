@@ -1075,6 +1075,18 @@ async fn taking_an_order_locks_its_decisions_to_the_taker(pool: PgPool) {
     assert_eq!(order_state(&o, order.id).await, OrderState::Refunded);
     let takes = o.audit("order.take").await;
     assert_eq!(takes.len(), 2, "{takes:?}");
+    // П-31: журнал словами (макет «Журнал»): «взял(а) K7M2…», свои действия — «Вы», без кодов.
+    let journal = o.say(OWNER, "/audit", "Журнал").await;
+    let text = journal.text();
+    assert!(
+        text.contains("взял(а)") && text.contains(&order.public_id) && text.contains("Вы"),
+        "{text}"
+    );
+    assert!(text.contains("вернул(а) деньги"), "{text}");
+    assert!(
+        !text.contains("order.take") && !text.contains("order.refund"),
+        "{text}"
+    );
 }
 
 /// Решение, начатое до того, как заявку забрали, не выполняется: подтверждение перепроверяет,

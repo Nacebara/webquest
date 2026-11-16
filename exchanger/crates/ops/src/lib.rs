@@ -28,6 +28,7 @@ pub mod chart;
 mod dash;
 mod inbox;
 mod invest;
+mod journal;
 mod lists;
 mod look;
 pub mod nav;
@@ -845,7 +846,7 @@ impl Inner {
                 "settings" => self.settings().await,
                 "bots" => self.bots().await,
                 "staff" => self.staff_list(staff).await,
-                "audit" => self.audit(0).await,
+                "audit" => self.audit(staff, 0).await,
                 "order" | "find" if !arg.is_empty() => self.find_order(arg).await,
                 "order" | "find" => Ok(self.prompt(staff, Input::OrderSearch, "order.ask")),
                 "user" if !arg.is_empty() => self.find_user(arg).await,
@@ -1145,6 +1146,7 @@ mod tests {
             include_str!("actions.rs"),
             include_str!("alerts.rs"),
             include_str!("invest.rs"),
+            include_str!("journal.rs"),
         ];
         let sections = [
             "common",
@@ -1172,37 +1174,11 @@ mod tests {
             "selftest",
             "capital",
             "invest",
+            "journal",
+            "maint",
         ];
         // Действия журнала (`admin_audit.action`) похожи на ключи, но это не тексты.
-        let audit = [
-            "order.take",
-            "order.call_admin",
-            "userbot.end_session",
-            "direction.set",
-            "direction.open",
-            "direction.close",
-            "direction.clear_auto_pause",
-            "promo.settings",
-            "promo.switch",
-            "promo.broadcast",
-            "reserve.target",
-            "user.terms",
-            "user.daily_limit",
-            "user.note",
-            "user.ban",
-            "user.unban",
-            "settings.flag",
-            "settings.emoji_style",
-            "settings.custom_emoji",
-            "userbot.pause",
-            "userbot.resume",
-            "staff.add",
-            "staff.role",
-            "staff.disable",
-            "capital.in",
-            "capital.out",
-            "capital.loss",
-        ];
+        let audit = crate::journal::ACTIONS;
         let mut keys = Vec::new();
         for src in sources {
             for piece in src.split('"').skip(1).step_by(2) {
