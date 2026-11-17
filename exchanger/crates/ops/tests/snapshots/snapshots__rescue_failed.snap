@@ -1,0 +1,12 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&screen)
+---
+--- rich
+
+--- html
+❌ <b>Резерв xRocket не спасён</b>
+в кошельке не хватило денег на чек: баланс изменился после замера
+Деньги остались в кошельке, xRocket — на паузе.
+--- keyboard
+[{"text":"🔄 Ещё раз","callback_data":"a:rsq"},{"text":"👍 Принял","callback_data":"a:ack:7"}]

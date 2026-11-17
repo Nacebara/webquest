@@ -1580,7 +1580,21 @@ impl Inner {
                 }
                 self.reconcile_now().await
             }
-            Cb::Reserves => self.reserves().await,
+            Cb::Reserves => {
+                let card = self.reserves().await?;
+                // «🆘 Спасти резерв» — только владельцу (решение 17.11.2026).
+                Ok(if staff.role >= Role::Owner {
+                    card.row(vec![
+                        btn(self.texts.t("rescue.b_open"), &Cb::Rescue)
+                            .style(botapi::ButtonStyle::Danger),
+                    ])
+                } else {
+                    card
+                })
+            }
+            Cb::Rescue => self.rescue_menu(staff).await,
+            Cb::RescueGo(p) => self.rescue_go(staff, p).await,
+            Cb::RescueResolve(id, happened) => self.rescue_resolve_entry(staff, id, happened).await,
             Cb::AlertShow(id) => self.alert_screen(id).await,
             // «Нет, разбираться» на недостаче — админ и выше (шаг 3, таблица прав).
             Cb::Investigate(id) => match self.deny(staff, Role::Admin) {

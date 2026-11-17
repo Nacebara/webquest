@@ -9,4 +9,5 @@ expression: dump(&text)
 iPhone 15 · Telegram iOS · NL · 185.…41 · <tg-time unix="1794653880" format="t">13:58</tg-time>
 --- keyboard
 [{"text":"🚫 Завершить сессию","style":"danger","callback_data":"a:es:9"}]
+[{"text":"🛡 Спасти резерв","style":"danger","callback_data":"a:rsq"}]
 [{"text":"👍 Это я","callback_data":"a:ack:9"}]

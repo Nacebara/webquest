@@ -216,7 +216,7 @@ impl Inner {
                 .map(|c| c.message_id);
             if let (Some(message_id), false) = (previous, repeat) {
                 let mut request = EditMessageText::html(chat, message_id, screen.text.clone());
-                request.reply_markup = screen.markup();
+                request.reply_markup = crate::rescue::for_role(screen.markup(), m.role);
                 match self.api.edit_message_text(&request).await {
                     Ok(_) => {
                         first.get_or_insert(message_id);
@@ -235,7 +235,8 @@ impl Inner {
                 }
             }
             let mut request = SendMessage::html(chat, screen.text.clone());
-            request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
+            request.reply_markup =
+                crate::rescue::for_role(screen.markup(), m.role).map(ReplyMarkup::Inline);
             // Звук — по роли (П-10).
             request.disable_notification = Some(!sound);
             match self.api.send_message(&request).await {
@@ -320,6 +321,9 @@ impl Inner {
             ]),
             "balance_mismatch" => mismatch_screen(t, p, a.id),
             "reconcile_stalled" => stalled_screen(t, p, a.id),
+            "rescue_done" | "rescue_failed" | "rescue_unknown" => {
+                crate::rescue::alert_screen(t, &a.title, p, a.id, &|x| self.platform_name(x))
+            }
             "balance_unreadable" => {
                 let name = p["platform"]
                     .as_str()
@@ -844,6 +848,9 @@ pub fn critical_screen(
                 btn(t.t("alert.b_end_session"), &Cb::EndSession(id))
                     .style(botapi::ButtonStyle::Danger),
             ])
+            .row(vec![
+                btn(t.t("rescue.b_open"), &Cb::Rescue).style(botapi::ButtonStyle::Danger),
+            ])
             .row(vec![btn(t.t("alert.b_its_me"), &Cb::Ack(id))])
         }
         "login_lost" | "account_restricted" | "flood_long" => {
@@ -884,6 +891,9 @@ pub fn critical_screen(
                     btn(t.t("alert.b_replace_account"), &Cb::Bots)
                         .style(botapi::ButtonStyle::Primary),
                     btn(t.t("alert.b_accounts"), &Cb::Bots),
+                ])
+                .row(vec![
+                    btn(t.t("rescue.b_open"), &Cb::Rescue).style(botapi::ButtonStyle::Danger),
                 ])
                 .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))]),
                 _ => {

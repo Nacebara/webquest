@@ -277,3 +277,14 @@ fn order_card_operator_unknown_outcome() {
     );
     insta::assert_snapshot!("order_card_operator_unknown", dump);
 }
+
+/// «Спасти резерв» (решение владельца 17.11.2026): три тревоги владельцу.
+#[test]
+fn rescue_alerts() {
+    let t = Texts::builtin().unwrap();
+    let name = |p: domain::Platform| t.t(&format!("names.{}", p.db_name()));
+    for (title, payload) in ops::preview::rescue_samples() {
+        let screen = Look::plain().screen(&ops::rescue_alert_screen(&t, title, &payload, 7, &name));
+        insta::assert_snapshot!(title, dump(&screen));
+    }
+}

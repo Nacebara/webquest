@@ -191,6 +191,19 @@ pub(crate) enum Action {
     Selftest {
         amount: Decimal,
     },
+    /// «Спасти резерв»: чек на весь баланс кошелька владельцу (решение 17.11.2026).
+    Rescue {
+        platform: Platform,
+        /// Баланс по леджеру — для предпросмотра; сумму чека движок берёт по живому замеру.
+        ledger: Decimal,
+    },
+    /// Решение владельца по неясному спасению.
+    RescueResolve {
+        id: i64,
+        happened: bool,
+        amount: Decimal,
+        platform: Platform,
+    },
     Invest(crate::invest::InvestOp),
 }
 
@@ -285,6 +298,8 @@ impl Action {
             | Action::Capital { .. }
             | Action::WriteOff { .. }
             | Action::PromoBroadcast { .. }
+            | Action::Rescue { .. }
+            | Action::RescueResolve { .. }
             | Action::Selftest { .. } => Role::Owner,
             Action::Invest(op) => op.min_role(),
             _ => Role::Admin,
@@ -335,6 +350,8 @@ impl Action {
             Action::Decide { .. }
                 | Action::Capital { .. }
                 | Action::WriteOff { .. }
+                | Action::Rescue { .. }
+                | Action::RescueResolve { .. }
                 | Action::StaffDisable { .. }
                 | Action::Flag {
                     flag: Flag::KillSwitch,
@@ -1673,6 +1690,35 @@ impl Inner {
                 )
             }
             Action::Selftest { amount } => t.f("selftest.preview", &[("amount", &usdt(*amount))]),
+            Action::Rescue { platform, ledger } => {
+                let name = self.platform_name(*platform);
+                confirm_label = Some(t.f("rescue.b_confirm", &[("name", &name)]));
+                let mut text = t.f(
+                    "rescue.preview",
+                    &[("name", &name), ("ledger", &usdt(*ledger))],
+                );
+                if *platform == Platform::CryptoBot {
+                    text.push('\n');
+                    text.push_str(&t.t("rescue.preview_cb"));
+                }
+                text
+            }
+            Action::RescueResolve {
+                happened,
+                amount,
+                platform,
+                ..
+            } => t.f(
+                if *happened {
+                    "rescue.preview_happened"
+                } else {
+                    "rescue.preview_not"
+                },
+                &[
+                    ("name", &self.platform_name(*platform)),
+                    ("amount", &usdt(*amount)),
+                ],
+            ),
             Action::Invest(op) => self.invest_preview(op),
         };
         // «Прежней попытки не было» при неясном исходе — админ и выше (шаг 3, таблица прав).
@@ -1795,6 +1841,12 @@ impl Inner {
 
         if let Action::Selftest { amount } = &action {
             return self.run_selftest(*amount).await;
+        }
+        if let Action::Rescue { platform, .. } = &action {
+            return self.rescue_apply(staff, *platform).await;
+        }
+        if let Action::RescueResolve { id, happened, .. } = &action {
+            return self.rescue_resolve_apply(staff, *id, *happened).await;
         }
         if let Action::Invest(op) = action {
             return self.invest_apply(staff, op).await;
@@ -2267,7 +2319,11 @@ impl Inner {
                 )
             }
             // Решения по заявке и самопроверка применены выше.
-            Action::Decide { .. } | Action::Selftest { .. } | Action::Invest(_) => {
+            Action::Decide { .. }
+            | Action::Selftest { .. }
+            | Action::Rescue { .. }
+            | Action::RescueResolve { .. }
+            | Action::Invest(_) => {
                 return self.menu(staff).await;
             }
         };
