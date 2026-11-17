@@ -1,0 +1,257 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE operations o\n           SET status = 'dispatched', attempts = o.attempts + 1, dispatched_at = now()\n          FROM (SELECT id FROM operations\n                 WHERE status = 'pending' AND next_attempt_at <= now()\n                   AND kind = ANY($2) AND money_role IN ('intake', 'settle', 'excess_refund')\n                 ORDER BY next_attempt_at, id\n                 LIMIT $1\n                 FOR UPDATE SKIP LOCKED) due\n         WHERE o.id = due.id\n        RETURNING o.id, o.order_id, o.invest_move_id, o.rescue_id, o.kind, o.money_role, o.platform, o.wallet_account_id,\n                  o.status, o.idempotency_key, o.start_param, o.amount, o.asset, o.request,\n                  o.attempts, o.max_attempts, o.external_id, o.dispatched_at,\n                  o.releases, o.first_released_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "order_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "order_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "invest_move_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "invest_move_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "rescue_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "rescue_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "money_role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "money_role"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "platform",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "platform"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "wallet_account_id",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "wallet_account_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "idempotency_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "idempotency_key"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "start_param",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "start_param"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "amount",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "amount"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "asset",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "asset"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "request",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "request"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "attempts",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "attempts"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "max_attempts",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "max_attempts"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "external_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "external_id"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "dispatched_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "dispatched_at"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "releases",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "releases"
+          }
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "first_released_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "operations",
+            "name": "first_released_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "926a65c0c120b122aeb5564abd29dfe314af2516861621d635fa54c9f0a11323"
+}

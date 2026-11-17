@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE rescues\n           SET status = $2, check_url = COALESCE($3, check_url),\n               finished_at = CASE WHEN $4 THEN now() ELSE finished_at END\n         WHERE id = $1 AND status IN ('pending', 'unknown')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fdc584dbb897eebc55c38786cd0ce5e81b6b7e68f0b0551c45d9e773188300f6"
+}

@@ -55,6 +55,9 @@ pub(crate) fn audience(title: &str, level: Level, role: Role) -> Option<bool> {
             admin.then_some(true)
         }
         t if t.starts_with("invest_") => admin.then_some(true),
+        // «Спасти резерв»: в тревоге — ссылка на чек со всем резервом кошелька. Только
+        // владельцу (решение 17.11.2026).
+        t if t.starts_with("rescue_") => (role == Role::Owner).then_some(true),
         // Выгодный курс и перекос резерва: админу и владельцу, тихо.
         "promo_hint" | "promo_started" | "promo_stopped" => admin.then_some(false),
         _ => Some(level >= Level::Warn),
@@ -1330,6 +1333,12 @@ mod audience_tests {
                 "{title}"
             );
             assert_eq!(audience(title, Level::Critical, Role::Admin), Some(true));
+            assert_eq!(audience(title, Level::Critical, Role::Owner), Some(true));
+        }
+        // «Спасти резерв» — ссылка на чек со всем резервом: только владельцу.
+        for title in ["rescue_done", "rescue_unknown", "rescue_failed"] {
+            assert_eq!(audience(title, Level::Critical, Role::Operator), None);
+            assert_eq!(audience(title, Level::Critical, Role::Admin), None);
             assert_eq!(audience(title, Level::Critical, Role::Owner), Some(true));
         }
         for title in ["promo_hint", "promo_started", "promo_stopped"] {

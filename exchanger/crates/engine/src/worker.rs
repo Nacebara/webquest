@@ -228,7 +228,9 @@ impl Engine {
                 return Ok(());
             }
         }
-        if is_money_out(op.kind) {
+        // Стоп-кран останавливает выплаты клиентам; «Спасти резерв» владельца — защиту денег —
+        // он не задерживает.
+        if is_money_out(op.kind) && op.rescue_id.is_none() {
             let mut conn = self.pool.acquire().await?;
             if storage::settings::flag_on(&mut conn, "kill_switch_payouts").await? {
                 let at = Utc::now()
@@ -376,6 +378,10 @@ impl Engine {
             tx.commit().await?;
             tracing::error!(op = op.id, move_id, %reason, "investor move handed to a human");
             return Ok(());
+        }
+        if let Some(rescue_id) = op.rescue_id {
+            tx.commit().await?;
+            return self.rescue_give_up(op, rescue_id, reason).await;
         }
         let Some(id) = op.order_id else {
             tx.commit().await?;
@@ -852,6 +858,9 @@ impl Engine {
         if let Some(move_id) = op.invest_move_id {
             return self.invest_on_issue(op, move_id, result).await;
         }
+        if let Some(rescue_id) = op.rescue_id {
+            return self.rescue_on_issue(op, rescue_id, result).await;
+        }
         let outcome = match result {
             Ok(outcome) => outcome,
             Err(e) => return self.release(op, &e).await,
@@ -1294,6 +1303,13 @@ impl Engine {
                 if op.status != OpStatus::Unknown {
                     continue;
                 }
+                // Спасение резерва: сверяем, пока автоматика не сдалась (`give_up`).
+                if op.rescue_id.is_some() {
+                    if op.kind == OpKind::CreatePayoutCheck {
+                        out.push(op);
+                    }
+                    continue;
+                }
                 // Вывод инвестора: сверяем, пока автоматика не сдалась (`give_up`).
                 if op.invest_move_id.is_some() {
                     if op.kind == OpKind::CreatePayoutCheck {
@@ -1318,6 +1334,13 @@ impl Engine {
             out
         };
         for op in pending {
+            if let Some(rescue_id) = op.rescue_id {
+                if let Err(e) = self.rescue_reconcile(&op, rescue_id).await {
+                    tracing::error!(op = op.id, error = %e, "reserve rescue reconciliation failed");
+                    self.park(&op, &format!("сверка не удалась: {e}")).await;
+                }
+                continue;
+            }
             if let Some(move_id) = op.invest_move_id {
                 if let Err(e) = self.invest_reconcile(&op, move_id).await {
                     tracing::error!(op = op.id, error = %e, "investor withdrawal reconciliation failed");
