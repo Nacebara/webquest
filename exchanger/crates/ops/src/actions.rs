@@ -450,6 +450,7 @@ fn refusal_text(inner: &Inner, r: &Refusal) -> String {
         Refusal::Underfunded => t.t("refusal.underfunded"),
         Refusal::AlreadySettled(k) => t.f("refusal.settled", &[("key", &esc(k))]),
         Refusal::PreviousUnknown(k) => t.f("refusal.unknown", &[("key", &esc(k))]),
+        Refusal::PreviousDone(k) => t.f("refusal.previous_done", &[("key", &esc(k))]),
         Refusal::OverManualLimit { amount, limit } => t.f(
             "refusal.limit",
             &[("amount", &usdt(*amount)), ("limit", &usdt(*limit))],

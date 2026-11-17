@@ -106,6 +106,11 @@ pub enum Refusal {
     AlreadySettled(String),
     #[error("operation {0} has an unknown outcome: confirm it did not happen")]
     PreviousUnknown(String),
+    /// Последняя сверка кошелька видела, что неясная попытка прошла (баланс сходится с её
+    /// вариантом «выполнена»): повтор или возврат был бы второй выплатой. Закрывать —
+    /// «Выплачено» по доказательству.
+    #[error("the last reconciliation saw operation {0} go through: close it as paid")]
+    PreviousDone(String),
     #[error("amount {amount} is above the manual limit {limit}")]
     OverManualLimit { amount: Decimal, limit: Decimal },
     #[error("by the rules this order is not paid out: {0}")]
@@ -195,6 +200,22 @@ async fn retire_unknown(
         && !confirmed
     {
         return Err(Refusal::PreviousUnknown(op.idempotency_key.clone()).into());
+    }
+    // Подтверждение «её не было» не сильнее сверки: если последний замер кошелька сошёлся
+    // с вариантом «прошла», повтор — двойная выплата (проверка 17.11.2026, П-1 в движке).
+    for op in &unknown {
+        let seen: Option<Option<Vec<i64>>> = sqlx::query_scalar(
+            "SELECT matched_ops FROM reconciliations \
+              WHERE $1 = ANY(unsettled_ops) AND verdict = 'ok' \
+              ORDER BY at DESC, id DESC LIMIT 1",
+        )
+        .bind(op.id)
+        .fetch_optional(&mut *conn)
+        .await
+        .map_err(StorageError::from)?;
+        if seen.flatten().is_some_and(|m| m.contains(&op.id)) {
+            return Err(Refusal::PreviousDone(op.idempotency_key.clone()).into());
+        }
     }
     for op in unknown {
         storage::operations::resolve_by_staff(

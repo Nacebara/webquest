@@ -1103,3 +1103,68 @@ async fn without_a_reading_after_the_activation_nothing_is_credited(pool: PgPool
     assert_eq!(e.order(id).await.1.intake_amount, Some(dec!(5)));
     e.assert_books_match().await;
 }
+
+/// Проверка 17.11.2026, П-1 в движке. Чек выплаты на деле создан, а ответ кошелька потерян:
+/// операция неясна, заявка у человека. Сверка увидела, что баланс сходится с вариантом
+/// «выплата прошла». Пульт прячет «Повторить выплату» и «Вернуть», но предохранитель должен
+/// стоять в движке: даже с подтверждением «прежней попытки не было» второй чек не создаётся.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn reconciliation_that_saw_the_payout_blocks_a_second_one(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    // «Подтверждаю» создало чек, а ответа нет: сверка чека его не нашла — к человеку.
+    e.world.inject(e.ub, Call::CheckPress, Fault::NoReply, 1);
+    e.drain().await;
+    e.engine.resolve_unknown().await.unwrap();
+    e.world.clear_faults(e.ub);
+    let id = order.id;
+    assert_eq!(e.order(id).await.0.state, OrderState::ManualReview);
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 1, "чек уже создан");
+    let payout = e
+        .ops(id)
+        .await
+        .into_iter()
+        .find(|o| o.kind == domain::fsm::OpKind::CreatePayoutCheck)
+        .unwrap();
+    assert_eq!(payout.status, OpStatus::Unknown);
+
+    // Сверка: баланс xRocket сходится с вариантом «выплата прошла».
+    let r = e.engine.reconcile_balances().await.unwrap();
+    let xr = r.iter().find(|x| x.platform == XR).unwrap();
+    assert_eq!(xr.matched, Some(vec![payout.id]), "{r:?}");
+
+    let owner = staff(&e.pool, 1, Role::Owner).await;
+    for decision in [
+        OperatorDecision::RetryPayout {
+            previous_failed: true,
+        },
+        OperatorDecision::Refund {
+            previous_failed: true,
+        },
+    ] {
+        let r = e
+            .engine
+            .operator_decide(request(id, decision, &owner))
+            .await;
+        assert!(
+            matches!(refused(r), Refusal::PreviousDone(_)),
+            "второй чек при выплате, которую сверка видела прошедшей"
+        );
+    }
+    e.drain().await;
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 1, "второго чека нет");
+
+    // Путь, который остаётся, — «Выплачено» по доказательству.
+    let check = e.world.checks_created_by(e.ub)[0].url.clone();
+    e.engine
+        .operator_decide(request(
+            id,
+            OperatorDecision::CloseAsPaid { evidence: check },
+            &owner,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(e.order(id).await.0.state, OrderState::Completed);
+    e.assert_books_match().await;
+}
