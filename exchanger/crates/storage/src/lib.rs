@@ -23,7 +23,6 @@ pub mod ledger;
 pub mod operations;
 pub mod orders;
 pub mod promo;
-pub mod rescues;
 pub mod sessions;
 pub mod settings;
 pub mod staff;

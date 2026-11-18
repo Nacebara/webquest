@@ -76,8 +76,6 @@ pub struct OperationRow {
     pub order_id: Option<i64>,
     /// Пополнение или вывод инвестора (`invest_moves`); тогда `order_id` пуст.
     pub invest_move_id: Option<i64>,
-    /// «Спасти резерв» (`rescues`); тогда `order_id` пуст.
-    pub rescue_id: Option<i64>,
     pub kind: OpKind,
     pub role: MoneyRole,
     pub platform: Platform,
@@ -101,7 +99,6 @@ struct RawRow {
     id: i64,
     order_id: Option<i64>,
     invest_move_id: Option<i64>,
-    rescue_id: Option<i64>,
     kind: String,
     money_role: String,
     platform: String,
@@ -133,7 +130,6 @@ impl TryFrom<RawRow> for OperationRow {
             id: r.id,
             order_id: r.order_id,
             invest_move_id: r.invest_move_id,
-            rescue_id: r.rescue_id,
             kind: OpKind::from_db_str(&r.kind)
                 .ok_or_else(|| StorageError::corrupt("operations.kind", &r.kind))?,
             role: MoneyRole::from_db_str(&r.money_role)
@@ -240,68 +236,6 @@ pub struct NewInvestOperation<'a> {
     pub amount: Option<Decimal>,
     pub asset: Asset,
     pub random_id: i64,
-}
-
-/// Операция «Спасти резерв» (чек на весь баланс кошелька владельцу).
-#[derive(Debug, Clone)]
-pub struct NewRescueOperation<'a> {
-    pub rescue_id: i64,
-    pub platform: Platform,
-    pub wallet_account_id: i16,
-    /// `rescue-<id>`; пишется и в метку операции в «Избранном».
-    pub idempotency_key: &'a str,
-    pub amount: Decimal,
-    pub asset: Asset,
-    pub random_id: i64,
-}
-
-/// Вставить операцию спасения: чек выплаты, одна попытка.
-pub async fn insert_rescue(
-    conn: &mut PgConnection,
-    op: &NewRescueOperation<'_>,
-) -> Result<i64, StorageError> {
-    let request = serde_json::json!({ "random_id": op.random_id });
-    let id = sqlx::query_scalar!(
-        r#"
-        INSERT INTO operations (rescue_id, kind, money_role, platform, wallet_account_id,
-                                idempotency_key, amount, asset, request, max_attempts)
-        VALUES ($1, 'create_payout_check', 'settle', $2, $3, $4, $5, $6, $7, 1)
-        RETURNING id
-        "#,
-        op.rescue_id,
-        op.platform.db_name(),
-        op.wallet_account_id,
-        op.idempotency_key,
-        op.amount,
-        op.asset.code(),
-        request,
-    )
-    .fetch_one(&mut *conn)
-    .await?;
-    sqlx::query!("SELECT pg_notify('exch_operations', $1)", id.to_string())
-        .execute(&mut *conn)
-        .await?;
-    Ok(id)
-}
-
-/// Операции спасения резерва (обычно одна).
-pub async fn for_rescue(
-    conn: &mut PgConnection,
-    rescue_id: i64,
-) -> Result<Vec<OperationRow>, StorageError> {
-    let rows = sqlx::query_as!(
-        RawRow,
-        r#"
-        SELECT id, order_id, invest_move_id, rescue_id, kind, money_role, platform, wallet_account_id, status,
-               idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
-               external_id, dispatched_at, releases, first_released_at
-          FROM operations WHERE rescue_id = $1 ORDER BY id
-        "#,
-        rescue_id
-    )
-    .fetch_all(conn)
-    .await?;
-    rows.into_iter().map(OperationRow::try_from).collect()
 }
 
 /// Вставить операцию инвестора. Те же правила: выводящие деньги — одна попытка, один чек —
@@ -411,7 +345,7 @@ pub async fn claim_due(
                  LIMIT $1
                  FOR UPDATE SKIP LOCKED) due
          WHERE o.id = due.id
-        RETURNING o.id, o.order_id, o.invest_move_id, o.rescue_id, o.kind, o.money_role, o.platform, o.wallet_account_id,
+        RETURNING o.id, o.order_id, o.invest_move_id, o.kind, o.money_role, o.platform, o.wallet_account_id,
                   o.status, o.idempotency_key, o.start_param, o.amount, o.asset, o.request,
                   o.attempts, o.max_attempts, o.external_id, o.dispatched_at,
                   o.releases, o.first_released_at
@@ -435,7 +369,7 @@ pub async fn in_flight(conn: &mut PgConnection) -> Result<Vec<OperationRow>, Sto
     let rows = sqlx::query_as!(
         RawRow,
         r#"
-        SELECT id, order_id, invest_move_id, rescue_id, kind, money_role, platform, wallet_account_id, status,
+        SELECT id, order_id, invest_move_id, kind, money_role, platform, wallet_account_id, status,
                idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
                external_id, dispatched_at, releases, first_released_at
           FROM operations
@@ -454,7 +388,7 @@ pub async fn get(conn: &mut PgConnection, id: i64) -> Result<OperationRow, Stora
     let row = sqlx::query_as!(
         RawRow,
         r#"
-        SELECT id, order_id, invest_move_id, rescue_id, kind, money_role, platform, wallet_account_id, status,
+        SELECT id, order_id, invest_move_id, kind, money_role, platform, wallet_account_id, status,
                idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
                external_id, dispatched_at, releases, first_released_at
           FROM operations WHERE id = $1
@@ -475,7 +409,7 @@ pub async fn for_order(
     let rows = sqlx::query_as!(
         RawRow,
         r#"
-        SELECT id, order_id, invest_move_id, rescue_id, kind, money_role, platform, wallet_account_id, status,
+        SELECT id, order_id, invest_move_id, kind, money_role, platform, wallet_account_id, status,
                idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
                external_id, dispatched_at, releases, first_released_at
           FROM operations WHERE order_id = $1 ORDER BY id
@@ -495,7 +429,7 @@ pub async fn for_invest_move(
     let rows = sqlx::query_as!(
         RawRow,
         r#"
-        SELECT id, order_id, invest_move_id, rescue_id, kind, money_role, platform, wallet_account_id, status,
+        SELECT id, order_id, invest_move_id, kind, money_role, platform, wallet_account_id, status,
                idempotency_key, start_param, amount, asset, request, attempts, max_attempts,
                external_id, dispatched_at, releases, first_released_at
           FROM operations WHERE invest_move_id = $1 ORDER BY id

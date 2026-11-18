@@ -22,7 +22,6 @@ pub mod invest;
 mod invoice;
 pub mod operator;
 pub mod reconcile;
-pub mod rescue;
 pub mod sessions;
 mod settle;
 mod submit;

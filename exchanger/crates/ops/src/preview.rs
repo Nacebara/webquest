@@ -468,12 +468,6 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
             send_card(api, chat, &look.screen(&screen)).await;
         }
     }
-    // «Спасти резерв» (решение владельца 17.11.2026): тревоги владельцу.
-    let name = |p: domain::Platform| texts.t(&format!("names.{}", p.db_name()));
-    for (title, payload) in rescue_samples() {
-        let screen = crate::rescue_alert_screen(&texts, title, &payload, 0, &name);
-        send_card(api, chat, &look.screen(&screen)).await;
-    }
     // Макет «Алерт и „Принял“» (П-6, П-7): «Нужен разбор» с номером, суммами и ответом кошелька.
     let review = serde_json::json!({"id": 15, "public": "K7M2Q9XR4T", "user": 51234567,
         "direction": "cb_to_xr_check", "amount_in": "100", "amount_out": "97.5",
@@ -590,27 +584,6 @@ async fn send_card(api: &BotApi, chat: i64, screen: &crate::Screen) {
             .await;
     }
     tokio::time::sleep(Duration::from_millis(350)).await;
-}
-
-/// Данные для примеров тревог «Спасти резерв» (ссылка — пример, не настоящий чек).
-pub fn rescue_samples() -> [(&'static str, serde_json::Value); 3] {
-    [
-        (
-            "rescue_done",
-            serde_json::json!({"rescue": 1, "platform": "xrocket", "amount": "640",
-            "measured": "640", "url": "https://t.me/xrocket?start=t_ExampleExample1", "reason": ""}),
-        ),
-        (
-            "rescue_unknown",
-            serde_json::json!({"rescue": 2, "platform": "cryptobot", "amount": "475",
-            "measured": "2140", "reason": "исход создания чека неизвестен и чек не найден: проверьте чат кошелька"}),
-        ),
-        (
-            "rescue_failed",
-            serde_json::json!({"rescue": 3, "platform": "xrocket", "amount": "640",
-            "measured": "640", "reason": "в кошельке не хватило денег на чек: баланс изменился после замера"}),
-        ),
-    ]
 }
 
 #[cfg(test)]

@@ -37,11 +37,6 @@ pub enum StorageError {
     /// У инвестора уже есть незакрытая заявка на вывод (`invest_moves_one_open_withdrawal`).
     #[error("the investor already has an open withdrawal")]
     OpenWithdrawal,
-    /// «Спасти резерв»: по кошельку уже есть незавершённое спасение.
-    #[error("this wallet already has an unfinished reserve rescue")]
-    RescueOpen,
-    #[error("reserve rescue {0} is not in a state that allows this change")]
-    RescueState(i64),
     /// Нет активного удержания нужного размера.
     #[error("order {0} has no matching active hold")]
     HoldState(i64),

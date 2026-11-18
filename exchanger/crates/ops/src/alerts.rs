@@ -55,9 +55,6 @@ pub(crate) fn audience(title: &str, level: Level, role: Role) -> Option<bool> {
             admin.then_some(true)
         }
         t if t.starts_with("invest_") => admin.then_some(true),
-        // «Спасти резерв»: в тревоге — ссылка на чек со всем резервом кошелька. Только
-        // владельцу (решение 17.11.2026).
-        t if t.starts_with("rescue_") => (role == Role::Owner).then_some(true),
         // Выгодный курс и перекос резерва: админу и владельцу, тихо.
         "promo_hint" | "promo_started" | "promo_stopped" => admin.then_some(false),
         _ => Some(level >= Level::Warn),
@@ -216,7 +213,7 @@ impl Inner {
                 .map(|c| c.message_id);
             if let (Some(message_id), false) = (previous, repeat) {
                 let mut request = EditMessageText::html(chat, message_id, screen.text.clone());
-                request.reply_markup = crate::rescue::for_role(screen.markup(), m.role);
+                request.reply_markup = screen.markup();
                 match self.api.edit_message_text(&request).await {
                     Ok(_) => {
                         first.get_or_insert(message_id);
@@ -235,8 +232,7 @@ impl Inner {
                 }
             }
             let mut request = SendMessage::html(chat, screen.text.clone());
-            request.reply_markup =
-                crate::rescue::for_role(screen.markup(), m.role).map(ReplyMarkup::Inline);
+            request.reply_markup = screen.markup().map(ReplyMarkup::Inline);
             // Звук — по роли (П-10).
             request.disable_notification = Some(!sound);
             match self.api.send_message(&request).await {
@@ -321,9 +317,6 @@ impl Inner {
             ]),
             "balance_mismatch" => mismatch_screen(t, p, a.id),
             "reconcile_stalled" => stalled_screen(t, p, a.id),
-            "rescue_done" | "rescue_failed" | "rescue_unknown" => {
-                crate::rescue::alert_screen(t, &a.title, p, a.id, &|x| self.platform_name(x))
-            }
             "balance_unreadable" => {
                 let name = p["platform"]
                     .as_str()
@@ -848,9 +841,6 @@ pub fn critical_screen(
                 btn(t.t("alert.b_end_session"), &Cb::EndSession(id))
                     .style(botapi::ButtonStyle::Danger),
             ])
-            .row(vec![
-                btn(t.t("rescue.b_open"), &Cb::Rescue).style(botapi::ButtonStyle::Danger),
-            ])
             .row(vec![btn(t.t("alert.b_its_me"), &Cb::Ack(id))])
         }
         "login_lost" | "account_restricted" | "flood_long" => {
@@ -891,9 +881,6 @@ pub fn critical_screen(
                     btn(t.t("alert.b_replace_account"), &Cb::Bots)
                         .style(botapi::ButtonStyle::Primary),
                     btn(t.t("alert.b_accounts"), &Cb::Bots),
-                ])
-                .row(vec![
-                    btn(t.t("rescue.b_open"), &Cb::Rescue).style(botapi::ButtonStyle::Danger),
                 ])
                 .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))]),
                 _ => {
@@ -1343,12 +1330,6 @@ mod audience_tests {
                 "{title}"
             );
             assert_eq!(audience(title, Level::Critical, Role::Admin), Some(true));
-            assert_eq!(audience(title, Level::Critical, Role::Owner), Some(true));
-        }
-        // «Спасти резерв» — ссылка на чек со всем резервом: только владельцу.
-        for title in ["rescue_done", "rescue_unknown", "rescue_failed"] {
-            assert_eq!(audience(title, Level::Critical, Role::Operator), None);
-            assert_eq!(audience(title, Level::Critical, Role::Admin), None);
             assert_eq!(audience(title, Level::Critical, Role::Owner), Some(true));
         }
         for title in ["promo_hint", "promo_started", "promo_stopped"] {

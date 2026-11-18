@@ -10,5 +10,4 @@ Telegram ограничил аккаунт — отправлять сообще
 Деньги клиентов — в леджере, начатые заявки ждут.
 --- keyboard
 [{"text":"🔁 Заменить аккаунт","style":"primary","callback_data":"a:b"},{"text":"🤖 Аккаунты","callback_data":"a:b"}]
-[{"text":"🛡 Спасти резерв","style":"danger","callback_data":"a:rsq"}]
 [{"text":"👍 Принял","callback_data":"a:ack:9"}]

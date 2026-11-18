@@ -173,12 +173,6 @@ pub enum Cb {
     EndSession(i64),
     /// «Списать как потерю» из «Недостачи» (id события).
     WriteOff(i64),
-    /// «🆘 Спасти резерв»: выбор кошелька (решение владельца 17.11.2026).
-    Rescue,
-    /// «Спасти резерв» кошелька — к подтверждению.
-    RescueGo(Platform),
-    /// Решение владельца по неясному спасению: чек был / не было.
-    RescueResolve(i64, bool),
     Decide(i64, DecisionKind),
     UserAsk,
     User(i64),
@@ -353,9 +347,6 @@ impl Cb {
             Cb::CallAdmin(id) => format!("cad:{id}"),
             Cb::EndSession(id) => format!("es:{id}"),
             Cb::WriteOff(id) => format!("wo:{id}"),
-            Cb::Rescue => "rsq".into(),
-            Cb::RescueGo(p) => format!("rsq:{}", platform_code(*p)),
-            Cb::RescueResolve(id, done) => format!("rsr:{id}:{}", bit(*done)),
             Cb::Decide(id, k) => format!("od:{id}:{}", k.code()),
             Cb::UserAsk => "ua".into(),
             Cb::User(id) => format!("u:{id}"),
@@ -464,9 +455,6 @@ impl Cb {
             ["cad", _] => Cb::CallAdmin(id(1)?),
             ["es", _] => Cb::EndSession(id(1)?),
             ["wo", _] => Cb::WriteOff(id(1)?),
-            ["rsq"] => Cb::Rescue,
-            ["rsq", p] => Cb::RescueGo(platform_of(p)?),
-            ["rsr", _, _] => Cb::RescueResolve(id(1)?, on(2)?),
             ["od", _, k] => Cb::Decide(
                 id(1)?,
                 DecisionKind::ALL.into_iter().find(|x| x.code() == *k)?,
@@ -629,13 +617,6 @@ mod tests {
         all.push(Cb::CallAdmin(big));
         all.push(Cb::EndSession(big));
         all.push(Cb::WriteOff(big));
-        all.extend([
-            Cb::Rescue,
-            Cb::RescueGo(Platform::CryptoBot),
-            Cb::RescueGo(Platform::XRocket),
-            Cb::RescueResolve(big, true),
-            Cb::RescueResolve(big, false),
-        ]);
         all.extend(Flag::ALL.map(Cb::Toggle));
         all.extend([
             Cb::Maintenance,

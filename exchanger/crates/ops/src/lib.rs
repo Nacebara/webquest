@@ -33,7 +33,6 @@ mod lists;
 mod look;
 pub mod nav;
 pub mod preview;
-mod rescue;
 mod reserves;
 mod review;
 pub mod stats;
@@ -57,7 +56,6 @@ pub use cb::Cb;
 pub use dash::{DashData, sample_dash};
 pub use look::Look;
 pub use nav::Links;
-pub use rescue::alert_screen as rescue_alert_screen;
 pub use reserves::{ReservesData, sample_reserves};
 pub use review::{
     OrderView, QueueData, QueueRow, ReconcileHint, sample_now, sample_order, sample_queue,
