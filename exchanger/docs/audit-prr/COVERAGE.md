@@ -122,15 +122,15 @@
 | `crates/botapi/src/methods.rs` | 762 | — | |
 | `crates/botapi/src/types.rs` | 450 | — | |
 | `crates/ops/ru.toml` | 1160 | прочитан 19.11 | Т-2…Т-6 |
-| `crates/ops/src/actions.rs` | 2423 | — | |
+| `crates/ops/src/actions.rs` | 2423 | частично 19.11: права (роль заново при подтверждении), одноразовый ключ подтверждения, взнос/вывод/списание | нет |
 | `crates/ops/src/alerts.rs` | 1345 | — | |
 | `crates/ops/src/cb.rs` | 642 | — | |
 | `crates/ops/src/chart.rs` | 357 | — | |
 | `crates/ops/src/dash.rs` | 1041 | — | |
-| `crates/ops/src/inbox.rs` | 581 | — | |
+| `crates/ops/src/inbox.rs` | 581 | частично 19.11: вопрос в поддержку — только своя заявка (Б-1 закрыта) | нет |
 | `crates/ops/src/invest.rs` | 825 | — | |
 | `crates/ops/src/journal.rs` | 358 | — | |
-| `crates/ops/src/lib.rs` | 1289 | — | |
+| `crates/ops/src/lib.rs` | 1289 | частично 19.11: кто сотрудник, ключ подтверждения, вопрос в поддержку | нет |
 | `crates/ops/src/lists.rs` | 282 | — | |
 | `crates/ops/src/look.rs` | 231 | — | |
 | `crates/ops/src/nav.rs` | 273 | — | |
@@ -143,7 +143,7 @@
 | `crates/tgbot/src/api.rs` | 232 | — | |
 | `crates/tgbot/src/checkwait.rs` | 259 | — | |
 | `crates/tgbot/src/emoji.rs` | 116 | — | |
-| `crates/tgbot/src/handler.rs` | 782 | — | |
+| `crates/tgbot/src/handler.rs` | 782 | частично 19.11: кнопки заявки только свои (own_order), поддержка | нет |
 | `crates/tgbot/src/intake.rs` | 342 | — | |
 | `crates/tgbot/src/invest.rs` | 433 | — | |
 | `crates/tgbot/src/lib.rs` | 551 | — | |
