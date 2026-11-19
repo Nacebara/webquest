@@ -192,26 +192,26 @@
 | `crates/app/src/db.rs` | 151 | — | |
 | `crates/app/src/demo.rs` | 540 | — | |
 | `crates/app/src/emoji.rs` | 533 | — | |
-| `crates/app/src/health.rs` | 121 | — | |
+| `crates/app/src/health.rs` | 121 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/app/src/lib.rs` | 38 | — | |
 | `crates/app/src/listen.rs` | 148 | — | |
 | `crates/app/src/logfile.rs` | 242 | — | |
 | `crates/app/src/login.rs` | 332 | — | |
-| `crates/app/src/main.rs` | 1061 | — | |
+| `crates/app/src/main.rs` | 1061 | частично 19.11: run(), задачи, пинг, сторож, копии | Э-19.1 |
 | `crates/app/src/project.rs` | 266 | — | |
 | `crates/app/src/prompt.rs` | 151 | — | |
 | `crates/app/src/record.rs` | 225 | — | |
-| `crates/app/src/runtime.rs` | 184 | — | |
+| `crates/app/src/runtime.rs` | 184 | прочитан 19.11 (подключение аккаунтов) | Э-19.1 |
 | `crates/app/src/service.rs` | 276 | прочитан 19.11 (без встроенных тестов) | Б-19.2 |
 | `crates/app/src/session_store.rs` | 98 | — | |
 | `crates/app/src/settings_file.rs` | 107 | — | |
 | `crates/app/src/setup.rs` | 735 | — | |
 | `crates/app/src/startup.rs` | 251 | — | |
 | `crates/app/src/stop.rs` | 165 | — | |
-| `crates/app/src/supervisor.rs` | 357 | — | |
+| `crates/app/src/supervisor.rs` | 357 | прочитан 19.11 (без встроенных тестов) | нет (запускает Ю-19.1) |
 | `crates/app/src/telegram.rs` | 244 | — | |
 | `crates/app/src/wallet_log.rs` | 223 | — | |
-| `crates/app/src/watchdog.rs` | 159 | — | |
+| `crates/app/src/watchdog.rs` | 159 | прочитан 19.11 (без встроенных тестов) | нет (запускает Ю-19.1) |
 | `crates/botapi/Cargo.toml` | 33 | — | |
 | `crates/domain/Cargo.toml` | 20 | — | |
 | `crates/engine/Cargo.toml` | 32 | — | |
