@@ -41,7 +41,7 @@
 | `crates/storage/src/audit.rs` | 103 | — | |
 | `crates/storage/src/client.rs` | 471 | — | |
 | `crates/storage/src/client_prefs.rs` | 61 | — | |
-| `crates/storage/src/directions.rs` | 312 | — | |
+| `crates/storage/src/directions.rs` | 312 | прочитан 19.11 | Д-19.9 |
 | `crates/storage/src/error.rs` | 74 | — | |
 | `crates/storage/src/holds.rs` | 216 | прочитан 19.11 | Д-19.6 (двойной счёт в лимите — тяж. 1) |
 | `crates/storage/src/invest.rs` | 543 | — | |
@@ -57,7 +57,7 @@
 | `crates/storage/src/user_terms.rs` | 342 | — | |
 | `crates/storage/src/users.rs` | 39 | — | |
 | `crates/storage/src/wallet_messages.rs` | 103 | — | |
-| `crates/storage/src/wallets.rs` | 176 | — | |
+| `crates/storage/src/wallets.rs` | 176 | прочитан 19.11 | к Д-19.1 |
 | `migrations/0001_init.sql` | 804 | прочитан 19.11 | нет |
 | `migrations/0002_promo_broadcast.sql` | 29 | прочитан 19.11 | нет |
 | `migrations/0003_reconcile_unsettled.sql` | 15 | прочитан 19.11 | нет |
