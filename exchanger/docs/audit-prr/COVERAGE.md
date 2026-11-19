@@ -80,18 +80,18 @@
 | Файл | Строк | Статус | Находки |
 |---|---|---|---|
 | `crates/mtproto/src/config.rs` | 236 | прочитан 19.11 (без встроенных тестов) | нет |
-| `crates/mtproto/src/convert.rs` | 1091 | — | |
+| `crates/mtproto/src/convert.rs` | 1091 | прочитан 19.11 (тесты — группа 5) | нет |
 | `crates/mtproto/src/crypto.rs` | 349 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/mtproto/src/errors.rs` | 248 | прочитан 19.11 (без встроенных тестов) | нет |
-| `crates/mtproto/src/lib.rs` | 109 | — | |
+| `crates/mtproto/src/lib.rs` | 109 | прочитан 19.11 | нет |
 | `crates/mtproto/src/login.rs` | 444 | частично 19.11: журнал входа без секретов | нет |
 | `crates/mtproto/src/requests.rs` | 300 | частично 19.11: адресаты (только закреплённые боты и «Избранное»), резолв со сверкой ID | нет |
 | `crates/mtproto/src/session.rs` | 1035 | частично 19.11: журнал входа без секретов | нет |
 | `crates/mtproto/src/transport.rs` | 1134 | частично 19.11: адресаты (только закреплённые боты и «Избранное»), резолв со сверкой ID | нет |
-| `crates/parsers/src/amount.rs` | 506 | — | |
-| `crates/parsers/src/lib.rs` | 16 | — | |
+| `crates/parsers/src/amount.rs` | 506 | прочитан 19.11 (тесты — группа 5) | нет |
+| `crates/parsers/src/lib.rs` | 16 | прочитан 19.11 | нет |
 | `crates/parsers/src/links.rs` | 1300 | частично 19.11: проверка формата кода, чужие боты, двойники доменов | нет |
-| `crates/parsers/src/replies.rs` | 1053 | — | |
+| `crates/parsers/src/replies.rs` | 1053 | прочитан 19.11 (тесты — группа 5) | нет |
 | `crates/parsers/src/screens.rs` | 414 | — | |
 | `crates/userbot/src/flows/activate.rs` | 149 | прочитан 19.11 | нет |
 | `crates/userbot/src/flows/balance.rs` | 48 | прочитан 19.11 | нет |
@@ -101,15 +101,15 @@
 | `crates/userbot/src/flows/issue.rs` | 606 | прочитан 19.11 | нет |
 | `crates/userbot/src/flows/mod.rs` | 279 | прочитан 19.11 | к Д-19.7 |
 | `crates/userbot/src/flows/rid.rs` | 84 | прочитан 19.11 (без встроенных тестов) | нет |
-| `crates/userbot/src/lib.rs` | 19 | — | |
+| `crates/userbot/src/lib.rs` | 19 | прочитан 19.11 | нет |
 | `crates/userbot/src/sim/bots.rs` | 1408 | — | |
 | `crates/userbot/src/sim/mod.rs` | 426 | — | |
 | `crates/userbot/src/sim/model.rs` | 327 | — | |
 | `crates/userbot/src/sim/state.rs` | 886 | — | |
 | `crates/userbot/src/sim/texts.rs` | 601 | — | |
 | `crates/userbot/src/sim/transport.rs` | 216 | — | |
-| `crates/userbot/src/transport.rs` | 192 | — | |
-| `crates/userbot/src/wallet.rs` | 228 | — | |
+| `crates/userbot/src/transport.rs` | 192 | прочитан 19.11 | нет |
+| `crates/userbot/src/wallet.rs` | 228 | прочитан 19.11 | нет |
 
 ## 3. Интерфейс: клиент, пульт, Bot API — 56 файлов, 30397 строк
 
@@ -187,29 +187,29 @@
 | `config.example.toml` | 40 | — | |
 | `crates/app/Cargo.toml` | 66 | — | |
 | `crates/app/src/backup.rs` | 695 | прочитан 19.11 (копия, проверка, восстановление, хранение) | Б-19.1 |
-| `crates/app/src/check.rs` | 419 | — | |
+| `crates/app/src/check.rs` | 419 | просмотрен 19.11 (служебные команды; секреты не печатаются) | нет |
 | `crates/app/src/config.rs` | 266 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/app/src/db.rs` | 151 | прочитан 19.11 (без встроенных тестов) | нет |
-| `crates/app/src/demo.rs` | 540 | — | |
-| `crates/app/src/emoji.rs` | 533 | — | |
+| `crates/app/src/demo.rs` | 540 | просмотрен 19.11 (служебные команды; секреты не печатаются) | нет |
+| `crates/app/src/emoji.rs` | 533 | просмотрен 19.11 (служебные команды; секреты не печатаются) | нет |
 | `crates/app/src/health.rs` | 121 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/app/src/lib.rs` | 38 | — | |
-| `crates/app/src/listen.rs` | 148 | — | |
+| `crates/app/src/listen.rs` | 148 | просмотрен 19.11 (служебные команды; секреты не печатаются) | нет |
 | `crates/app/src/logfile.rs` | 242 | частично 19.11: хранение по дням | нет |
 | `crates/app/src/login.rs` | 332 | частично 19.11: код и пароль не печатаются | нет |
 | `crates/app/src/main.rs` | 1061 | частично 19.11: run(), задачи, пинг, сторож, копии | Э-19.1 |
-| `crates/app/src/project.rs` | 266 | — | |
-| `crates/app/src/prompt.rs` | 151 | — | |
-| `crates/app/src/record.rs` | 225 | — | |
+| `crates/app/src/project.rs` | 266 | прочитан 19.11 | нет |
+| `crates/app/src/prompt.rs` | 151 | просмотрен 19.11 (служебные команды; секреты не печатаются) | нет |
+| `crates/app/src/record.rs` | 225 | прочитан 19.11 | нет |
 | `crates/app/src/runtime.rs` | 184 | прочитан 19.11 (подключение аккаунтов) | Э-19.1 |
 | `crates/app/src/service.rs` | 276 | прочитан 19.11 (без встроенных тестов) | Б-19.2 |
-| `crates/app/src/session_store.rs` | 98 | — | |
-| `crates/app/src/settings_file.rs` | 107 | — | |
+| `crates/app/src/session_store.rs` | 98 | прочитан 19.11 | нет |
+| `crates/app/src/settings_file.rs` | 107 | прочитан 19.11 | нет |
 | `crates/app/src/setup.rs` | 735 | частично 19.11: секреты только в .env, .env.bak вне git | нет |
-| `crates/app/src/startup.rs` | 251 | — | |
+| `crates/app/src/startup.rs` | 251 | прочитан 19.11 (тесты — группа 5) | нет |
 | `crates/app/src/stop.rs` | 165 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/app/src/supervisor.rs` | 357 | прочитан 19.11 (без встроенных тестов) | нет (запускает Ю-19.1) |
-| `crates/app/src/telegram.rs` | 244 | — | |
+| `crates/app/src/telegram.rs` | 244 | прочитан 19.11 | нет |
 | `crates/app/src/wallet_log.rs` | 223 | прочитан 19.11 | Р: правило 8 «по возможности» |
 | `crates/app/src/watchdog.rs` | 159 | прочитан 19.11 (без встроенных тестов) | нет (запускает Ю-19.1) |
 | `crates/botapi/Cargo.toml` | 33 | — | |
@@ -303,7 +303,7 @@
 | `crates/parsers/tests/fixtures/invoice_cards.json` | 70 | — | |
 | `crates/parsers/tests/fixtures/invoice_payments.json` | 25 | — | |
 | `crates/parsers/tests/fixtures/links.json` | 63 | — | |
-| `crates/parsers/tests/fixtures/live_wallet_replies.json` | 3412 | — | |
+| `crates/parsers/tests/fixtures/live_wallet_replies.json` | 3412 | прочитан 19.11 | Б-19.4 |
 | `crates/parsers/tests/fixtures/messages.json` | 61 | — | |
 | `crates/parsers/tests/live.rs` | 238 | — | |
 | `crates/parsers/tests/prop.proptest-regressions` | 8 | — | |
