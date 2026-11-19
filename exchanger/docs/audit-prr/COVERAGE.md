@@ -140,7 +140,7 @@
 | `crates/ops/src/stats.rs` | 374 | — | |
 | `crates/ops/src/texts.rs` | 86 | — | |
 | `crates/ops/src/views.rs` | 2040 | — | |
-| `crates/tgbot/src/api.rs` | 232 | — | |
+| `crates/tgbot/src/api.rs` | 232 | частично 19.11: повтор по retry_after, запрет пересылки | нет |
 | `crates/tgbot/src/checkwait.rs` | 259 | — | |
 | `crates/tgbot/src/emoji.rs` | 116 | — | |
 | `crates/tgbot/src/handler.rs` | 782 | частично 19.11: кнопки заявки только свои (own_order), поддержка | нет |
@@ -151,7 +151,7 @@
 | `crates/tgbot/src/locks.rs` | 90 | — | |
 | `crates/tgbot/src/orders.rs` | 1324 | — | |
 | `crates/tgbot/src/poll.rs` | 177 | — | |
-| `crates/tgbot/src/promo.rs` | 91 | — | |
+| `crates/tgbot/src/promo.rs` | 91 | прочитан 19.11 | нет |
 | `crates/tgbot/src/terms.rs` | 191 | — | |
 | `crates/ui/ru.toml` | 581 | прочитан 19.11 | Т-1 |
 | `crates/ui/src/callback.rs` | 236 | — | |
