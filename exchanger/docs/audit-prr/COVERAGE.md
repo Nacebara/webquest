@@ -23,16 +23,16 @@
 | `crates/domain/src/money.rs` | 208 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/domain/src/pricing.rs` | 567 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/domain/src/reconcile.rs` | 266 | прочитан 19.11 (без встроенных тестов) | нет |
-| `crates/engine/src/account_alerts.rs` | 192 | — | |
+| `crates/engine/src/account_alerts.rs` | 192 | прочитан 19.11 (без встроенных тестов) | Д-19.6 |
 | `crates/engine/src/availability.rs` | 124 | прочитан 19.11 | Д-19.4 |
 | `crates/engine/src/effects.rs` | 269 | прочитан 19.11 | нет |
 | `crates/engine/src/fees.rs` | 418 | прочитан 19.11 | нет |
-| `crates/engine/src/invest.rs` | 1286 | — | |
+| `crates/engine/src/invest.rs` | 1286 | прочитан 19.11 (без встроенных тестов) | Д-19.5, Д-19.6 |
 | `crates/engine/src/invoice.rs` | 778 | прочитан 19.11 | нет |
 | `crates/engine/src/lib.rs` | 429 | прочитан 19.11 | нет |
 | `crates/engine/src/operator.rs` | 742 | прочитан 19.11 | Д-19.3 |
 | `crates/engine/src/reconcile.rs` | 635 | прочитан 19.11 | нет |
-| `crates/engine/src/sessions.rs` | 106 | — | |
+| `crates/engine/src/sessions.rs` | 106 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/engine/src/settle.rs` | 123 | прочитан 19.11 | Д-19.2 |
 | `crates/engine/src/submit.rs` | 330 | прочитан 19.11 | Д-19.2 |
 | `crates/engine/src/worker.rs` | 1418 | прочитан 19.11 | Д-19.1 |
