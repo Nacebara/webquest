@@ -92,7 +92,7 @@
 | `crates/parsers/src/lib.rs` | 16 | прочитан 19.11 | нет |
 | `crates/parsers/src/links.rs` | 1300 | частично 19.11: проверка формата кода, чужие боты, двойники доменов | нет |
 | `crates/parsers/src/replies.rs` | 1053 | прочитан 19.11 (тесты — группа 5) | нет |
-| `crates/parsers/src/screens.rs` | 414 | — | |
+| `crates/parsers/src/screens.rs` | 414 | прочитан 19.11 (тесты — группа 5) | нет |
 | `crates/userbot/src/flows/activate.rs` | 149 | прочитан 19.11 | нет |
 | `crates/userbot/src/flows/balance.rs` | 48 | прочитан 19.11 | нет |
 | `crates/userbot/src/flows/conv.rs` | 617 | прочитан 19.11 | Ю-19.1 |
@@ -176,16 +176,16 @@
 
 | Файл | Строк | Статус | Находки |
 |---|---|---|---|
-| `.cargo/audit.toml` | 14 | — | |
-| `.cargo/config.toml` | 6 | — | |
-| `.env.example` | 26 | — | |
-| `../.github/workflows/exchanger-ci.yml` | 178 | — | |
+| `.cargo/audit.toml` | 14 | прочитан 19.11 | нет |
+| `.cargo/config.toml` | 6 | прочитан 19.11 | нет |
+| `.env.example` | 26 | прочитан 19.11 | нет |
+| `../.github/workflows/exchanger-ci.yml` | 178 | прочитан 19.11 | нет |
 | `.gitignore` | 9 | прочитан 19.11 | нет |
-| `Cargo.lock` | 4017 | — | |
-| `Cargo.toml` | 50 | — | |
-| `clippy.toml` | 7 | — | |
-| `config.example.toml` | 40 | — | |
-| `crates/app/Cargo.toml` | 66 | — | |
+| `Cargo.lock` | 4017 | просмотрен 19.11 (зависимости) | нет |
+| `Cargo.toml` | 50 | прочитан 19.11 | нет |
+| `clippy.toml` | 7 | прочитан 19.11 | нет |
+| `config.example.toml` | 40 | прочитан 19.11 | нет |
+| `crates/app/Cargo.toml` | 66 | просмотрен 19.11 (зависимости) | нет |
 | `crates/app/src/backup.rs` | 695 | прочитан 19.11 (копия, проверка, восстановление, хранение) | Б-19.1 |
 | `crates/app/src/check.rs` | 419 | просмотрен 19.11 (служебные команды; секреты не печатаются) | нет |
 | `crates/app/src/config.rs` | 266 | прочитан 19.11 (без встроенных тестов) | нет |
@@ -193,7 +193,7 @@
 | `crates/app/src/demo.rs` | 540 | просмотрен 19.11 (служебные команды; секреты не печатаются) | нет |
 | `crates/app/src/emoji.rs` | 533 | просмотрен 19.11 (служебные команды; секреты не печатаются) | нет |
 | `crates/app/src/health.rs` | 121 | прочитан 19.11 (без встроенных тестов) | нет |
-| `crates/app/src/lib.rs` | 38 | — | |
+| `crates/app/src/lib.rs` | 38 | прочитан 19.11 | нет |
 | `crates/app/src/listen.rs` | 148 | просмотрен 19.11 (служебные команды; секреты не печатаются) | нет |
 | `crates/app/src/logfile.rs` | 242 | частично 19.11: хранение по дням | нет |
 | `crates/app/src/login.rs` | 332 | частично 19.11: код и пароль не печатаются | нет |
@@ -212,17 +212,17 @@
 | `crates/app/src/telegram.rs` | 244 | прочитан 19.11 | нет |
 | `crates/app/src/wallet_log.rs` | 223 | прочитан 19.11 | Р: правило 8 «по возможности» |
 | `crates/app/src/watchdog.rs` | 159 | прочитан 19.11 (без встроенных тестов) | нет (запускает Ю-19.1) |
-| `crates/botapi/Cargo.toml` | 33 | — | |
-| `crates/domain/Cargo.toml` | 20 | — | |
-| `crates/engine/Cargo.toml` | 32 | — | |
-| `crates/mtproto/Cargo.toml` | 45 | — | |
-| `crates/ops/Cargo.toml` | 44 | — | |
-| `crates/parsers/Cargo.toml` | 26 | — | |
-| `crates/storage/Cargo.toml` | 23 | — | |
-| `crates/tgbot/Cargo.toml` | 36 | — | |
-| `crates/ui/Cargo.toml` | 30 | — | |
-| `crates/userbot/Cargo.toml` | 32 | — | |
-| `rust-toolchain.toml` | 3 | — | |
+| `crates/botapi/Cargo.toml` | 33 | просмотрен 19.11 (зависимости) | нет |
+| `crates/domain/Cargo.toml` | 20 | просмотрен 19.11 (зависимости) | нет |
+| `crates/engine/Cargo.toml` | 32 | просмотрен 19.11 (зависимости) | нет |
+| `crates/mtproto/Cargo.toml` | 45 | просмотрен 19.11 (зависимости) | нет |
+| `crates/ops/Cargo.toml` | 44 | просмотрен 19.11 (зависимости) | нет |
+| `crates/parsers/Cargo.toml` | 26 | просмотрен 19.11 (зависимости) | нет |
+| `crates/storage/Cargo.toml` | 23 | просмотрен 19.11 (зависимости) | нет |
+| `crates/tgbot/Cargo.toml` | 36 | просмотрен 19.11 (зависимости) | нет |
+| `crates/ui/Cargo.toml` | 30 | просмотрен 19.11 (зависимости) | нет |
+| `crates/userbot/Cargo.toml` | 32 | просмотрен 19.11 (зависимости) | нет |
+| `rust-toolchain.toml` | 3 | прочитан 19.11 | нет |
 
 ## 5. Тесты и фикстуры — 187 файлов, 31302 строк
 
@@ -420,57 +420,57 @@
 
 | Файл | Строк | Статус | Находки |
 |---|---|---|---|
-| `assets/fonts/LICENSE-DejaVu.txt` | 78 | — | |
-| `assets/widgets/accounts.html` | 32 | — | |
-| `assets/widgets/calc_a.html` | 63 | — | |
-| `assets/widgets/calc_b.html` | 57 | — | |
-| `assets/widgets/code.html` | 34 | — | |
-| `assets/widgets/dash.html` | 62 | — | |
-| `assets/widgets/inv_calc.html` | 39 | — | |
-| `assets/widgets/inv_home.html` | 39 | — | |
-| `assets/widgets/inv_withdraw.html` | 44 | — | |
-| `assets/widgets/invoice.html` | 44 | — | |
-| `assets/widgets/maint.html` | 38 | — | |
-| `assets/widgets/order_a.html` | 46 | — | |
-| `assets/widgets/process.html` | 55 | — | |
-| `assets/widgets/promo.html` | 30 | — | |
-| `assets/widgets/queue.html` | 34 | — | |
-| `assets/widgets/rebalance.html` | 49 | — | |
-| `assets/widgets/reserves.html` | 47 | — | |
-| `assets/widgets/system.html` | 33 | — | |
-| `assets/widgets/value.html` | 53 | — | |
-| `assets/widgets/withdraw.html` | 48 | — | |
-| `diagrams/01-use-cases.puml` | 89 | — | |
-| `diagrams/02-activity-check-exchange.puml` | 141 | — | |
-| `diagrams/03-activity-invoice-payment.puml` | 108 | — | |
-| `diagrams/04-activity-rebalance.puml` | 63 | — | |
-| `diagrams/05-activity-recovery-reconcile.puml` | 84 | — | |
-| `diagrams/06-sequence-check-exchange.puml` | 58 | — | |
-| `diagrams/07-sequence-invoice-payment.puml` | 67 | — | |
-| `diagrams/08-state-order.puml` | 76 | — | |
-| `diagrams/09-components.puml` | 50 | — | |
-| `diagrams/10-deployment.puml` | 36 | — | |
-| `diagrams/11-er.puml` | 193 | — | |
-| `docs/mockups/build.py` | 37 | — | |
-| `docs/mockups/logo/README.md` | 37 | — | |
-| `docs/mockups/logo/avatar-render.js` | 13 | — | |
-| `docs/mockups/logo/avatar.html` | 23 | — | |
-| `docs/mockups/logo/logo.html` | 70 | — | |
-| `docs/mockups/logo/render.js` | 9 | — | |
-| `docs/mockups/template.html` | 790 | — | |
-| `docs/mockups/widgets/GAPS.md` | 78 | — | |
-| `docs/mockups/widgets/RECHECK-14-11.md` | 121 | — | |
-| `docs/mockups/widgets/analysis.json` | 515 | — | |
-| `docs/mockups/widgets/build.py` | 106 | — | |
-| `docs/mockups/widgets/console-login.js` | 7 | — | |
-| `docs/mockups/widgets/console-p234.html` | 21 | — | |
-| `docs/mockups/widgets/console-p8-p10.html` | 27 | — | |
-| `docs/mockups/widgets/gaps_samples.py` | 577 | — | |
-| `docs/mockups/widgets/gen_samples.py` | 244 | — | |
-| `docs/mockups/widgets/preview.html` | 755 | — | |
-| `docs/mockups/widgets/samples.json` | 8955 | — | |
-| `tools/emoji/.gitignore` | 2 | — | |
-| `tools/emoji/README.md` | 90 | — | |
+| `assets/fonts/LICENSE-DejaVu.txt` | 78 | просмотрен 19.11 | нет |
+| `assets/widgets/accounts.html` | 32 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/calc_a.html` | 63 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/calc_b.html` | 57 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/code.html` | 34 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/dash.html` | 62 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/inv_calc.html` | 39 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/inv_home.html` | 39 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/inv_withdraw.html` | 44 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/invoice.html` | 44 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/maint.html` | 38 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/order_a.html` | 46 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/process.html` | 55 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/promo.html` | 30 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/queue.html` | 34 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/rebalance.html` | 49 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/reserves.html` | 47 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/system.html` | 33 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/value.html` | 53 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `assets/widgets/withdraw.html` | 48 | просмотрен 19.11 (данные — свои; не отправляются: INPUT_MEDIA_WIDGET_NOT_ALLOWED) | нет |
+| `diagrams/01-use-cases.puml` | 89 | прочитан 19.11 | Р-19.2 |
+| `diagrams/02-activity-check-exchange.puml` | 141 | прочитан 19.11 | Р-19.2 |
+| `diagrams/03-activity-invoice-payment.puml` | 108 | просмотрен 19.11 | нет |
+| `diagrams/04-activity-rebalance.puml` | 63 | просмотрен 19.11 | нет |
+| `diagrams/05-activity-recovery-reconcile.puml` | 84 | просмотрен 19.11 | нет |
+| `diagrams/06-sequence-check-exchange.puml` | 58 | прочитан 19.11 | Р-19.2 |
+| `diagrams/07-sequence-invoice-payment.puml` | 67 | просмотрен 19.11 | нет |
+| `diagrams/08-state-order.puml` | 76 | прочитан 19.11 | нет (совпадает с ALLOWED) |
+| `diagrams/09-components.puml` | 50 | прочитан 19.11 | Р-19.2 |
+| `diagrams/10-deployment.puml` | 36 | прочитан 19.11 | Р-19.2 |
+| `diagrams/11-er.puml` | 193 | прочитан 19.11 | Р-19.2 |
+| `docs/mockups/build.py` | 37 | просмотрен 19.11 | нет |
+| `docs/mockups/logo/README.md` | 37 | просмотрен 19.11 | нет |
+| `docs/mockups/logo/avatar-render.js` | 13 | просмотрен 19.11 | нет |
+| `docs/mockups/logo/avatar.html` | 23 | просмотрен 19.11 | нет |
+| `docs/mockups/logo/logo.html` | 70 | просмотрен 19.11 | нет |
+| `docs/mockups/logo/render.js` | 9 | просмотрен 19.11 | нет |
+| `docs/mockups/template.html` | 790 | сверялся с кодом по экранам 19.11 (h3, «Курс», «Меньше минимума», тревоги, разбор) | К-19.3 |
+| `docs/mockups/widgets/GAPS.md` | 78 | просмотрен 19.11 | нет |
+| `docs/mockups/widgets/RECHECK-14-11.md` | 121 | просмотрен 19.11 | нет |
+| `docs/mockups/widgets/analysis.json` | 515 | просмотрен 19.11 | нет |
+| `docs/mockups/widgets/build.py` | 106 | просмотрен 19.11 | нет |
+| `docs/mockups/widgets/console-login.js` | 7 | просмотрен 19.11 | нет |
+| `docs/mockups/widgets/console-p234.html` | 21 | просмотрен 19.11 | нет |
+| `docs/mockups/widgets/console-p8-p10.html` | 27 | просмотрен 19.11 | нет |
+| `docs/mockups/widgets/gaps_samples.py` | 577 | просмотрен 19.11 | нет |
+| `docs/mockups/widgets/gen_samples.py` | 244 | просмотрен 19.11 | нет |
+| `docs/mockups/widgets/preview.html` | 755 | просмотрен 19.11 | нет |
+| `docs/mockups/widgets/samples.json` | 8955 | просмотрен 19.11 | нет |
+| `tools/emoji/.gitignore` | 2 | просмотрен 19.11 | нет |
+| `tools/emoji/README.md` | 90 | просмотрен 19.11 | нет |
 | `tools/emoji/check.js` | 47 | — | |
 | `tools/emoji/demo-packs.json` | 241 | — | |
 | `tools/emoji/frames.js` | 43 | — | |
@@ -490,16 +490,16 @@
 
 | Файл | Строк | Статус | Находки |
 |---|---|---|---|
-| `CLAUDE.md` | 130 | — | |
-| `README.md` | 72 | — | |
+| `CLAUDE.md` | 130 | прочитан 19.11 | Р-19.1 (п. 8) |
+| `README.md` | 72 | прочитан 19.11 | Р-19.4 |
 | `SPEC.md` | 1878 | — | |
 | `docs/AUDIT-2026-11-11.md` | 278 | — | |
 | `docs/AUDIT-METHOD.md` | 284 | — | |
 | `docs/AUDIT-UI.md` | 130 | — | |
 | `docs/BOTAPI-RICH.md` | 41 | — | |
 | `docs/BOTAPI-WIDGETS.md` | 145 | — | |
-| `docs/DEPLOY.md` | 104 | — | |
-| `docs/DESIGN-v0.2.md` | 112 | — | |
+| `docs/DEPLOY.md` | 104 | прочитан 19.11 | Д-19.10 (лимит без код-пароля только в CryptoBot) |
+| `docs/DESIGN-v0.2.md` | 112 | прочитан 19.11 (Р11 — «меняется из пульта» неверно) | Д-19.10 |
 | `docs/HANDOVER.md` | 327 | — | |
 | `docs/INVEST-LOSSES.md` | 46 | — | |
 | `docs/LAPTOP.md` | 83 | — | |
@@ -511,7 +511,7 @@
 | `docs/PROGRESS.md` | 663 | — | |
 | `docs/PROPOSALS-16-11.md` | 131 | — | |
 | `docs/RECORDING.md` | 163 | — | |
-| `docs/RUNBOOK.md` | 138 | — | |
+| `docs/RUNBOOK.md` | 138 | прочитан 19.11 | Р-19.3 |
 | `docs/STATUS-18-11.md` | 202 | — | |
 | `docs/audit-16-11/client.md` | 243 | — | |
 | `docs/audit-16-11/ops.md` | 599 | — | |
