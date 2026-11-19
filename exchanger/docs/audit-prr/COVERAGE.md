@@ -43,12 +43,12 @@
 | `crates/storage/src/client_prefs.rs` | 61 | — | |
 | `crates/storage/src/directions.rs` | 312 | — | |
 | `crates/storage/src/error.rs` | 74 | — | |
-| `crates/storage/src/holds.rs` | 216 | — | |
+| `crates/storage/src/holds.rs` | 216 | прочитан 19.11 | Д-19.6 (двойной счёт в лимите — тяж. 1) |
 | `crates/storage/src/invest.rs` | 543 | — | |
-| `crates/storage/src/ledger.rs` | 163 | — | |
+| `crates/storage/src/ledger.rs` | 163 | прочитан 19.11 | нет |
 | `crates/storage/src/lib.rs` | 78 | — | |
-| `crates/storage/src/operations.rs` | 715 | — | |
-| `crates/storage/src/orders.rs` | 500 | — | |
+| `crates/storage/src/operations.rs` | 715 | прочитан 19.11 | Д-19.7 |
+| `crates/storage/src/orders.rs` | 500 | прочитан 19.11 | Д-19.8 |
 | `crates/storage/src/promo.rs` | 167 | — | |
 | `crates/storage/src/sessions.rs` | 260 | — | |
 | `crates/storage/src/settings.rs` | 106 | — | |
