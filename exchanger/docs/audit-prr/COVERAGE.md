@@ -149,7 +149,7 @@
 | `crates/tgbot/src/lib.rs` | 551 | — | |
 | `crates/tgbot/src/limits.rs` | 190 | — | |
 | `crates/tgbot/src/locks.rs` | 90 | — | |
-| `crates/tgbot/src/orders.rs` | 1324 | — | |
+| `crates/tgbot/src/orders.rs` | 1324 | частично 19.11: экран по состоянию заявки | К-19.1 |
 | `crates/tgbot/src/poll.rs` | 177 | — | |
 | `crates/tgbot/src/promo.rs` | 91 | прочитан 19.11 | нет |
 | `crates/tgbot/src/terms.rs` | 191 | — | |
