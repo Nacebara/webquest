@@ -186,9 +186,9 @@
 | `clippy.toml` | 7 | — | |
 | `config.example.toml` | 40 | — | |
 | `crates/app/Cargo.toml` | 66 | — | |
-| `crates/app/src/backup.rs` | 695 | — | |
+| `crates/app/src/backup.rs` | 695 | прочитан 19.11 (копия, проверка, восстановление, хранение) | Б-19.1 |
 | `crates/app/src/check.rs` | 419 | — | |
-| `crates/app/src/config.rs` | 266 | — | |
+| `crates/app/src/config.rs` | 266 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/app/src/db.rs` | 151 | — | |
 | `crates/app/src/demo.rs` | 540 | — | |
 | `crates/app/src/emoji.rs` | 533 | — | |
@@ -202,7 +202,7 @@
 | `crates/app/src/prompt.rs` | 151 | — | |
 | `crates/app/src/record.rs` | 225 | — | |
 | `crates/app/src/runtime.rs` | 184 | — | |
-| `crates/app/src/service.rs` | 276 | — | |
+| `crates/app/src/service.rs` | 276 | прочитан 19.11 (без встроенных тестов) | Б-19.2 |
 | `crates/app/src/session_store.rs` | 98 | — | |
 | `crates/app/src/settings_file.rs` | 107 | — | |
 | `crates/app/src/setup.rs` | 735 | — | |
