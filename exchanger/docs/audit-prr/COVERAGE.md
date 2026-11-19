@@ -123,7 +123,7 @@
 | `crates/botapi/src/types.rs` | 450 | — | |
 | `crates/ops/ru.toml` | 1160 | прочитан 19.11 | Т-2…Т-6 |
 | `crates/ops/src/actions.rs` | 2423 | частично 19.11: права (роль заново при подтверждении), одноразовый ключ подтверждения, взнос/вывод/списание | нет |
-| `crates/ops/src/alerts.rs` | 1345 | — | |
+| `crates/ops/src/alerts.rs` | 1345 | прочитан 19.11 (тесты — группа 5) | С-19.1, Б-19.3, П-19.2, П-19.3 |
 | `crates/ops/src/cb.rs` | 642 | — | |
 | `crates/ops/src/chart.rs` | 357 | — | |
 | `crates/ops/src/dash.rs` | 1041 | — | |
