@@ -140,16 +140,16 @@
 | `crates/ops/src/stats.rs` | 374 | — | |
 | `crates/ops/src/texts.rs` | 86 | — | |
 | `crates/ops/src/views.rs` | 2040 | — | |
-| `crates/tgbot/src/api.rs` | 232 | частично 19.11: повтор по retry_after, запрет пересылки | нет |
+| `crates/tgbot/src/api.rs` | 232 | прочитан 19.11 | нет |
 | `crates/tgbot/src/checkwait.rs` | 259 | прочитан 19.11 | нет |
-| `crates/tgbot/src/emoji.rs` | 116 | — | |
-| `crates/tgbot/src/handler.rs` | 782 | частично 19.11: кнопки заявки только свои (own_order), поддержка | нет |
+| `crates/tgbot/src/emoji.rs` | 116 | прочитан 19.11 | нет |
+| `crates/tgbot/src/handler.rs` | 782 | прочитан 19.11 | З-19.2 |
 | `crates/tgbot/src/intake.rs` | 342 | прочитан 19.11 | нет |
 | `crates/tgbot/src/invest.rs` | 433 | прочитан 19.11 | К-19.2 |
-| `crates/tgbot/src/lib.rs` | 551 | — | |
+| `crates/tgbot/src/lib.rs` | 551 | прочитан 19.11 | нет |
 | `crates/tgbot/src/limits.rs` | 190 | прочитан 19.11 | нет |
 | `crates/tgbot/src/locks.rs` | 90 | прочитан 19.11 | нет |
-| `crates/tgbot/src/orders.rs` | 1324 | частично 19.11: экран по состоянию заявки | К-19.1 |
+| `crates/tgbot/src/orders.rs` | 1324 | прочитан 19.11 (тесты — группа 5) | К-19.1, К-19.3 |
 | `crates/tgbot/src/poll.rs` | 177 | прочитан 19.11 | нет |
 | `crates/tgbot/src/promo.rs` | 91 | прочитан 19.11 | нет |
 | `crates/tgbot/src/terms.rs` | 191 | прочитан 19.11 | Д-19.10 |
