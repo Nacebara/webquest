@@ -115,12 +115,12 @@
 
 | Файл | Строк | Статус | Находки |
 |---|---|---|---|
-| `crates/botapi/src/client.rs` | 706 | — | |
-| `crates/botapi/src/error.rs` | 369 | — | |
-| `crates/botapi/src/keyboard.rs` | 340 | — | |
-| `crates/botapi/src/lib.rs` | 41 | — | |
-| `crates/botapi/src/methods.rs` | 762 | — | |
-| `crates/botapi/src/types.rs` | 450 | — | |
+| `crates/botapi/src/client.rs` | 706 | прочитан 19.11 | нет |
+| `crates/botapi/src/error.rs` | 369 | прочитан 19.11 | нет |
+| `crates/botapi/src/keyboard.rs` | 340 | просмотрен 19.11 (сериализация; проверяют фикстуры Bot API) | нет |
+| `crates/botapi/src/lib.rs` | 41 | просмотрен 19.11 (сериализация; проверяют фикстуры Bot API) | нет |
+| `crates/botapi/src/methods.rs` | 762 | просмотрен 19.11 (сериализация; проверяют фикстуры Bot API) | нет |
+| `crates/botapi/src/types.rs` | 450 | просмотрен 19.11 (сериализация; проверяют фикстуры Bot API) | нет |
 | `crates/ops/ru.toml` | 1160 | прочитан 19.11 | Т-2…Т-6 |
 | `crates/ops/src/actions.rs` | 2423 | прочитан 19.11 (права, решения, настройки) | Д-19.11 (кнопки), П-19.4 |
 | `crates/ops/src/alerts.rs` | 1345 | прочитан 19.11 (тесты — группа 5) | С-19.1, Б-19.3, П-19.2, П-19.3 |
@@ -154,23 +154,23 @@
 | `crates/tgbot/src/promo.rs` | 91 | прочитан 19.11 | нет |
 | `crates/tgbot/src/terms.rs` | 191 | прочитан 19.11 | Д-19.10 |
 | `crates/ui/ru.toml` | 581 | прочитан 19.11 | Т-1 |
-| `crates/ui/src/callback.rs` | 236 | — | |
-| `crates/ui/src/command.rs` | 73 | — | |
-| `crates/ui/src/doc.rs` | 280 | — | |
-| `crates/ui/src/emoji.rs` | 785 | — | |
-| `crates/ui/src/fmt.rs` | 302 | — | |
-| `crates/ui/src/html.rs` | 234 | — | |
-| `crates/ui/src/lib.rs` | 43 | — | |
-| `crates/ui/src/model.rs` | 475 | — | |
-| `crates/ui/src/preview.rs` | 360 | — | |
-| `crates/ui/src/screen.rs` | 131 | — | |
-| `crates/ui/src/screens/errors.rs` | 376 | — | |
-| `crates/ui/src/screens/flow.rs` | 589 | — | |
-| `crates/ui/src/screens/invest.rs` | 467 | — | |
-| `crates/ui/src/screens/mod.rs` | 382 | — | |
-| `crates/ui/src/screens/reference.rs` | 1346 | — | |
-| `crates/ui/src/texts.rs` | 844 | — | |
-| `crates/ui/src/widgets.rs` | 187 | — | |
+| `crates/ui/src/callback.rs` | 236 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/command.rs` | 73 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/doc.rs` | 280 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/emoji.rs` | 785 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/fmt.rs` | 302 | прочитан 19.11 | нет |
+| `crates/ui/src/html.rs` | 234 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/lib.rs` | 43 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/model.rs` | 475 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/preview.rs` | 360 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/screen.rs` | 131 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/screens/errors.rs` | 376 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/screens/flow.rs` | 589 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/screens/invest.rs` | 467 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/screens/mod.rs` | 382 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/screens/reference.rs` | 1346 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/texts.rs` | 844 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
+| `crates/ui/src/widgets.rs` | 187 | просмотрен 19.11 (деньги не считает; тексты — §8 STATUS-18-11; вид — снимки и приёмка владельца) | нет |
 
 ## 4. Запуск, настройки, сборка, CI — 46 файлов, 12546 строк
 
