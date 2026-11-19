@@ -95,11 +95,11 @@
 | `crates/parsers/src/screens.rs` | 414 | — | |
 | `crates/userbot/src/flows/activate.rs` | 149 | — | |
 | `crates/userbot/src/flows/balance.rs` | 48 | — | |
-| `crates/userbot/src/flows/conv.rs` | 617 | — | |
-| `crates/userbot/src/flows/gate.rs` | 227 | — | |
+| `crates/userbot/src/flows/conv.rs` | 617 | прочитан 19.11 | Ю-19.1 |
+| `crates/userbot/src/flows/gate.rs` | 227 | прочитан 19.11 (без встроенных тестов) | Ю-19.1 |
 | `crates/userbot/src/flows/invoice.rs` | 440 | — | |
 | `crates/userbot/src/flows/issue.rs` | 606 | — | |
-| `crates/userbot/src/flows/mod.rs` | 279 | — | |
+| `crates/userbot/src/flows/mod.rs` | 279 | прочитан 19.11 | к Д-19.7 |
 | `crates/userbot/src/flows/rid.rs` | 84 | — | |
 | `crates/userbot/src/lib.rs` | 19 | — | |
 | `crates/userbot/src/sim/bots.rs` | 1408 | — | |
