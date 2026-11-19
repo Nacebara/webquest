@@ -136,7 +136,7 @@
 | `crates/ops/src/nav.rs` | 273 | — | |
 | `crates/ops/src/preview.rs` | 691 | — | |
 | `crates/ops/src/reserves.rs` | 503 | — | |
-| `crates/ops/src/review.rs` | 759 | — | |
+| `crates/ops/src/review.rs` | 759 | прочитан 19.11 | Д-19.11 |
 | `crates/ops/src/stats.rs` | 374 | — | |
 | `crates/ops/src/texts.rs` | 86 | — | |
 | `crates/ops/src/views.rs` | 2040 | — | |
