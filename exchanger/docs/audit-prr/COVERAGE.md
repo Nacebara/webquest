@@ -126,20 +126,20 @@
 | `crates/ops/src/alerts.rs` | 1345 | прочитан 19.11 (тесты — группа 5) | С-19.1, Б-19.3, П-19.2, П-19.3 |
 | `crates/ops/src/cb.rs` | 642 | — | |
 | `crates/ops/src/chart.rs` | 357 | — | |
-| `crates/ops/src/dash.rs` | 1041 | — | |
+| `crates/ops/src/dash.rs` | 1041 | прочитан 19.11 (тесты — группа 5) | С-19.1 (не всё на главном) |
 | `crates/ops/src/inbox.rs` | 581 | частично 19.11: вопрос в поддержку — только своя заявка (Б-1 закрыта) | нет |
-| `crates/ops/src/invest.rs` | 825 | — | |
-| `crates/ops/src/journal.rs` | 358 | — | |
+| `crates/ops/src/invest.rs` | 825 | прочитан 19.11 (роли, решения; тексты экранов — просмотрены) | нет |
+| `crates/ops/src/journal.rs` | 358 | прочитан 19.11 | нет |
 | `crates/ops/src/lib.rs` | 1289 | частично 19.11: кто сотрудник, ключ подтверждения, вопрос в поддержку | нет |
-| `crates/ops/src/lists.rs` | 282 | — | |
+| `crates/ops/src/lists.rs` | 282 | прочитан 19.11 | нет |
 | `crates/ops/src/look.rs` | 231 | — | |
 | `crates/ops/src/nav.rs` | 273 | — | |
 | `crates/ops/src/preview.rs` | 691 | — | |
-| `crates/ops/src/reserves.rs` | 503 | — | |
+| `crates/ops/src/reserves.rs` | 503 | прочитан 19.11 | нет |
 | `crates/ops/src/review.rs` | 759 | прочитан 19.11 | Д-19.11 |
-| `crates/ops/src/stats.rs` | 374 | — | |
+| `crates/ops/src/stats.rs` | 374 | прочитан 19.11 | нет |
 | `crates/ops/src/texts.rs` | 86 | — | |
-| `crates/ops/src/views.rs` | 2040 | — | |
+| `crates/ops/src/views.rs` | 2040 | прочитан 19.11 (кроме navigate и вспомогательных) | П-19.1; вид — 🛠 по PLAN-v1 |
 | `crates/tgbot/src/api.rs` | 232 | прочитан 19.11 | нет |
 | `crates/tgbot/src/checkwait.rs` | 259 | прочитан 19.11 | нет |
 | `crates/tgbot/src/emoji.rs` | 116 | прочитан 19.11 | нет |
