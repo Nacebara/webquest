@@ -866,6 +866,85 @@ async fn unanswered_activation_pauses_the_wallet_until_the_order_is_resolved(poo
     e.assert_books_match().await;
 }
 
+/// Ю-19.1 (проверка 19.11): признание «команда разобрана» жило только в памяти ворот. Активация
+/// без ответа → человек разобрал заявку → exch перезапустился → следующая заявка через этот
+/// кошелёк навсегда вставала на «чат занят». Теперь чат свободен: команду не держит ни одна
+/// нерешённая операция.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_restart_after_the_human_decision_does_not_hold_the_wallet_chat(pool: PgPool) {
+    let mut e = env(pool).await;
+    let a = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    let order_a = accepted(e.submit(&a).await);
+    e.world.inject(e.ub, Call::SendText, Fault::NoReply, 1);
+    e.drain().await;
+    assert_eq!(e.order(order_a.id).await.0.state, OrderState::ManualReview);
+    // Решение без замера баланса: последней командой в чате остаётся активация без ответа.
+    let owner = staff(&e.pool, 1, Role::Owner).await;
+    e.engine
+        .operator_decide(request(
+            order_a.id,
+            OperatorDecision::CloseWithoutPayout,
+            &owner,
+        ))
+        .await
+        .unwrap();
+
+    e.restart();
+    e.engine.recover().await.unwrap();
+    let b = e.world.client_check(CB, usdt(dec!(7))).unwrap();
+    let order_b = accepted(e.submit(&b).await);
+    e.drain().await;
+    let (b_now, b_details) = e.order(order_b.id).await;
+    assert_eq!(b_now.state, OrderState::Completed, "{b_details:?}");
+    assert_eq!(
+        b_details.intake_amount,
+        Some(dec!(7)),
+        "B получает свою сумму"
+    );
+    // Чек A кошелёк зачислил молча, а владелец закрыл заявку без прихода: эти 100 — излишек,
+    // который покажет сверка. Больше расхождений нет.
+    assert_eq!(
+        e.world.balance(e.ub, CB, Asset::Usdt) - e.ledger("asset:cb:USDT").await,
+        dec!(100)
+    );
+    assert_eq!(
+        e.world.balance(e.ub, XR, Asset::Usdt),
+        e.ledger("asset:xr:USDT").await
+    );
+}
+
+/// Ю-19.1, второй путь: exch перезапустился, пока заявка с неотвеченной активацией ждала
+/// человека. Ворота после старта этой команды не видели, признавать им нечего — решение человека
+/// всё равно освобождает чат, а «Деньги пришли» получает замер баланса.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_restart_before_the_human_decision_does_not_hold_the_wallet_chat(pool: PgPool) {
+    let mut e = env(pool).await;
+    let a = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    let order_a = accepted(e.submit(&a).await);
+    e.world.inject(e.ub, Call::SendText, Fault::NoReply, 1);
+    e.drain().await;
+    assert_eq!(e.order(order_a.id).await.0.state, OrderState::ManualReview);
+
+    e.restart();
+    e.engine.recover().await.unwrap();
+    let admin = staff(&e.pool, 20, Role::Admin).await;
+    e.engine
+        .operator_decide(request(
+            order_a.id,
+            OperatorDecision::ConfirmIntake { amount: dec!(100) },
+            &admin,
+        ))
+        .await
+        .unwrap();
+    let b = e.world.client_check(CB, usdt(dec!(7))).unwrap();
+    let order_b = accepted(e.submit(&b).await);
+    e.drain().await;
+    let (b_now, b_details) = e.order(order_b.id).await;
+    assert_eq!(b_now.state, OrderState::Completed, "{b_details:?}");
+    assert_eq!(b_details.intake_amount, Some(dec!(7)));
+    e.assert_books_match().await;
+}
+
 /// Шаг 1.2 (аудит 11.11.2026). Сумма чека выплаты CryptoBot осталась без ответа: чек мог создать
 /// сама сумма, а его поздний экран — новое сообщение — достался бы следующей выплате. Кошелёк
 /// сразу на паузе: новые заявки через CryptoBot не принимаются. Человек проверил: чека нет,

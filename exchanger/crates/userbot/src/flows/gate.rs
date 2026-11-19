@@ -5,7 +5,7 @@
 //! `min_interval` и не больше `bot_actions_per_minute` обращений к ботам за 60 с — lovec
 //! получал FLOOD_WAIT уже после 10 команд в минуту. FLOOD_WAIT останавливает весь аккаунт.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Duration;
 
 use tokio::sync::{Mutex, MutexGuard};
@@ -42,6 +42,10 @@ pub(crate) struct GateState {
     unanswered: HashMap<Chat, (i32, Instant)>,
     /// Команда без ответа, которую человек признал разобранной: её ответа больше не ждём.
     acked: HashMap<Chat, i32>,
+    /// Человек разобрал команду, которую эти ворота не видели (exch перезапускался, Ю-19.1):
+    /// последняя денежная команда без ответа в истории чата признаётся при первой же проверке
+    /// чата. Новая команда до этой проверки уйти не может: каждая отправка начинается с неё.
+    release: HashSet<Chat>,
 }
 
 impl AccountGate {
@@ -58,8 +62,10 @@ impl AccountGate {
     }
 
     /// Человек разобрал команду, оставшуюся в `chat` без ответа (заявка решена вручную): чат
-    /// можно использовать снова. Признаётся только команда, которую ворота уже видели
-    /// неотвеченной, — будущую команду заранее признать нельзя. `false` — признавать нечего.
+    /// можно использовать снова. Признаётся команда, которую ворота видели неотвеченной; не
+    /// видели (после перезапуска, Ю-19.1) — последняя денежная команда в истории чата при
+    /// следующей его проверке. Будущую команду заранее признать нельзя: до этой проверки ничего
+    /// не отправляется. `true` — признана видимая команда, `false` — признание отложено до проверки.
     pub async fn acknowledge_unanswered(&self, chat: Chat) -> bool {
         let mut st = self.state.lock().await;
         match st.unanswered.get(&chat).map(|(cmd, _)| *cmd) {
@@ -67,7 +73,10 @@ impl AccountGate {
                 st.acked.insert(chat, cmd);
                 true
             }
-            None => false,
+            None => {
+                st.release.insert(chat);
+                false
+            }
         }
     }
 
@@ -164,6 +173,23 @@ impl GateState {
     pub(crate) fn acknowledged(&self, chat: Chat, cmd_id: i32) -> bool {
         self.acked.get(&chat) == Some(&cmd_id)
     }
+
+    /// Отложенное признание (см. поле `release`) для команды `cmd_id` — последней в истории
+    /// чата и без ответа: признать её и снять отложенное.
+    pub(crate) fn take_release(&mut self, chat: Chat, cmd_id: i32) -> bool {
+        if self.release.remove(&chat) {
+            self.acked.insert(chat, cmd_id);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Проверка чата прошла без отложенного признания: признавать нечего (последняя команда с
+    /// ответом или её нет) — снять его, чтобы оно не досталось следующей команде.
+    pub(crate) fn end_release(&mut self, chat: Chat) {
+        self.release.remove(&chat);
+    }
 }
 
 #[cfg(test)]
@@ -211,6 +237,38 @@ mod tests {
         assert_eq!(st.flood_left(Instant::now()), Some(Duration::from_secs(19)));
         tokio::time::advance(Duration::from_secs(19)).await;
         assert!(st.pace(&cfg(), Pace::Bot).await.is_ok());
+    }
+
+    /// Ю-19.1: команду без ответа разобрал человек, а ворота её не видели (перезапуск) —
+    /// признаётся та, что первая проверка чата найдёт последней без ответа, и только она.
+    #[tokio::test]
+    async fn an_acknowledgement_after_a_restart_waits_for_the_chat_check() {
+        let gate = AccountGate::new("ub");
+        let chat = Chat::WalletBot(domain::Platform::CryptoBot);
+        assert!(
+            !gate.acknowledge_unanswered(chat).await,
+            "команду ворота не видели"
+        );
+        let mut st = gate.lock().await;
+        assert!(!st.acknowledged(chat, 7));
+        assert!(st.take_release(chat, 7));
+        assert!(st.acknowledged(chat, 7));
+        assert!(
+            !st.take_release(chat, 9),
+            "будущую команду заранее не признать"
+        );
+        assert!(!st.acknowledged(chat, 9));
+        drop(st);
+        // Проверка, которой признавать было нечего, снимает отложенное признание.
+        assert!(!gate.acknowledge_unanswered(chat).await);
+        let mut st = gate.lock().await;
+        st.end_release(chat);
+        assert!(!st.take_release(chat, 11));
+        // Видимая команда признаётся сразу.
+        st.unanswered_since(chat, 12);
+        drop(st);
+        assert!(gate.acknowledge_unanswered(chat).await);
+        assert!(gate.lock().await.acknowledged(chat, 12));
     }
 
     #[tokio::test(start_paused = true)]

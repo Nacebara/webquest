@@ -1346,7 +1346,34 @@ impl Engine {
     /// Ошибка по одной операции не останавливает остальные.
     pub async fn recover(&self) -> Result<(), EngineError> {
         self.recover_dispatched(None).await?;
-        self.resolve_unknown().await
+        self.resolve_unknown().await?;
+        self.release_resolved_chats().await
+    }
+
+    /// Ю-19.1 (проверка 19.11): «команда без ответа разобрана» ворота помнят только в памяти, и
+    /// перезапуск это стирает — чат кошелька держался бы последней командой без ответа навсегда.
+    /// Если по кошельку не осталось ни одной денежной операции, чья команда могла остаться без
+    /// ответа (неясная или уже действовавшая и ждущая повтора), её разобрал человек до
+    /// перезапуска: ворота признают такую команду при первой проверке чата. Вызывается до
+    /// первой операции — новые команды ещё не уходили.
+    pub(crate) async fn release_resolved_chats(&self) -> Result<(), EngineError> {
+        for (platform, wallet) in &self.wallets {
+            let mut conn = self.pool.acquire().await?;
+            let held: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM operations WHERE platform = $1 \
+                   AND kind IN ('activate_check', 'create_payout_check', 'create_refund_check', \
+                                'create_excess_check', 'pay_invoice', 'withdrawal') \
+                   AND (status = 'unknown' OR (status IN ('pending', 'dispatched') AND attempts > 0)))",
+            )
+            .bind(platform.db_name())
+            .fetch_one(&mut *conn)
+            .await?;
+            drop(conn);
+            if !held {
+                wallet.acknowledge_unanswered().await;
+            }
+        }
+        Ok(())
     }
 
     /// Операции `dispatched` (все или только взятые раньше `min_age` — «зависшие» на ходу).

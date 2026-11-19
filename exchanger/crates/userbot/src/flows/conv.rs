@@ -295,6 +295,17 @@ impl<'a, T: Transport> Conv<'a, T> {
                 self.after_ack.insert(chat);
                 break;
             }
+            // Человек разобрал эту команду, когда ворота её не видели (перезапуск, Ю-19.1).
+            if carries_money(platform, &last.text) && self.gate.take_release(chat, last.id) {
+                tracing::warn!(
+                    account = self.w.gate.label(),
+                    ?chat,
+                    command = last.id,
+                    "money command without a reply was resolved before a restart: the chat is used again"
+                );
+                self.after_ack.insert(chat);
+                break;
+            }
             let since = self.gate.unanswered_since(chat, last.id);
             let waited = since.elapsed();
             let block = self.w.cfg.unanswered_block;
@@ -345,6 +356,7 @@ impl<'a, T: Transport> Conv<'a, T> {
                 ));
             }
         }
+        self.gate.end_release(chat);
         self.gate.clear_unanswered(chat);
         self.cleared.insert(chat);
         Ok(())

@@ -263,13 +263,13 @@ impl<T: Transport> WalletBot for UserbotWallet<T> {
 
     async fn acknowledge_unanswered(&self) {
         let chat = crate::transport::Chat::WalletBot(self.platform);
-        if self.gate.acknowledge_unanswered(chat).await {
-            tracing::warn!(
-                account = self.gate.label(),
-                platform = ?self.platform,
-                "unanswered command acknowledged by a human, the chat is used again"
-            );
-        }
+        let seen = self.gate.acknowledge_unanswered(chat).await;
+        tracing::warn!(
+            account = self.gate.label(),
+            platform = ?self.platform,
+            seen,
+            "unanswered command acknowledged, the chat is used again"
+        );
     }
 }
 

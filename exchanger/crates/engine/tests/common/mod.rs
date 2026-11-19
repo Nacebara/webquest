@@ -32,6 +32,7 @@ pub struct Env {
     pub client: AccountId,
     pub engine: Engine,
     pub wallets: HashMap<Platform, Arc<UserbotWallet<SimTransport>>>,
+    pub flow: FlowConfig,
 }
 
 pub fn fast() -> FlowConfig {
@@ -140,6 +141,25 @@ async fn build(pool: PgPool, flow: FlowConfig) -> Env {
         .unwrap();
     tx.commit().await.unwrap();
 
+    let (engine, wallets) = wire(engine, &world, ub, &flow);
+    Env {
+        pool,
+        world,
+        ub,
+        client,
+        engine,
+        wallets,
+        flow,
+    }
+}
+
+/// Юзербот на симуляторе: новые ворота аккаунта и кошельки обеих платформ — как при запуске exch.
+fn wire(
+    engine: Engine,
+    world: &SimWorld,
+    ub: AccountId,
+    flow: &FlowConfig,
+) -> (Engine, HashMap<Platform, Arc<UserbotWallet<SimTransport>>>) {
     let transport = Arc::new(world.transport(ub));
     let gate = Arc::new(AccountGate::new("ub-1"));
     let mut wallets = HashMap::new();
@@ -151,18 +171,19 @@ async fn build(pool: PgPool, flow: FlowConfig) -> Env {
         engine = engine.with_wallet(w.clone() as Arc<dyn WalletBot>);
         wallets.insert(platform, w);
     }
-    let engine = engine.with_account("ub-1", transport.clone());
-    Env {
-        pool,
-        world,
-        ub,
-        client,
-        engine,
-        wallets,
-    }
+    (engine.with_account("ub-1", transport.clone()), wallets)
 }
 
 impl Env {
+    /// Перезапуск exch: та же база и те же кошельки, а движок, ворота аккаунта и всё, что было
+    /// в памяти, — новые.
+    pub fn restart(&mut self) {
+        let engine = Engine::new(self.pool.clone(), self.engine.config().clone());
+        let (engine, wallets) = wire(engine, &self.world, self.ub, &self.flow);
+        self.engine = engine;
+        self.wallets = wallets;
+    }
+
     pub async fn submit(&self, url: &str) -> Submitted {
         let link = parsers::links::parse_url(url).unwrap();
         self.engine.submit_check(CLIENT, &link).await.unwrap()
