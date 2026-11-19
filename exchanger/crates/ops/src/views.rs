@@ -747,7 +747,7 @@ impl Inner {
         let title = t.t("promo.c_title");
         let para = |l: &str| format!("<p>{}</p>", l.replace('\n', "<br>"));
         let rich = format!(
-            "<p><b>{title}</b></p><table striped compact><tr><th>{}</th><th align=\"right\">{}</th><th align=\"right\">{}</th></tr>{rows}</table>{}{}<footer>{foot}</footer>",
+            "<h3>{title}</h3><table striped compact><tr><th>{}</th><th align=\"right\">{}</th><th align=\"right\">{}</th></tr>{rows}</table>{}{}<footer>{foot}</footer>",
             t.t("promo.c_reserve"),
             t.t("promo.c_have"),
             t.t("promo.c_of_target"),
@@ -819,7 +819,7 @@ impl Inner {
         let lines = [t.t("promo.modes_off"), t.t("promo.modes_hint"), auto];
         let title = t.t("promo.modes_title");
         let rich = format!(
-            "<p><b>{title}</b></p>{}",
+            "<h3>{title}</h3>{}",
             lines
                 .iter()
                 .map(|l| format!("<p>{l}</p>"))

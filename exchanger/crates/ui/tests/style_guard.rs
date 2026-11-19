@@ -1,6 +1,8 @@
 //! Страж стиля (решение владельца 16.11): стиль интерфейса не должен «поплыть» через месяц.
 //!
-//! - Заголовков h1–h6 нет нигде: вместо них значок и жирная строка.
+//! - Заголовок карточки — `<h3>`, подзаголовок — `<h4>` (решение владельца 19.11). «Значок +
+//!   жирная строка» (`<p><b>`, 16.11) в Telegram рисует премиум-эмодзи почти вдвое крупнее
+//!   текста — так было 15–18.11, владелец вернул как до 15.11. Других заголовков нет.
 //! - В текстах клиента нет обычных эмодзи: только роли премиум-эмодзи (`{e_…}`), у которых есть
 //!   запасной символ на случай, если наборы не установлены.
 
@@ -30,7 +32,7 @@ fn is_plain_emoji(c: char) -> bool {
 }
 
 #[test]
-fn no_headings_in_interface_code_or_texts() {
+fn card_titles_are_h3_and_nothing_else_is_a_heading() {
     let mut files = Vec::new();
     for krate in ["ui", "ops", "tgbot"] {
         rust_files(&crates_dir().join(krate).join("src"), &mut files);
@@ -40,14 +42,19 @@ fn no_headings_in_interface_code_or_texts() {
     for file in files.iter().filter(|f| f.exists()) {
         let text = fs::read_to_string(file).expect("файл читается");
         for (n, line) in text.lines().enumerate() {
-            if (1..=6).any(|h| line.contains(&format!("<h{h}"))) {
+            let other_heading = [1, 2, 5, 6]
+                .iter()
+                .any(|h| line.contains(&format!("<h{h}")));
+            // Жирная строка вместо заголовка: значок в ней Telegram рисует крупнее текста.
+            let bold_title = line.contains("<p><b>{") || line.contains("push_str(\"<p><b>\")");
+            if other_heading || bold_title {
                 bad.push(format!("{}:{}", file.display(), n + 1));
             }
         }
     }
     assert!(
         bad.is_empty(),
-        "заголовки вместо «значок + жирная строка»: {bad:?}"
+        "заголовок карточки — только <h3> (подзаголовок <h4>): {bad:?}"
     );
 }
 

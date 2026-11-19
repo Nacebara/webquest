@@ -139,14 +139,14 @@ impl Inner {
         let title = t.f("orders.title", &[("n", &total)]);
         let mut s = if rows.is_empty() {
             Screen::card(
-                format!("<p><b>{title}</b></p><p>{}</p>", t.t("orders.empty")),
+                format!("<h3>{title}</h3><p>{}</p>", t.t("orders.empty")),
                 format!("<b>{title}</b>\n{}", t.t("orders.empty")),
             )
         } else {
             let (table, plain) = orders_table(&self.links(), t, &rows, Utc::now());
             Screen::card(
                 format!(
-                    "<p><b>{title}</b></p>{table}<footer>{}</footer>",
+                    "<h3>{title}</h3>{table}<footer>{}</footer>",
                     t.t("orders.hint")
                 ),
                 format!("<b>{title}</b>\n{plain}\n<i>{}</i>", t.t("orders.hint")),
@@ -188,12 +188,12 @@ impl Inner {
         let now = Utc::now();
         let mut s = if rows.is_empty() {
             Screen::card(
-                format!("<p><b>{title}</b></p><p>{}</p>", t.t("users.empty")),
+                format!("<h3>{title}</h3><p>{}</p>", t.t("users.empty")),
                 format!("<b>{title}</b>\n{}", t.t("users.empty")),
             )
         } else {
             let mut rich = format!(
-                "<p><b>{title}</b></p><table striped compact><tr><th>{}</th><th align=\"right\">{}</th><th align=\"right\">{}</th></tr>",
+                "<h3>{title}</h3><table striped compact><tr><th>{}</th><th align=\"right\">{}</th><th align=\"right\">{}</th></tr>",
                 t.t("users.c_client"),
                 t.t("users.c_done"),
                 t.t("users.c_last"),
@@ -244,13 +244,13 @@ impl Inner {
         );
         let mut s = if rows.is_empty() {
             Screen::card(
-                format!("<p><b>{title}</b></p><p>{}</p>", t.t("orders.empty")),
+                format!("<h3>{title}</h3><p>{}</p>", t.t("orders.empty")),
                 format!("<b>{title}</b>\n{}", t.t("orders.empty")),
             )
         } else {
             let (table, plain) = orders_table(&self.links(), t, &rows, Utc::now());
             Screen::card(
-                format!("<p><b>{title}</b></p>{table}"),
+                format!("<h3>{title}</h3>{table}"),
                 format!("<b>{title}</b>\n{plain}"),
             )
         };

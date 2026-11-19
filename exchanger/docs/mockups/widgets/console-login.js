@@ -2,6 +2,6 @@
     { t: 'Вход сброшен', tag: 'critical', topic: 'Ошибки', n: 'Ваш выбор «а»: «Войти заново» и «Заменить» вели в тупик — вместо них «Как войти».', bot: 'ops',
       m: [B(`{alarm} <b>ub-2: вход сброшен</b>\nTelegram завершил сессию. ub-2 на паузе, заявки идут через ub-1.`, [[['Как войти', 'help', 'primary']], [['Отключить', 'power']]], { time: '14:15' })] },
     { t: 'Как войти', tag: 'rich', n: 'Шаги на сервере — карточкой, как справка.', bot: 'ops',
-      m: [R(`<p><b>{robot} Как войти · ub-2</b></p><ul class="tasks"><li>{step_todo}<span>Устройства аккаунта: чужое — «Завершить все», новый облачный пароль</span></li><li>{step_todo}<span>На сервере: <code>exch service stop</code></span></li><li>{step_todo}<span><code>exch setup</code> → «Войти заново» → код и пароль</span></li><li>{step_todo}<span><code>exch service start</code></span></li></ul><footer>Номер потерян — тот же exch setup перенесёт кошелёк на другой аккаунт</footer>`, [[['Аккаунты', 'back'], ['Меню', 'dash']]])] },
+      m: [R(`<h3>{robot} Как войти · ub-2</h3><ul class="tasks"><li>{step_todo}<span>Устройства аккаунта: чужое — «Завершить все», новый облачный пароль</span></li><li>{step_todo}<span>На сервере: <code>exch service stop</code></span></li><li>{step_todo}<span><code>exch setup</code> → «Войти заново» → код и пароль</span></li><li>{step_todo}<span><code>exch service start</code></span></li></ul><footer>Номер потерян — тот же exch setup перенесёт кошелёк на другой аккаунт</footer>`, [[['Аккаунты', 'back'], ['Меню', 'dash']]])] },
 
   ] },

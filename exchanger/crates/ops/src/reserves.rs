@@ -70,7 +70,7 @@ pub(crate) fn short(d: Direction) -> &'static str {
 impl ReservesData {
     pub fn screen(&self, t: &Texts) -> Screen {
         let title = t.t("reserves.title");
-        let mut rich = format!("<p><b>{title}</b></p><table striped compact><tr><th></th>");
+        let mut rich = format!("<h3>{title}</h3><table striped compact><tr><th></th>");
         for w in &self.wallets {
             rich.push_str(&format!("<th align=\"right\">{}</th>", name(w.platform)));
         }
@@ -457,7 +457,7 @@ impl Inner {
         let data = self.reserves_data().await?;
         let title = t.t("reserves.th_title");
         let mut rich = format!(
-            "<p><b>{title}</b></p><table striped compact><tr><th></th><th align=\"right\">{}</th><th align=\"right\">{}</th></tr>",
+            "<h3>{title}</h3><table striped compact><tr><th></th><th align=\"right\">{}</th><th align=\"right\">{}</th></tr>",
             t.t("reserves.th_target"),
             t.t("reserves.th_low"),
         );
@@ -489,7 +489,7 @@ impl Inner {
     pub(crate) fn profit(&self) -> Screen {
         let t = &self.texts;
         let rich = format!(
-            "<p><b>{}</b></p><p>{}</p>",
+            "<h3>{}</h3><p>{}</p>",
             t.t("reserves.profit_title"),
             t.t("reserves.profit_soon")
         );

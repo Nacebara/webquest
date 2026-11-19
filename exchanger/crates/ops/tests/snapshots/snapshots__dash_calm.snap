@@ -3,9 +3,7 @@ source: crates/ops/tests/snapshots.rs
 expression: dump(&screen)
 ---
 --- rich
-<p>
-<b>🟢 Всё спокойно</b>
-</p>
+<h3>🟢 Всё спокойно</h3>
 <p>Решать нечего. Выплаты идут, аккаунты на связи.</p>
 <table bordered>
 <tr>

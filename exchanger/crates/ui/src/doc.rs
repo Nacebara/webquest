@@ -5,7 +5,7 @@
 //! Соответствие блоков:
 //! | rich                          | обычный HTML                                  |
 //! |-------------------------------|-----------------------------------------------|
-//! | `<p><b>` (заголовков h1–h6 нет, 16.11) | жирная строка                    |
+//! | `<h3>`, `<h4>` (19.11)         | жирная строка                                 |
 //! | `<p>`                         | строка                                        |
 //! | `<ul><li>`                    | строки `• …`                                  |
 //! | `<table>`                     | готовая фраза на строку, при желании в цитате |
@@ -65,18 +65,18 @@ impl Doc {
     }
 
     pub fn title(&mut self, title: &Frag) {
-        self.rich.push_str("<p><b>");
+        self.rich.push_str("<h3>");
         self.rich.push_str(title.rich());
-        self.rich.push_str("</b></p>");
+        self.rich.push_str("</h3>");
         self.plain.push_str("<b>");
         self.plain.push_str(title.plain());
         self.plain.push_str("</b>\n");
     }
 
     pub fn subtitle(&mut self, title: &Frag) {
-        self.rich.push_str("<p><b>");
+        self.rich.push_str("<h4>");
         self.rich.push_str(title.rich());
-        self.rich.push_str("</b></p>");
+        self.rich.push_str("</h4>");
         self.plain.push_str("<b>");
         self.plain.push_str(title.plain());
         self.plain.push_str("</b>\n");
@@ -246,7 +246,7 @@ mod tests {
         let (rich, plain) = doc.finish();
         assert_eq!(
             rich,
-            "<p><b>Заголовок &lt;x&gt;</b></p><details><summary>Подробнее</summary>\
+            "<h3>Заголовок &lt;x&gt;</h3><details><summary>Подробнее</summary>\
              <ul><li>раз</li><li>два</li></ul><table><tr><td>ячейка</td></tr></table></details>"
         );
         assert_eq!(

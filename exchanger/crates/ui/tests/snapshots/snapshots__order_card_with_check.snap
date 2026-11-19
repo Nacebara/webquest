@@ -11,7 +11,7 @@ expression: "both(p, q)"
 Получили: 97.50 xRocket
 Чек: в кнопке ниже</blockquote>
 --- rich
-<p><b>Заявка <code>A1B2C3D4E5</code></b></p>
+<h3>Заявка <code>A1B2C3D4E5</code></h3>
 <p>🟢 <b>Готово</b> · 7 окт, 15:30 · 9 секунд</p>
 <table compact>
 <tr><td>Прислали</td><td align="right">100.00 CryptoBot</td></tr>
@@ -32,7 +32,7 @@ expression: "both(p, q)"
 Получили: 97.50 xRocket
 Чек: в кнопке ниже</blockquote>
 --- rich
-<p><b>Заявка <code>A1B2C3D4E5</code></b></p>
+<h3>Заявка <code>A1B2C3D4E5</code></h3>
 <p><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> <b>Готово</b> · 7 окт, 15:30 · 9 секунд</p>
 <table compact>
 <tr><td>Прислали</td><td align="right">100.00 CryptoBot</td></tr>

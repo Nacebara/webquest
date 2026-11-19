@@ -10,7 +10,7 @@ expression: "both(p, q)"
 Пришлите ссылку на счёт — назову сумму чека.
 <i>⚡ Одноразовые счета с суммой · 2–200 USDT</i>
 --- rich
-<p><b>🧾 Оплачу ваш счёт</b></p>
+<h3>🧾 Оплачу ваш счёт</h3>
 <table striped compact>
 <tr><th></th><th>Счёт</th><th>Платите чеком</th><th align="right">Комиссия</th></tr>
 <tr><td>🟢</td><td>CryptoBot</td><td>xRocket</td><td align="right">3 %</td></tr>
@@ -29,7 +29,7 @@ expression: "both(p, q)"
 Пришлите ссылку на счёт — назову сумму чека.
 <i><tg-emoji emoji-id="5368000000000000027">⚡</tg-emoji> Одноразовые счета с суммой · 2–200 USDT</i>
 --- rich
-<p><b><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Оплачу ваш счёт</b></p>
+<h3><tg-emoji emoji-id="5368000000000000004">🧾</tg-emoji> Оплачу ваш счёт</h3>
 <table striped compact>
 <tr><th></th><th>Счёт</th><th>Платите чеком</th><th align="right">Комиссия</th></tr>
 <tr><td><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji></td><td>CryptoBot</td><td>xRocket</td><td align="right">3 %</td></tr>

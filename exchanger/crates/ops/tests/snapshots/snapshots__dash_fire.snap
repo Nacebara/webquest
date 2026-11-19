@@ -3,9 +3,7 @@ source: crates/ops/tests/snapshots.rs
 expression: dump(&screen)
 ---
 --- rich
-<p>
-<b>🚨 Нужно решить · 6</b>
-</p>
+<h3>🚨 Нужно решить · 6</h3>
 <p>⛔ <b>Выплаты в xRocket на паузе</b> · с <tg-time unix="1793877300" format="t">14:15</tg-time>
 </p>
 <table compact>
