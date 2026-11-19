@@ -38,25 +38,25 @@
 | `crates/engine/src/worker.rs` | 1418 | прочитан 19.11 | Д-19.1 |
 | `crates/storage/src/admin.rs` | 861 | частично 19.11: бан, лимиты, статистика, пауза аккаунта; карточки и очередь — бегло | нет |
 | `crates/storage/src/alerts.rs` | 571 | прочитан 19.11 | нет |
-| `crates/storage/src/audit.rs` | 103 | — | |
-| `crates/storage/src/client.rs` | 471 | — | |
-| `crates/storage/src/client_prefs.rs` | 61 | — | |
+| `crates/storage/src/audit.rs` | 103 | просмотрен 19.11: все запросы и функции | нет |
+| `crates/storage/src/client.rs` | 471 | прочитан 19.11 (запросы и доступ к чужим заявкам) | нет |
+| `crates/storage/src/client_prefs.rs` | 61 | просмотрен 19.11: все запросы и функции | нет |
 | `crates/storage/src/directions.rs` | 312 | прочитан 19.11 | Д-19.9 |
-| `crates/storage/src/error.rs` | 74 | — | |
+| `crates/storage/src/error.rs` | 74 | просмотрен 19.11: все запросы и функции | нет |
 | `crates/storage/src/holds.rs` | 216 | прочитан 19.11 | Д-19.6 (двойной счёт в лимите — тяж. 1) |
 | `crates/storage/src/invest.rs` | 543 | прочитан 19.11 | нет |
 | `crates/storage/src/ledger.rs` | 163 | прочитан 19.11 | нет |
-| `crates/storage/src/lib.rs` | 78 | — | |
+| `crates/storage/src/lib.rs` | 78 | просмотрен 19.11: все запросы и функции | нет |
 | `crates/storage/src/operations.rs` | 715 | прочитан 19.11 | Д-19.7 |
 | `crates/storage/src/orders.rs` | 500 | прочитан 19.11 | Д-19.8 |
-| `crates/storage/src/promo.rs` | 167 | — | |
-| `crates/storage/src/sessions.rs` | 260 | — | |
-| `crates/storage/src/settings.rs` | 106 | — | |
-| `crates/storage/src/staff.rs` | 243 | — | |
-| `crates/storage/src/transitions.rs` | 30 | — | |
+| `crates/storage/src/promo.rs` | 167 | просмотрен 19.11: все запросы и функции | нет |
+| `crates/storage/src/sessions.rs` | 260 | просмотрен 19.11: все запросы и функции | нет |
+| `crates/storage/src/settings.rs` | 106 | просмотрен 19.11: все запросы и функции | нет |
+| `crates/storage/src/staff.rs` | 243 | прочитан 19.11 (роли, добавление, владелец) | Д-19.6 (тяж. 1) |
+| `crates/storage/src/transitions.rs` | 30 | просмотрен 19.11: все запросы и функции | нет |
 | `crates/storage/src/user_terms.rs` | 342 | прочитан 19.11 | нет |
-| `crates/storage/src/users.rs` | 39 | — | |
-| `crates/storage/src/wallet_messages.rs` | 103 | — | |
+| `crates/storage/src/users.rs` | 39 | просмотрен 19.11: все запросы и функции | нет |
+| `crates/storage/src/wallet_messages.rs` | 103 | просмотрен 19.11: все запросы и функции | нет |
 | `crates/storage/src/wallets.rs` | 176 | прочитан 19.11 | к Д-19.1 |
 | `migrations/0001_init.sql` | 804 | прочитан 19.11 | нет |
 | `migrations/0002_promo_broadcast.sql` | 29 | прочитан 19.11 | нет |
