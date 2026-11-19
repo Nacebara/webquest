@@ -79,18 +79,18 @@
 
 | Файл | Строк | Статус | Находки |
 |---|---|---|---|
-| `crates/mtproto/src/config.rs` | 236 | — | |
+| `crates/mtproto/src/config.rs` | 236 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/mtproto/src/convert.rs` | 1091 | — | |
-| `crates/mtproto/src/crypto.rs` | 349 | — | |
-| `crates/mtproto/src/errors.rs` | 248 | — | |
+| `crates/mtproto/src/crypto.rs` | 349 | прочитан 19.11 (без встроенных тестов) | нет |
+| `crates/mtproto/src/errors.rs` | 248 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/mtproto/src/lib.rs` | 109 | — | |
-| `crates/mtproto/src/login.rs` | 444 | — | |
-| `crates/mtproto/src/requests.rs` | 300 | — | |
-| `crates/mtproto/src/session.rs` | 1035 | — | |
-| `crates/mtproto/src/transport.rs` | 1134 | — | |
+| `crates/mtproto/src/login.rs` | 444 | частично 19.11: журнал входа без секретов | нет |
+| `crates/mtproto/src/requests.rs` | 300 | частично 19.11: адресаты (только закреплённые боты и «Избранное»), резолв со сверкой ID | нет |
+| `crates/mtproto/src/session.rs` | 1035 | частично 19.11: журнал входа без секретов | нет |
+| `crates/mtproto/src/transport.rs` | 1134 | частично 19.11: адресаты (только закреплённые боты и «Избранное»), резолв со сверкой ID | нет |
 | `crates/parsers/src/amount.rs` | 506 | — | |
 | `crates/parsers/src/lib.rs` | 16 | — | |
-| `crates/parsers/src/links.rs` | 1300 | — | |
+| `crates/parsers/src/links.rs` | 1300 | частично 19.11: проверка формата кода, чужие боты, двойники доменов | нет |
 | `crates/parsers/src/replies.rs` | 1053 | — | |
 | `crates/parsers/src/screens.rs` | 414 | — | |
 | `crates/userbot/src/flows/activate.rs` | 149 | прочитан 19.11 | нет |
