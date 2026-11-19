@@ -73,7 +73,7 @@
 | `migrations/0013_rescues.sql` | 44 | прочитан 19.11 | нет |
 | `migrations/0014_drop_rescues.sql` | 19 | прочитан 19.11 | нет |
 | `schema.sql` | 804 | прочитан 19.11 | нет |
-| `schema_test.sql` | 82 | — | сверяется тестом storage/tests/invariants.rs |
+| `schema_test.sql` | 82 | просмотрен 19.11 (сверяется тестом storage/tests/invariants.rs) | нет |
 
 ## 2. Юзербот и кошельки — 31 файлов, 14988 строк
 
@@ -102,12 +102,12 @@
 | `crates/userbot/src/flows/mod.rs` | 279 | прочитан 19.11 | к Д-19.7 |
 | `crates/userbot/src/flows/rid.rs` | 84 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/userbot/src/lib.rs` | 19 | прочитан 19.11 | нет |
-| `crates/userbot/src/sim/bots.rs` | 1408 | — | |
-| `crates/userbot/src/sim/mod.rs` | 426 | — | |
-| `crates/userbot/src/sim/model.rs` | 327 | — | |
-| `crates/userbot/src/sim/state.rs` | 886 | — | |
-| `crates/userbot/src/sim/texts.rs` | 601 | — | |
-| `crates/userbot/src/sim/transport.rs` | 216 | — | |
+| `crates/userbot/src/sim/bots.rs` | 1408 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/userbot/src/sim/mod.rs` | 426 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/userbot/src/sim/model.rs` | 327 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/userbot/src/sim/state.rs` | 886 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/userbot/src/sim/texts.rs` | 601 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/userbot/src/sim/transport.rs` | 216 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
 | `crates/userbot/src/transport.rs` | 192 | прочитан 19.11 | нет |
 | `crates/userbot/src/wallet.rs` | 228 | прочитан 19.11 | нет |
 
@@ -228,193 +228,193 @@
 
 | Файл | Строк | Статус | Находки |
 |---|---|---|---|
-| `crates/app/tests/backup.rs` | 172 | — | |
-| `crates/app/tests/health.rs` | 102 | — | |
-| `crates/app/tests/session_store.rs` | 233 | — | |
-| `crates/app/tests/startup.rs` | 78 | — | |
-| `crates/app/tests/wallet_log.rs` | 289 | — | |
-| `crates/app/tests/wallet_move.rs` | 112 | — | |
-| `crates/botapi/tests/fixtures/telegram/delete_message.json` | 3 | — | |
-| `crates/botapi/tests/fixtures/telegram/edit_message_text.json` | 72 | — | |
-| `crates/botapi/tests/fixtures/telegram/get_me.json` | 18 | — | |
-| `crates/botapi/tests/fixtures/telegram/send_message_protected_with_buttons.json` | 66 | — | |
-| `crates/botapi/tests/fixtures/telegram/send_message_with_effect.json` | 20 | — | |
-| `crates/botapi/tests/fixtures/telegram/send_rich_message.json` | 74 | — | |
-| `crates/botapi/tests/fixtures/telegram/send_widget_not_allowed.json` | 4 | — | |
-| `crates/botapi/tests/fixtures/telegram/set_message_reaction.json` | 3 | — | |
-| `crates/botapi/tests/http.rs` | 565 | — | |
-| `crates/botapi/tests/serialize.rs` | 484 | — | |
-| `crates/engine/tests/admin.rs` | 1170 | — | |
-| `crates/engine/tests/availability.rs` | 101 | — | |
-| `crates/engine/tests/common/mod.rs` | 229 | — | |
-| `crates/engine/tests/crash.rs` | 314 | — | |
-| `crates/engine/tests/engine.rs` | 1141 | — | |
-| `crates/engine/tests/invest.rs` | 477 | — | |
-| `crates/engine/tests/invoice.rs` | 767 | — | |
-| `crates/engine/tests/multi_check.rs` | 341 | — | |
-| `crates/engine/tests/reconcile.rs` | 387 | — | |
-| `crates/mtproto/tests/fake_login.rs` | 250 | — | |
-| `crates/mtproto/tests/fake_transport.rs` | 592 | — | |
-| `crates/mtproto/tests/support/fake_tg.rs` | 493 | — | |
-| `crates/mtproto/tests/support/mod.rs` | 322 | — | |
-| `crates/ops/tests/mockup_dash.rs` | 461 | — | |
-| `crates/ops/tests/ops_bot.rs` | 2370 | — | |
-| `crates/ops/tests/snapshots.rs` | 279 | — | |
-| `crates/ops/tests/snapshots/snapshots__critical_account_restricted.snap` | 13 | — | |
-| `crates/ops/tests/snapshots/snapshots__critical_engine_down.snap` | 11 | — | |
-| `crates/ops/tests/snapshots/snapshots__critical_flood_long.snap` | 12 | — | |
-| `crates/ops/tests/snapshots/snapshots__critical_kill_switch.snap` | 13 | — | |
-| `crates/ops/tests/snapshots/snapshots__critical_login_lost.snap` | 13 | — | |
-| `crates/ops/tests/snapshots/snapshots__critical_new_login.snap` | 12 | — | |
-| `crates/ops/tests/snapshots/snapshots__critical_second_instance.snap` | 13 | — | |
-| `crates/ops/tests/snapshots/snapshots__critical_unknown_reply.snap` | 13 | — | |
-| `crates/ops/tests/snapshots/snapshots__dash_calm.snap` | 45 | — | |
-| `crates/ops/tests/snapshots/snapshots__dash_fire.snap` | 62 | — | |
-| `crates/ops/tests/snapshots/snapshots__dash_ok.snap` | 68 | — | |
-| `crates/ops/tests/snapshots/snapshots__dash_pauses.snap` | 70 | — | |
-| `crates/ops/tests/snapshots/snapshots__maintenance_since_idle.snap` | 12 | — | |
-| `crates/ops/tests/snapshots/snapshots__maintenance_until.snap` | 12 | — | |
-| `crates/ops/tests/snapshots/snapshots__menu_operator_kill_switch.snap` | 18 | — | |
-| `crates/ops/tests/snapshots/snapshots__menu_owner.snap` | 17 | — | |
-| `crates/ops/tests/snapshots/snapshots__order_card_hint_done.snap` | 78 | — | |
-| `crates/ops/tests/snapshots/snapshots__order_card_hint_not.snap` | 79 | — | |
-| `crates/ops/tests/snapshots/snapshots__order_card_hint_unclear.snap` | 79 | — | |
-| `crates/ops/tests/snapshots/snapshots__order_card_operator.snap` | 77 | — | |
-| `crates/ops/tests/snapshots/snapshots__order_card_operator_unknown.snap` | 77 | — | |
-| `crates/ops/tests/snapshots/snapshots__order_card_owner.snap` | 77 | — | |
-| `crates/ops/tests/snapshots/snapshots__queue.snap` | 48 | — | |
-| `crates/ops/tests/snapshots/snapshots__queue_empty.snap` | 13 | — | |
-| `crates/ops/tests/snapshots/snapshots__reconcile_stalled.snap` | 14 | — | |
-| `crates/ops/tests/snapshots/snapshots__reconcile_stalled_selftest.snap` | 12 | — | |
-| `crates/ops/tests/snapshots/snapshots__reserves.snap` | 62 | — | |
-| `crates/ops/tests/snapshots/snapshots__review_alert_no_reply.snap` | 14 | — | |
-| `crates/ops/tests/snapshots/snapshots__review_alert_reply.snap` | 14 | — | |
-| `crates/ops/tests/snapshots/snapshots__shortfall.snap` | 14 | — | |
-| `crates/ops/tests/snapshots/snapshots__shortfall_unsettled.snap` | 15 | — | |
-| `crates/ops/tests/snapshots/snapshots__shortfall_unsettled_between.snap` | 15 | — | |
-| `crates/ops/tests/snapshots/snapshots__surplus.snap` | 13 | — | |
-| `crates/parsers/tests/fixtures.rs` | 450 | — | |
-| `crates/parsers/tests/fixtures/activation.json` | 63 | — | |
-| `crates/parsers/tests/fixtures/amounts.json` | 24 | — | |
-| `crates/parsers/tests/fixtures/balances.json` | 35 | — | |
-| `crates/parsers/tests/fixtures/bare_codes.json` | 16 | — | |
-| `crates/parsers/tests/fixtures/created_checks.json` | 59 | — | |
-| `crates/parsers/tests/fixtures/fiat.json` | 11 | — | |
-| `crates/parsers/tests/fixtures/invoice_cards.json` | 70 | — | |
-| `crates/parsers/tests/fixtures/invoice_payments.json` | 25 | — | |
-| `crates/parsers/tests/fixtures/links.json` | 63 | — | |
-| `crates/parsers/tests/fixtures/live_wallet_replies.json` | 3412 | прочитан 19.11 | Б-19.4 |
-| `crates/parsers/tests/fixtures/messages.json` | 61 | — | |
-| `crates/parsers/tests/live.rs` | 238 | — | |
-| `crates/parsers/tests/prop.proptest-regressions` | 8 | — | |
-| `crates/parsers/tests/prop.rs` | 406 | — | |
-| `crates/storage/tests/alerts.rs` | 101 | — | |
-| `crates/storage/tests/client.rs` | 291 | — | |
-| `crates/storage/tests/common/mod.rs` | 82 | — | |
-| `crates/storage/tests/invariants.rs` | 426 | — | |
-| `crates/storage/tests/orders.rs` | 298 | — | |
-| `crates/storage/tests/outbox.rs` | 444 | — | |
-| `crates/storage/tests/promo.rs` | 104 | — | |
-| `crates/storage/tests/schema.rs` | 79 | — | |
-| `crates/storage/tests/userbots.rs` | 404 | — | |
-| `crates/tgbot/tests/client_bot.rs` | 2171 | — | |
-| `crates/ui/tests/common/mod.rs` | 919 | — | |
-| `crates/ui/tests/errors.rs` | 39 | — | |
-| `crates/ui/tests/html_valid.proptest-regressions` | 7 | — | |
-| `crates/ui/tests/html_valid.rs` | 470 | — | |
-| `crates/ui/tests/menu.rs` | 120 | — | |
-| `crates/ui/tests/mockup.rs` | 548 | — | |
-| `crates/ui/tests/snapshots.rs` | 139 | — | |
-| `crates/ui/tests/snapshots/snapshots__cancelled_flow.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__cancelled_order.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__check_link_missing.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__check_link_pending.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__check_link_waiting.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__closed_by_operator_kept.snap` | 19 | — | |
-| `crates/ui/tests/snapshots/snapshots__closed_by_operator_paid.snap` | 19 | — | |
-| `crates/ui/tests/snapshots/snapshots__errors.snap` | 747 | — | |
-| `crates/ui/tests/snapshots/snapshots__exchange_menu.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__exchange_menu_paused.snap` | 19 | — | |
-| `crates/ui/tests/snapshots/snapshots__exchange_menu_with_offers.snap` | 19 | — | |
-| `crates/ui/tests/snapshots/snapshots__help.snap` | 83 | — | |
-| `crates/ui/tests/snapshots/snapshots__history.snap` | 55 | — | |
-| `crates/ui/tests/snapshots/snapshots__history_empty.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__history_links_page_2.snap` | 49 | — | |
-| `crates/ui/tests/snapshots/snapshots__howto_cryptobot.snap` | 39 | — | |
-| `crates/ui/tests/snapshots/snapshots__howto_xrocket.snap` | 39 | — | |
-| `crates/ui/tests/snapshots/snapshots__inline_cards.snap` | 55 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_deposit.snap` | 21 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_home.snap` | 41 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_home_losses.snap` | 43 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_home_new.snap` | 31 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_howto.snap` | 139 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_howto_new.snap` | 135 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_notice_deposit_accepted.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_notice_deposit_done.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_notice_deposit_manual.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_notice_deposit_rejected.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_done.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_failed.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_manual.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_processing.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_rejected.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_requested.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_problem_bad_amount.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_problem_internal.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_problem_not_a_check.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_problem_open.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_problem_over.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_problem_wallet.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_withdraw.snap` | 21 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_withdraw_amount.snap` | 19 | — | |
-| `crates/ui/tests/snapshots/snapshots__invest_withdraw_nothing.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_awaiting.snap` | 43 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_check_rejected.snap` | 35 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_paid.snap` | 19 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_paid_excess_check.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_paid_excess_kept.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_paid_excess_refund.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_paying.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_prompt.snap` | 41 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_quote.snap` | 47 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_quote_fiat.snap` | 47 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_soon.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__invoice_underpaid.snap` | 39 | — | |
-| `crates/ui/tests/snapshots/snapshots__manual_review.snap` | 19 | — | |
-| `crates/ui/tests/snapshots/snapshots__manual_review_unknown.snap` | 19 | — | |
-| `crates/ui/tests/snapshots/snapshots__menu_and_commands.snap` | 45 | — | |
-| `crates/ui/tests/snapshots/snapshots__no_link.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__operator_answer.snap` | 19 | — | |
-| `crates/ui/tests/snapshots/snapshots__order_card.snap` | 35 | — | |
-| `crates/ui/tests/snapshots/snapshots__order_card_with_check.snap` | 45 | — | |
-| `crates/ui/tests/snapshots/snapshots__order_checking.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__order_checking_amount.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__order_done.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__order_done_details.snap` | 21 | — | |
-| `crates/ui/tests/snapshots/snapshots__order_sending.snap` | 13 | — | |
-| `crates/ui/tests/snapshots/snapshots__order_sending_slow.snap` | 15 | — | |
-| `crates/ui/tests/snapshots/snapshots__other_coin_review.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__privacy.snap` | 49 | — | |
-| `crates/ui/tests/snapshots/snapshots__promo_broadcast.snap` | 23 | — | |
-| `crates/ui/tests/snapshots/snapshots__refund_done.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__refund_done_below_minimum.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__refund_started.snap` | 120 | — | |
-| `crates/ui/tests/snapshots/snapshots__result_below.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__send_check_cb_to_xr.snap` | 39 | — | |
-| `crates/ui/tests/snapshots/snapshots__send_check_paused.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__send_check_xr_to_cb.snap` | 39 | — | |
-| `crates/ui/tests/snapshots/snapshots__support_with_contact.snap` | 19 | — | |
-| `crates/ui/tests/snapshots/snapshots__support_without_contact.snap` | 17 | — | |
-| `crates/ui/tests/snapshots/snapshots__terms.snap` | 49 | — | |
-| `crates/ui/tests/snapshots/snapshots__terms_partly_paused.snap` | 49 | — | |
-| `crates/ui/tests/snapshots/snapshots__terms_with_offers.snap` | 69 | — | |
-| `crates/ui/tests/snapshots/snapshots__welcome.snap` | 47 | — | |
-| `crates/ui/tests/snapshots/snapshots__welcome_all_paused.snap` | 51 | — | |
-| `crates/ui/tests/snapshots/snapshots__welcome_with_offers.snap` | 51 | — | |
-| `crates/ui/tests/style_guard.rs` | 96 | — | |
-| `crates/ui/tests/widgets.rs` | 91 | — | |
-| `crates/userbot/tests/flows.rs` | 1672 | — | |
-| `crates/userbot/tests/sim.rs` | 1473 | — | |
+| `crates/app/tests/backup.rs` | 172 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/app/tests/health.rs` | 102 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/app/tests/session_store.rs` | 233 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/app/tests/startup.rs` | 78 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/app/tests/wallet_log.rs` | 289 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/app/tests/wallet_move.rs` | 112 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/botapi/tests/fixtures/telegram/delete_message.json` | 3 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/botapi/tests/fixtures/telegram/edit_message_text.json` | 72 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/botapi/tests/fixtures/telegram/get_me.json` | 18 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/botapi/tests/fixtures/telegram/send_message_protected_with_buttons.json` | 66 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/botapi/tests/fixtures/telegram/send_message_with_effect.json` | 20 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/botapi/tests/fixtures/telegram/send_rich_message.json` | 74 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/botapi/tests/fixtures/telegram/send_widget_not_allowed.json` | 4 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/botapi/tests/fixtures/telegram/set_message_reaction.json` | 3 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/botapi/tests/http.rs` | 565 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/botapi/tests/serialize.rs` | 484 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/engine/tests/admin.rs` | 1170 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/engine/tests/availability.rs` | 101 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/engine/tests/common/mod.rs` | 229 | прочитан 19.11 | Д-19.10 (обвязка ставит лимит, которого в бою нет) |
+| `crates/engine/tests/crash.rs` | 314 | прочитан 19.11 | нет (инварианты денег верны; счета и переплата — не в прогоне) |
+| `crates/engine/tests/engine.rs` | 1141 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/engine/tests/invest.rs` | 477 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/engine/tests/invoice.rs` | 767 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/engine/tests/multi_check.rs` | 341 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/engine/tests/reconcile.rs` | 387 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/mtproto/tests/fake_login.rs` | 250 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/mtproto/tests/fake_transport.rs` | 592 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/mtproto/tests/support/fake_tg.rs` | 493 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/mtproto/tests/support/mod.rs` | 322 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/mockup_dash.rs` | 461 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/ops_bot.rs` | 2370 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots.rs` | 279 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__critical_account_restricted.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__critical_engine_down.snap` | 11 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__critical_flood_long.snap` | 12 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__critical_kill_switch.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__critical_login_lost.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__critical_new_login.snap` | 12 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__critical_second_instance.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__critical_unknown_reply.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__dash_calm.snap` | 45 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__dash_fire.snap` | 62 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__dash_ok.snap` | 68 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__dash_pauses.snap` | 70 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__maintenance_since_idle.snap` | 12 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__maintenance_until.snap` | 12 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__menu_operator_kill_switch.snap` | 18 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__menu_owner.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__order_card_hint_done.snap` | 78 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__order_card_hint_not.snap` | 79 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__order_card_hint_unclear.snap` | 79 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__order_card_operator.snap` | 77 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__order_card_operator_unknown.snap` | 77 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__order_card_owner.snap` | 77 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__queue.snap` | 48 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__queue_empty.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__reconcile_stalled.snap` | 14 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__reconcile_stalled_selftest.snap` | 12 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__reserves.snap` | 62 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__review_alert_no_reply.snap` | 14 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__review_alert_reply.snap` | 14 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__shortfall.snap` | 14 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__shortfall_unsettled.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__shortfall_unsettled_between.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ops/tests/snapshots/snapshots__surplus.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/fixtures.rs` | 450 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/fixtures/activation.json` | 63 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/fixtures/amounts.json` | 24 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/fixtures/balances.json` | 35 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/fixtures/bare_codes.json` | 16 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/fixtures/created_checks.json` | 59 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/fixtures/fiat.json` | 11 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/fixtures/invoice_cards.json` | 70 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/fixtures/invoice_payments.json` | 25 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/fixtures/links.json` | 63 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/fixtures/live_wallet_replies.json` | 3412 | прочитан 19.11 (коды перемешаны — Б-19.4 снята) | нет |
+| `crates/parsers/tests/fixtures/messages.json` | 61 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/live.rs` | 238 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/prop.proptest-regressions` | 8 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/parsers/tests/prop.rs` | 406 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/storage/tests/alerts.rs` | 101 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/storage/tests/client.rs` | 291 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/storage/tests/common/mod.rs` | 82 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/storage/tests/invariants.rs` | 426 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/storage/tests/orders.rs` | 298 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/storage/tests/outbox.rs` | 444 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/storage/tests/promo.rs` | 104 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/storage/tests/schema.rs` | 79 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/storage/tests/userbots.rs` | 404 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/tgbot/tests/client_bot.rs` | 2171 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/common/mod.rs` | 919 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/errors.rs` | 39 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/html_valid.proptest-regressions` | 7 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/html_valid.rs` | 470 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/menu.rs` | 120 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/mockup.rs` | 548 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots.rs` | 139 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__cancelled_flow.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__cancelled_order.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__check_link_missing.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__check_link_pending.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__check_link_waiting.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__closed_by_operator_kept.snap` | 19 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__closed_by_operator_paid.snap` | 19 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__errors.snap` | 747 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__exchange_menu.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__exchange_menu_paused.snap` | 19 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__exchange_menu_with_offers.snap` | 19 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__help.snap` | 83 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__history.snap` | 55 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__history_empty.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__history_links_page_2.snap` | 49 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__howto_cryptobot.snap` | 39 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__howto_xrocket.snap` | 39 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__inline_cards.snap` | 55 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_deposit.snap` | 21 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_home.snap` | 41 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_home_losses.snap` | 43 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_home_new.snap` | 31 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_howto.snap` | 139 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_howto_new.snap` | 135 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_notice_deposit_accepted.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_notice_deposit_done.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_notice_deposit_manual.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_notice_deposit_rejected.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_done.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_failed.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_manual.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_processing.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_rejected.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_notice_withdraw_requested.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_problem_bad_amount.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_problem_internal.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_problem_not_a_check.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_problem_open.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_problem_over.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_problem_wallet.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_withdraw.snap` | 21 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_withdraw_amount.snap` | 19 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invest_withdraw_nothing.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_awaiting.snap` | 43 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_check_rejected.snap` | 35 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_paid.snap` | 19 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_paid_excess_check.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_paid_excess_kept.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_paid_excess_refund.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_paying.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_prompt.snap` | 41 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_quote.snap` | 47 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_quote_fiat.snap` | 47 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_soon.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__invoice_underpaid.snap` | 39 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__manual_review.snap` | 19 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__manual_review_unknown.snap` | 19 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__menu_and_commands.snap` | 45 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__no_link.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__operator_answer.snap` | 19 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__order_card.snap` | 35 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__order_card_with_check.snap` | 45 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__order_checking.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__order_checking_amount.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__order_done.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__order_done_details.snap` | 21 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__order_sending.snap` | 13 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__order_sending_slow.snap` | 15 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__other_coin_review.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__privacy.snap` | 49 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__promo_broadcast.snap` | 23 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__refund_done.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__refund_done_below_minimum.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__refund_started.snap` | 120 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__result_below.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__send_check_cb_to_xr.snap` | 39 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__send_check_paused.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__send_check_xr_to_cb.snap` | 39 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__support_with_contact.snap` | 19 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__support_without_contact.snap` | 17 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__terms.snap` | 49 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__terms_partly_paused.snap` | 49 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__terms_with_offers.snap` | 69 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__welcome.snap` | 47 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__welcome_all_paused.snap` | 51 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/snapshots/snapshots__welcome_with_offers.snap` | 51 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/style_guard.rs` | 96 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/ui/tests/widgets.rs` | 91 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/userbot/tests/flows.rs` | 1672 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `crates/userbot/tests/sim.rs` | 1473 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
 
 ## 6. Виджеты, макеты, инструменты, диаграммы — 65 файлов, 17728 строк
 
@@ -471,20 +471,20 @@
 | `docs/mockups/widgets/samples.json` | 8955 | просмотрен 19.11 | нет |
 | `tools/emoji/.gitignore` | 2 | просмотрен 19.11 | нет |
 | `tools/emoji/README.md` | 90 | просмотрен 19.11 | нет |
-| `tools/emoji/check.js` | 47 | — | |
-| `tools/emoji/demo-packs.json` | 241 | — | |
-| `tools/emoji/frames.js` | 43 | — | |
-| `tools/emoji/icons.js` | 701 | — | |
-| `tools/emoji/package-lock.json` | 536 | — | |
-| `tools/emoji/package.json` | 9 | — | |
-| `tools/emoji/preview.py` | 99 | — | |
-| `tools/emoji/static.js` | 84 | — | |
-| `tools/emoji/tgs.js` | 1107 | — | |
-| `tools/emoji/verify_tgs.py` | 153 | — | |
-| `tools/recording/README.md` | 20 | — | |
-| `tools/recording/live_fixtures.py` | 146 | — | |
-| `tools/recording/sanitize.py` | 113 | — | |
-| `tools/telegram/record.py` | 62 | — | |
+| `tools/emoji/check.js` | 47 | просмотрен 19.11 (инструмент наборов эмодзи, вне exch) | нет |
+| `tools/emoji/demo-packs.json` | 241 | просмотрен 19.11 (инструмент наборов эмодзи, вне exch) | нет |
+| `tools/emoji/frames.js` | 43 | просмотрен 19.11 (инструмент наборов эмодзи, вне exch) | нет |
+| `tools/emoji/icons.js` | 701 | просмотрен 19.11 (инструмент наборов эмодзи, вне exch) | нет |
+| `tools/emoji/package-lock.json` | 536 | просмотрен 19.11 (инструмент наборов эмодзи, вне exch) | нет |
+| `tools/emoji/package.json` | 9 | просмотрен 19.11 (инструмент наборов эмодзи, вне exch) | нет |
+| `tools/emoji/preview.py` | 99 | просмотрен 19.11 (инструмент наборов эмодзи, вне exch) | нет |
+| `tools/emoji/static.js` | 84 | просмотрен 19.11 (инструмент наборов эмодзи, вне exch) | нет |
+| `tools/emoji/tgs.js` | 1107 | просмотрен 19.11 (инструмент наборов эмодзи, вне exch) | нет |
+| `tools/emoji/verify_tgs.py` | 153 | просмотрен 19.11 (инструмент наборов эмодзи, вне exch) | нет |
+| `tools/recording/README.md` | 20 | прочитан 19.11 (перемешивает коды, убирает имена и «Избранное») | нет |
+| `tools/recording/live_fixtures.py` | 146 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `tools/recording/sanitize.py` | 113 | прочитан 19.11 (перемешивает коды, убирает имена и «Избранное») | нет |
+| `tools/telegram/record.py` | 62 | просмотрен 19.11 (служебный инструмент записи) | нет |
 
 ## 7. Документы — 26 файлов, 7689 строк
 
@@ -492,34 +492,34 @@
 |---|---|---|---|
 | `CLAUDE.md` | 130 | прочитан 19.11 | Р-19.1 (п. 8) |
 | `README.md` | 72 | прочитан 19.11 | Р-19.4 |
-| `SPEC.md` | 1878 | — | |
-| `docs/AUDIT-2026-11-11.md` | 278 | — | |
-| `docs/AUDIT-METHOD.md` | 284 | — | |
-| `docs/AUDIT-UI.md` | 130 | — | |
-| `docs/BOTAPI-RICH.md` | 41 | — | |
-| `docs/BOTAPI-WIDGETS.md` | 145 | — | |
+| `SPEC.md` | 1878 | просмотрен 19.11 (по ссылкам из кода: §11, §15.1) | Д-19.10 (§15.1 п. 2) |
+| `docs/AUDIT-2026-11-11.md` | 278 | просмотрен 19.11 (архив и прошлые аудиты; живые решения перенесены в PLAN-v2/NEXT) | нет |
+| `docs/AUDIT-METHOD.md` | 284 | прочитан 19.11 (обновлялся в эти дни) | Г-19.1, Р-19.3 |
+| `docs/AUDIT-UI.md` | 130 | просмотрен 19.11 (архив и прошлые аудиты; живые решения перенесены в PLAN-v2/NEXT) | нет |
+| `docs/BOTAPI-RICH.md` | 41 | просмотрен 19.11 | нет |
+| `docs/BOTAPI-WIDGETS.md` | 145 | прочитан 19.11 (обновлялся в эти дни) | Г-19.1, Р-19.3 |
 | `docs/DEPLOY.md` | 104 | прочитан 19.11 | Д-19.10 (лимит без код-пароля только в CryptoBot) |
 | `docs/DESIGN-v0.2.md` | 112 | прочитан 19.11 (Р11 — «меняется из пульта» неверно) | Д-19.10 |
-| `docs/HANDOVER.md` | 327 | — | |
-| `docs/INVEST-LOSSES.md` | 46 | — | |
-| `docs/LAPTOP.md` | 83 | — | |
-| `docs/LOVEC-PORTING.md` | 726 | — | |
-| `docs/NEXT.md` | 258 | — | |
-| `docs/OWNER-BRIEF.md` | 105 | — | |
-| `docs/PLAN-v1.md` | 263 | — | |
-| `docs/PLAN-v2.md` | 218 | — | |
-| `docs/PROGRESS.md` | 663 | — | |
-| `docs/PROPOSALS-16-11.md` | 131 | — | |
-| `docs/RECORDING.md` | 163 | — | |
+| `docs/HANDOVER.md` | 327 | просмотрен 19.11 (архив и прошлые аудиты; живые решения перенесены в PLAN-v2/NEXT) | нет |
+| `docs/INVEST-LOSSES.md` | 46 | просмотрен 19.11 | нет |
+| `docs/LAPTOP.md` | 83 | прочитан 19.11 | Д-19.10 (лимит без код-пароля не упомянут) |
+| `docs/LOVEC-PORTING.md` | 726 | просмотрен 19.11 (архив и прошлые аудиты; живые решения перенесены в PLAN-v2/NEXT) | нет |
+| `docs/NEXT.md` | 258 | прочитан 19.11 (обновлялся в эти дни) | Г-19.1, Р-19.3 |
+| `docs/OWNER-BRIEF.md` | 105 | просмотрен 19.11 (архив и прошлые аудиты; живые решения перенесены в PLAN-v2/NEXT) | нет |
+| `docs/PLAN-v1.md` | 263 | прочитан 19.11 (обновлялся в эти дни) | Г-19.1, Р-19.3 |
+| `docs/PLAN-v2.md` | 218 | прочитан 19.11 (обновлялся в эти дни) | Г-19.1, Р-19.3 |
+| `docs/PROGRESS.md` | 663 | прочитан 19.11 (обновлялся в эти дни) | Г-19.1, Р-19.3 |
+| `docs/PROPOSALS-16-11.md` | 131 | просмотрен 19.11 (архив и прошлые аудиты; живые решения перенесены в PLAN-v2/NEXT) | нет |
+| `docs/RECORDING.md` | 163 | просмотрен 19.11 | нет |
 | `docs/RUNBOOK.md` | 138 | прочитан 19.11 | Р-19.3 |
-| `docs/STATUS-18-11.md` | 202 | — | |
-| `docs/audit-16-11/client.md` | 243 | — | |
-| `docs/audit-16-11/ops.md` | 599 | — | |
-| `docs/audit-16-11/platform.md` | 350 | — | |
+| `docs/STATUS-18-11.md` | 202 | прочитан 19.11 (обновлялся в эти дни) | Г-19.1, Р-19.3 |
+| `docs/audit-16-11/client.md` | 243 | просмотрен 19.11 (архив и прошлые аудиты; живые решения перенесены в PLAN-v2/NEXT) | нет |
+| `docs/audit-16-11/ops.md` | 599 | просмотрен 19.11 (архив и прошлые аудиты; живые решения перенесены в PLAN-v2/NEXT) | нет |
+| `docs/audit-16-11/platform.md` | 350 | просмотрен 19.11 (архив и прошлые аудиты; живые решения перенесены в PLAN-v2/NEXT) | нет |
 
 ## 8. Прочее — 2 файлов, 413 строк
 
 | Файл | Строк | Статус | Находки |
 |---|---|---|---|
-| `crates/domain/proptest-regressions/reconcile.txt` | 9 | — | |
-| `docs/launch-checklist.json` | 404 | — | |
+| `crates/domain/proptest-regressions/reconcile.txt` | 9 | частично 19.11: поиск (нет #[ignore], пустых и выключенных проверок), прогон в CI; построчно не читан | нет |
+| `docs/launch-checklist.json` | 404 | прочитан 19.11 (сверка с находками) | Г-19.1 |
