@@ -14,15 +14,15 @@
 
 | Файл | Строк | Статус | Находки |
 |---|---|---|---|
-| `crates/domain/src/asset.rs` | 126 | — | |
-| `crates/domain/src/direction.rs` | 104 | — | |
-| `crates/domain/src/fees.rs` | 597 | — | |
-| `crates/domain/src/fsm.rs` | 882 | — | |
-| `crates/domain/src/ledger.rs` | 659 | — | |
-| `crates/domain/src/lib.rs` | 17 | — | |
-| `crates/domain/src/money.rs` | 208 | — | |
-| `crates/domain/src/pricing.rs` | 567 | — | |
-| `crates/domain/src/reconcile.rs` | 266 | — | |
+| `crates/domain/src/asset.rs` | 126 | прочитан 19.11 (без встроенных тестов) | нет |
+| `crates/domain/src/direction.rs` | 104 | прочитан 19.11 (без встроенных тестов) | нет |
+| `crates/domain/src/fees.rs` | 597 | прочитан 19.11 (без встроенных тестов) | нет |
+| `crates/domain/src/fsm.rs` | 882 | прочитан 19.11 (без встроенных тестов) | нет |
+| `crates/domain/src/ledger.rs` | 659 | прочитан 19.11 (без встроенных тестов) | нет |
+| `crates/domain/src/lib.rs` | 17 | прочитан 19.11 | нет |
+| `crates/domain/src/money.rs` | 208 | прочитан 19.11 (без встроенных тестов) | нет |
+| `crates/domain/src/pricing.rs` | 567 | прочитан 19.11 (без встроенных тестов) | нет |
+| `crates/domain/src/reconcile.rs` | 266 | прочитан 19.11 (без встроенных тестов) | нет |
 | `crates/engine/src/account_alerts.rs` | 192 | — | |
 | `crates/engine/src/availability.rs` | 124 | — | |
 | `crates/engine/src/effects.rs` | 269 | — | |
@@ -58,22 +58,22 @@
 | `crates/storage/src/users.rs` | 39 | — | |
 | `crates/storage/src/wallet_messages.rs` | 103 | — | |
 | `crates/storage/src/wallets.rs` | 176 | — | |
-| `migrations/0001_init.sql` | 804 | — | |
-| `migrations/0002_promo_broadcast.sql` | 29 | — | |
-| `migrations/0003_reconcile_unsettled.sql` | 15 | — | |
-| `migrations/0004_reconcile_balance_read.sql` | 16 | — | |
-| `migrations/0005_alert_copies.sql` | 27 | — | |
-| `migrations/0006_progress_sent_at.sql` | 8 | — | |
-| `migrations/0007_client_prefs.sql` | 12 | — | |
-| `migrations/0008_drop_plain_view.sql` | 3 | — | |
-| `migrations/0009_alert_mutes.sql` | 6 | — | |
-| `migrations/0010_check_claimed.sql` | 5 | — | |
-| `migrations/0011_alert_copy_by_message.sql` | 4 | — | |
-| `migrations/0012_alert_copy_closed.sql` | 9 | — | |
-| `migrations/0013_rescues.sql` | 44 | — | |
-| `migrations/0014_drop_rescues.sql` | 19 | — | |
-| `schema.sql` | 804 | — | |
-| `schema_test.sql` | 82 | — | |
+| `migrations/0001_init.sql` | 804 | прочитан 19.11 | нет |
+| `migrations/0002_promo_broadcast.sql` | 29 | прочитан 19.11 | нет |
+| `migrations/0003_reconcile_unsettled.sql` | 15 | прочитан 19.11 | нет |
+| `migrations/0004_reconcile_balance_read.sql` | 16 | прочитан 19.11 | нет |
+| `migrations/0005_alert_copies.sql` | 27 | прочитан 19.11 | нет |
+| `migrations/0006_progress_sent_at.sql` | 8 | прочитан 19.11 | нет |
+| `migrations/0007_client_prefs.sql` | 12 | прочитан 19.11 | нет |
+| `migrations/0008_drop_plain_view.sql` | 3 | прочитан 19.11 | нет |
+| `migrations/0009_alert_mutes.sql` | 6 | прочитан 19.11 | нет |
+| `migrations/0010_check_claimed.sql` | 5 | прочитан 19.11 | нет |
+| `migrations/0011_alert_copy_by_message.sql` | 4 | прочитан 19.11 | нет |
+| `migrations/0012_alert_copy_closed.sql` | 9 | прочитан 19.11 | нет |
+| `migrations/0013_rescues.sql` | 44 | прочитан 19.11 | нет |
+| `migrations/0014_drop_rescues.sql` | 19 | прочитан 19.11 | нет |
+| `schema.sql` | 804 | прочитан 19.11 | нет |
+| `schema_test.sql` | 82 | — | сверяется тестом storage/tests/invariants.rs |
 
 ## 2. Юзербот и кошельки — 31 файлов, 14988 строк
 
