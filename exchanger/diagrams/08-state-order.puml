@@ -37,7 +37,7 @@ PAYOUT_PENDING --> MANUAL_REVIEW : PayoutFailed: нет средств /\nисх
 
 INVOICE_PAY_PENDING --> COMPLETED : InvoicePaid
 INVOICE_PAY_PENDING --> REFUND_PENDING : InvoiceUnpayable: счёт истёк /\nоплачен кем-то до нас
-INVOICE_PAY_PENDING --> MANUAL_REVIEW : InvoicePayNeedsHuman:\nPIN (NeedsHuman) / исход неясен
+INVOICE_PAY_PENDING --> MANUAL_REVIEW : InvoicePayNeedsHuman:\nкод-пароль / мини-приложение (NeedsHuman) / исход неясен
 
 REFUND_PENDING --> REFUNDED : RefundConfirmed:\nчек возврата создан
 REFUND_PENDING --> MANUAL_REVIEW : RefundFailed

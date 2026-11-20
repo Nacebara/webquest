@@ -1,7 +1,7 @@
 @startuml sequence-invoice-payment
 ' Последовательность: оплата счёта CryptoBot деньгами из xRocket (pay_cb_invoice, DESIGN-v0.2 Р4).
-' Клиент платит чеком; счёт оплачивает юзербот через мини-приложение с PIN.
-' Пока протокол мини-приложения не записан (HAR), исход — NeedsHuman и оператор.
+' Клиент платит чеком; счёт оплачивает юзербот кнопками в чате @send (Р4, Р12). Мини-приложений
+' не открываем, код-пароль не вводим никогда. Сверено с кодом 20.11.2026.
 skinparam shadowing false
 autonumber "<b>[00]"
 title Оплата счёта CryptoBot деньгами из xRocket
@@ -12,10 +12,9 @@ participant "Ядро" as CORE
 database "PostgreSQL" as DB
 participant "Юзербот CryptoBot" as UBC
 participant "@send (CryptoBot)" as SEND
-participant "Мини-приложение\nCryptoBot (HTTP)" as WEB
 participant "Юзербот xRocket" as UBX
 participant "@xrocket" as XRB
-actor "Оператор\n(ops-бот)" as OP
+actor "Сотрудник\n(пульт в том же боте)" as OP
 
 C -> BOT : t.me/send?start=IV…
 BOT -> CORE : IncomingLink(invoice)
@@ -42,24 +41,24 @@ CORE -> DB : operation→dispatched (коммит ДО нажатия)
 CORE -> UBC : pay_invoice(IV…, USDT, 10.00)
 UBC -> SEND : "/start IV…" — повторное открытие
 SEND --> UBC : карточка, статус «активен»
-UBC -> SEND : getBotCallbackAnswer(USDT),\nзатем getBotCallbackAnswer(«Оплатить»)
-SEND --> UBC : кнопка мини-приложения
-UBC -> SEND : messages.requestWebView → URL с tgWebAppData
-alt протокол мини-приложения записан (после HAR, M6)
-  UBC -> WEB : ввод PIN (CRYPTOBOT_PIN), подтверждение
-  WEB --> UBC : оплачено
-  SEND --> UBC : «Счёт оплачен»
+UBC -> SEND : «📥 Подтвердите оплату … 10 USDT» → сверка суммы →\n«💳 Оплатить 10 USDT» (один раз, никогда снова)
+alt знакомый получатель
+  SEND --> UBC : «💸» → «👌» → «📥 Вы оплатили счёт #IV…»
+else «👉 Вы уверены, что доверяете этому получателю?»
+  UBC -> SEND : «💸 Отправить платеж получателю» (один раз)
+  SEND --> UBC : «📥 Вы оплатили счёт #IV…»
+end
+alt оплачено
   UBC -> CORE : PayOutcome::Paid
   CORE -> DB : order→COMPLETED; ledger: Дт payable 10.30 /\nКт asset:cb 10.00 / Кт revenue:fee 0.30; hold → consumed
   CORE -> BOT : «Счёт оплачен»
-else сейчас: протокол неизвестен
+else код-пароль, мини-приложение или незнакомый экран — деньги не двигались
   UBC -> CORE : PayOutcome::NeedsHuman
   CORE -> DB : order→MANUAL_REVIEW (InvoicePayNeedsHuman)
-  CORE -> BOT : «Заявка на ручной проверке, деньги у меня» (S8)
-  CORE -> OP : задача «оплати счёт вручную» (SLA 15 мин)
-  OP -> SEND : оплата со служебного аккаунта\n(Telegram Desktop, юзербот на паузе)
-  OP -> CORE : «Оплачено» (Operator(CloseAsPaid))\nили «Не получилось» (Operator(Refund))
-else таймаут / незнакомый ответ после «Оплатить»
+  CORE -> BOT : «Проверяю вручную… деньги у меня»
+  CORE -> OP : тревога «Нужен разбор»
+  OP -> CORE : «Повторить оплату», «Вернуть»\nили «Выплачено» по найденной оплате
+else таймаут / незнакомый ответ после нажатия
   UBC -> CORE : PayOutcome::Unknown
   CORE -> DB : order→MANUAL_REVIEW; повторно НЕ нажимаем
   CORE -> UBC : inspect_invoice + balances — сверка для оператора

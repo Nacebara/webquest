@@ -34,8 +34,9 @@ while (Есть операция?) is (да)
     endif
   case (create_payout / refund / excess_check DISPATCHED)
     :Повторно НЕ создавать;
-    :find_issued_check: «Избранное»
-    и список чеков бота;
+    :find_issued_check: чек между меткой
+    операции в «Избранном» и следующей меткой,
+    список чеков бота;
     if (Однозначно?) then (да)
       :PayoutConfirmed / RefundConfirmed;
     else (нет)

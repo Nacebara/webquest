@@ -13,7 +13,7 @@ participant "Юзербот CryptoBot\n(актор, mtproto)" as UBC
 participant "@send" as SEND
 participant "Юзербот xRocket\n(актор, mtproto)" as UBX
 participant "@xrocket" as XRB
-participant "Ops-бот" as OPS
+participant "Пульт\n(тот же бот)" as OPS
 
 C -> BOT : ссылка t.me/send?start=CQ…
 BOT -> CORE : IncomingLink{user, CryptoBot, CQ…}
@@ -34,18 +34,18 @@ CORE -> BOT : edit «Чек принят: 100 USDT. Готовлю чек xRocke
 
 CORE -> DB : UPDATE operation SET status='dispatched'; COMMIT
 CORE -> UBX : issue_check(97.50 USDT, OpTag{key, random_id})
-UBX -> XRB : messages.getInlineBotResults("97.5")
-XRB --> UBX : результаты (USDT 97.5 …)
-UBX -> XRB : messages.sendInlineBotResult(→ «Избранное», random_id)
-XRB --> UBX : сообщение-чек в «Избранном» с URL-кнопкой\n(кнопка может прийти правкой)
-UBX -> DB : INSERT wallet_message(raw)
+UBX -> UBX : метка «🏷 exch ord-42-payout» в «Избранное»
+UBX -> XRB : меню: /cheques → «Персональный» →\n«Создать чек» → USDT
+UBX -> XRB : сумма «97.5» (random_id операции)
+XRB --> UBX : правка меню: «Сумма чека 97.5 USDT — подтвердите»
+UBX -> XRB : сверка суммы → «✅ Подтверждаю»
+XRB --> UBX : правка: экран чека с URL-кнопкой
+UBX -> DB : INSERT wallet_message(raw) — до разбора
 alt ссылка получена
-  UBX -> CORE : IssueOutcome::Issued{t.me/xrocket?start=t_…, Inline}
-else ошибка ДО sendInlineBotResult
-  UBX -> XRB : меню: /cheques → «Персональный» →\n«Создать чек» → USDT → 97.5
-  XRB --> UBX : чек со ссылкой
-  UBX -> CORE : IssueOutcome::Issued{…, Menu}
-else сбой или таймаут ПОСЛЕ отправки
+  UBX -> CORE : IssueOutcome::Issued{t.me/xrocket?start=t_…, Menu}
+else сбой меню ДО отправки суммы
+  UBX -> CORE : Err — чек появиться не мог;\nповтор проходит меню заново (retry_room)
+else сбой или таймаут ПОСЛЕ отправки суммы
   UBX -> CORE : IssueOutcome::Unknown
   CORE -> UBX : find_issued_check(97.50, OpTag)\n— повторно чек НЕ создаём
   UBX --> CORE : чек найден / не найден
@@ -53,6 +53,6 @@ else сбой или таймаут ПОСЛЕ отправки
 end
 CORE -> DB : BEGIN; operation→succeeded(external_id = ссылка);\norder→COMPLETED; ledger: Дт payable 100 /\nКт asset:xr 97.50 / Кт revenue:fee 2.50;\nhold → consumed; payout_check_url; COMMIT
 CORE -> BOT : edit итог
-BOT -> C : «Ваш чек xRocket на 97.50 USDT»\n[Забрать чек] [Скопировать ссылку]
+BOT -> C : итог заявки с зелёной «Забрать 97.50 USDT»
 CORE -> OPS : лог в тему «Обмены» (агрегировано)
 @enduml

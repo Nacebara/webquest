@@ -1,5 +1,5 @@
 @startuml er
-' ER-диаграмма (соответствует schema.sql, миграция 0001, v0.2)
+' ER-диаграмма: схема после миграций 0001–0016 (сверено 20.11.2026). Показаны ключи и главные столбцы.
 skinparam shadowing false
 skinparam linetype ortho
 hide circle
@@ -59,7 +59,7 @@ entity orders {
   intake_amount, fee_amount, payout_amount
   payout_method, payout_check_url
   quote_amount_in, quote_expires_at
-  progress_chat_id, progress_message_id
+  progress_chat_id, progress_message_id, progress_sent_at
 }
 entity order_transitions {
   * id <<PK>>
@@ -76,6 +76,7 @@ entity operations {
   start_param, amount, asset
   request (random_id), response, external_id
   attempts, max_attempts (=1 для выводящих деньги)
+  claimed_at (чек забран)
 }
 entity wallet_messages {
   * id <<PK>>
@@ -138,6 +139,7 @@ entity reconciliations {
   --
   wallet_account_id, asset, source
   expected, actual, diff, verdict
+  unsettled_ops[], matched_ops[], balance_read
 }
 entity rebalances {
   * id <<PK>>
@@ -157,7 +159,76 @@ entity alerts {
   * id <<PK>>
   --
   level, topic, dedup_key, count
-  acked_by <<FK staff>>
+  acked_by <<FK staff>>, resolved_at, repeats
+}
+entity alert_copies {
+  * alert_id <<FK alerts>>, chat_id <<PK>>
+  --
+  message_id, sent_at, muted_at, closed_at
+}
+entity direction_pauses {
+  * direction <<FK directions>>, platform, kind <<PK>>
+  --
+  reason, since
+  (причины автопаузы набором, 0016)
+}
+entity order_state_transitions {
+  * from_state, to_state <<PK>>
+  --
+  (= domain::fsm::ALLOWED, 32)
+}
+entity user_terms {
+  * user_id <<FK users>>, direction <<FK directions>> <<PK>>
+  --
+  fee_pct, min_fee, min_amount, max_amount
+  newcomer_exempt, note, updated_by <<FK staff>>
+}
+entity client_prefs {
+  * user_id <<PK>>
+  --
+  plain_view, support_order, support_since
+}
+entity investors {
+  * user_id <<PK, FK users>>
+  --
+  share_pct, lock_days, min_deposit
+  auto_withdraw_max, is_active, granted_by <<FK staff>>
+}
+entity invest_moves {
+  * id <<PK>>
+  --
+  user_id <<FK investors>>
+  kind (deposit|withdrawal), status, platform
+  amount, start_param, check_url, note
+  decided_by <<FK staff>>
+}
+entity broadcasts {
+  * id <<PK>>
+  --
+  created_by <<FK staff>>
+  text_html, audience, state, total, sent, failed
+}
+entity broadcast_deliveries {
+  * broadcast_id <<FK>>, user_id <<FK users>> <<PK>>
+  --
+  status
+}
+entity promo_broadcasts {
+  * id <<PK>>
+  --
+  direction, started_at, finished_at
+  cursor_user, total, delivered, skipped, failed
+}
+entity referral_rewards {
+  * id <<PK>>
+  --
+  referrer_id <<FK users>>, order_id <<UQ, FK orders>>
+  asset, amount, paid_operation_id <<FK operations>>
+}
+entity rates {
+  * base, quote, source <<PK>>
+  --
+  rate, fetched_at
 }
 entity settings {
   * key <<PK>>
@@ -190,4 +261,14 @@ wallet_accounts ||--o{ reconciliations
 wallet_accounts ||--o| reserve_thresholds
 ledger_transactions ||--|{ ledger_entries
 ledger_accounts ||--o{ ledger_entries
+alerts ||--o{ alert_copies
+directions ||--o{ direction_pauses
+users ||--o{ user_terms
+directions ||--o{ user_terms
+users ||--o| investors
+investors ||--o{ invest_moves
+broadcasts ||--o{ broadcast_deliveries
+users ||--o{ broadcast_deliveries
+users ||--o{ referral_rewards
+orders ||--o| referral_rewards
 @enduml

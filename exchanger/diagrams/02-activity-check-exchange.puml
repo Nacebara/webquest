@@ -1,7 +1,8 @@
 @startuml activity-check-exchange
 ' Обмен чека CryptoBot -> xRocket — основной поток (DESIGN-v0.2, Р1).
 ' Обратное направление симметрично: вход @xrocket, выплата чеком @send.
-' Всё делает юзербот; выплата — чек, который юзербот создаёт сам (create_payout_check, одна попытка).
+' Всё делает юзербот; выплата — чек, который юзербот создаёт сам через меню бота (DESIGN-v0.2 Р5,
+' инлайн-режима нет), create_payout_check — одна попытка. Сверено с кодом 20.11.2026.
 skinparam shadowing false
 skinparam ActivityBackgroundColor #FFFFFF
 title Обмен чека CryptoBot → xRocket (основной поток; обратное направление симметрично)
@@ -96,18 +97,19 @@ COMMIT;
 :Outbox: operation → dispatched (COMMIT);
 
 |Юзербот xRocket|
-:inline_query(@xrocket, "97.5")
-→ результат USDT ровно на 97,50;
-if (Ошибка ДО отправки результата?) then (да)
-  :Запасной путь — меню:
-  /cheques → «Персональный» →
-  «Создать чек» → USDT → 97.5;
-else (нет)
-  :send_inline в «Избранное»
-  с сохранённым random_id;
-endif
+:Метка операции в «Избранное»:
+«🏷 exch ord-42-payout»;
+:Меню бота: /cheques → «Персональный» →
+«Создать чек» → USDT → сумма 97.5 →
+сверка суммы → «✅ Подтверждаю»;
+note right
+  Сбой меню ДО отправки суммы — чек
+  появиться не мог: повтор проходит меню
+  заново (retry_room). С отправки суммы —
+  ни повтора, ни второго нажатия.
+end note
 :Ссылка t.me/xrocket?start=t_…
-из URL-кнопки сообщения-чека;
+с экрана чека (правка того же сообщения);
 
 |Бот / ядро|
 switch (Результат issue_check)
@@ -120,8 +122,8 @@ case (Issued)
   COMMIT;
 case (Unknown: сбой ПОСЛЕ отправки)
   :Повторно чек НЕ создаём,
-  find_issued_check: «Избранное»
-  и список чеков бота;
+  find_issued_check: чек между меткой
+  операции и следующей меткой, список чеков бота;
   if (Чек найден однозначно?) then (да)
     :→ COMPLETED (PayoutConfirmed);
   else (нет / неясно)

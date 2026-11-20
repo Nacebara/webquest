@@ -1,5 +1,5 @@
 @startuml use-cases
-' Варианты использования бота-обменника xRocket <-> CryptoBot (v0.2: всё через юзербота)
+' Варианты использования бота-обменника xRocket <-> CryptoBot (v0.2: всё через юзербота; сверено 20.11.2026)
 left to right direction
 skinparam packageStyle rectangle
 skinparam actorStyle awesome
@@ -9,7 +9,7 @@ actor "Клиент" as Client
 actor "Владелец" as Owner
 actor "Админ" as Admin
 actor "Оператор" as Operator
-actor "Юзербот\n(выделенный аккаунт Telegram,\nпо одному на платформу)" as Userbot <<system>>
+actor "Юзербот\n(выделенный аккаунт Telegram:\nодин на оба кошелька или по одному)" as Userbot <<system>>
 actor "CryptoBot\n(@send)" as CB <<external>>
 actor "xRocket\n(@xrocket)" as XR <<external>>
 
@@ -25,21 +25,22 @@ rectangle "Бот-обменник" {
   usecase "Забрать чек выплаты\nили возврата" as UC_Claim
   usecase "История и статус заявки" as UC_History
   usecase "Помощь / поддержка" as UC_Help
+  usecase "Инвестиции:\nпополнить, вывести" as UC_Invest
 
   usecase "Активировать чек\n(/start <код>)" as UC_Activate
-  usecase "Создать чек выплаты\nили возврата\n(инлайн → «Избранное», меню)" as UC_Issue
+  usecase "Создать чек выплаты\nили возврата\n(меню /checks · /cheques)" as UC_Issue
   usecase "Открыть и оплатить\nчужой счёт" as UC_PayInvoice
   usecase "Прочитать баланс,\nсверить с леджером" as UC_Reconcile
 
-  usecase "Разобрать заявку вручную" as UC_Manual
-  usecase "Оплатить счёт CryptoBot\nвручную (PIN, пока нет HAR)" as UC_ManualPay
+  usecase "Разобрать заявку вручную\n(повторить, вернуть, «Выплачено»,\n«Деньги пришли», «Возврат выдан»)" as UC_Manual
+  usecase "Стоп-кран выплат" as UC_Kill
   usecase "Карточка пользователя,\nпоиск заявки" as UC_Search
   usecase "Бан / разбан" as UC_Ban
   usecase "Маржа, лимиты,\nпауза направления" as UC_Pricing
   usecase "Ребалансировка резервов,\nвывод прибыли" as UC_Rebalance
   usecase "Статистика и дашборды" as UC_Stats
   usecase "Рассылка, экспорт CSV" as UC_Broadcast
-  usecase "Роли, режим обслуживания,\nсессии юзерботов" as UC_Owner
+  usecase "Роли, режим обслуживания,\nсессии юзерботов, доступ инвесторов,\nнедостача: «это я» / списать" as UC_Owner
   usecase "Логи и алерты по темам" as UC_Logs
 }
 
@@ -51,6 +52,9 @@ Client --> UC_PayXR
 Client --> UC_Claim
 Client --> UC_History
 Client --> UC_Help
+Client --> UC_Invest
+UC_Invest ..> UC_Activate : <<include>>
+UC_Invest ..> UC_Issue : <<include>>
 UC_CX ..> UC_Activate : <<include>>
 UC_XC ..> UC_Activate : <<include>>
 UC_CX ..> UC_Issue : <<include>>
@@ -59,7 +63,6 @@ UC_PayCB ..> UC_Activate : <<include>>\n(клиент платит чеком)
 UC_PayXR ..> UC_Activate : <<include>>
 UC_PayCB ..> UC_PayInvoice : <<include>>
 UC_PayXR ..> UC_PayInvoice : <<include>>
-UC_ManualPay ..> UC_PayInvoice : <<extend>>
 UC_Claim ..> UC_Issue : <<include>>
 
 Userbot --> UC_Activate
@@ -76,7 +79,7 @@ UC_Reconcile --> CB
 UC_Reconcile --> XR
 
 Operator --> UC_Manual
-Operator --> UC_ManualPay
+Operator --> UC_Kill
 Operator --> UC_Search
 Operator --> UC_Logs
 Admin --> UC_Ban

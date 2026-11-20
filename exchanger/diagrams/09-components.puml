@@ -1,17 +1,17 @@
 @startuml components
 ' Компоненты: один процесс exch (tokio), крейты рабочего пространства — карта из CLAUDE.md (v0.2).
-' engine, tgbot, ops — ещё не созданы (вехи M3–M5).
+' Сверено с кодом 20.11.2026: все 11 крейтов есть; бот один — пульт внутри клиентского бота.
 skinparam shadowing false
 skinparam componentStyle rectangle
 title Компоненты (Cargo workspace, один бинарник exch)
 
 package "exch (бинарник, tokio runtime)" {
   component "app\n(бинарник exch: конфиг,\nсупервизор, CLI)" as APP
-  component "tgbot\n(клиентский бот) — M4" as TG
-  component "ops\n(ops-бот: админка, алерты,\nстатистика) — M5" as OPS
+  component "tgbot\n(клиентский бот:\nопрос, заявки, «Курс»)" as TG
+  component "ops\n(пульт в том же боте:\nразбор, тревоги, резервы,\nстатистика)" as OPS
   component "ui\n(экраны, клавиатуры,\nru.toml, rich + HTML)" as UI
   component "botapi\n(клиент Bot API 10.3)" as BA
-  component "engine\n(FSM-драйвер, outbox,\nсверка, резервы) — M3" as ENG
+  component "engine\n(FSM-драйвер, outbox,\nсверка, резервы)" as ENG
   component "userbot\n(Transport, WalletBot,\nflows, sim)" as UB
   component "mtproto\n(grammers 0.10:\nGrammersTransport, сессия, вход)" as MT
   component "parsers\n(ссылки, суммы,\nответы ботов кошельков)" as PAR
@@ -19,7 +19,7 @@ package "exch (бинарник, tokio runtime)" {
   component "domain\n(деньги, цены, FSM,\nпроводки) — без IO" as DOM
 }
 
-cloud "Telegram Bot API\n(клиентский и ops-бот)" as TBA
+cloud "Telegram Bot API\n(один бот: клиенты и пульт)" as TBA
 cloud "Telegram MTProto\n(@send, @xrocket, «Избранное»)" as MTP
 database "PostgreSQL 16" as PG
 
@@ -33,6 +33,8 @@ TG --> BA
 TG --> ENG
 OPS --> BA
 OPS --> ENG
+OPS --> UI
+TG ..> OPS : обновления — сначала пульту\n(UpdateHook)
 UI --> BA
 UI --> DOM
 ENG --> UB
