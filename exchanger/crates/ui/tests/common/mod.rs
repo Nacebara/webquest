@@ -921,6 +921,15 @@ pub fn invest_gallery(ui: &Ui) -> Vec<(String, Screen)> {
             ui.invest_notice(&InvestNotice::DepositManual),
         ),
         (
+            "invest_notice_deposit_returned",
+            ui.invest_notice(&InvestNotice::DepositReturned {
+                min: dec!(10),
+                amount: dec!(5),
+                platform: domain::Platform::CryptoBot,
+                check_url: "https://t.me/send?start=CQ5mN8pQ2rT7".to_owned(),
+            }),
+        ),
+        (
             "invest_notice_withdraw_requested",
             ui.invest_notice(&InvestNotice::WithdrawRequested {
                 amount: dec!(500),

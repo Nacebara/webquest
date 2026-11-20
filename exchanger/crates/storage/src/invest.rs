@@ -51,6 +51,10 @@ pub enum MoveStatus {
     Failed,
     /// Неясный исход — решает человек.
     Manual,
+    /// Пополнение меньше минимума: чек возврата создаётся (Д-19.6, миграция 0018).
+    Refunding,
+    /// Пополнение меньше минимума возвращено чеком (`check_url`); в капитал не попадало.
+    Refunded,
 }
 
 impl MoveStatus {
@@ -62,6 +66,8 @@ impl MoveStatus {
             MoveStatus::Rejected => "rejected",
             MoveStatus::Failed => "failed",
             MoveStatus::Manual => "manual",
+            MoveStatus::Refunding => "refunding",
+            MoveStatus::Refunded => "refunded",
         }
     }
 
@@ -73,6 +79,8 @@ impl MoveStatus {
             MoveStatus::Rejected,
             MoveStatus::Failed,
             MoveStatus::Manual,
+            MoveStatus::Refunding,
+            MoveStatus::Refunded,
         ]
         .into_iter()
         .find(|m| m.as_db_str() == s)
@@ -307,7 +315,7 @@ pub async fn set_status(
 ) -> Result<(), StorageError> {
     let finished = matches!(
         status,
-        MoveStatus::Done | MoveStatus::Rejected | MoveStatus::Failed
+        MoveStatus::Done | MoveStatus::Rejected | MoveStatus::Failed | MoveStatus::Refunded
     );
     sqlx::query!(
         r#"

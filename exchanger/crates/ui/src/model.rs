@@ -399,6 +399,8 @@ pub enum InvestMoveStatus {
     Failed,
     /// Неясный исход — разбирает владелец.
     Manual,
+    /// Пополнение меньше минимума вернули чеком (Д-19.6).
+    Refunded,
 }
 
 /// Строка «последних движений».
@@ -448,6 +450,14 @@ pub enum InvestNotice {
     /// Чек не открыт или не принят — экран ошибки чека.
     DepositRejected(UiError),
     DepositManual,
+    /// Пополнение меньше минимума вернули чеком того же кошелька (Д-19.6, картинка
+    /// last-fixes.png принята 20.11, вариант Б): `amount` — сумма чека возврата.
+    DepositReturned {
+        min: Decimal,
+        amount: Decimal,
+        platform: Platform,
+        check_url: String,
+    },
     /// Заявка ушла владельцу.
     WithdrawRequested {
         amount: Decimal,

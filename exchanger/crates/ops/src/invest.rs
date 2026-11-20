@@ -60,6 +60,8 @@ pub(crate) enum InvestOp {
         move_id: i64,
         user: i64,
         kind: MoveKind,
+        /// Неясен чек возврата пополнения меньше минимума (Д-19.6), а не приход.
+        returning: bool,
         happened: bool,
         amount: Option<Decimal>,
         reason: String,
@@ -115,11 +117,12 @@ impl Inner {
     fn move_status(&self, s: MoveStatus) -> String {
         self.texts.t(match s {
             MoveStatus::Requested => "invest.status_requested",
-            MoveStatus::Processing => "invest.status_processing",
+            MoveStatus::Processing | MoveStatus::Refunding => "invest.status_processing",
             MoveStatus::Done => "invest.status_done",
             MoveStatus::Rejected => "invest.status_rejected",
             MoveStatus::Failed => "invest.status_failed",
             MoveStatus::Manual => "invest.status_manual",
+            MoveStatus::Refunded => "invest.status_refunded",
         })
     }
 
@@ -366,6 +369,7 @@ impl Inner {
             .as_deref()
             .map(|n| t.f("invest.move_note", &[("note", &esc(n))]))
             .unwrap_or_default();
+        let returning = returning(&mut conn, &m).await?;
         let text = t.f(
             "invest.move_card",
             &[
@@ -390,9 +394,10 @@ impl Inner {
                 ]);
             }
             MoveStatus::Manual if staff.role >= Role::Owner => {
+                // Неясен чек (вывода или возврата пополнения меньше минимума, Д-19.6), а не приход.
                 let yes = t.t(match m.kind {
-                    MoveKind::Deposit => "invest.b_happened_deposit",
-                    MoveKind::Withdrawal => "invest.b_happened_withdrawal",
+                    MoveKind::Deposit if !returning => "invest.b_happened_deposit",
+                    _ => "invest.b_happened_withdrawal",
                 });
                 s = s.row(vec![
                     btn(yes, &Cb::InvestResolve(m.id, true)),
@@ -471,7 +476,9 @@ impl Inner {
                             text,
                         ));
                     }
-                    Cb::InvestResolve(_, true) if m.kind == MoveKind::Deposit => {
+                    Cb::InvestResolve(_, true)
+                        if m.kind == MoveKind::Deposit && !returning(&mut conn, &m).await? =>
+                    {
                         let text = t.f("invest.ask_amount", &[("id", &id)]);
                         return Ok(self.prompt_with(
                             staff,
@@ -584,6 +591,7 @@ impl Inner {
                     move_id,
                     user: m.user_id,
                     kind: m.kind,
+                    returning: returning(&mut conn, &m).await?,
                     happened,
                     amount: amount.or(m.amount),
                     reason: text.chars().take(300).collect(),
@@ -680,15 +688,18 @@ impl Inner {
                 move_id,
                 user,
                 kind,
+                returning,
                 happened,
                 amount,
                 reason,
             } => {
-                let key = match (kind, happened) {
-                    (MoveKind::Deposit, true) => "invest.preview_dep_yes",
-                    (MoveKind::Deposit, false) => "invest.preview_dep_no",
-                    (MoveKind::Withdrawal, true) => "invest.preview_out_yes",
-                    (MoveKind::Withdrawal, false) => "invest.preview_out_no",
+                let key = match (kind, returning, happened) {
+                    (MoveKind::Deposit, true, true) => "invest.preview_back_yes",
+                    (MoveKind::Deposit, true, false) => "invest.preview_back_no",
+                    (MoveKind::Deposit, false, true) => "invest.preview_dep_yes",
+                    (MoveKind::Deposit, false, false) => "invest.preview_dep_no",
+                    (MoveKind::Withdrawal, _, true) => "invest.preview_out_yes",
+                    (MoveKind::Withdrawal, _, false) => "invest.preview_out_no",
                 };
                 t.f(
                     key,
@@ -776,6 +787,21 @@ impl Inner {
         };
         Ok(self.invest_move(staff, move_id).await?.notice(&head))
     }
+}
+
+/// Пополнение меньше минимума, чей чек возврата неясен (Д-19.6): у него есть операция чека
+/// возврата — человек решает про чек, а не про приход.
+async fn returning(
+    conn: &mut sqlx::PgConnection,
+    m: &storage::invest::Move,
+) -> Result<bool, OpsError> {
+    if m.kind != MoveKind::Deposit {
+        return Ok(false);
+    }
+    Ok(storage::operations::for_invest_move(conn, m.id)
+        .await?
+        .iter()
+        .any(|o| o.kind == domain::fsm::OpKind::CreateRefundCheck))
 }
 
 #[cfg(test)]

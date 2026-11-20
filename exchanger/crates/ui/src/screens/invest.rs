@@ -3,7 +3,7 @@
 //! остальное — обычный HTML (это деньги).
 
 use botapi::{ButtonStyle, KeyboardButton};
-use domain::{Decimal, Platform};
+use domain::{Asset, Decimal, Money, Platform};
 
 use super::{Ui, inline_command};
 use crate::callback::{Callback, InvestAction};
@@ -81,6 +81,7 @@ impl Ui {
             InvestMoveStatus::Rejected => &t.status_rejected,
             InvestMoveStatus::Failed => &t.status_failed,
             InvestMoveStatus::Manual => &t.status_manual,
+            InvestMoveStatus::Refunded => &t.status_refunded,
         }
     }
 
@@ -294,6 +295,29 @@ impl Ui {
                 screen
             }
             InvestNotice::DepositManual => self.plain(self.fill(&t.deposit_manual, &[]), home()),
+            // Та же строка, что «Меньше минимума» у обмена, «Забрать» — зелёная.
+            InvestNotice::DepositReturned {
+                min,
+                amount,
+                platform,
+                check_url,
+            } => {
+                let usdt = |x: Decimal| {
+                    Money::new(x, Asset::Usdt).unwrap_or_else(|_| Money::zero(Asset::Usdt))
+                };
+                let back = usdt(*amount);
+                self.plain(
+                    self.fill(
+                        &self.texts.refund.below_minimum,
+                        &[
+                            ("min", &self.money(&usdt(*min))),
+                            ("refund_short", &self.amount_code(&back)),
+                            ("src", &self.wallet(*platform)),
+                        ],
+                    ),
+                    Keyboard::inline_rows(vec![vec![self.claim_button(&back, check_url)]]),
+                )
+            }
             InvestNotice::WithdrawRequested { amount, platform } => self.plain(
                 self.fill(
                     &t.withdraw_requested,

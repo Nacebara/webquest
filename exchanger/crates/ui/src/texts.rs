@@ -641,6 +641,7 @@ pub struct InvestTexts {
     pub status_rejected: String,
     pub status_failed: String,
     pub status_manual: String,
+    pub status_refunded: String,
     pub check_link: String,
 
     pub deposit: String,

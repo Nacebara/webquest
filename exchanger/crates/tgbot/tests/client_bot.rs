@@ -1136,6 +1136,61 @@ async fn an_investor_result_reached_while_the_bot_was_down_is_sent_once(pool: Pg
     assert_eq!(sent, 1, "итог — ровно один раз");
 }
 
+/// Д-19.6 (картинка last-fixes.png принята 20.11, вариант Б): чек пополнения меньше минимума
+/// возвращается чеком того же кошелька — инвестору «Меньше минимума · от 10.00» и «Забрать», как у
+/// обмена. Раньше чек молча зачислялся.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_deposit_below_the_minimum_comes_back_with_a_claim_button(pool: PgPool) {
+    let e = env(pool).await;
+    grant_investor(&e).await;
+    let bot = e.start_bot();
+    e.fake.client_writes("/start");
+    e.fake
+        .wait_for("menu with the invest button", |c| {
+            c.method == "sendMessage" && c.contains("Инвестиции")
+        })
+        .await;
+    e.fake.client_writes("💼 Инвестиции");
+    e.fake
+        .wait_for("invest home", |c| {
+            c.method == "sendMessage" && c.contains("В обороте")
+        })
+        .await;
+    e.fake.client_presses(1001, "inv:dep");
+    e.fake
+        .wait_for("deposit prompt", |c| c.contains("Пополнение"))
+        .await;
+    let url = e.world.client_check(CB, usdt(dec!(5))).unwrap();
+    e.fake.client_writes(&url);
+    e.fake
+        .wait_for("deposit accepted", |c| c.contains("Чек принят"))
+        .await;
+    e.drain().await;
+    let checks = e.world.checks_created_by(e.ub);
+    assert_eq!(checks.len(), 1, "один чек возврата");
+    let back = format!("\"url\":\"{}\"", checks[0].url);
+    let sent = e
+        .fake
+        .wait_for("the return", |c| {
+            c.method == "sendMessage" && c.contains("Меньше минимума") && c.contains(&back)
+        })
+        .await;
+    bot.stop().await;
+    assert!(
+        sent.contains("от <code>10.00</code>\u{a0}USDT")
+            || sent.contains("от <code>10.00</code>\\u00a0USDT"),
+        "{}",
+        sent.body
+    );
+    assert!(
+        sent.contains("Верну <code>5.00</code> чеком CryptoBot."),
+        "{}",
+        sent.body
+    );
+    assert!(sent.contains("Забрать 5.00"), "{}", sent.body);
+    assert!(!sent.contains("Зачислено"), "{}", sent.body);
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn investor_deposits_by_check_and_withdraws_a_check(pool: PgPool) {
     let e = env(pool).await;
@@ -2173,9 +2228,11 @@ async fn a_claimed_check_loses_its_claim_button(pool: PgPool) {
         tokio::time::sleep(Duration::from_millis(30)).await;
     }
     assert!(claimed, "уведомление кошелька отметило чек забранным");
-    // Ждём правку сообщения заявки именно после уведомления.
+    // Ждём правку сообщения заявки после уведомления. Плановая правка, собранная до отметки,
+    // может прийти раньше и ещё нести кнопку (гонка под нагрузкой полного прогона, 20.11) —
+    // поэтому ждём, пока последняя правка станет без «Забрать».
     let mut edits = Vec::new();
-    for _ in 0..100 {
+    for _ in 0..200 {
         edits = e
             .fake
             .calls()
@@ -2183,7 +2240,7 @@ async fn a_claimed_check_loses_its_claim_button(pool: PgPool) {
             .skip(before)
             .filter(|c| c.method == "editMessageText" && c.message_id() == Some(order_message))
             .collect();
-        if !edits.is_empty() {
+        if edits.last().is_some_and(|c| !c.contains(&button)) {
             break;
         }
         tokio::time::sleep(Duration::from_millis(30)).await;

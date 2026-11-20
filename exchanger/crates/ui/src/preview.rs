@@ -315,6 +315,16 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
                 Some(&RefundReason::BelowMinimum { min: usdt(100, 2) }),
             ),
         ),
+        // Д-19.6 (картинка last-fixes.png принята 20.11, вариант Б).
+        one(
+            "Пополнение · меньше минимума",
+            ui.invest_notice(&crate::InvestNotice::DepositReturned {
+                min: Decimal::TEN,
+                amount: Decimal::new(5, 0),
+                platform: domain::Platform::CryptoBot,
+                check_url: REFUND_URL.to_owned(),
+            }),
+        ),
         one(
             "Больше лимита",
             ui.refund_done(

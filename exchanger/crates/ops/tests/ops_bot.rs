@@ -2153,6 +2153,82 @@ async fn owner_grants_investor_access_and_admin_approves_a_withdrawal(pool: PgPo
     assert_eq!(o.audit("invest.approve").await.len(), 1);
 }
 
+/// Д-19.6 (картинка last-fixes.png принята 20.11, вариант Б): чек возврата пополнения меньше
+/// минимума не создался (исход неясен) — у владельца выбор «Чек создан» / «Ничего не было», как у
+/// вывода, а не «Деньги пришли» с вопросом о сумме. «Ничего не было» — новый чек, один.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn an_unclear_deposit_return_asks_whether_the_check_was_made(pool: PgPool) {
+    use userbot::sim::{Call as SimCall, Fault};
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        let owner = storage::staff::get(&mut conn, OWNER)
+            .await
+            .unwrap()
+            .unwrap();
+        drop(conn);
+        o.engine
+            .invest_save_terms(
+                &owner,
+                &storage::invest::Investor {
+                    user_id: common::CLIENT,
+                    share_pct: dec!(50),
+                    lock_days: 0,
+                    min_deposit: dec!(10),
+                    auto_withdraw_max: dec!(10),
+                    is_active: true,
+                    granted_by: None,
+                    created_at: chrono::Utc::now(),
+                },
+            )
+            .await
+            .unwrap();
+    }
+    o.world
+        .inject(o.ub, SimCall::CheckPress, Fault::TimeoutBeforeEffect, 1);
+    let url = o.world.client_check(CB, usdt(dec!(5))).unwrap();
+    let link = parsers::links::parse_url(&url).unwrap();
+    let id = o
+        .engine
+        .invest_deposit(common::CLIENT, &link)
+        .await
+        .unwrap();
+    let mark = o.tg.mark();
+    o.drain().await;
+    o.engine.resolve_unknown().await.unwrap();
+    o.drain().await;
+    let alert = o.tg.screen(mark, OWNER, "Инвестиции: нужен человек").await;
+    let card = o
+        .press(OWNER, &alert, "Открыть", &format!("Движение #{id}"))
+        .await;
+    assert!(card.button("Чек создан").is_some(), "{:?}", card.buttons());
+    assert!(
+        card.button("Деньги пришли").is_none(),
+        "{:?}",
+        card.buttons()
+    );
+    o.press(OWNER, &card, "Ничего не было", "что вы проверили")
+        .await;
+    let preview = o
+        .say(
+            OWNER,
+            "проверил «Мои чеки» — чека нет",
+            "чека возврата нет — создам новый чек",
+        )
+        .await;
+    o.press(OWNER, &preview, "Подтвердить", "Готово").await;
+    o.drain().await;
+    let mut conn = o.pool.acquire().await.unwrap();
+    let m = storage::invest::get(&mut conn, id, false).await.unwrap();
+    assert_eq!(m.status, storage::invest::MoveStatus::Refunded, "{m:?}");
+    assert_eq!(
+        o.world.checks_created_by(o.ub).len(),
+        1,
+        "один чек возврата"
+    );
+}
+
 /// Сводка говорит, почему направление не принимает; «Сверить балансы» сразу предлагает
 /// провести пополнение владельца; нечитаемый баланс — событие с причиной.
 #[sqlx::test(migrator = "storage::MIGRATOR")]
@@ -2373,7 +2449,7 @@ async fn system_screen_and_screen_preview_from_the_panel(pool: PgPool) {
     )
     .await;
     // Экраны идут по порядку макета, с паузой между сообщениями: проверяем начало.
-    o.tg.screen(mark, OWNER, "1/39 · Приветствие").await;
+    o.tg.screen(mark, OWNER, "1/40 · Приветствие").await;
     o.tg.screen(mark, OWNER, "Что меняем?").await;
 }
 

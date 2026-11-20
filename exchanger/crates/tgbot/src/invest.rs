@@ -72,11 +72,12 @@ fn row(m: &Move) -> InvestMoveRow {
 fn status(s: MoveStatus) -> InvestMoveStatus {
     match s {
         MoveStatus::Requested => InvestMoveStatus::Requested,
-        MoveStatus::Processing => InvestMoveStatus::Processing,
+        MoveStatus::Processing | MoveStatus::Refunding => InvestMoveStatus::Processing,
         MoveStatus::Done => InvestMoveStatus::Done,
         MoveStatus::Rejected => InvestMoveStatus::Rejected,
         MoveStatus::Failed => InvestMoveStatus::Failed,
         MoveStatus::Manual => InvestMoveStatus::Manual,
+        MoveStatus::Refunded => InvestMoveStatus::Refunded,
     }
 }
 
@@ -343,16 +344,31 @@ impl Inner {
 /// на свою кнопку (заявка у владельца, автовывод начат), не повторяем. О каждом статусе — один
 /// раз: живое событие и досылка после перезапуска делят отметку в базе (К-19.2).
 async fn notify(inner: &Inner, move_id: i64) -> Result<(), TgBotError> {
-    let (m, balance) = {
+    let (m, balance, min_deposit, returned) = {
         let mut conn = inner.pool.acquire().await?;
         let m = storage::invest::get(&mut conn, move_id, false).await?;
-        let lock = storage::invest::investor(&mut conn, m.user_id)
-            .await?
-            .map_or(0, |i| i.lock_days);
+        let investor = storage::invest::investor(&mut conn, m.user_id).await?;
+        let lock = investor.as_ref().map_or(0, |i| i.lock_days);
         let balance = storage::invest::figures(&mut conn, m.user_id, lock)
             .await?
             .balance;
-        (m, balance)
+        // Д-19.6: сумма чека возврата пополнения меньше минимума.
+        let returned = if m.status == MoveStatus::Refunded {
+            storage::operations::for_invest_move(&mut conn, m.id)
+                .await?
+                .into_iter()
+                .rev()
+                .find(|o| o.kind == domain::fsm::OpKind::CreateRefundCheck)
+                .and_then(|o| o.amount)
+        } else {
+            None
+        };
+        (
+            m,
+            balance,
+            investor.map(|i| i.min_deposit).unwrap_or_default(),
+            returned,
+        )
     };
     let amount = m.amount.unwrap_or_default();
     let notice = match (m.kind, m.status) {
@@ -363,6 +379,17 @@ async fn notify(inner: &Inner, move_id: i64) -> Result<(), TgBotError> {
             crate::orders::intake_failure(m.note.as_deref(), inner.cfg.bind_username.as_deref()),
         )),
         (MoveKind::Deposit, MoveStatus::Manual) => Some(InvestNotice::DepositManual),
+        // Меньше минимума: одно сообщение, когда чек возврата готов (картинка last-fixes.png).
+        (MoveKind::Deposit, MoveStatus::Refunded) => {
+            m.check_url
+                .clone()
+                .map(|check_url| InvestNotice::DepositReturned {
+                    min: min_deposit,
+                    amount: returned.unwrap_or(amount),
+                    platform: m.platform,
+                    check_url,
+                })
+        }
         // Одобрил владелец — инвестор ещё не знает, что чек создаётся.
         (MoveKind::Withdrawal, MoveStatus::Processing) if m.decided_by.is_some() => {
             Some(InvestNotice::WithdrawProcessing {

@@ -20,7 +20,7 @@
 use chrono::Utc;
 use domain::fsm::{MoneyRole, OpKind};
 use domain::ledger::{self, AccountCode, Expense, Revenue};
-use domain::{Asset, Decimal, Money, Platform};
+use domain::{Asset, Decimal, Money, Platform, Step};
 use parsers::links::{LinkKind, WalletLink};
 use rust_decimal::RoundingStrategy;
 use serde_json::json;
@@ -195,6 +195,15 @@ async fn ensure_investor_accounts(
     )
     .await?;
     Ok(())
+}
+
+/// Чей чек: возврата пополнения меньше минимума или вывода.
+fn check_label(op: &OperationRow) -> &'static str {
+    if op.kind == OpKind::CreateRefundCheck {
+        "возврата пополнения"
+    } else {
+        "вывода"
+    }
 }
 
 fn alert_payload(m: &Move) -> serde_json::Value {
@@ -590,8 +599,25 @@ impl Engine {
             created_by: Some(&created_by),
             ..Default::default()
         };
-        let (status, amount) = match (m.kind, verdict) {
-            (MoveKind::Deposit, InvestVerdict::Happened { amount }) => {
+        // Д-19.6: неясен чек возврата пополнения меньше минимума, а не сам приход.
+        let returning = open_op.filter(|o| o.kind == OpKind::CreateRefundCheck);
+        let (status, amount) = match (m.kind, verdict, returning) {
+            (MoveKind::Deposit, InvestVerdict::Happened { .. }, Some(o)) => {
+                let back = o.amount.ok_or(InvestRefusal::BadAmount)?;
+                storage::ledger::post(&mut tx, &ledger::refund(m.platform, ASSET, back)?, refs)
+                    .await?;
+                storage::holds::close_invest(&mut tx, move_id, true).await?;
+                (MoveStatus::Refunded, None)
+            }
+            // Владелец проверил: чека возврата нет — новая попытка (правило 6).
+            (MoveKind::Deposit, InvestVerdict::DidNotHappen, Some(o)) => {
+                let back = o.amount.ok_or(InvestRefusal::BadAmount)?;
+                storage::holds::close_invest(&mut tx, move_id, false).await?;
+                self.queue_deposit_return(&mut tx, &m, o.wallet_account_id, back)
+                    .await?;
+                (MoveStatus::Refunding, None)
+            }
+            (MoveKind::Deposit, InvestVerdict::Happened { amount }, None) => {
                 let amount = amount
                     .filter(|a| *a > Decimal::ZERO)
                     .ok_or(InvestRefusal::BadAmount)?;
@@ -624,7 +650,7 @@ impl Engine {
                 .await?;
                 (MoveStatus::Done, Some(amount))
             }
-            (MoveKind::Withdrawal, InvestVerdict::Happened { .. }) => {
+            (MoveKind::Withdrawal, InvestVerdict::Happened { .. }, _) => {
                 let amount = m.amount.ok_or(InvestRefusal::BadAmount)?;
                 storage::ledger::post(
                     &mut tx,
@@ -635,11 +661,11 @@ impl Engine {
                 storage::holds::close_invest(&mut tx, move_id, true).await?;
                 (MoveStatus::Done, None)
             }
-            (MoveKind::Withdrawal, InvestVerdict::DidNotHappen) => {
+            (MoveKind::Withdrawal, InvestVerdict::DidNotHappen, _) => {
                 storage::holds::close_invest(&mut tx, move_id, false).await?;
                 (MoveStatus::Failed, None)
             }
-            (MoveKind::Deposit, InvestVerdict::DidNotHappen) => (MoveStatus::Failed, None),
+            (MoveKind::Deposit, InvestVerdict::DidNotHappen, None) => (MoveStatus::Failed, None),
         };
         storage::invest::set_status(
             &mut tx,
@@ -676,7 +702,12 @@ impl Engine {
         let unanswered = open_op
             .filter(|o| {
                 o.status == OpStatus::Unknown
-                    && matches!(o.kind, OpKind::ActivateCheck | OpKind::CreatePayoutCheck)
+                    && matches!(
+                        o.kind,
+                        OpKind::ActivateCheck
+                            | OpKind::CreatePayoutCheck
+                            | OpKind::CreateRefundCheck
+                    )
             })
             .map(|o| o.platform);
         if let Some(platform) = unanswered {
@@ -808,28 +839,37 @@ impl Engine {
                     None,
                 )
                 .await?;
-                ensure_investor_accounts(&mut tx, m.user_id).await?;
-                storage::ledger::post(
-                    &mut tx,
-                    &ledger::invest_deposit(op.platform, ASSET, m.user_id, money.amount())?,
-                    PostingRefs {
-                        operation_id: Some(op.id),
-                        memo: Some("пополнение инвестора"),
-                        ..Default::default()
-                    },
-                )
-                .await?;
-                storage::invest::set_status(
-                    &mut tx,
-                    move_id,
-                    MoveStatus::Done,
-                    Some(money.amount()),
-                    None,
-                    None,
-                    None,
-                )
-                .await?;
-                tracing::info!(move_id, user = m.user_id, amount = %money.amount(), "investor deposit credited");
+                let back = self
+                    .below_minimum_return(&mut tx, &m, op.platform, money.amount())
+                    .await?;
+                if let Some(back) = back {
+                    self.start_deposit_return(&mut tx, &m, op, money.amount(), back)
+                        .await?;
+                    tracing::info!(move_id, user = m.user_id, amount = %money.amount(), %back, "investor deposit below the minimum, returning it");
+                } else {
+                    ensure_investor_accounts(&mut tx, m.user_id).await?;
+                    storage::ledger::post(
+                        &mut tx,
+                        &ledger::invest_deposit(op.platform, ASSET, m.user_id, money.amount())?,
+                        PostingRefs {
+                            operation_id: Some(op.id),
+                            memo: Some("пополнение инвестора"),
+                            ..Default::default()
+                        },
+                    )
+                    .await?;
+                    storage::invest::set_status(
+                        &mut tx,
+                        move_id,
+                        MoveStatus::Done,
+                        Some(money.amount()),
+                        None,
+                        None,
+                        None,
+                    )
+                    .await?;
+                    tracing::info!(move_id, user = m.user_id, amount = %money.amount(), "investor deposit credited");
+                }
             }
             ActivationOutcome::Received(money) => {
                 storage::operations::finish(
@@ -937,7 +977,12 @@ impl Engine {
         match outcome {
             IssueOutcome::Issued { check, .. } => self.invest_issued(op, move_id, &check).await,
             IssueOutcome::InsufficientFunds => {
-                let reason = "в кошельке не хватило денег на чек вывода";
+                let returned = op.kind == OpKind::CreateRefundCheck;
+                let reason = if returned {
+                    "в кошельке не хватило денег на чек возврата пополнения: проверьте кошелёк"
+                } else {
+                    "в кошельке не хватило денег на чек вывода"
+                };
                 let mut tx = self.pool.begin().await?;
                 let m = storage::invest::get(&mut tx, move_id, true).await?;
                 storage::operations::finish(
@@ -950,16 +995,21 @@ impl Engine {
                 )
                 .await?;
                 storage::holds::close_invest(&mut tx, move_id, false).await?;
-                storage::invest::set_status(
-                    &mut tx,
-                    move_id,
-                    MoveStatus::Failed,
-                    None,
-                    None,
-                    Some(reason),
-                    None,
-                )
-                .await?;
+                if returned {
+                    // Деньги инвестора у нас (клиентские деньги) — решает владелец.
+                    self.invest_manual(&mut tx, &m, reason).await?;
+                } else {
+                    storage::invest::set_status(
+                        &mut tx,
+                        move_id,
+                        MoveStatus::Failed,
+                        None,
+                        None,
+                        Some(reason),
+                        None,
+                    )
+                    .await?;
+                }
                 storage::directions::auto_pause_platform(
                     &mut tx,
                     op.platform,
@@ -967,8 +1017,10 @@ impl Engine {
                     reason,
                 )
                 .await?;
-                self.invest_alert(&mut tx, &m, "invest_failed", Level::Warn)
-                    .await?;
+                if !returned {
+                    self.invest_alert(&mut tx, &m, "invest_failed", Level::Warn)
+                        .await?;
+                }
                 let m = storage::invest::get(&mut tx, move_id, false).await?;
                 tx.commit().await?;
                 self.notify_invest(&m);
@@ -1018,14 +1070,25 @@ impl Engine {
             None,
         )
         .await?;
-        ensure_investor_accounts(&mut tx, m.user_id).await?;
         let amount = op.amount.unwrap_or_else(|| check.amount.amount());
+        let returned = op.kind == OpKind::CreateRefundCheck;
+        let posting = if returned {
+            // Д-19.6: возврат пополнения меньше минимума — из клиентских денег, не из капитала.
+            ledger::refund(op.platform, ASSET, amount)?
+        } else {
+            ensure_investor_accounts(&mut tx, m.user_id).await?;
+            ledger::invest_withdrawal(op.platform, ASSET, m.user_id, amount)?
+        };
         storage::ledger::post(
             &mut tx,
-            &ledger::invest_withdrawal(op.platform, ASSET, m.user_id, amount)?,
+            &posting,
             PostingRefs {
                 operation_id: Some(op.id),
-                memo: Some("вывод инвестора"),
+                memo: Some(if returned {
+                    "возврат пополнения меньше минимума"
+                } else {
+                    "вывод инвестора"
+                }),
                 ..Default::default()
             },
         )
@@ -1034,7 +1097,11 @@ impl Engine {
         storage::invest::set_status(
             &mut tx,
             move_id,
-            MoveStatus::Done,
+            if returned {
+                MoveStatus::Refunded
+            } else {
+                MoveStatus::Done
+            },
             None,
             Some(&check.url),
             None,
@@ -1066,7 +1133,10 @@ impl Engine {
                 self.invest_give_up(
                     op,
                     move_id,
-                    "исход создания чека вывода неизвестен и чек не найден: проверьте в кошельке",
+                    &format!(
+                        "исход создания чека {} неизвестен и чек не найден: проверьте в кошельке",
+                        check_label(op)
+                    ),
                 )
                 .await
             }
@@ -1074,7 +1144,10 @@ impl Engine {
                 self.invest_give_up(
                     op,
                     move_id,
-                    &format!("исход создания чека вывода неизвестен, сверка невозможна: {e}"),
+                    &format!(
+                        "исход создания чека {} неизвестен, сверка невозможна: {e}",
+                        check_label(op)
+                    ),
                 )
                 .await
             }
@@ -1094,7 +1167,7 @@ impl Engine {
     ) -> Result<(), EngineError> {
         let mut tx = self.pool.begin().await?;
         let m = storage::invest::get(&mut tx, move_id, true).await?;
-        if m.status == MoveStatus::Processing {
+        if matches!(m.status, MoveStatus::Processing | MoveStatus::Refunding) {
             self.invest_manual(&mut tx, &m, reason).await?;
         }
         storage::operations::give_up(&mut tx, op.id, reason).await?;
@@ -1104,6 +1177,126 @@ impl Engine {
         tx.commit().await?;
         tracing::error!(op = op.id, move_id, %reason, "investor move handed to a human");
         self.notify_invest(&m);
+        Ok(())
+    }
+
+    /// Д-19.6 (картинка last-fixes.png принята 20.11, вариант Б): пополнение меньше минимума
+    /// инвестора — сколько вернуть чеком (вниз до шага кошелька). `None` — минимум не нарушен или
+    /// вернуть нечем (меньше минимального чека кошелька — такого чека не бывает; зачисляем).
+    async fn below_minimum_return(
+        &self,
+        conn: &mut PgConnection,
+        m: &Move,
+        platform: Platform,
+        received: Decimal,
+    ) -> Result<Option<Decimal>, EngineError> {
+        let Some(investor) = storage::invest::investor(&mut *conn, m.user_id).await? else {
+            return Ok(None);
+        };
+        if received >= investor.min_deposit {
+            return Ok(None);
+        }
+        let step = Step::from_decimal(
+            storage::directions::payout_step(&mut *conn, platform, ASSET).await?,
+        )?;
+        let back = step.floor(received);
+        let min_check = storage::directions::min_check(&mut *conn, platform, ASSET).await?;
+        if back <= Decimal::ZERO || back < min_check {
+            tracing::warn!(move_id = m.id, %received, %min_check, "deposit below the minimum is below the wallet's smallest check too, crediting it");
+            return Ok(None);
+        }
+        Ok(Some(back))
+    }
+
+    /// Пополнение меньше минимума: приход — клиентские деньги (как чек обмена), не капитал;
+    /// остаток округления — в доход; чек возврата — в очередь. В транзакции активации.
+    async fn start_deposit_return(
+        &self,
+        conn: &mut PgConnection,
+        m: &Move,
+        op: &OperationRow,
+        received: Decimal,
+        back: Decimal,
+    ) -> Result<(), EngineError> {
+        storage::ledger::post(
+            &mut *conn,
+            &ledger::intake(op.platform, ASSET, received)?,
+            PostingRefs {
+                operation_id: Some(op.id),
+                memo: Some("пополнение меньше минимума — к возврату"),
+                ..Default::default()
+            },
+        )
+        .await?;
+        if received > back {
+            storage::ledger::post(
+                &mut *conn,
+                &ledger::excess_kept(ASSET, received - back)?,
+                PostingRefs {
+                    operation_id: Some(op.id),
+                    memo: Some("остаток округления возврата пополнения"),
+                    ..Default::default()
+                },
+            )
+            .await?;
+        }
+        storage::invest::set_status(
+            &mut *conn,
+            m.id,
+            MoveStatus::Refunding,
+            Some(received),
+            None,
+            None,
+            None,
+        )
+        .await?;
+        self.queue_deposit_return(conn, m, op.wallet_account_id, back)
+            .await
+    }
+
+    /// Чек возврата пополнения: удержание и операция (одна попытка, правило 6). Новая попытка —
+    /// только после того, как владелец проверил, что прежнего чека нет.
+    async fn queue_deposit_return(
+        &self,
+        conn: &mut PgConnection,
+        m: &Move,
+        wallet: Option<i16>,
+        amount: Decimal,
+    ) -> Result<(), EngineError> {
+        let wallet = match wallet {
+            Some(w) => w,
+            None => {
+                storage::wallets::active(&mut *conn, m.platform)
+                    .await?
+                    .ok_or(EngineError::NoWalletAccount(m.platform))?
+                    .0
+            }
+        };
+        let attempt = storage::operations::for_invest_move(&mut *conn, m.id)
+            .await?
+            .iter()
+            .filter(|o| o.kind == OpKind::CreateRefundCheck)
+            .count()
+            + 1;
+        // Деньги только что пришли в этот кошелёк — удерживаем их без проверки свободного резерва.
+        storage::holds::place_invest_return(&mut *conn, m.id, wallet, ASSET, amount).await?;
+        let key = format!("inv-{}-back-{attempt}", m.id);
+        storage::operations::insert_invest(
+            &mut *conn,
+            &NewInvestOperation {
+                invest_move_id: m.id,
+                kind: OpKind::CreateRefundCheck,
+                role: MoneyRole::Settle,
+                platform: m.platform,
+                wallet_account_id: wallet,
+                idempotency_key: &key,
+                start_param: None,
+                amount: Some(amount),
+                asset: ASSET,
+                random_id: userbot::flows::rid::new_random_id(),
+            },
+        )
+        .await?;
         Ok(())
     }
 

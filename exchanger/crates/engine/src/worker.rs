@@ -385,7 +385,10 @@ impl Engine {
         }
         if let Some(move_id) = op.invest_move_id {
             let m = storage::invest::get(&mut tx, move_id, true).await?;
-            if m.status == storage::invest::MoveStatus::Processing {
+            if matches!(
+                m.status,
+                storage::invest::MoveStatus::Processing | storage::invest::MoveStatus::Refunding
+            ) {
                 self.invest_manual(&mut tx, &m, reason).await?;
             }
             tx.commit().await?;
@@ -1329,7 +1332,11 @@ impl Engine {
                 }
                 // Вывод инвестора: сверяем, пока автоматика не сдалась (`give_up`).
                 if op.invest_move_id.is_some() {
-                    if op.kind == OpKind::CreatePayoutCheck {
+                    // Вывод и возврат пополнения меньше минимума (Д-19.6).
+                    if matches!(
+                        op.kind,
+                        OpKind::CreatePayoutCheck | OpKind::CreateRefundCheck
+                    ) {
                         out.push(op);
                     }
                     continue;

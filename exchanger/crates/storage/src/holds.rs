@@ -198,6 +198,27 @@ pub async fn place_invest(
     Ok(())
 }
 
+/// Удержание под чек возврата пополнения меньше минимума (Д-19.6): деньги только что пришли в
+/// этот кошелёк чеком инвестора — свободный резерв не проверяем, их нельзя отдать другим.
+pub async fn place_invest_return(
+    conn: &mut PgConnection,
+    invest_move_id: i64,
+    wallet_account_id: i16,
+    asset: Asset,
+    amount: Decimal,
+) -> Result<(), StorageError> {
+    sqlx::query!(
+        "INSERT INTO holds (invest_move_id, wallet_account_id, asset, amount) VALUES ($1, $2, $3, $4)",
+        invest_move_id,
+        wallet_account_id,
+        asset.code(),
+        amount,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 /// Закрыть удержание вывода инвестора: чек создан (`consumed`) или вывод не состоялся.
 pub async fn close_invest(
     conn: &mut PgConnection,

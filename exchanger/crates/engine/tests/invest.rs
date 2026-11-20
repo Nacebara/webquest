@@ -527,3 +527,99 @@ async fn profit_is_income_minus_losses_and_a_loss_carries_forward(pool: PgPool) 
     assert!(credited > Decimal::ZERO, "убыток покрыт — начисления пошли");
     e.assert_books_match().await;
 }
+
+/// Д-19.6 (проверка 19.11; картинка last-fixes.png принята владельцем 20.11, вариант Б): чек
+/// пополнения меньше минимума инвестора в инвестиции не идёт — его сумма возвращается чеком того
+/// же кошелька. Раньше такой чек молча зачислялся, хотя экран обещал «от 10».
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_deposit_below_the_minimum_is_returned_by_check(pool: PgPool) {
+    let e = env(pool).await;
+    grant(&e, 0, dec!(100)).await;
+    let dep = deposit(&e, CB, dec!(5)).await;
+    let m = get_move(&e, dep).await;
+    assert_eq!(m.status, MoveStatus::Refunded, "{m:?}");
+    assert_eq!(m.amount, Some(dec!(5)));
+    assert_eq!(balance(&e).await, dec!(0), "в капитал не попало");
+    let checks = e.world.checks_created_by(e.ub);
+    assert_eq!(checks.len(), 1, "один чек возврата");
+    assert_eq!(checks[0].amount, usdt(dec!(5)));
+    assert_eq!(checks[0].platform, CB, "тем же кошельком");
+    assert_eq!(m.check_url.as_deref(), Some(checks[0].url.as_str()));
+    assert_eq!(active_holds(&e).await, 0);
+    e.world.claim_check(e.client, &checks[0].url).unwrap();
+    e.assert_books_match().await;
+    // Ровно минимум — обычное пополнение.
+    let dep = deposit(&e, CB, dec!(10)).await;
+    assert_eq!(get_move(&e, dep).await.status, MoveStatus::Done);
+    assert_eq!(balance(&e).await, dec!(10));
+}
+
+/// Чек возврата создан, а ответ потерян («выполнил и вернул таймаут»): сверка находит его — один
+/// чек, второго нет.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_lost_reply_on_the_return_check_ends_with_one_check(pool: PgPool) {
+    let e = env(pool).await;
+    grant(&e, 0, dec!(100)).await;
+    e.world
+        .inject(e.ub, Call::CheckPress, Fault::TimeoutAfterEffect, 1);
+    let dep = deposit(&e, XR, dec!(4)).await;
+    e.engine.resolve_unknown().await.unwrap();
+    e.drain().await;
+    let m = get_move(&e, dep).await;
+    assert_eq!(m.status, MoveStatus::Refunded, "{m:?}");
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 1, "второго чека нет");
+    assert_eq!(balance(&e).await, dec!(0));
+    assert_eq!(active_holds(&e).await, 0);
+    e.assert_books_match().await;
+}
+
+/// Нажатие, которое создаёт чек возврата, не дошло (таймаут до действия): исход неясен, сверка
+/// чека не находит — к владельцу, повтора нет. Владелец проверил — чека нет: возврат создаётся
+/// заново, один чек.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_return_check_that_was_never_made_is_made_after_the_owner_checks(pool: PgPool) {
+    let e = env(pool).await;
+    let staff = grant(&e, 0, dec!(100)).await;
+    e.world
+        .inject(e.ub, Call::CheckPress, Fault::TimeoutBeforeEffect, 1);
+    let dep = deposit(&e, CB, dec!(3)).await;
+    let ops = {
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::operations::for_invest_move(&mut conn, dep)
+            .await
+            .unwrap()
+    };
+    assert!(
+        ops.iter()
+            .any(|o| o.kind == OpKind::CreateRefundCheck && o.invest_move_id == Some(dep)),
+        "{ops:?}"
+    );
+    e.engine.resolve_unknown().await.unwrap();
+    e.drain().await;
+    let m = get_move(&e, dep).await;
+    assert_eq!(m.status, MoveStatus::Manual, "{m:?}");
+    assert!(
+        e.world.checks_created_by(e.ub).is_empty(),
+        "без человека не повторяем"
+    );
+    assert_eq!(active_holds(&e).await, 1, "деньги удержаны до решения");
+
+    e.engine
+        .invest_resolve(
+            dep,
+            &staff,
+            &InvestVerdict::DidNotHappen,
+            "проверил кошелёк, чека нет",
+        )
+        .await
+        .unwrap();
+    e.drain().await;
+    let m = get_move(&e, dep).await;
+    assert_eq!(m.status, MoveStatus::Refunded, "{m:?}");
+    let checks = e.world.checks_created_by(e.ub);
+    assert_eq!(checks.len(), 1, "один чек возврата");
+    assert_eq!(checks[0].amount, usdt(dec!(3)));
+    assert_eq!(balance(&e).await, dec!(0));
+    assert_eq!(active_holds(&e).await, 0);
+    e.assert_books_match().await;
+}
