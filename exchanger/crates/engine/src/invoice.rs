@@ -192,6 +192,7 @@ async fn prechecks(
     if !storage::directions::get(&mut *conn, direction)
         .await?
         .accepting()
+        || crate::submit::account_paused(&mut *conn, direction).await?
     {
         return Ok(Some(InvoiceReject::DirectionClosed));
     }

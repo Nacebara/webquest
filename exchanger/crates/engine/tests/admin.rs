@@ -749,6 +749,9 @@ async fn confirm_intake_then_pay_out_when_the_wallet_stayed_silent(pool: PgPool)
     e.assert_books_match().await;
 }
 
+/// Аккаунт поставили на паузу, когда заявка уже принята: её операции ждут без траты попыток. Новые
+/// чеки через этот аккаунт во время паузы не принимаются — как при закрытом направлении, чек не
+/// открыт (Д-19.4, проверка 19.11: раньше принимались и висели «Проверяю чек», пока паузу не снимут).
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn paused_userbot_account_postpones_operations_without_spending_attempts(pool: PgPool) {
     let e = env(pool).await;
@@ -756,14 +759,26 @@ async fn paused_userbot_account_postpones_operations_without_spending_attempts(p
         .fetch_one(&e.pool)
         .await
         .unwrap();
+    let url = e.world.client_check(CB, usdt(dec!(20))).unwrap();
+    let order = accepted(e.submit(&url).await);
     {
         let mut conn = e.pool.acquire().await.unwrap();
         storage::admin::set_userbot_paused(&mut conn, ub_id, true)
             .await
             .unwrap();
     }
-    let url = e.world.client_check(CB, usdt(dec!(20))).unwrap();
-    let order = accepted(e.submit(&url).await);
+    let late = e.world.client_check(CB, usdt(dec!(7))).unwrap();
+    let refused = e.submit(&late).await;
+    assert!(
+        matches!(
+            refused,
+            engine::Submitted::Rejected {
+                reason: engine::SubmitReject::DirectionClosed,
+                ..
+            }
+        ),
+        "{refused:?}"
+    );
     e.engine.process_due().await.unwrap();
     let (now, _) = e.order(order.id).await;
     assert_eq!(now.state, OrderState::IntakePending);

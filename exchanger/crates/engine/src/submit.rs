@@ -170,7 +170,7 @@ impl Engine {
             || storage::settings::flag_on(&mut tx, "kill_switch_payouts").await?;
         let hold = if paused {
             Err(SubmitReject::ServicePaused)
-        } else if dir.accepting() {
+        } else if dir.accepting() && !account_paused(&mut tx, direction).await? {
             let (wallet, _) = storage::wallets::active(&mut tx, target)
                 .await?
                 .ok_or(EngineError::NoWalletAccount(target))?;
@@ -327,4 +327,19 @@ pub(crate) async fn setting_decimal(
         .await?
         .as_ref()
         .and_then(decimal_of))
+}
+/// Аккаунт юзербота кошелька входа или выплаты на паузе («Аккаунты» в пульте): новые чеки и счета
+/// через него не принимаются — как при закрытом направлении, «Курс» показывает то же (Д-19.4).
+pub(crate) async fn account_paused(
+    conn: &mut sqlx::PgConnection,
+    direction: domain::Direction,
+) -> Result<bool, EngineError> {
+    for platform in [direction.source(), direction.target()] {
+        if let Some((wallet, _)) = storage::wallets::active(&mut *conn, platform).await?
+            && storage::wallets::userbot_paused(&mut *conn, wallet).await?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }

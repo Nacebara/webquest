@@ -87,6 +87,32 @@ async fn expire_quote(e: &Env, order: i64) {
         .unwrap();
 }
 
+/// Д-19.4 (проверка 19.11): аккаунт кошелька на паузе — счёт не берём, как при закрытом
+/// направлении; «Курс» показывает ту же паузу.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn an_invoice_is_refused_while_the_wallet_account_is_paused(pool: PgPool) {
+    let e = setup(pool).await;
+    let ub_id: i16 = sqlx::query_scalar("SELECT id FROM userbot_accounts LIMIT 1")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    let mut conn = e.pool.acquire().await.unwrap();
+    storage::admin::set_userbot_paused(&mut conn, ub_id, true)
+        .await
+        .unwrap();
+    drop(conn);
+    let inv = shop_invoice(&e, InvoiceSpec::crypto(CB, usdt(dec!(10))));
+    assert_eq!(
+        rejected(submit_invoice(&e, &inv).await),
+        InvoiceReject::DirectionClosed
+    );
+    let orders: i64 = sqlx::query_scalar("SELECT count(*) FROM orders")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    assert_eq!(orders, 0, "заявки нет");
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn cryptobot_invoice_is_paid_with_an_xrocket_check(pool: PgPool) {
     let e = setup(pool).await;
