@@ -34,8 +34,11 @@ pub(crate) fn pct(v: Decimal) -> String {
     ui::fmt::percent(v)
 }
 
+/// Дата и время в пульте — по времени владельца, как время на главном экране и в тревогах
+/// ([`crate::dash::hhmm`]: запасом — Москва), без пометки пояса (П-19.1).
 pub(crate) fn when(at: DateTime<Utc>) -> String {
-    at.format("%d.%m %H:%M").to_string()
+    let clock = ui::Clock::new(3 * 3600, "").unwrap_or_else(ui::Clock::msk);
+    clock.text(at, ui::TimeFormat::DayTime).trim().to_owned()
 }
 
 /// `CQab…9F`: код чека или счёта в пульте не показываем целиком (CLAUDE.md п. 16).
@@ -1301,7 +1304,8 @@ impl Inner {
             let flood = b
                 .flood_wait_until
                 .filter(|u| *u > Utc::now())
-                .map(|u| t.f("bots.flood", &[("until", &when(u))]))
+                // Макет «Аккаунты»: «FLOOD до 14:12» — время, как на главном экране.
+                .map(|u| t.f("bots.flood", &[("until", &crate::dash::hhmm(u))]))
                 .unwrap_or_default();
             lines.push(
                 t.f(
@@ -2026,6 +2030,14 @@ impl Inner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// П-19.1 (проверка 19.11): даты пульта — по времени владельца, как время на главном экране
+    /// (запасом — Москва), а не UTC без пометки: «Бан до …», «С нами с …», «последнее …».
+    #[test]
+    fn console_dates_are_in_the_owners_time() {
+        let at = chrono::TimeZone::with_ymd_and_hms(&Utc, 2026, 11, 20, 23, 5, 0).unwrap();
+        assert_eq!(when(at), "21.11 02:05");
+    }
 
     #[test]
     fn check_codes_are_masked() {
