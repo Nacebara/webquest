@@ -46,7 +46,9 @@ impl Ui {
         match refusal {
             InvoiceRefusal::Paused { .. } => self.fill(&r.paused, &[]),
             InvoiceRefusal::Maintenance => self.fill(&r.maintenance, &[]),
-            InvoiceRefusal::DailyLimit => self.fill(&r.daily_limit, &[]),
+            InvoiceRefusal::DailyLimit { free } => {
+                self.fill(&r.daily_limit, &[("when", &self.free_when(free.as_ref()))])
+            }
             InvoiceRefusal::NoReserve { max } => {
                 self.fill(&r.no_reserve, &[("max", &self.money(max))])
             }
@@ -253,8 +255,8 @@ impl Ui {
                 (body, Keyboard::None)
             }
             // Владелец 14.11, вариант А: с кнопкой «Курс» — не тупик.
-            UiError::DailyLimit => (
-                self.fill(&e.daily_limit, &[]),
+            UiError::DailyLimit { free } => (
+                self.fill(&e.daily_limit, &[("when", &self.free_when(free.as_ref()))]),
                 self.err_keys(&[ErrKey::Rates]),
             ),
             UiError::RateLimited { retry_after_secs } => (

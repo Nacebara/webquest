@@ -18,14 +18,27 @@ expression: refunds.trim_end()
 ## above_maximum
 ### plain
 --- html
-↩️ <b>Возвращаю <code>750.00</code> USDT</b>
-Сумма больше текущего лимита <code>500.00</code> USDT.
+↩️ <b>Больше лимита</b> · до <code>500.00</code> USDT
+Верну <code>750.00</code> чеком CryptoBot. Разбейте сумму на части.
 --- keyboard: none
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00</code> USDT</b>
-Сумма больше текущего лимита <code>500.00</code> USDT.
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Больше лимита</b> · до <code>500.00</code> USDT
+Верну <code>750.00</code> чеком CryptoBot. Разбейте сумму на части.
+--- keyboard: none
+
+## above_daily
+### plain
+--- html
+↩️ <b>Больше лимита</b> · до <code>50.00</code> USDT
+Верну <code>750.00</code> чеком CryptoBot. Весь лимит — завтра после <tg-time unix="1791440100" format="t">09:15 МСК</tg-time>.
+--- keyboard: none
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Больше лимита</b> · до <code>50.00</code> USDT
+Верну <code>750.00</code> чеком CryptoBot. Весь лимит — завтра после <tg-time unix="1791440100" format="t">09:15 МСК</tg-time>.
 --- keyboard: none
 
 ## unsupported_asset

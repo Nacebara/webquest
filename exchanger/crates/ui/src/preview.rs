@@ -45,6 +45,14 @@ pub fn now() -> DateTime<Utc> {
     msk(5, 14, 5)
 }
 
+/// Суточный лимит освободится завтра в 09:15 (сутки подряд после обменов, которые его заняли).
+fn limit_free() -> crate::LimitFree {
+    crate::LimitFree {
+        at: msk(6, 9, 15),
+        now: now(),
+    }
+}
+
 fn dir(direction: Direction, fee: i64, max: i64, status: DirectionStatus) -> DirectionTerms {
     DirectionTerms {
         direction,
@@ -307,15 +315,41 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
                 Some(&RefundReason::BelowMinimum { min: usdt(100, 2) }),
             ),
         ),
+        one(
+            "Больше лимита",
+            ui.refund_done(
+                &o,
+                &usdt(100, 0),
+                REFUND_URL,
+                Some(&RefundReason::AboveDaily {
+                    max: usdt(5000, 2),
+                    free: Some(limit_free()),
+                }),
+            ),
+        ),
         PreviewScreen {
             title: "Лимит и пауза",
             messages: vec![
-                ui.error(&UiError::DailyLimit),
+                ui.error(&UiError::DailyLimit {
+                    free: Some(limit_free()),
+                }),
                 ui.error(&UiError::InvoiceRefused(InvoiceRefusal::Paused {
                     platform: domain::Platform::XRocket,
                 })),
             ],
         },
+        one(
+            "Лимит исчерпан · прислали чек",
+            ui.error(&UiError::DailyLimit {
+                free: Some(limit_free()),
+            }),
+        ),
+        one(
+            "Счёт не возьму · лимит",
+            ui.error(&UiError::InvoiceRefused(InvoiceRefusal::DailyLimit {
+                free: Some(limit_free()),
+            })),
+        ),
         one(
             "Обслуживание",
             ui.error(&UiError::Maintenance {

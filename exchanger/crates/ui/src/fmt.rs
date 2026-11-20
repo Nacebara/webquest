@@ -162,6 +162,11 @@ impl Clock {
         }
     }
 
+    /// Один ли календарный день у `a` и `b` в поясе часов («сегодня» или «завтра»).
+    pub fn same_day(&self, a: DateTime<Utc>, b: DateTime<Utc>) -> bool {
+        a.with_timezone(&self.offset).date_naive() == b.with_timezone(&self.offset).date_naive()
+    }
+
     /// Текст времени в поясе: `14:05 МСК`.
     pub fn text(&self, at: DateTime<Utc>, format: TimeFormat) -> String {
         let local = at.with_timezone(&self.offset).format(format.pattern());

@@ -155,6 +155,14 @@ pub enum Excess {
     Kept { amount: Money, min_refund: Money },
 }
 
+/// Когда освободится суточный лимит (сутки подряд, решение владельца 20.11) и «сейчас» — чтобы
+/// сказать «сегодня» или «завтра».
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LimitFree {
+    pub at: DateTime<Utc>,
+    pub now: DateTime<Utc>,
+}
+
 /// Почему не берём подходящий счёт прямо сейчас. Денег клиента у нас нет.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InvoiceRefusal {
@@ -163,7 +171,10 @@ pub enum InvoiceRefusal {
         platform: domain::Platform,
     },
     Maintenance,
-    DailyLimit,
+    /// Лимит на сутки исчерпан; `free` — когда освободится (`None` — неизвестно).
+    DailyLimit {
+        free: Option<LimitFree>,
+    },
     NoReserve {
         max: Money,
     },
@@ -178,8 +189,19 @@ pub enum InvoiceRefusal {
 /// Причина возврата (S9).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RefundReason {
-    BelowMinimum { min: Money },
-    AboveMaximum { max: Money },
+    BelowMinimum {
+        min: Money,
+    },
+    /// Больше лимита одной заявки (или резерва): «Разбейте сумму на части».
+    AboveMaximum {
+        max: Money,
+    },
+    /// Больше остатка суточного лимита: `max` — сколько можно сейчас, `free` — когда освободится
+    /// весь (картинка daily-limit.png, Д-19.2).
+    AboveDaily {
+        max: Money,
+        free: Option<LimitFree>,
+    },
     UnsupportedAsset,
     InvoicePaidElsewhere,
     InvoiceExpired,
@@ -262,8 +284,11 @@ pub enum UiError {
         /// Текст владельца строкой под «Обновляемся до 15:30» (решение 18.11, вариант «а»).
         note: Option<String>,
     },
-    /// Суточный лимит обменов клиента исчерпан (`settings.daily_limit_usd`).
-    DailyLimit,
+    /// Суточный лимит обменов клиента исчерпан (`settings.daily_limit_usd`); `free` — когда
+    /// освободится (сутки подряд, решение владельца 20.11).
+    DailyLimit {
+        free: Option<LimitFree>,
+    },
     /// E14.
     RateLimited {
         retry_after_secs: u64,

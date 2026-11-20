@@ -532,7 +532,7 @@ impl Ui {
             RefundReason::BelowMinimum { min } => {
                 self.fill(&r.below_minimum, &[("min", &self.money(min))])
             }
-            RefundReason::AboveMaximum { max } => {
+            RefundReason::AboveMaximum { max } | RefundReason::AboveDaily { max, .. } => {
                 self.fill(&r.above_maximum, &[("max", &self.money(max))])
             }
             RefundReason::UnsupportedAsset => self.fill(&r.unsupported_asset, &[]),
@@ -557,6 +557,23 @@ impl Ui {
                     ("min", &self.money(min)),
                     ("refund_short", &self.amount_code(refund)),
                     ("src", &src),
+                ],
+            ),
+            RefundReason::AboveMaximum { max } => self.fill(
+                &t.above_maximum,
+                &[
+                    ("max", &self.money(max)),
+                    ("refund_short", &self.amount_code(refund)),
+                    ("src", &src),
+                ],
+            ),
+            RefundReason::AboveDaily { max, free } => self.fill(
+                &t.above_daily,
+                &[
+                    ("max", &self.money(max)),
+                    ("refund_short", &self.amount_code(refund)),
+                    ("src", &src),
+                    ("when", &self.free_when(free.as_ref())),
                 ],
             ),
             other => self.fill(
@@ -589,7 +606,12 @@ impl Ui {
         reason: Option<&RefundReason>,
     ) -> Screen {
         let body = match reason {
-            Some(r @ RefundReason::BelowMinimum { .. }) => self.refund_text(order, refund, r),
+            // Та же строка, что и до чека (макеты «Меньше минимума», «Больше лимита»).
+            Some(
+                r @ (RefundReason::BelowMinimum { .. }
+                | RefundReason::AboveMaximum { .. }
+                | RefundReason::AboveDaily { .. }),
+            ) => self.refund_text(order, refund, r),
             _ => self.fill(
                 &self.texts.refund.done,
                 &[

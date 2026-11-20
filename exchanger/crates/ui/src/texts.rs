@@ -426,6 +426,10 @@ pub struct RefundTexts {
     pub done: String,
     /// «Меньше минимума · от 1.00 USDT / Верну 0.50 чеком CryptoBot.» — до и после чека.
     pub below_minimum: String,
+    /// «Больше лимита · до 300 USDT / Верну 750.00 чеком CryptoBot. Разбейте сумму на части.»
+    pub above_maximum: String,
+    /// «Больше лимита · до 50.00 USDT / … Весь лимит — завтра после 09:15.» (Д-19.2)
+    pub above_daily: String,
     /// Кнопка «Забрать 51.25 USDT».
     pub claim: String,
 }
@@ -468,6 +472,10 @@ pub struct ErrorTexts {
     pub maintenance: String,
     pub maintenance_until: String,
     pub daily_limit: String,
+    /// Когда освободится суточный лимит: «сегодня после 21:40», «завтра после 09:15», «позже».
+    pub when_today: String,
+    pub when_tomorrow: String,
+    pub when_later: String,
     pub rate_limited: String,
     pub banned: String,
     pub banned_until: String,

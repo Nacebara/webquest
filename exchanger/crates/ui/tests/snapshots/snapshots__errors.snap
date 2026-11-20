@@ -301,15 +301,45 @@ expression: errors.trim_end()
 ## daily_limit
 ### plain
 --- html
-🚫 <b>Лимит на сегодня исчерпан</b>
-Чек не открывал — деньги в нём. Новые обмены — после 00:00.
+🚫 <b>Лимит на сутки исчерпан</b>
+Чек не открывал — деньги в нём. Пришлите его завтра после <tg-time unix="1791440100" format="t">09:15 МСК</tg-time>.
 --- keyboard: inline
 [{"callback_data":"terms","text":"📈 Курс"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000028">🚫</tg-emoji> <b>Лимит на сегодня исчерпан</b>
-Чек не открывал — деньги в нём. Новые обмены — после 00:00.
+<tg-emoji emoji-id="5368000000000000028">🚫</tg-emoji> <b>Лимит на сутки исчерпан</b>
+Чек не открывал — деньги в нём. Пришлите его завтра после <tg-time unix="1791440100" format="t">09:15 МСК</tg-time>.
+--- keyboard: inline
+[{"callback_data":"terms","icon_custom_emoji_id":"5368000000000000015","text":"Курс"}]
+
+## daily_limit_today
+### plain
+--- html
+🚫 <b>Лимит на сутки исчерпан</b>
+Чек не открывал — деньги в нём. Пришлите его сегодня после <tg-time unix="1791398400" format="t">21:40 МСК</tg-time>.
+--- keyboard: inline
+[{"callback_data":"terms","text":"📈 Курс"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000028">🚫</tg-emoji> <b>Лимит на сутки исчерпан</b>
+Чек не открывал — деньги в нём. Пришлите его сегодня после <tg-time unix="1791398400" format="t">21:40 МСК</tg-time>.
+--- keyboard: inline
+[{"callback_data":"terms","icon_custom_emoji_id":"5368000000000000015","text":"Курс"}]
+
+## daily_limit_later
+### plain
+--- html
+🚫 <b>Лимит на сутки исчерпан</b>
+Чек не открывал — деньги в нём. Пришлите его позже.
+--- keyboard: inline
+[{"callback_data":"terms","text":"📈 Курс"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000028">🚫</tg-emoji> <b>Лимит на сутки исчерпан</b>
+Чек не открывал — деньги в нём. Пришлите его позже.
 --- keyboard: inline
 [{"callback_data":"terms","icon_custom_emoji_id":"5368000000000000015","text":"Курс"}]
 
@@ -660,14 +690,14 @@ expression: errors.trim_end()
 ### plain
 --- html
 ⏸ <b>Этот счёт сейчас не возьму</b>
-Причина: на сегодня лимит исчерпан — пришлите счёт завтра. Деньги не списаны.
+Причина: лимит на сутки исчерпан — пришлите счёт завтра после <tg-time unix="1791440100" format="t">09:15 МСК</tg-time>. Деньги не списаны.
 --- keyboard: inline
 [{"callback_data":"invoice","text":"🧾 Другой счёт"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> <b>Этот счёт сейчас не возьму</b>
-Причина: на сегодня лимит исчерпан — пришлите счёт завтра. Деньги не списаны.
+Причина: лимит на сутки исчерпан — пришлите счёт завтра после <tg-time unix="1791440100" format="t">09:15 МСК</tg-time>. Деньги не списаны.
 --- keyboard: inline
 [{"callback_data":"invoice","icon_custom_emoji_id":"5368000000000000004","text":"Другой счёт"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 

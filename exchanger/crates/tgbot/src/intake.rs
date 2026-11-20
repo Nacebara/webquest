@@ -133,7 +133,14 @@ fn invoice_error(reason: &InvoiceReject, platform: domain::Platform) -> UiError 
         InvoiceReject::NoReserve { max } => {
             UiError::InvoiceRefused(InvoiceRefusal::NoReserve { max: usdt(*max) })
         }
-        InvoiceReject::DailyLimit => UiError::InvoiceRefused(InvoiceRefusal::DailyLimit),
+        InvoiceReject::DailyLimit { free_at } => {
+            UiError::InvoiceRefused(InvoiceRefusal::DailyLimit {
+                free: free_at.map(|at| ui::LimitFree {
+                    at,
+                    now: chrono::Utc::now(),
+                }),
+            })
+        }
         InvoiceReject::BelowMinimum { min } => {
             UiError::InvoiceRefused(InvoiceRefusal::BelowMinimum { min: usdt(*min) })
         }
@@ -296,7 +303,9 @@ async fn submit(
                     let (until, note) = maintenance_until(inner).await?;
                     UiError::Maintenance { until, note }
                 }
-                SubmitReject::DailyLimit => UiError::DailyLimit,
+                SubmitReject::DailyLimit => UiError::DailyLimit {
+                    free: limit_free(inner, user, check_direction(link.platform)).await?,
+                },
                 SubmitReject::QuoteExpired => UiError::QuoteExpired,
                 SubmitReject::InvoiceBusy => UiError::InvoiceCheckBusy,
                 SubmitReject::MultiCheck => UiError::MultiCheck,
@@ -306,6 +315,21 @@ async fn submit(
             inner.reply_error(chat, &error).await
         }
     }
+}
+
+/// Когда клиент снова сможет обменять хотя бы минимум направления: сутки подряд после обменов,
+/// которые заняли лимит (решение владельца 20.11, картинка daily-limit.png).
+pub(crate) async fn limit_free(
+    inner: &Inner,
+    user: i64,
+    direction: domain::Direction,
+) -> Result<Option<ui::LimitFree>, TgBotError> {
+    let mut conn = inner.pool.acquire().await?;
+    let room = engine::daily_room(&mut conn, user, direction, None).await?;
+    Ok(room.and_then(|r| r.next_at).map(|at| ui::LimitFree {
+        at,
+        now: chrono::Utc::now(),
+    }))
 }
 
 /// До какого времени обслуживание («Обслуживание 30 мин» в пульте, П-13): клиенту — «Обновляемся

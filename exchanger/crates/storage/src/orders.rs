@@ -477,6 +477,31 @@ fn map_duplicate(err: sqlx::Error) -> StorageError {
     }
 }
 
+/// Обмены клиента в окне суточного лимита, старые первыми: когда и сколько — по тем же правилам,
+/// что [`user_volume_24h`]. Из них видно, когда лимит освободится (сутки подряд, решение владельца
+/// 20.11).
+pub async fn user_volume_entries_24h(
+    conn: &mut PgConnection,
+    user_id: i64,
+) -> Result<Vec<(chrono::DateTime<chrono::Utc>, Decimal)>, StorageError> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT o.created_at AS "at!", COALESCE(o.intake_amount, h.amount, 0) AS "amount!"
+          FROM orders o
+          LEFT JOIN holds h ON h.order_id = o.id AND h.state = 'active'
+         WHERE o.user_id = $1
+           AND o.created_at > now() - interval '24 hours'
+           AND o.state NOT IN ('REJECTED', 'INTAKE_FAILED', 'EXPIRED', 'CANCELLED',
+                               'REFUND_PENDING', 'REFUNDED')
+         ORDER BY o.created_at, o.id
+        "#,
+        user_id
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(rows.into_iter().map(|r| (r.at, r.amount)).collect())
+}
+
 /// Объём клиента за последние 24 часа: пришедшие суммы и удержания ещё не оплаченных заявок
 /// (без отказов и без возвратов: деньги вернулись — обмена не было, Д-19.8). Для лимитов
 /// `daily_limit_usd` и «новый клиент» (SPEC §3.4).

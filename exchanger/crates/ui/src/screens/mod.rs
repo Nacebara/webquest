@@ -203,6 +203,22 @@ impl Ui {
             .frag(at, format, self.config.tg_time_in_html)
     }
 
+    /// Когда освободится суточный лимит: «сегодня после 21:40», «завтра после 09:15», «позже».
+    fn free_when(&self, free: Option<&crate::LimitFree>) -> Frag {
+        let e = &self.texts.errors;
+        match free {
+            None => self.fill(&e.when_later, &[]),
+            Some(f) => {
+                let key = if self.config.clock.same_day(f.at, f.now) {
+                    &e.when_today
+                } else {
+                    &e.when_tomorrow
+                };
+                self.fill(key, &[("time", &self.at(f.at, TimeFormat::Time))])
+            }
+        }
+    }
+
     fn order_id(&self, id: &str) -> Frag {
         Frag::code(id)
     }

@@ -410,6 +410,82 @@ async fn daily_limit_caps_a_new_client(pool: PgPool) {
     ));
 }
 
+/// Суточный лимит — «сутки подряд» (решение владельца 20.11, картинка daily-limit.png): движок
+/// говорит, сколько осталось, когда можно снова обменять (освободится хотя бы минимум) и когда
+/// освободится весь лимит — 24 часа после обменов, которые его заняли.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn the_daily_limit_says_when_it_frees_up(pool: PgPool) {
+    let e = env(pool).await;
+    let mut conn = e.pool.acquire().await.unwrap();
+    storage::settings::set(
+        &mut conn,
+        "daily_limit_usd",
+        &serde_json::json!({ "default": 100, "new_user": 100 }),
+        None,
+    )
+    .await
+    .unwrap();
+    let mut placed = Vec::new();
+    for (code, amount, hours_ago) in [("CQday1", dec!(60), 10), ("CQday2", dec!(40), 2)] {
+        let o = storage::orders::insert(
+            &mut conn,
+            &storage::orders::NewOrder {
+                user_id: common::CLIENT,
+                direction: Direction::CbToXrCheck,
+                asset: Asset::Usdt,
+                intake_start_param: Some(code),
+                invoice_start_param: None,
+            },
+        )
+        .await
+        .unwrap();
+        let at: chrono::DateTime<chrono::Utc> = sqlx::query_scalar(
+            "UPDATE orders SET intake_amount = $2, created_at = now() - make_interval(hours => $3) \
+              WHERE id = $1 RETURNING created_at",
+        )
+        .bind(o.id)
+        .bind(amount)
+        .bind(hours_ago)
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
+        placed.push(at);
+    }
+    let room = engine::daily_room(&mut conn, common::CLIENT, Direction::CbToXrCheck, None)
+        .await
+        .unwrap()
+        .expect("лимит задан");
+    assert_eq!(room.left, dec!(0));
+    // Минимум (2) освободится, когда выйдет из окна первый обмен; весь лимит — второй.
+    assert_eq!(room.next_at, Some(placed[0] + chrono::Duration::hours(24)));
+    assert_eq!(room.full_at, Some(placed[1] + chrono::Duration::hours(24)));
+    // Счёт на 70 вместится, только когда выйдут оба (после первого свободно 60).
+    let invoice = engine::daily_room(
+        &mut conn,
+        common::CLIENT,
+        Direction::CbToXrCheck,
+        Some(dec!(70)),
+    )
+    .await
+    .unwrap()
+    .expect("лимит задан");
+    assert_eq!(
+        invoice.next_at,
+        Some(placed[1] + chrono::Duration::hours(24))
+    );
+    // Больше самого лимита не вместится никогда.
+    let never = engine::daily_room(
+        &mut conn,
+        common::CLIENT,
+        Direction::CbToXrCheck,
+        Some(dec!(150)),
+    )
+    .await
+    .unwrap()
+    .expect("лимит задан");
+    assert_eq!(never.next_at, None);
+}
+
 /// Д-19.8 (проверка 19.11): возврат не съедает суточный лимит. Раньше чек больше лимита заявки
 /// возвращался, но его сумма оставалась в объёме за сутки — следующий чек получал «Лимит на
 /// сегодня исчерпан», хотя обмена не было.

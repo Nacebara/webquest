@@ -36,6 +36,22 @@ pub fn at(h: u32, m: u32) -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2026, 10, 7, h, m, 0).unwrap()
 }
 
+/// Суточный лимит освободится (картинка daily-limit.png): «сейчас» 18:02 МСК, свободно — завтра
+/// в 09:15 или сегодня в 21:40.
+pub fn free_tomorrow() -> ui::LimitFree {
+    ui::LimitFree {
+        at: at(6, 15) + chrono::Duration::days(1),
+        now: at(15, 2),
+    }
+}
+
+pub fn free_today() -> ui::LimitFree {
+    ui::LimitFree {
+        at: at(18, 40),
+        now: at(15, 2),
+    }
+}
+
 pub fn usdt(v: Decimal) -> Money {
     Money::new(v, Asset::Usdt).unwrap()
 }
@@ -337,7 +353,19 @@ pub fn all_errors() -> Vec<(&'static str, UiError)> {
                 note: Some("Меняем сервер — вернёмся вовремя".into()),
             },
         ),
-        ("daily_limit", UiError::DailyLimit),
+        (
+            "daily_limit",
+            UiError::DailyLimit {
+                free: Some(free_tomorrow()),
+            },
+        ),
+        (
+            "daily_limit_today",
+            UiError::DailyLimit {
+                free: Some(free_today()),
+            },
+        ),
+        ("daily_limit_later", UiError::DailyLimit { free: None }),
         (
             "rate_limited",
             UiError::RateLimited {
@@ -454,7 +482,9 @@ pub fn all_errors() -> Vec<(&'static str, UiError)> {
         ),
         (
             "invoice_refused_daily_limit",
-            UiError::InvoiceRefused(InvoiceRefusal::DailyLimit),
+            UiError::InvoiceRefused(InvoiceRefusal::DailyLimit {
+                free: Some(free_tomorrow()),
+            }),
         ),
         (
             "invoice_refused_no_reserve",
@@ -487,6 +517,13 @@ pub fn all_refund_reasons() -> Vec<(&'static str, RefundReason)> {
             "above_maximum",
             RefundReason::AboveMaximum {
                 max: usdt(dec!(500)),
+            },
+        ),
+        (
+            "above_daily",
+            RefundReason::AboveDaily {
+                max: usdt(dec!(50)),
+                free: Some(free_tomorrow()),
             },
         ),
         ("unsupported_asset", RefundReason::UnsupportedAsset),
@@ -669,6 +706,30 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
                 &usdt(dec!(0.5)),
                 REFUND_URL,
                 Some(&RefundReason::BelowMinimum { min: usdt(dec!(1)) }),
+            ),
+        ),
+        // Картинка daily-limit.png (принята 20.11): «Больше лимита» — та же строка и после чека.
+        (
+            "refund_done_above_daily",
+            ui.refund_done(
+                &order(cb),
+                &usdt(dec!(100)),
+                REFUND_URL,
+                Some(&RefundReason::AboveDaily {
+                    max: usdt(dec!(50)),
+                    free: Some(free_tomorrow()),
+                }),
+            ),
+        ),
+        (
+            "refund_done_above_maximum",
+            ui.refund_done(
+                &order(cb),
+                &usdt(dec!(750)),
+                REFUND_URL,
+                Some(&RefundReason::AboveMaximum {
+                    max: usdt(dec!(300)),
+                }),
             ),
         ),
         (

@@ -1348,6 +1348,106 @@ async fn a_refund_below_the_minimum_keeps_its_reason_when_the_check_is_ready(poo
     assert!(!done.contains("Возврат готов"), "{}", done.body);
 }
 
+/// Лимит на сутки подряд (решение владельца 20.11, картинка daily-limit.png): исчерпан — клиент
+/// видит, когда лимит правда освободится (24 часа после обмена, который его занял), а не «после
+/// 00:00», когда он снова получил бы отказ.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn an_exhausted_daily_limit_says_when_it_frees_up(pool: PgPool) {
+    let e = env(pool).await;
+    set_daily_limit(&e, 100).await;
+    let bot = e.start_bot();
+    let first = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    e.fake.client_writes(&first);
+    e.order_message().await;
+    e.drain().await;
+    assert_eq!(e.orders().await[0].1, OrderState::Completed);
+    let placed: chrono::DateTime<chrono::Utc> =
+        sqlx::query_scalar("SELECT created_at FROM orders ORDER BY id LIMIT 1")
+            .fetch_one(&e.pool)
+            .await
+            .unwrap();
+    let frees = (placed + chrono::Duration::hours(24))
+        .timestamp()
+        .to_string();
+
+    let second = e.world.client_check(CB, usdt(dec!(50))).unwrap();
+    e.fake.client_writes(&second);
+    let refused = e
+        .fake
+        .wait_for("daily limit refusal", |c| {
+            c.contains("Лимит на сутки исчерпан")
+        })
+        .await;
+    bot.stop().await;
+    assert!(
+        refused.contains("Пришлите его завтра после") && refused.contains(&frees),
+        "время — сутки после первого обмена ({frees}): {}",
+        refused.body
+    );
+    assert!(!refused.contains("00:00"), "{}", refused.body);
+}
+
+/// Д-19.2 (проверка 19.11): чек больше остатка лимита на сутки — «Больше лимита · до» остатка, а
+/// не лимита одной заявки, и когда освободится весь лимит (картинка daily-limit.png).
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_check_above_what_is_left_today_says_how_much_and_when(pool: PgPool) {
+    let e = env(pool).await;
+    set_daily_limit(&e, 150).await;
+    let bot = e.start_bot();
+    let first = e.world.client_check(CB, usdt(dec!(100))).unwrap();
+    e.fake.client_writes(&first);
+    e.order_message().await;
+    e.drain().await;
+    let placed: chrono::DateTime<chrono::Utc> =
+        sqlx::query_scalar("SELECT created_at FROM orders ORDER BY id LIMIT 1")
+            .fetch_one(&e.pool)
+            .await
+            .unwrap();
+    let frees = (placed + chrono::Duration::hours(24))
+        .timestamp()
+        .to_string();
+
+    let second = e.world.client_check(CB, usdt(dec!(80))).unwrap();
+    e.fake.client_writes(&second);
+    for _ in 0..500 {
+        if e.orders().await.get(1).is_some_and(|o| o.3.is_some()) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    e.drain().await;
+    assert_eq!(e.orders().await[1].1, OrderState::Refunded);
+    let done = e
+        .fake
+        .wait_for("the refund above the daily room", |c| {
+            c.contains("Больше лимита") && c.contains("Забрать")
+        })
+        .await;
+    bot.stop().await;
+    assert!(
+        done.contains("до <code>50.00</code>\u{a0}USDT"),
+        "остаток на сутки: {}",
+        done.body
+    );
+    assert!(
+        done.contains("Весь лимит — завтра после") && done.contains(&frees),
+        "когда освободится весь лимит ({frees}): {}",
+        done.body
+    );
+}
+
+async fn set_daily_limit(e: &Env, usd: i64) {
+    let mut conn = e.pool.acquire().await.unwrap();
+    storage::settings::set(
+        &mut conn,
+        "daily_limit_usd",
+        &json!({ "default": usd, "new_user": usd }),
+        None,
+    )
+    .await
+    .unwrap();
+}
+
 /// Клиент видит, почему направление на паузе: «в xRocket закончился резерв», а не голое «пауза».
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn paused_direction_tells_the_client_why(pool: PgPool) {

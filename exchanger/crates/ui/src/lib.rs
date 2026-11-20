@@ -35,8 +35,8 @@ pub use fmt::{Clock, TimeFormat};
 pub use model::{
     Breakdown, DirectionStatus, DirectionTerms, Excess, FiatAmount, HistoryPage, HistoryRow,
     HistorySummary, InlineCard, InvestHome, InvestMoveKind, InvestMoveRow, InvestMoveStatus,
-    InvestNotice, InvestProblem, InvoiceProblem, InvoiceQuote, InvoiceRefusal, OrderCard, OrderRef,
-    PauseReason, PromoTerms, RefundReason, Terms, TierTerms, UiError,
+    InvestNotice, InvestProblem, InvoiceProblem, InvoiceQuote, InvoiceRefusal, LimitFree,
+    OrderCard, OrderRef, PauseReason, PromoTerms, RefundReason, Terms, TierTerms, UiError,
 };
 pub use screen::{Keyboard, MenuAction, Screen, normalize_menu_text};
 pub use screens::{Ui, UiConfig, inline_command, menu_command, wallet_bot_url};

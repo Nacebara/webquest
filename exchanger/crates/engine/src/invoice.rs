@@ -75,7 +75,11 @@ pub enum InvoiceReject {
     NoReserve {
         max: Decimal,
     },
-    DailyLimit,
+    /// Суточный лимит не вмещает счёт; `free_at` — когда вместит (`None` — не вместит никогда:
+    /// лимит меньше счёта). Сутки подряд — решение владельца 20.11.
+    DailyLimit {
+        free_at: Option<chrono::DateTime<chrono::Utc>>,
+    },
     /// Сколько прислать (`X`) меньше минимума направления.
     BelowMinimum {
         min: Decimal,
@@ -99,7 +103,7 @@ impl InvoiceReject {
             InvoiceReject::DirectionClosed => "direction_closed",
             InvoiceReject::ServicePaused => "service_paused",
             InvoiceReject::NoReserve { .. } => "no_reserve",
-            InvoiceReject::DailyLimit => "daily_limit",
+            InvoiceReject::DailyLimit { .. } => "daily_limit",
             InvoiceReject::BelowMinimum { .. } => "below_minimum",
             InvoiceReject::AboveMaximum { .. } => "above_maximum",
             InvoiceReject::Unsuitable(_) => "invoice_unsuitable",
@@ -317,7 +321,12 @@ impl Engine {
         } else if quote.client_pays > per_order {
             Some(InvoiceReject::AboveMaximum { max: per_order })
         } else if daily_left.is_some_and(|left| quote.client_pays > left) {
-            Some(InvoiceReject::DailyLimit)
+            let room =
+                crate::submit::daily_room(&mut tx, user_id, direction, Some(quote.client_pays))
+                    .await?;
+            Some(InvoiceReject::DailyLimit {
+                free_at: room.and_then(|r| r.next_at),
+            })
         } else if hold > room {
             Some(InvoiceReject::NoReserve {
                 max: room.max(Decimal::ZERO),

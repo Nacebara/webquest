@@ -57,7 +57,8 @@ pub const UNANSWERED_PAUSE: &str =
 /// Э-19.1). Пауза снимается сама, когда аккаунт снова подключён при следующем запуске.
 pub const LOGIN_LOST_PAUSE: &str = "вход в аккаунт кошелька сброшен: нужен вход заново";
 pub use submit::{
-    PASSCODE_FREE_LIMIT_KEY, SubmitReject, Submitted, passcode_free, passcode_free_limit, spendable,
+    DailyRoom, PASSCODE_FREE_LIMIT_KEY, SubmitReject, Submitted, daily_room, passcode_free,
+    passcode_free_limit, spendable,
 };
 
 /// Настройки движка.

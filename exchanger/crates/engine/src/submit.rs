@@ -318,6 +318,55 @@ pub async fn passcode_free(
     )))
 }
 
+/// Суточный лимит клиента сейчас — «сутки подряд» (решение владельца 20.11).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DailyRoom {
+    pub limit: domain::Decimal,
+    /// Сколько можно обменять сейчас (может быть меньше нуля, если лимит уменьшили).
+    pub left: domain::Decimal,
+    /// Когда снова можно обменять `need` (по умолчанию — минимум направления). `None` — можно уже
+    /// сейчас или не освободится вовсе (лимит меньше `need`).
+    pub next_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Когда освободится весь лимит: 24 часа после последнего обмена в окне; `None` — обменов нет.
+    pub full_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// Суточный лимит клиента по направлению: сколько осталось и когда освободится. `None` — лимита нет.
+/// `need` — сколько клиент хочет обменять (сумма счёта); `None` — минимум направления.
+pub async fn daily_room(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    direction: domain::Direction,
+    need: Option<domain::Decimal>,
+) -> Result<Option<DailyRoom>, EngineError> {
+    let eff = storage::user_terms::effective(&mut *conn, direction, user_id).await?;
+    let new_user = storage::orders::is_new_user(&mut *conn, user_id).await?;
+    let Some(limit) = daily_limit(&mut *conn, user_id, new_user && eff.newcomer_limit).await?
+    else {
+        return Ok(None);
+    };
+    let entries = storage::orders::user_volume_entries_24h(&mut *conn, user_id).await?;
+    let used: domain::Decimal = entries.iter().map(|(_, a)| *a).sum();
+    let left = limit - used;
+    let need = need.unwrap_or(eff.dir.min_amount);
+    let window = chrono::Duration::hours(24);
+    let next_at = if left >= need {
+        None
+    } else {
+        let mut still = used;
+        entries.iter().find_map(|(at, amount)| {
+            still -= *amount;
+            (limit - still >= need).then(|| *at + window)
+        })
+    };
+    Ok(Some(DailyRoom {
+        limit,
+        left,
+        next_at,
+        full_at: entries.last().map(|(at, _)| *at + window),
+    }))
+}
+
 /// Суточный лимит клиента: личный (`users.daily_limit_usd`, пульт), иначе общий из
 /// `settings.daily_limit_usd` (`{"default": 1000, "new_user": 200}`); `None` — не задан.
 /// `newcomer` — к клиенту применяется лимит нового клиента.

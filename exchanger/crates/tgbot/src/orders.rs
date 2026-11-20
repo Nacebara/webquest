@@ -51,6 +51,9 @@ pub(crate) struct Extra {
     pub other_coin: Option<(String, String)>,
     /// Чек выплаты или возврата уже забрали (уведомление кошелька): без «Забрать».
     pub claimed: bool,
+    /// Суточный лимит клиента и когда его измерили (отказ «Лимит исчерпан», возврат «Больше
+    /// лимита»; сутки подряд — решение владельца 20.11).
+    pub daily: Option<(engine::DailyRoom, DateTime<Utc>)>,
 }
 
 /// Убрать кнопку-ссылку на чек: его уже забрали (аудит 16.11; утверждённое «Чек забран»).
@@ -190,7 +193,11 @@ fn reject_error(view: &OrderView, extra: &Extra) -> UiError {
         Some("not_a_check") => UiError::NotCheckOrInvoice,
         // Аудит 16.11, К-5: лимит на сутки и остановленные выплаты — свои экраны, а не «что-то
         // пошло не так, попробуйте через минуту» (клиент пробовал бы снова и снова).
-        Some("daily_limit") => UiError::DailyLimit,
+        Some("daily_limit") => UiError::DailyLimit {
+            free: extra
+                .daily
+                .and_then(|(room, now)| room.next_at.map(|at| ui::LimitFree { at, now })),
+        },
         Some("service_paused") => UiError::Maintenance {
             until: None,
             note: None,
@@ -211,13 +218,34 @@ fn refund_reason(view: &OrderView, extra: &Extra) -> RefundReason {
             RefundReason::BelowMinimum { min }
         }
         (Some("above_maximum" | "above_reserved_amount"), _, Some(max)) => {
-            RefundReason::AboveMaximum { max }
+            above_limit(view, extra, max)
         }
         (Some("quote_expired"), _, _) => RefundReason::Underpaid,
         (Some("client_cancelled"), _, _) => RefundReason::ClientRequest,
         (Some("invoice_unpayable"), _, _) => RefundReason::InvoiceExpired,
         (Some("rate_moved"), _, _) => RefundReason::RateMoved,
         _ => RefundReason::Operator,
+    }
+}
+
+/// «Больше лимита · до …» — сколько можно сейчас (Д-19.2, картинка daily-limit.png). Остаток лимита
+/// на сутки меньше лимита заявки — «до» остатка и когда освободится весь лимит; иначе лимит заявки
+/// и «Разбейте сумму на части».
+fn above_limit(view: &OrderView, extra: &Extra, max: Money) -> RefundReason {
+    let Some((room, now)) = extra.daily else {
+        return RefundReason::AboveMaximum { max };
+    };
+    if room.left >= max.amount() {
+        return RefundReason::AboveMaximum { max };
+    }
+    let left = money(view, Some(room.left.max(Decimal::ZERO))).unwrap_or(max);
+    match room.full_at {
+        Some(at) => RefundReason::AboveDaily {
+            max: left,
+            free: Some(ui::LimitFree { at, now }),
+        },
+        // Обменов за сутки нет: сам лимит на сутки меньше лимита заявки — он и есть потолок.
+        None => RefundReason::AboveMaximum { max: left },
     }
 }
 
@@ -469,6 +497,15 @@ impl Inner {
                         .map(|t| t.max)
                         .or(extra.max_amount);
                 }
+                if matches!(
+                    view.failure_code.as_deref(),
+                    Some("above_maximum" | "above_reserved_amount")
+                ) {
+                    extra.daily = self.daily(view).await?;
+                }
+            }
+            OrderState::Rejected if view.failure_code.as_deref() == Some("daily_limit") => {
+                extra.daily = self.daily(view).await?;
             }
             OrderState::Rejected => {
                 extra.room = self
@@ -487,6 +524,16 @@ impl Inner {
             _ => {}
         }
         Ok(extra)
+    }
+
+    /// Суточный лимит клиента сейчас (`None` — лимита нет).
+    async fn daily(
+        &self,
+        view: &OrderView,
+    ) -> Result<Option<(engine::DailyRoom, DateTime<Utc>)>, TgBotError> {
+        let mut conn = self.pool.acquire().await?;
+        let room = engine::daily_room(&mut conn, view.user_id, view.direction, None).await?;
+        Ok(room.map(|r| (r, Utc::now())))
     }
 
     async fn store_progress(
@@ -1168,7 +1215,11 @@ mod tests {
                 "not_a_check",
                 UiError::NotCheckOrInvoice,
             ),
-            (OrderState::Rejected, "daily_limit", UiError::DailyLimit),
+            (
+                OrderState::Rejected,
+                "daily_limit",
+                UiError::DailyLimit { free: None },
+            ),
             (
                 OrderState::Rejected,
                 "service_paused",
@@ -1215,6 +1266,39 @@ mod tests {
             refund_reason(&v, &extra),
             RefundReason::AboveMaximum { .. }
         ));
+        // Д-19.2: на сутки осталось меньше лимита заявки — «до» остатка и когда освободится весь.
+        let now = Utc::now();
+        let full = now + chrono::Duration::hours(5);
+        let usd = |x| Money::new(x, Asset::Usdt).unwrap_or_else(|_| Money::zero(Asset::Usdt));
+        let room = |left, full_at| engine::DailyRoom {
+            limit: dec!(150),
+            left,
+            next_at: None,
+            full_at,
+        };
+        let with = |left, full_at| Extra {
+            daily: Some((room(left, full_at), now)),
+            ..extra.clone()
+        };
+        assert_eq!(
+            refund_reason(&v, &with(dec!(30), Some(full))),
+            RefundReason::AboveDaily {
+                max: usd(dec!(30)),
+                free: Some(ui::LimitFree { at: full, now }),
+            }
+        );
+        // Остатка хватает на лимит заявки — прежний экран «до 100 · Разбейте сумму на части».
+        assert_eq!(
+            refund_reason(&v, &with(dec!(500), Some(full))),
+            RefundReason::AboveMaximum {
+                max: usd(dec!(100))
+            }
+        );
+        // Обменов за сутки нет, а лимит на сутки меньше лимита заявки — он и есть потолок.
+        assert_eq!(
+            refund_reason(&v, &with(dec!(50), None)),
+            RefundReason::AboveMaximum { max: usd(dec!(50)) }
+        );
         v.failure_code = None;
         assert_eq!(refund_reason(&v, &extra), RefundReason::Operator);
         let screen = render(&ui(), &cfg(), &v, &extra);
