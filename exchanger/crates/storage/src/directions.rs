@@ -131,12 +131,18 @@ pub async fn save_terms(
     Ok(())
 }
 
-/// Снять автопаузу (человек разобрался с причиной).
+/// Снять автопаузу (человек разобрался с причиной): все причины разом.
 pub async fn clear_auto_pause(
     conn: &mut PgConnection,
     direction: Direction,
     staff: i64,
 ) -> Result<(), StorageError> {
+    sqlx::query!(
+        "DELETE FROM direction_pauses WHERE direction = $1",
+        direction.code()
+    )
+    .execute(&mut *conn)
+    .await?;
     sqlx::query!(
         r#"
         UPDATE directions SET auto_paused = FALSE, pause_reason = NULL, updated_by = $2,
@@ -191,16 +197,81 @@ pub async fn closed_by_staff(conn: &mut PgConnection) -> Result<Vec<Direction>, 
     Ok(codes.iter().filter_map(|c| c.parse().ok()).collect())
 }
 
-/// Автопауза системой (резерв, незнакомый ответ, сверка) с причиной.
+/// Автопауза одного направления системой, без привязки к кошельку.
 pub async fn auto_pause(
     conn: &mut PgConnection,
     direction: Direction,
     reason: &str,
 ) -> Result<(), StorageError> {
+    add_pause(conn, &[direction.code().to_owned()], "", reason).await?;
+    Ok(())
+}
+
+/// Вид причины паузы — текст до двоеточия: «сверка: … не хватает 12» и «… 13» — одна причина.
+fn pause_kind(reason: &str) -> &str {
+    let kind = reason.split(':').next().unwrap_or(reason).trim();
+    if kind.is_empty() {
+        "автопауза"
+    } else {
+        kind
+    }
+}
+
+/// Добавить причину паузы направлениям `codes` (кошелёк `platform`, '' — без кошелька) и обновить
+/// сводку. Сколько из них до этого были открыты.
+async fn add_pause(
+    conn: &mut PgConnection,
+    codes: &[String],
+    platform: &str,
+    reason: &str,
+) -> Result<u64, StorageError> {
+    let before = sqlx::query!(
+        "SELECT code, auto_paused FROM directions WHERE code = ANY($1) ORDER BY code FOR UPDATE",
+        codes
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    // Направление открыто — старые причины (если остались) не в счёт: пауза начинается заново.
+    let open: Vec<String> = before
+        .iter()
+        .filter(|r| !r.auto_paused)
+        .map(|r| r.code.clone())
+        .collect();
     sqlx::query!(
-        "UPDATE directions SET auto_paused = TRUE, pause_reason = $2, updated_at = now() WHERE code = $1",
-        direction.code(),
+        "DELETE FROM direction_pauses WHERE direction = ANY($1)",
+        &open
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!(
+        r#"
+        INSERT INTO direction_pauses (direction, platform, kind, reason)
+        SELECT unnest($1::text[]), $2, $3, $4
+        ON CONFLICT (direction, platform, kind) DO UPDATE SET reason = EXCLUDED.reason
+        "#,
+        codes,
+        platform,
+        pause_kind(reason),
         reason
+    )
+    .execute(&mut *conn)
+    .await?;
+    sync_pauses(conn, codes).await?;
+    Ok(u64::try_from(open.len()).unwrap_or(u64::MAX))
+}
+
+/// Сводка в `directions`: на паузе, пока есть причина; показывается самая ранняя.
+async fn sync_pauses(conn: &mut PgConnection, codes: &[String]) -> Result<(), StorageError> {
+    sqlx::query!(
+        r#"
+        UPDATE directions d
+           SET auto_paused = EXISTS (SELECT 1 FROM direction_pauses p WHERE p.direction = d.code),
+               pause_reason = (SELECT p.reason FROM direction_pauses p WHERE p.direction = d.code
+                                ORDER BY p.since, p.kind, p.platform LIMIT 1),
+               updated_at = now()
+         WHERE d.code = ANY($1)
+        "#,
+        codes
     )
     .execute(conn)
     .await?;
@@ -248,8 +319,8 @@ pub enum Side {
     Target,
 }
 
-/// Автопауза всех направлений, у которых `platform` стоит на стороне `side`. Возвращает,
-/// сколько направлений встало на паузу.
+/// Автопауза всех направлений, у которых `platform` стоит на стороне `side`: причина добавляется
+/// к уже стоящим (Д-19.9). Возвращает, сколько направлений встало на паузу (было открыто).
 pub async fn auto_pause_platform(
     conn: &mut PgConnection,
     platform: domain::Platform,
@@ -257,42 +328,51 @@ pub async fn auto_pause_platform(
     reason: &str,
 ) -> Result<u64, StorageError> {
     let column_is_source = side == Side::Source;
-    let n = sqlx::query!(
+    let codes = sqlx::query_scalar!(
         r#"
-        UPDATE directions SET auto_paused = TRUE, pause_reason = $3, updated_at = now()
+        SELECT code FROM directions
          WHERE (CASE WHEN $2 THEN source_platform ELSE target_platform END) = $1
-           AND NOT auto_paused
         "#,
         platform.db_name(),
-        column_is_source,
-        reason
+        column_is_source
     )
-    .execute(conn)
-    .await?
-    .rows_affected();
-    Ok(n)
+    .fetch_all(&mut *conn)
+    .await?;
+    add_pause(conn, &codes, platform.db_name(), reason).await
 }
 
-/// Снять автопаузу с направлений платформы, поставленную ровно с этой причиной (другие
-/// причины не трогаются). Сколько направлений снято.
+/// Снять с направлений платформы только эту причину паузы этого кошелька (того же вида —
+/// [`pause_kind`]); другие причины и паузы из-за другого кошелька остаются (Д-19.9).
+/// Сколько направлений открылось.
 pub async fn clear_auto_pause_reason(
     conn: &mut PgConnection,
     platform: domain::Platform,
     reason: &str,
 ) -> Result<u64, StorageError> {
-    let n = sqlx::query!(
+    let codes = sqlx::query_scalar!(
         r#"
-        UPDATE directions SET auto_paused = FALSE, pause_reason = NULL, updated_at = now()
-         WHERE auto_paused AND pause_reason = $2
-           AND (source_platform = $1 OR target_platform = $1)
+        DELETE FROM direction_pauses p USING directions d
+         WHERE p.direction = d.code AND d.auto_paused
+           AND (d.source_platform = $1 OR d.target_platform = $1)
+           AND p.platform IN ($1, '') AND p.kind = $2
+        RETURNING p.direction
         "#,
         platform.db_name(),
-        reason
+        pause_kind(reason)
     )
-    .execute(conn)
-    .await?
-    .rows_affected();
-    Ok(n)
+    .fetch_all(&mut *conn)
+    .await?;
+    if codes.is_empty() {
+        return Ok(0);
+    }
+    sync_pauses(&mut *conn, &codes).await?;
+    let opened = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM directions WHERE code = ANY($1) AND NOT auto_paused"#,
+        &codes
+    )
+    .fetch_one(conn)
+    .await?;
+    Ok(u64::try_from(opened).unwrap_or(0))
 }
 
 /// Минимальная сумма чека актива на платформе (`platform_assets.min_check`).

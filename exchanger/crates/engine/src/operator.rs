@@ -839,6 +839,8 @@ impl Engine {
                 crate::UNANSWERED_PAUSE,
             )
             .await?;
+            // Та же операция могла поставить и паузу «исход неизвестен» (Д-19.9: причины — набором).
+            Self::clear_issue_pause_if_settled(&mut tx, platform).await?;
         }
         tx.commit().await?;
         if let Some(platform) = unanswered_intake {
@@ -960,6 +962,7 @@ impl Engine {
         // снимает и то и другое, если других неясных денежных команд по кошельку нет.
         if was_unknown {
             crate::Engine::clear_unanswered_if_settled(&mut tx, platform).await?;
+            crate::Engine::clear_issue_pause_if_settled(&mut tx, platform).await?;
         }
         let after_details = storage::orders::details(&mut tx, order.id).await?;
         let mut after = snapshot(&order, &after_details);

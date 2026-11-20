@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM direction_pauses WHERE direction = ANY($1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d1d13aac2616a5c394122289d7165fd1d92e714b21bbd75ff9894fc6378fb06a"
+}

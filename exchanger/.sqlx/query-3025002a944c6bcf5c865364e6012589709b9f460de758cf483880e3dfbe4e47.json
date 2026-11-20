@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM direction_pauses p USING directions d\n         WHERE p.direction = d.code AND d.auto_paused\n           AND (d.source_platform = $1 OR d.target_platform = $1)\n           AND p.platform IN ($1, '') AND p.kind = $2\n        RETURNING p.direction\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "direction",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "direction_pauses",
+            "name": "direction"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3025002a944c6bcf5c865364e6012589709b9f460de758cf483880e3dfbe4e47"
+}

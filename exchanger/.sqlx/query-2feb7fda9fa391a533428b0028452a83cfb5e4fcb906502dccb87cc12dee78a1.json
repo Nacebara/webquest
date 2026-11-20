@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT code, auto_paused FROM directions WHERE code = ANY($1) ORDER BY code FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "directions",
+            "name": "code"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "auto_paused",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "directions",
+            "name": "auto_paused"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "2feb7fda9fa391a533428b0028452a83cfb5e4fcb906502dccb87cc12dee78a1"
+}

@@ -442,3 +442,94 @@ async fn queued_money_out_is_what_a_kill_switch_holds(pool: PgPool) {
         .unwrap();
     assert_eq!(queued, vec![(Asset::Usdt, 1, dec!(10))]);
 }
+
+/// Д-19.9 (проверка 19.11): причин автопаузы у направления может быть несколько, у каждой — свой
+/// кошелёк; снимается только своя. Раньше вторая причина не записывалась («уже на паузе»), а
+/// снятие первой («без ответа») снимало паузу целиком — выплаты из кошелька с недостачей шли снова.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn an_auto_pause_is_lifted_only_with_its_own_reason(pool: PgPool) {
+    use storage::directions::{
+        Side, auto_pause_platform, clear_auto_pause, clear_auto_pause_reason,
+    };
+    let mut conn = pool.acquire().await.unwrap();
+    let state = |d: storage::directions::DirectionRow| (d.auto_paused, d.pause_reason);
+    async fn dir(conn: &mut sqlx::PgConnection, d: Direction) -> storage::directions::DirectionRow {
+        storage::directions::get(conn, d).await.unwrap()
+    }
+    const UNANSWERED: &str = "команда кошельку без ответа";
+    // xRocket не ответил на активацию: все четыре направления (xRocket в каждом) — на паузе.
+    let mut paused = 0;
+    for side in [Side::Source, Side::Target] {
+        paused += auto_pause_platform(&mut conn, XR, side, UNANSWERED)
+            .await
+            .unwrap();
+    }
+    assert_eq!(paused, 4);
+    // Сверка: в xRocket не хватает — выплаты из него на паузу; повтор сверки — та же причина.
+    let short = |n: u32| format!("сверка: в кошельке 628 USDT, ожидалось 640 — не хватает {n}");
+    assert_eq!(
+        auto_pause_platform(&mut conn, XR, Side::Target, &short(12))
+            .await
+            .unwrap(),
+        0,
+        "уже на паузе — новых пауз нет"
+    );
+    auto_pause_platform(&mut conn, XR, Side::Target, &short(13))
+        .await
+        .unwrap();
+    // Заявку без ответа разобрали: снята только «без ответа».
+    clear_auto_pause_reason(&mut conn, XR, UNANSWERED)
+        .await
+        .unwrap();
+    for d in [Direction::XrToCbCheck, Direction::PayCbInvoice] {
+        assert_eq!(
+            state(dir(&mut conn, d).await),
+            (false, None),
+            "{d:?}: приём из xRocket открыт"
+        );
+    }
+    for d in [Direction::CbToXrCheck, Direction::PayXrInvoice] {
+        assert_eq!(
+            state(dir(&mut conn, d).await),
+            (true, Some(short(13))),
+            "{d:?}: выплаты в xRocket ждут человека по недостаче"
+        );
+    }
+    // Человек снял паузу кнопкой — снято всё; снятие одной причины потом ничего не возвращает.
+    storage::staff::ensure_owner(&mut conn, 1, "Владелец")
+        .await
+        .unwrap();
+    for d in [Direction::CbToXrCheck, Direction::PayXrInvoice] {
+        clear_auto_pause(&mut conn, d, 1).await.unwrap();
+    }
+    clear_auto_pause_reason(&mut conn, XR, &short(13))
+        .await
+        .unwrap();
+    for d in Direction::ALL {
+        assert!(!dir(&mut conn, d).await.auto_paused, "{d:?}");
+    }
+
+    // Оба кошелька без ответа (сбой Telegram): ответил xRocket — пауза CryptoBot остаётся.
+    for p in [CB, XR] {
+        for side in [Side::Source, Side::Target] {
+            auto_pause_platform(&mut conn, p, side, UNANSWERED)
+                .await
+                .unwrap();
+        }
+    }
+    clear_auto_pause_reason(&mut conn, XR, UNANSWERED)
+        .await
+        .unwrap();
+    for d in Direction::ALL {
+        assert!(
+            dir(&mut conn, d).await.auto_paused,
+            "{d:?}: CryptoBot всё ещё без ответа"
+        );
+    }
+    clear_auto_pause_reason(&mut conn, CB, UNANSWERED)
+        .await
+        .unwrap();
+    for d in Direction::ALL {
+        assert!(!dir(&mut conn, d).await.auto_paused, "{d:?}");
+    }
+}

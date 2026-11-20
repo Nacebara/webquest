@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE directions d\n           SET auto_paused = EXISTS (SELECT 1 FROM direction_pauses p WHERE p.direction = d.code),\n               pause_reason = (SELECT p.reason FROM direction_pauses p WHERE p.direction = d.code\n                                ORDER BY p.since, p.kind, p.platform LIMIT 1),\n               updated_at = now()\n         WHERE d.code = ANY($1)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "92487d4ca66dae7c21dcaff9115c2198dc1186093467179c75cab55792810f7c"
+}

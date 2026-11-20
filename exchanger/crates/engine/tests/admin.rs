@@ -788,6 +788,49 @@ async fn paused_userbot_account_postpones_operations_without_spending_attempts(p
     e.assert_books_match().await;
 }
 
+/// Д-19.9 (проверка 19.11): xRocket не ответил на активацию — все направления на паузе «без
+/// ответа»; в это время сверка нашла недостачу в CryptoBot. Человек разобрал заявку — снята только
+/// пауза «без ответа»: выплаты из CryptoBot ждут разбора недостачи. Раньше вторая причина не
+/// записывалась, и разбор заявки открывал выплаты из кошелька, где не хватает денег.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn resolving_an_unanswered_order_keeps_the_shortfall_pause(pool: PgPool) {
+    let e = env(pool).await;
+    let a = e.world.client_check(XR, usdt(dec!(100))).unwrap();
+    let order_a = accepted(e.submit(&a).await);
+    e.world.inject(e.ub, Call::SendText, Fault::NoReply, 1);
+    e.drain().await;
+    assert_eq!(e.order(order_a.id).await.0.state, OrderState::ManualReview);
+    e.world
+        .set_balance(e.ub, CB, Asset::Usdt, dec!(950))
+        .unwrap();
+    let r = e.engine.reconcile_balances().await.unwrap();
+    let cb = r.iter().find(|x| x.platform == CB).unwrap();
+    assert_eq!(cb.verdict, engine::reconcile::Verdict::Pause, "{r:?}");
+
+    let admin = staff(&e.pool, 20, Role::Admin).await;
+    e.engine
+        .operator_decide(request(
+            order_a.id,
+            OperatorDecision::ConfirmIntake { amount: dec!(100) },
+            &admin,
+        ))
+        .await
+        .unwrap();
+    let paused: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT code, pause_reason FROM directions WHERE auto_paused ORDER BY code")
+            .fetch_all(&e.pool)
+            .await
+            .unwrap();
+    let codes: Vec<&str> = paused.iter().map(|(c, _)| c.as_str()).collect();
+    assert_eq!(codes, ["pay_cb_invoice", "xr_to_cb_check"], "{paused:?}");
+    assert!(
+        paused
+            .iter()
+            .all(|(_, r)| r.as_deref().is_some_and(|r| r.starts_with("сверка:"))),
+        "{paused:?}"
+    );
+}
+
 /// Аудит 11.11.2026, Ю-2. Активация без ответа: чат кошелька занят ею, поздний ответ несёт
 /// сумму. Кошелёк на паузе — новые заявки через него не принимаются, чеки клиентов не тронуты.
 /// Человек подтвердил приход — пауза снята, следующая заявка получает свою сумму.

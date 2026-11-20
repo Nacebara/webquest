@@ -88,6 +88,13 @@ pub(crate) fn older_than(op: &OperationRow, age: std::time::Duration) -> bool {
 }
 
 /// Сколько раз пробовать запись в базу после действия в кошельке (М-4, шаг 1.7).
+/// Причины паузы выплат с кошелька, когда исход создания чека неясен и сверка его не нашла
+/// (снимает разбор последней такой заявки — [`Engine::clear_issue_pause_if_settled`]).
+pub(crate) const ISSUE_NOT_FOUND_PAUSE: &str =
+    "исход создания чека неизвестен и чек не найден: проверьте в кошельке";
+pub(crate) const ISSUE_UNVERIFIABLE_PAUSE: &str =
+    "исход создания чека неизвестен, сверка невозможна";
+
 const DB_RETRIES: u32 = 3;
 /// Через сколько снова взять операцию, если база так и не ответила.
 const DB_FAILURE_BACKOFF: std::time::Duration = std::time::Duration::from_secs(10);
@@ -783,6 +790,28 @@ impl Engine {
         Ok(())
     }
 
+    /// Неясных чеков по кошельку не осталось (человек разобрал последнюю такую заявку): пауза
+    /// выплат «исход создания чека неизвестен» снята — её причина ушла вместе с операцией. Другие
+    /// причины паузы (недостача, нехватка денег) остаются до своего разбора (Д-19.9).
+    pub(crate) async fn clear_issue_pause_if_settled(
+        conn: &mut PgConnection,
+        platform: Platform,
+    ) -> Result<(), EngineError> {
+        let left: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM operations WHERE platform = $1 AND status = 'unknown' \
+               AND kind IN ('create_payout_check', 'create_refund_check', 'create_excess_check')",
+        )
+        .bind(platform.db_name())
+        .fetch_one(&mut *conn)
+        .await?;
+        if left == 0 {
+            for reason in [ISSUE_NOT_FOUND_PAUSE, ISSUE_UNVERIFIABLE_PAUSE] {
+                storage::directions::clear_auto_pause_reason(&mut *conn, platform, reason).await?;
+            }
+        }
+        Ok(())
+    }
+
     /// Человек разобрал заявку с неотвеченной активацией (после коммита решения): чат
     /// кошелька можно использовать снова.
     pub(crate) async fn unanswered_resolved(&self, platform: Platform) {
@@ -1102,19 +1131,14 @@ impl Engine {
                 Ok(())
             }
             Ok(None) => {
-                self.fail_issue(
-                    op,
-                    OpStatus::Unknown,
-                    "исход создания чека неизвестен и чек не найден: проверьте в кошельке",
-                    true,
-                )
-                .await
+                self.fail_issue(op, OpStatus::Unknown, ISSUE_NOT_FOUND_PAUSE, true)
+                    .await
             }
             Err(e) if older_than(op, self.cfg.escalate_after) => {
                 self.fail_issue(
                     op,
                     OpStatus::Unknown,
-                    &format!("исход создания чека неизвестен, сверка невозможна: {e}"),
+                    &format!("{ISSUE_UNVERIFIABLE_PAUSE}: {e}"),
                     true,
                 )
                 .await

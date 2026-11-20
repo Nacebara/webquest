@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO direction_pauses (direction, platform, kind, reason)\n        SELECT unnest($1::text[]), $2, $3, $4\n        ON CONFLICT (direction, platform, kind) DO UPDATE SET reason = EXCLUDED.reason\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3672e6131bd65be73dfa884e8fc23307648115c576624eba47aedd64fe36cd7b"
+}
