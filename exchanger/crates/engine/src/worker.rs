@@ -244,6 +244,14 @@ impl Engine {
             }
         }
 
+        // Аккаунт кошелька не подключён (вход сброшен, Э-19.1): ждём его, попытку не тратим.
+        if !self.wallets.contains_key(&op.platform) {
+            let at = Utc::now()
+                + chrono::Duration::from_std(self.cfg.unavailable_backoff).unwrap_or_default();
+            let mut conn = self.pool.acquire().await?;
+            storage::operations::postpone(&mut conn, op.id, at, crate::LOGIN_LOST_PAUSE).await?;
+            return Ok(());
+        }
         let wallet = self.wallet(op.platform)?.clone();
         let tag = tag(op);
         match op.kind {
@@ -1291,7 +1299,8 @@ impl Engine {
             let mut conn = self.pool.acquire().await?;
             let mut out = Vec::new();
             for op in storage::operations::in_flight(&mut conn).await? {
-                if op.status != OpStatus::Unknown {
+                // Кошелёк без аккаунта (Э-19.1): сверять нечем — после входа сверка продолжится.
+                if op.status != OpStatus::Unknown || !self.wallets.contains_key(&op.platform) {
                     continue;
                 }
                 // Вывод инвестора: сверяем, пока автоматика не сдалась (`give_up`).
@@ -1391,6 +1400,11 @@ impl Engine {
                 .collect()
         };
         for op in dispatched {
+            // Кошелёк без аккаунта (вход сброшен, Э-19.1): спросить его нечем — ждём входа.
+            if !self.wallets.contains_key(&op.platform) {
+                tracing::warn!(op = op.id, key = %op.idempotency_key, "interrupted operation waits: its wallet account is not connected");
+                continue;
+            }
             tracing::warn!(op = op.id, key = %op.idempotency_key, kind = op.kind.as_db_str(), "recovering an interrupted operation");
             if let Err(e) = self.recover_one(&op).await {
                 tracing::error!(op = op.id, error = %e, "recovery failed");

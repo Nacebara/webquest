@@ -1075,6 +1075,78 @@ async fn unclear_refund_is_closed_with_the_check_found_in_the_wallet(pool: PgPoo
     e.assert_books_match().await;
 }
 
+/// Э-19.1 (проверка 19.11): аккаунт xRocket не вошёл при запуске exch. exch работает без него:
+/// направления xRocket на паузе, тревога «Вход сброшен»; операция xRocket, начатая раньше, ждёт —
+/// не тратит попытку и не уходит человеку. Аккаунт снова вошёл — пауза снята, заявка доходит.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_wallet_whose_account_did_not_log_in_waits_and_the_rest_runs(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(XR, usdt(dec!(50))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    // Запуск без xRocket: движок только с кошельком CryptoBot.
+    let cb_only = engine::Engine::new(e.pool.clone(), e.engine.config().clone())
+        .with_wallet(e.wallets[&CB].clone() as std::sync::Arc<dyn userbot::WalletBot>);
+    {
+        let mut conn = e.pool.acquire().await.unwrap();
+        engine::account_alerts::account_not_connected(&mut conn, "ub-1", 1, &[XR])
+            .await
+            .unwrap();
+    }
+    for _ in 0..3 {
+        cb_only.process_due().await.unwrap();
+    }
+    cb_only.recover().await.unwrap();
+    let activation = e
+        .ops(order.id)
+        .await
+        .into_iter()
+        .find(|o| o.kind == domain::fsm::OpKind::ActivateCheck)
+        .unwrap();
+    assert_eq!(activation.status, OpStatus::Pending, "ждёт, а не неясна");
+    assert_eq!(activation.attempts, 0, "попытка не потрачена");
+    assert_eq!(e.order(order.id).await.0.state, OrderState::IntakePending);
+    let paused: Vec<String> = sqlx::query_scalar(
+        "SELECT code FROM directions WHERE auto_paused AND pause_reason = $1 ORDER BY code",
+    )
+    .bind(engine::LOGIN_LOST_PAUSE)
+    .fetch_all(&e.pool)
+    .await
+    .unwrap();
+    // xRocket — вход или выход в каждом из четырёх направлений.
+    assert_eq!(
+        paused,
+        [
+            "cb_to_xr_check",
+            "pay_cb_invoice",
+            "pay_xr_invoice",
+            "xr_to_cb_check"
+        ]
+    );
+    let alert: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM alerts WHERE dedup_key = 'login_lost:ub-1' AND resolved_at IS NULL",
+    )
+    .fetch_one(&e.pool)
+    .await
+    .unwrap();
+    assert_eq!(alert, 1);
+
+    // Аккаунт снова вошёл: пауза снята, заявка доходит.
+    {
+        let mut conn = e.pool.acquire().await.unwrap();
+        engine::account_alerts::account_connected(&mut conn, &[CB, XR])
+            .await
+            .unwrap();
+    }
+    let still: i64 = sqlx::query_scalar("SELECT count(*) FROM directions WHERE auto_paused")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    assert_eq!(still, 0);
+    e.drain().await;
+    assert_eq!(e.order(order.id).await.0.state, OrderState::Completed);
+    e.assert_books_match().await;
+}
+
 /// Шаг 1.2 (аудит 11.11.2026). Сумма чека выплаты CryptoBot осталась без ответа: чек мог создать
 /// сама сумма, а его поздний экран — новое сообщение — достался бы следующей выплате. Кошелёк
 /// сразу на паузе: новые заявки через CryptoBot не принимаются. Человек проверил: чека нет,

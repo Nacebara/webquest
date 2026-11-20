@@ -176,6 +176,68 @@ pub fn mask(text: &str) -> String {
     }
 }
 
+/// Э-19.1 (проверка 19.11): аккаунт `label` не вошёл при запуске exch — сессии нет или Telegram
+/// её отозвал. exch работает без него: аккаунт помечен «вход сброшен», направления его кошельков
+/// на автопаузе ([`crate::LOGIN_LOST_PAUSE`]), персоналу — та же тревога «Вход сброшен», что и при
+/// потере входа на ходу.
+pub async fn account_not_connected(
+    conn: &mut PgConnection,
+    label: &str,
+    userbot_id: i16,
+    platforms: &[Platform],
+) -> Result<(), EngineError> {
+    storage::sessions::mark_logged_out(&mut *conn, label).await?;
+    for platform in platforms {
+        for side in [
+            storage::directions::Side::Source,
+            storage::directions::Side::Target,
+        ] {
+            storage::directions::auto_pause_platform(
+                &mut *conn,
+                *platform,
+                side,
+                crate::LOGIN_LOST_PAUSE,
+            )
+            .await?;
+        }
+    }
+    let key = format!("login_lost:{label}");
+    storage::alerts::raise_condition(
+        conn,
+        &NewAlert {
+            level: Level::Critical,
+            topic: Topic::Errors,
+            dedup_key: &key,
+            title: "login_lost",
+            payload: json!({
+                "account": label,
+                "userbot_id": userbot_id,
+                "platforms": platforms_json(platforms),
+            }),
+        },
+    )
+    .await?;
+    tracing::error!(account = %label, "wallet account did not log in at start: it is skipped, its directions are paused");
+    Ok(())
+}
+
+/// Аккаунт снова подключён при запуске: снять паузу «вход сброшен» с направлений его кошельков.
+/// Тревогу закроет первый ответ кошелька ([`on_answer`]).
+pub async fn account_connected(
+    conn: &mut PgConnection,
+    platforms: &[Platform],
+) -> Result<(), EngineError> {
+    for platform in platforms {
+        storage::directions::clear_auto_pause_reason(
+            &mut *conn,
+            *platform,
+            crate::LOGIN_LOST_PAUSE,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

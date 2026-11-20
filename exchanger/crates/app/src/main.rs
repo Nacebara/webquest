@@ -643,12 +643,18 @@ async fn run() -> anyhow::Result<()> {
                 pool.clone(),
                 tg.bots().clone(),
             ));
-            let userbots = app::runtime::connect_userbots(&pool, &tg, &log).await?;
-            if userbots.is_empty() {
+            let connected = app::runtime::connect_userbots_for_run(&pool, &tg, &log).await?;
+            let userbots = connected.userbots;
+            if connected.accounts == 0 {
                 tracing::warn!(
                     "no active wallet accounts: run `exch login` first; the engine is not started"
                 );
             } else {
+                // Аккаунт, который не вошёл, пропущен (Э-19.1): его направления на паузе, в пульте
+                // тревога «Вход сброшен»; клиенты и пульт работают.
+                for label in &connected.lost {
+                    tracing::error!(account = %label, "running without this userbot: log in again with `exch setup`");
+                }
                 let engine = Arc::new(app::runtime::engine(&pool, &userbots));
                 engine.ensure_ledger_accounts().await?;
                 {

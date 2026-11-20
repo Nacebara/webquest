@@ -55,12 +55,57 @@ pub async fn connect_account(
     Ok(Arc::new(transport))
 }
 
-/// Подключить аккаунты всех активных кошельков и собрать для них сценарии.
+/// Подключить аккаунты всех активных кошельков и собрать для них сценарии. Любой аккаунт не
+/// вошёл — ошибка (самопроверка и служебные команды).
 pub async fn connect_userbots(
     pool: &PgPool,
     tg: &TelegramSettings,
     log: &Arc<WalletLog>,
 ) -> anyhow::Result<Vec<Userbot>> {
+    Ok(connect(pool, tg, log, false).await?.userbots)
+}
+
+/// Итог подключения для работы (`exch run`).
+#[derive(Debug)]
+pub struct Connected {
+    pub userbots: Vec<Userbot>,
+    /// Аккаунты, которые не вошли (вход сброшен): работаем без них.
+    pub lost: Vec<String>,
+    /// Сколько аккаунтов у активных кошельков всего.
+    pub accounts: usize,
+}
+
+/// Для `exch run` (Э-19.1, проверка 19.11): аккаунт, у которого нет сессии или Telegram её
+/// отозвал, не останавливает exch — он пропущен, его направления на паузе, персоналу тревога
+/// «Вход сброшен». Клиентский бот, пульт и другой аккаунт работают.
+pub async fn connect_userbots_for_run(
+    pool: &PgPool,
+    tg: &TelegramSettings,
+    log: &Arc<WalletLog>,
+) -> anyhow::Result<Connected> {
+    connect(pool, tg, log, true).await
+}
+
+/// Вход сброшен: сессии нет, Telegram её отозвал или её не расшифровать этим ключом.
+pub fn login_lost(e: &anyhow::Error) -> bool {
+    e.chain().any(|c| {
+        c.downcast_ref::<mtproto::ConnectError>().is_some_and(|c| {
+            matches!(
+                c,
+                mtproto::ConnectError::NoSession
+                    | mtproto::ConnectError::NotAuthorized
+                    | mtproto::ConnectError::Session(_)
+            )
+        })
+    })
+}
+
+async fn connect(
+    pool: &PgPool,
+    tg: &TelegramSettings,
+    log: &Arc<WalletLog>,
+    skip_lost: bool,
+) -> anyhow::Result<Connected> {
     let rows = {
         let mut conn = pool.acquire().await?;
         storage::wallets::list(&mut conn).await?
@@ -75,15 +120,35 @@ pub async fn connect_userbots(
             .push(row.platform);
     }
     let mut out = Vec::new();
+    let mut lost = Vec::new();
+    let total = accounts.len();
     for (label, (userbot_id, platforms)) in accounts {
         // После перезагрузки сеть поднимается не сразу: ждать её, но не «вход сброшен» (шаг 2.3).
-        let transport = crate::startup::retry(
+        let connected = crate::startup::retry(
             "Telegram",
             crate::startup::WAIT_LIMIT,
             || connect_account(pool, tg, &label),
             crate::startup::transient_telegram,
         )
-        .await?;
+        .await;
+        let transport = match connected {
+            Ok(t) => t,
+            Err(e) if skip_lost && login_lost(&e) => {
+                tracing::error!(account = %label, error = %e, "userbot is not logged in: exch runs without it");
+                let mut conn = pool.acquire().await?;
+                engine::account_alerts::account_not_connected(
+                    &mut conn, &label, userbot_id, &platforms,
+                )
+                .await?;
+                lost.push(label);
+                continue;
+            }
+            Err(e) => return Err(e),
+        };
+        if skip_lost {
+            let mut conn = pool.acquire().await?;
+            engine::account_alerts::account_connected(&mut conn, &platforms).await?;
+        }
         log.register(
             &label,
             AccountIds {
@@ -108,7 +173,11 @@ pub async fn connect_userbots(
             wallets,
         });
     }
-    Ok(out)
+    Ok(Connected {
+        userbots: out,
+        lost,
+        accounts: total,
+    })
 }
 
 /// Клиентский бот поверх того же движка, который крутит `Engine::run`.
@@ -181,4 +250,19 @@ pub fn engine(pool: &PgPool, userbots: &[Userbot]) -> engine::Engine {
         engine = engine.with_account(&u.label, u.transport.clone());
     }
     engine
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Э-19.1: «вход сброшен» — пропустить аккаунт; сеть, таймаут и сверка ботов — нет.
+    #[test]
+    fn only_a_lost_login_lets_exch_run_without_the_account() {
+        let lost = |e: mtproto::ConnectError| login_lost(&anyhow::Error::new(e).context("connect"));
+        assert!(lost(mtproto::ConnectError::NoSession));
+        assert!(lost(mtproto::ConnectError::NotAuthorized));
+        assert!(!lost(mtproto::ConnectError::Timeout("connect")));
+        assert!(!lost(mtproto::ConnectError::InvalidConfig("api_id".into())));
+    }
 }
