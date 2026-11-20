@@ -410,6 +410,35 @@ async fn daily_limit_caps_a_new_client(pool: PgPool) {
     ));
 }
 
+/// Д-19.8 (проверка 19.11): возврат не съедает суточный лимит. Раньше чек больше лимита заявки
+/// возвращался, но его сумма оставалась в объёме за сутки — следующий чек получал «Лимит на
+/// сегодня исчерпан», хотя обмена не было.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_refunded_check_does_not_use_up_the_daily_limit(pool: PgPool) {
+    let e = env(pool).await;
+    let mut conn = e.pool.acquire().await.unwrap();
+    storage::settings::set(
+        &mut conn,
+        "daily_limit_usd",
+        &serde_json::json!({ "default": 500, "new_user": 500 }),
+        None,
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    // Чек на 500 больше лимита заявки — деньги вернулись чеком.
+    let big = e.world.client_check(CB, usdt(dec!(500))).unwrap();
+    let order = accepted(e.submit(&big).await);
+    e.drain().await;
+    assert_eq!(e.order(order.id).await.0.state, OrderState::Refunded);
+    // Обмена не было — следующий чек принимается.
+    let url = e.world.client_check(CB, usdt(dec!(50))).unwrap();
+    let next = e.submit(&url).await;
+    assert!(matches!(next, Submitted::Accepted { .. }), "{next:?}");
+    e.drain().await;
+    e.assert_books_match().await;
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn kill_switch_stops_new_checks_and_queued_payouts(pool: PgPool) {
     let e = env(pool).await;

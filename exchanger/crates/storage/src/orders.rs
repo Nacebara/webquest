@@ -478,7 +478,8 @@ fn map_duplicate(err: sqlx::Error) -> StorageError {
 }
 
 /// Объём клиента за последние 24 часа: пришедшие суммы и удержания ещё не оплаченных заявок
-/// (без отказов). Для лимитов `daily_limit_usd` и «новый клиент» (SPEC §3.4).
+/// (без отказов и без возвратов: деньги вернулись — обмена не было, Д-19.8). Для лимитов
+/// `daily_limit_usd` и «новый клиент» (SPEC §3.4).
 pub async fn user_volume_24h(
     conn: &mut PgConnection,
     user_id: i64,
@@ -490,7 +491,8 @@ pub async fn user_volume_24h(
           LEFT JOIN holds h ON h.order_id = o.id AND h.state = 'active'
          WHERE o.user_id = $1
            AND o.created_at > now() - interval '24 hours'
-           AND o.state NOT IN ('REJECTED', 'INTAKE_FAILED', 'EXPIRED', 'CANCELLED')
+           AND o.state NOT IN ('REJECTED', 'INTAKE_FAILED', 'EXPIRED', 'CANCELLED',
+                               'REFUND_PENDING', 'REFUNDED')
         "#,
         user_id
     )
