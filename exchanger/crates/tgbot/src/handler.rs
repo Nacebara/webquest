@@ -612,7 +612,18 @@ async fn message_update(
         && let Some(platform) = wallet_via_bot(message)
     {
         inner.react_seen(chat, message.message_id);
-        crate::checkwait::start(inner.clone(), chat, from.id, message.message_id, platform);
+        // З-19.2: заглушка — та же ссылка, только позже: в пределе сообщений со ссылками, и
+        // ожиданий у клиента не больше двух сразу. Сверх — «Слишком много заявок подряд».
+        let limits = inner.rate_limits().await;
+        let started = inner
+            .limiter
+            .hit_link(from.id, limits.links_per_min, std::time::Instant::now())
+            .and_then(|()| {
+                crate::checkwait::start(inner.clone(), chat, from.id, message.message_id, platform)
+            });
+        if let Err(wait) = started {
+            return intake::rate_limited(inner, chat, from.id, wait).await;
+        }
         return Ok(());
     }
     // Инвестор нажал «Пополнить» или выбрал кошелёк вывода: чек или сумма — туда.

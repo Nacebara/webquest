@@ -1462,6 +1462,37 @@ async fn missing_check_link_tells_where_the_money_is(pool: PgPool) {
     assert_eq!(n, 1, "владельцу — событие с устройством сообщения");
 }
 
+/// З-19.2 (проверка 19.11): сообщения «через @send» без ссылки — не больше двух ожиданий на
+/// клиента сразу и в общем пределе сообщений со ссылками. Раньше каждое запускало своё ожидание
+/// (~37 запросов к Telegram за минуту): сотня заглушек — 429 для всех клиентов и сотни пересылок
+/// в служебный чат.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_flood_of_inline_stubs_starts_at_most_two_waits(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    for id in 100..120 {
+        e.fake.client_message(
+            "message",
+            id,
+            "Создание чека…",
+            json!({ "via_bot": via_send() }),
+        );
+    }
+    e.fake
+        .wait_for("rate limit notice", |c| c.contains("Слишком много заявок"))
+        .await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let waits = e
+        .fake
+        .calls_of("sendMessage")
+        .into_iter()
+        .filter(|c| c.body["reply_parameters"]["message_id"].is_i64())
+        .count();
+    bot.stop().await;
+    assert_eq!(waits, 2, "ожиданий ссылки — не больше двух сразу");
+    assert!(e.orders().await.is_empty());
+}
+
 /// «История» по решению владельца 8 ноября: время в строке — кнопка в тексте (callback, как в
 /// гаранте); нажали — карточка заявки, без «/start» в чате.
 #[sqlx::test(migrator = "storage::MIGRATOR")]

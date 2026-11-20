@@ -197,7 +197,7 @@ async fn submit_invoice(
     }
 }
 
-async fn rate_limited(
+pub(crate) async fn rate_limited(
     inner: &Arc<Inner>,
     chat: i64,
     user: i64,

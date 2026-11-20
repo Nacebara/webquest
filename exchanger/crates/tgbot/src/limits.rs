@@ -47,11 +47,17 @@ impl RateLimits {
     }
 }
 
+/// Сколько ожиданий ссылки на чек из инлайн-режима кошелька идёт у клиента сразу (З-19.2): каждое —
+/// десятки запросов к Telegram за минуту.
+pub(crate) const MAX_CHECK_WAITS: usize = 2;
+
 /// Скользящие окна по клиентам.
 #[derive(Debug, Default)]
 pub(crate) struct RateLimiter {
     links: Mutex<HashMap<i64, VecDeque<Instant>>>,
     orders: Mutex<HashMap<i64, VecDeque<Instant>>>,
+    /// Идущие ожидания ссылки: клиент → (сообщение с чеком, когда началось).
+    waits: Mutex<HashMap<i64, Vec<(i32, Instant)>>>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -120,6 +126,36 @@ impl RateLimiter {
         lock(&self.orders).entry(user).or_default().push_back(now);
     }
 
+    /// Начать ожидание ссылки для сообщения `message`: не больше [`MAX_CHECK_WAITS`] сразу. Нет —
+    /// сколько ждать, пока кончится самое раннее (ожидание длится `ttl`).
+    pub(crate) fn begin_wait(
+        &self,
+        user: i64,
+        message: i32,
+        ttl: Duration,
+        now: Instant,
+    ) -> Result<(), Duration> {
+        let mut map = lock(&self.waits);
+        let waits = map.entry(user).or_default();
+        if waits.len() >= MAX_CHECK_WAITS {
+            let oldest = waits.iter().map(|(_, at)| *at).min().unwrap_or(now);
+            return Err(ttl.saturating_sub(now.duration_since(oldest)));
+        }
+        waits.push((message, now));
+        Ok(())
+    }
+
+    /// Ожидание ссылки для сообщения `message` кончилось (взяли, не дождались, ошибка).
+    pub(crate) fn end_wait(&self, user: i64, message: i32) {
+        let mut map = lock(&self.waits);
+        if let Some(waits) = map.get_mut(&user) {
+            waits.retain(|(m, _)| *m != message);
+            if waits.is_empty() {
+                map.remove(&user);
+            }
+        }
+    }
+
     /// Забыть клиентов, у которых окна опустели.
     pub(crate) fn purge(&self, now: Instant) {
         for (map, window) in [(&self.links, LINKS_WINDOW), (&self.orders, ORDERS_WINDOW)] {
@@ -186,5 +222,34 @@ mod tests {
         );
         l.purge(t0 + ORDERS_WINDOW);
         assert!(lock(&l.orders).is_empty());
+    }
+
+    #[test]
+    fn at_most_two_check_waits_at_once() {
+        let l = RateLimiter::default();
+        let t0 = Instant::now();
+        let ttl = Duration::from_secs(60);
+        assert!(l.begin_wait(1, 10, ttl, t0).is_ok());
+        assert!(
+            l.begin_wait(1, 11, ttl, t0 + Duration::from_secs(5))
+                .is_ok()
+        );
+        let wait = l
+            .begin_wait(1, 12, ttl, t0 + Duration::from_secs(20))
+            .unwrap_err();
+        assert_eq!(wait, Duration::from_secs(40), "пока не кончится первое");
+        assert!(
+            l.begin_wait(2, 12, ttl, t0).is_ok(),
+            "другой клиент не затронут"
+        );
+        l.end_wait(1, 10);
+        assert!(
+            l.begin_wait(1, 12, ttl, t0 + Duration::from_secs(21))
+                .is_ok()
+        );
+        l.end_wait(1, 11);
+        l.end_wait(1, 12);
+        l.end_wait(2, 12);
+        assert!(lock(&l.waits).is_empty());
     }
 }

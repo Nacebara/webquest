@@ -71,13 +71,44 @@ fn host(url: &str) -> String {
         .collect()
 }
 
-/// Запустить ожидание ссылки для сообщения `check_msg` (без ссылки, через инлайн кошелька).
-pub(crate) fn start(inner: Arc<Inner>, chat: i64, user: i64, check_msg: i32, platform: Platform) {
+/// Запустить ожидание ссылки для сообщения `check_msg` (без ссылки, через инлайн кошелька). У
+/// клиента их не больше [`crate::limits::MAX_CHECK_WAITS`] сразу (З-19.2); нет места — `Err`
+/// со временем, через которое освободится.
+pub(crate) fn start(
+    inner: Arc<Inner>,
+    chat: i64,
+    user: i64,
+    check_msg: i32,
+    platform: Platform,
+) -> Result<(), std::time::Duration> {
+    inner
+        .limiter
+        .begin_wait(user, check_msg, inner.cfg.check_link_wait, Instant::now())?;
     tokio::spawn(async move {
+        // Место освобождается при любом исходе, в том числе при ошибке.
+        let _slot = WaitSlot {
+            inner: inner.clone(),
+            user,
+            check_msg,
+        };
         if let Err(e) = run(&inner, chat, user, check_msg, platform).await {
             tracing::warn!(user, error = %e, "waiting for the check link failed");
         }
     });
+    Ok(())
+}
+
+/// Место ожидания клиента: освобождается, когда ожидание кончилось.
+struct WaitSlot {
+    inner: Arc<Inner>,
+    user: i64,
+    check_msg: i32,
+}
+
+impl Drop for WaitSlot {
+    fn drop(&mut self) {
+        self.inner.limiter.end_wait(self.user, self.check_msg);
+    }
 }
 
 async fn run(
