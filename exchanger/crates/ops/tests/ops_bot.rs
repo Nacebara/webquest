@@ -1506,6 +1506,85 @@ async fn a_foreign_login_is_shown_and_ended_from_the_panel(pool: PgPool) {
     assert_eq!(o.audit("userbot.end_session").await.len(), 1);
 }
 
+/// Б-19.3 (проверка 19.11): «Принял» («Это я») и показ тревоги по номеру — только тем, кому она
+/// приходит. Раньше оператор, которому «Новый вход» не приходит, присылал `ack:<номер>` — у
+/// владельца и админа повторы стихали, — а `al:<номер>` показывал ему устройство и страну.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn an_operator_can_neither_ack_nor_open_an_alert_meant_for_admins(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
+    let id = {
+        let mut conn = o.pool.acquire().await.unwrap();
+        storage::staff::add(&mut conn, OPERATOR, Role::Operator, "Олег", OWNER)
+            .await
+            .unwrap();
+        storage::alerts::raise(
+            &mut conn,
+            &storage::alerts::NewAlert {
+                level: storage::alerts::Level::Critical,
+                topic: storage::alerts::Topic::Security,
+                dedup_key: "new_login:ub-1:7",
+                title: "new_login",
+                payload: json!({"label": "ub-1", "hash": 7, "device": "iPhone 15",
+                    "app": "Telegram iOS 11.2", "country": "NL", "ip": "185.…41"}),
+            },
+        )
+        .await
+        .unwrap()
+    };
+    let mark = o.tg.mark();
+    o.bot.deliver_alerts().await.unwrap();
+    o.tg.screen(mark, ADMIN, "Новый вход").await;
+    o.say(OPERATOR, "/menu", "<b>Пульт</b>").await;
+
+    // Подделанные кнопки оператора: показ и «Это я».
+    let mark = o.tg.mark();
+    o.tg.presses(OPERATOR, 1, &format!("a:al:{id}"));
+    o.tg.presses(OPERATOR, 1, &format!("a:ack:{id}"));
+    o.say(OPERATOR, "/menu", "<b>Пульт</b>").await;
+    let to_operator: Vec<String> =
+        o.tg.calls()
+            .into_iter()
+            .skip(mark)
+            .filter(|c| c.chat() == Some(OPERATOR))
+            .map(|c| c.text())
+            .collect();
+    assert!(
+        to_operator.iter().all(|t| !t.contains("iPhone 15")),
+        "оператору тревога не показана: {to_operator:#?}"
+    );
+    assert!(
+        o.tg.calls()
+            .iter()
+            .skip(mark)
+            .all(|c| !c.text().contains("повторы остановлены")),
+        "копии владельца и админа не тронуты"
+    );
+    let mut conn = o.pool.acquire().await.unwrap();
+    let alert = storage::alerts::get(&mut conn, id).await.unwrap().unwrap();
+    assert!(alert.acked_at.is_none(), "тревога не принята оператором");
+
+    // Недостачу оператор видит на главном экране и в «Резервах» — её кнопка «Недостача» открывает.
+    let short = storage::alerts::raise(
+        &mut conn,
+        &storage::alerts::NewAlert {
+            level: storage::alerts::Level::Critical,
+            topic: storage::alerts::Topic::Security,
+            dedup_key: "balance_mismatch:xrocket",
+            title: "balance_mismatch",
+            payload: json!({"platform": "xrocket", "diff": "-12", "expected": "640",
+                "actual": "628"}),
+        },
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    let mark = o.tg.mark();
+    o.tg.presses(OPERATOR, 1, &format!("a:al:{short}"));
+    o.tg.screen(mark, OPERATOR, "меньше на").await;
+}
+
 /// П-26 (аудит 16.11): «Реально» красное только при открытой недостаче. Раньше сверку
 /// десятиминутной давности сравнивали с текущим леджером — после каждого приёма между сверками
 /// загоралась красная точка, будто денег меньше.

@@ -61,6 +61,13 @@ pub(crate) fn audience(title: &str, level: Level, role: Role) -> Option<bool> {
     }
 }
 
+/// Б-19.3: кому можно показать тревогу по номеру — тем, кому она приходит. Недостачу видит каждая
+/// роль: она на главном экране и в «Резервах» у всех (утверждённые экраны «Нужно решить» и
+/// «Резервы и сверка»), кнопка «Недостача» ведёт сюда.
+pub(crate) fn may_see(a: &AlertRow, role: Role) -> bool {
+    audience(&a.title, a.level, role).is_some() || a.title == "balance_mismatch"
+}
+
 impl Inner {
     pub(crate) async fn alerts_once(&self) -> Result<(), OpsError> {
         let mut conn = self.pool.acquire().await?;
@@ -576,10 +583,25 @@ impl Inner {
             let mut conn = self.pool.acquire().await?;
             storage::alerts::get(&mut conn, id).await?
         };
-        if let Some(a) = peek.filter(|a| a.title == "manual_review" && staff.role < Role::Admin)
+        if let Some(a) = peek
+            .as_ref()
+            .filter(|a| a.title == "manual_review" && staff.role < Role::Admin)
             && let Some(order) = a.payload["id"].as_i64()
         {
             self.call_admin(staff, order).await?;
+            return Ok(());
+        }
+        // Б-19.3: «Принял» — только тем, кому тревога приходит. Кнопки у других нет; данные кнопки
+        // можно подделать — тогда ничего не меняется.
+        if let Some(a) = &peek
+            && audience(&a.title, a.level, staff.role).is_none()
+        {
+            tracing::warn!(
+                staff = staff.tg_user_id,
+                alert = id,
+                title = %a.title,
+                "ack of an alert this role does not receive, ignored"
+            );
             return Ok(());
         }
         let _turn = self.alert_turn.lock().await;

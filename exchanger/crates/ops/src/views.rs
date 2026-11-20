@@ -1581,7 +1581,7 @@ impl Inner {
                 self.reconcile_now().await
             }
             Cb::Reserves => self.reserves().await,
-            Cb::AlertShow(id) => self.alert_screen(id).await,
+            Cb::AlertShow(id) => self.alert_screen(staff, id).await,
             // «Нет, разбираться» на недостаче — админ и выше (шаг 3, таблица прав).
             Cb::Investigate(id) => match self.deny(staff, Role::Admin) {
                 Some(denied) => Ok(denied),

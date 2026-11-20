@@ -407,11 +407,29 @@ impl Inner {
     }
 
     /// Событие пульта по id — например «Недостача» с главного экрана или из «Резервов».
-    pub(crate) async fn alert_screen(&self, id: i64) -> Result<Screen, OpsError> {
+    pub(crate) async fn alert_screen(
+        &self,
+        staff: &StaffMember,
+        id: i64,
+    ) -> Result<Screen, OpsError> {
         let a = {
             let mut conn = self.pool.acquire().await?;
             storage::alerts::get(&mut conn, id).await?
         };
+        // Б-19.3: тревогу по номеру видят те, кому она приходит.
+        // Не видят её только роли ниже админа.
+        if let Some(a) = &a
+            && !crate::alerts::may_see(a, staff.role)
+            && let Some(denied) = self.deny(staff, storage::staff::Role::Admin)
+        {
+            tracing::warn!(
+                staff = staff.tg_user_id,
+                alert = id,
+                title = %a.title,
+                "alert shown only to the roles it is sent to"
+            );
+            return Ok(denied);
+        }
         Ok(match a {
             Some(a) => self
                 .render_alert(&a)
