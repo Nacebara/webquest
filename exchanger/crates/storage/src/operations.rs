@@ -674,26 +674,44 @@ pub async fn received_other(
 /// Уведомление «ваш чек забрали» (кошелёк `platform`, сумма `amount`): отметить операцию, чей
 /// чек это был, — созданный нами чек выплаты, возврата или переплаты за последние 14 дней, ещё не
 /// отмеченный. Уведомление не называет чек, поэтому отмечаем, только если подходит ровно одна
-/// операция; две с той же суммой — не трогаем ничего. Возвращает заявку отмеченной операции.
+/// операция; две с той же суммой — не трогаем ничего. `by` — кто забрал (имя или @имя из
+/// уведомления): тогда подходят только чеки клиента с этим именем. Возвращает заявку отмеченной
+/// операции.
 pub async fn mark_claimed(
     conn: &mut PgConnection,
     platform: domain::Platform,
     amount: Decimal,
     asset: domain::Asset,
+    by: Option<&str>,
 ) -> Result<Option<i64>, StorageError> {
-    let found: Vec<(i64, Option<i64>)> = sqlx::query_as(
-        "SELECT id, order_id FROM operations \
-          WHERE platform = $1 AND asset = $3 AND amount = $2 AND status = 'succeeded' \
-            AND kind IN ('create_payout_check', 'create_refund_check', 'create_excess_check') \
-            AND claimed_at IS NULL AND finished_at > now() - interval '14 days' \
-          LIMIT 2",
+    type Candidate = (i64, Option<i64>, Option<String>, Option<String>);
+    let found: Vec<Candidate> = sqlx::query_as(
+        "SELECT o.id, o.order_id, u.first_name, u.username FROM operations o \
+           LEFT JOIN orders r ON r.id = o.order_id \
+           LEFT JOIN users u ON u.tg_user_id = r.user_id \
+          WHERE o.platform = $1 AND o.asset = $3 AND o.amount = $2 AND o.status = 'succeeded' \
+            AND o.kind IN ('create_payout_check', 'create_refund_check', 'create_excess_check') \
+            AND o.claimed_at IS NULL AND o.finished_at > now() - interval '14 days' \
+          LIMIT 50",
     )
     .bind(platform.db_name())
     .bind(amount)
     .bind(asset.code())
     .fetch_all(&mut *conn)
     .await?;
-    let [(id, order_id)] = found.as_slice() else {
+    // Д-19.7: уведомление называет, кто забрал, — только чеки этого клиента. Владелец забрал
+    // свой чек на ту же сумму — его имя не совпадёт ни с одним клиентом, ничего не отмечаем.
+    let by = by
+        .map(|b| b.trim().to_lowercase())
+        .filter(|b| !b.is_empty());
+    let matches: Vec<&Candidate> = found
+        .iter()
+        .filter(|(_, _, first, user)| {
+            by.as_deref()
+                .is_none_or(|by| claimed_by(by, first.as_deref(), user.as_deref()))
+        })
+        .collect();
+    let [(id, order_id, ..)] = matches.as_slice() else {
         return Ok(None);
     };
     sqlx::query("UPDATE operations SET claimed_at = now() WHERE id = $1 AND claimed_at IS NULL")
@@ -701,6 +719,17 @@ pub async fn mark_claimed(
         .execute(conn)
         .await?;
     Ok(*order_id)
+}
+
+/// Имя из уведомления кошелька (`by`, в нижнем регистре) — клиент с этим именем или @именем.
+fn claimed_by(by: &str, first_name: Option<&str>, username: Option<&str>) -> bool {
+    let handle = username
+        .map(|u| format!("@{}", u.trim_start_matches('@').to_lowercase()))
+        .is_some_and(|h| h.len() > 1 && by == h);
+    let name = first_name
+        .map(|f| f.trim().to_lowercase())
+        .is_some_and(|f| !f.is_empty() && by.contains(&f));
+    handle || name
 }
 
 /// Чек расчёта заявки (выплата или возврат) уже забрали.

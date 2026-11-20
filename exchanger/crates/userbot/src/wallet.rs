@@ -48,6 +48,13 @@ pub enum ActivationOutcome {
     },
 }
 
+/// «Ваш чек забрали»: сумма и кто забрал — имя или @имя из уведомления, если оно там есть (Д-19.7).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClaimNotice {
+    pub money: Money,
+    pub by: Option<String>,
+}
+
 /// Чек, созданный юзерботом для клиента.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IssuedCheck {
@@ -220,9 +227,9 @@ pub trait WalletBot: Send + Sync {
     /// использовать снова (см. `flows::conv`, «чистый чат»). По умолчанию — ничего.
     async fn acknowledge_unanswered(&self) {}
 
-    /// Уведомления кошелька «… активировал(а) ваш чек …» с суммой: наш чек выплаты забрали
-    /// (аудит 16.11 — «Забрать» гаснет). `None` — кошелёк этого не умеет.
-    fn claim_notices(&self) -> Option<tokio::sync::broadcast::Receiver<Money>> {
+    /// Уведомления кошелька «… активировал(а) ваш чек …» с суммой и тем, кто забрал: наш чек
+    /// выплаты забрали (аудит 16.11 — «Забрать» гаснет). `None` — кошелёк этого не умеет.
+    fn claim_notices(&self) -> Option<tokio::sync::broadcast::Receiver<ClaimNotice>> {
         None
     }
 }

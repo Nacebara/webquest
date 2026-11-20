@@ -247,6 +247,22 @@ static FROM_NAME: LazyLock<Regex> = LazyLock::new(|| {
 /// Чек только для Telegram Premium (SPEC §1.3).
 const PREMIUM: &[&str] = &["premium", "премиум"];
 
+static CLAIMER_HANDLE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"@[A-Za-z0-9_]{3,32}").expect("handle regex is valid"));
+
+/// Кто забрал наш чек — из уведомления «Ivan активировал(а) ваш чек …» (имя кошелёк ставит между
+/// метками направления текста U+2068 … U+2069) или «Ваш чек активировал @someone». `None` — имени в
+/// тексте нет (Д-19.7: по нему «забран» отличает чек клиента от чека владельца на ту же сумму).
+pub fn claimer(text: &str) -> Option<String> {
+    if let Some((_, rest)) = text.split_once('\u{2068}')
+        && let Some((name, _)) = rest.split_once('\u{2069}')
+    {
+        let name = name.trim();
+        return (!name.is_empty()).then(|| name.to_owned());
+    }
+    CLAIMER_HANDLE.find(text).map(|m| m.as_str().to_owned())
+}
+
 /// Классифицировать ответ бота на `/start <чек>`.
 ///
 /// Порядок — как в lovec, с дополнениями exch (в lovec уведомление «ваш чек …» проверялось
@@ -825,6 +841,25 @@ mod tests {
             classify_activation(CB, "Вы получили 3 USDT. Купите Telegram Premium в @send"),
             received(dec!(3), Asset::Usdt)
         );
+    }
+
+    #[test]
+    fn claimer_is_read_from_live_and_lovec_notices() {
+        for (text, who) in [
+            (
+                "🦋 \u{2068}Ivan\u{2069} активировал(а) ваш чек и получил(а) 🪙 5 USDT ($4.99).",
+                Some("Ivan"),
+            ),
+            (
+                "\u{2068}Ivan Petrov\u{2069} активировал(а) ваш чек на 6.5 USDT (6.5$)",
+                Some("Ivan Petrov"),
+            ),
+            ("Ваш чек активировал @someone", Some("@someone")),
+            ("🦋 Ваш чек на 5 USDT получил @someone", Some("@someone")),
+            ("Your check was activated", None),
+        ] {
+            assert_eq!(claimer(text).as_deref(), who, "{text}");
+        }
     }
 
     #[test]

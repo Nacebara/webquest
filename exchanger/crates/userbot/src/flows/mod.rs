@@ -190,7 +190,7 @@ impl<T: Transport> WalletBot for UserbotWallet<T> {
         self.platform
     }
 
-    fn claim_notices(&self) -> Option<tokio::sync::broadcast::Receiver<Money>> {
+    fn claim_notices(&self) -> Option<tokio::sync::broadcast::Receiver<crate::ClaimNotice>> {
         let (tx, rx) = tokio::sync::broadcast::channel(64);
         let mut messages = self.transport.subscribe();
         let platform = self.platform;
@@ -214,8 +214,12 @@ impl<T: Transport> WalletBot for UserbotWallet<T> {
                 else {
                     continue;
                 };
+                let notice = crate::ClaimNotice {
+                    money,
+                    by: parsers::replies::claimer(&m.text),
+                };
                 // Никто не слушает — движок остановлен; уведомление не важнее жизни задачи.
-                if tx.send(money).is_err() && tx.receiver_count() == 0 {
+                if tx.send(notice).is_err() && tx.receiver_count() == 0 {
                     return;
                 }
             }

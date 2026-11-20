@@ -212,12 +212,12 @@ impl Engine {
                 let platform = wallet.platform();
                 claims.spawn(async move {
                     loop {
-                        let money = match rx.recv().await {
+                        let notice = match rx.recv().await {
                             Ok(m) => m,
                             Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                             Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
                         };
-                        if let Err(e) = claim_seen(&pool, &updates, platform, &money).await {
+                        if let Err(e) = claim_seen(&pool, &updates, platform, &notice).await {
                             tracing::warn!(error = %e, "check claim notice not recorded");
                         }
                     }
@@ -409,13 +409,22 @@ async fn claim_seen(
     pool: &PgPool,
     updates: &broadcast::Sender<OrderUpdate>,
     platform: Platform,
-    money: &domain::Money,
+    notice: &userbot::ClaimNotice,
 ) -> Result<(), EngineError> {
     let mut conn = pool.acquire().await?;
-    let Some(order_id) =
-        storage::operations::mark_claimed(&mut conn, platform, money.amount(), money.asset())
-            .await?
+    let Some(order_id) = storage::operations::mark_claimed(
+        &mut conn,
+        platform,
+        notice.money.amount(),
+        notice.money.asset(),
+        notice.by.as_deref(),
+    )
+    .await?
     else {
+        tracing::info!(
+            platform = platform.db_name(),
+            "claim notice matches no single client check (another check or another person)"
+        );
         return Ok(());
     };
     let order = storage::orders::get(&mut conn, order_id, false).await?;

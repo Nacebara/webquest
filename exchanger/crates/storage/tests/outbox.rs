@@ -367,14 +367,14 @@ async fn a_claim_notice_marks_only_an_unambiguous_check(pool: PgPool) {
     let mut conn = pool.acquire().await.unwrap();
     // Две выплаты по 97.5 — какая забрана, неизвестно: не трогаем ни одну.
     assert_eq!(
-        storage::operations::mark_claimed(&mut conn, XR, dec!(97.5), Asset::Usdt)
+        storage::operations::mark_claimed(&mut conn, XR, dec!(97.5), Asset::Usdt, None)
             .await
             .unwrap(),
         None
     );
     // Другая сумма — ничего.
     assert_eq!(
-        storage::operations::mark_claimed(&mut conn, XR, dec!(10), Asset::Usdt)
+        storage::operations::mark_claimed(&mut conn, XR, dec!(10), Asset::Usdt, None)
             .await
             .unwrap(),
         None
@@ -386,7 +386,7 @@ async fn a_claim_notice_marks_only_an_unambiguous_check(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(
-        storage::operations::mark_claimed(&mut conn, XR, dec!(97.5), Asset::Usdt)
+        storage::operations::mark_claimed(&mut conn, XR, dec!(97.5), Asset::Usdt, None)
             .await
             .unwrap(),
         Some(ids[1])
@@ -532,4 +532,80 @@ async fn an_auto_pause_is_lifted_only_with_its_own_reason(pool: PgPool) {
     for d in Direction::ALL {
         assert!(!dir(&mut conn, d).await.auto_paused, "{d:?}");
     }
+}
+
+/// Д-19.7 (проверка 19.11): уведомление называет, кто забрал чек. Владелец забрал свой чек на ту же
+/// сумму — выплата клиента не отмечается забранной («Забрать» у клиента остаётся); клиент забрал —
+/// отмечается, по имени или @имени. Раньше сходилась одна сумма.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_claim_by_someone_else_does_not_mark_the_clients_check(pool: PgPool) {
+    setup(&pool).await;
+    let xr = wallet(&pool, XR).await;
+    let mut orders = Vec::new();
+    for (n, check) in ["CQname1", "CQname2"].iter().enumerate() {
+        let order_id = order(&pool, check).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let key = format!("ord-name-{n}-payout");
+        let op_id = storage::operations::insert(
+            &mut conn,
+            &op(order_id, OpKind::CreatePayoutCheck, &key, xr),
+        )
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE operations SET status = 'succeeded', finished_at = now() WHERE id = $1",
+        )
+        .bind(op_id)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+        orders.push(order_id);
+    }
+    let mut conn = pool.acquire().await.unwrap();
+    sqlx::query("UPDATE users SET first_name = 'Ivan' WHERE tg_user_id = $1")
+        .bind(CLIENT)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    // Вторая выплата — другому клиенту.
+    storage::users::upsert(
+        &mut conn,
+        222,
+        &storage::users::Profile {
+            first_name: Some("Oleg"),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    sqlx::query("UPDATE orders SET user_id = 222 WHERE id = $1")
+        .bind(orders[1])
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    let mark = |by: &'static str| {
+        let pool = pool.clone();
+        async move {
+            let mut conn = pool.acquire().await.unwrap();
+            storage::operations::mark_claimed(&mut conn, XR, dec!(97.5), Asset::Usdt, Some(by))
+                .await
+                .unwrap()
+        }
+    };
+    assert_eq!(
+        mark("Игнат").await,
+        None,
+        "чек владельца — не выплата клиента"
+    );
+    assert_eq!(
+        mark("Oleg").await,
+        Some(orders[1]),
+        "по имени — его выплата"
+    );
+    assert_eq!(mark("@client").await, Some(orders[0]), "по @имени");
+    assert!(
+        storage::operations::settle_claimed(&mut conn, orders[0])
+            .await
+            .unwrap()
+    );
 }
