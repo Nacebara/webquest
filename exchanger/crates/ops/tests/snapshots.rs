@@ -277,3 +277,87 @@ fn order_card_operator_unknown_outcome() {
     );
     insta::assert_snapshot!("order_card_operator_unknown", dump);
 }
+
+/// Д-19.11 (картинка принята 20.11): неясен возврат — «Вернуть» и «Возврат выдан», без
+/// «Повторить выплату» и «Выплачено».
+#[test]
+fn order_card_unclear_refund() {
+    let t = Texts::builtin().unwrap();
+    let links = ops::Links::default();
+    let mut v = ops::sample_order();
+    v.card.refund_amount = Some(domain::Decimal::new(50, 2));
+    for op in &mut v.card.operations {
+        if op.key.ends_with("payout") {
+            op.key = op.key.replace("payout", "refund");
+            op.kind = "create_refund_check".into();
+            op.status = "unknown".into();
+        }
+    }
+    let card =
+        Look::plain().screen(&v.screen(&t, storage::staff::Role::Owner, ops::sample_now(), &links));
+    let dump = dump(&card);
+    assert!(
+        dump.contains("Возврат выдан") && dump.contains("Вернуть"),
+        "{dump}"
+    );
+    assert!(
+        !dump.contains("Повторить выплату") && !dump.contains("Выплачено"),
+        "{dump}"
+    );
+    insta::assert_snapshot!("order_card_unclear_refund", dump);
+}
+
+/// Д-19.1 (картинка принята 20.11): заявка на оплату счёта выполнена, чек на переплату застрял —
+/// строка-подсказка, «Переплата» в таблице, «Повторить чек переплаты» и «Чек выдан».
+#[test]
+fn order_card_stuck_overpayment() {
+    let t = Texts::builtin().unwrap();
+    let links = ops::Links::default();
+    let mut v = ops::sample_order();
+    v.card.state = domain::fsm::OrderState::Completed;
+    v.card.direction = domain::Direction::PayCbInvoice;
+    v.card.intake_platform = domain::Platform::XRocket;
+    v.card.intake_amount = Some(domain::Decimal::new(6000, 2));
+    v.card.invoice_amount = Some(domain::Decimal::new(5000, 2));
+    v.card.payout_amount = None;
+    v.card.fee_amount = Some(domain::Decimal::new(125, 2));
+    v.card.refund_amount = Some(domain::Decimal::new(875, 2));
+    v.card.manual_reason = None;
+    for op in &mut v.card.operations {
+        if op.key.ends_with("payout") {
+            op.key = op.key.replace("payout", "excess-1");
+            op.kind = "create_excess_check".into();
+            op.status = "unknown".into();
+            op.last_error = Some("чек xRocket — нет ответа, в истории не найден".into());
+        }
+    }
+    for (role, name) in [
+        (storage::staff::Role::Admin, "order_card_stuck_overpayment"),
+        (
+            storage::staff::Role::Operator,
+            "order_card_stuck_overpayment_operator",
+        ),
+    ] {
+        let card = Look::plain().screen(&v.screen(&t, role, ops::sample_now(), &links));
+        let dump = dump(&card);
+        assert!(dump.contains("Переплата не вернулась"), "{dump}");
+        insta::assert_snapshot!(name, dump);
+    }
+}
+
+/// Д-19.1: тревога «Нужен разбор» по застрявшей переплате — «Переплата 8.75: …», суммы счёта.
+#[test]
+fn review_alert_stuck_overpayment() {
+    let t = Texts::builtin().unwrap();
+    let p = serde_json::json!({"id": 17, "public": "Q1W2E3R4T5", "user": 51234567,
+        "direction": "pay_cb_invoice", "amount_in": "60", "amount_out": "50",
+        "excess": "8.75", "reason": "нет ответа 30 с, чек не найден",
+        "since": "2026-11-14T11:13:58Z"});
+    let screen = Look::plain().screen(&ops::review_alert_screen(&t, &p, 9));
+    let dump = dump(&screen);
+    assert!(
+        dump.contains("Переплата 8.75: нет ответа 30 с, чек не найден"),
+        "{dump}"
+    );
+    insta::assert_snapshot!("review_alert_stuck_overpayment", dump);
+}

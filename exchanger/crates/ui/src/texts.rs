@@ -400,6 +400,7 @@ pub struct InvoiceTexts {
     pub excess_refund: String,
     /// Переплата возвращается, чек ещё создаётся.
     pub excess_refund_pending: String,
+    pub excess_held: String,
     pub excess_kept: String,
 }
 

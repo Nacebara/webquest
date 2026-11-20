@@ -17,7 +17,7 @@ use sqlx::PgPool;
 use storage::operations::OpStatus;
 use storage::orders::OrderRow;
 use userbot::WalletBot;
-use userbot::sim::{Call, Fault, InvoiceSpec, SimInvoice, SimInvoiceStatus};
+use userbot::sim::{Call, CheckSpec, Fault, InvoiceSpec, SimInvoice, SimInvoiceStatus};
 
 async fn open_invoices(e: &Env) {
     let mut conn = e.pool.acquire().await.unwrap();
@@ -833,5 +833,214 @@ async fn overpayment_comes_back_after_a_manual_close(pool: PgPool) {
     assert_eq!(excess[0].status, OpStatus::Succeeded);
     assert_eq!(e.ledger("liability:payable:USDT").await, dec!(0));
     assert_eq!(e.world.invoice(&inv.code).unwrap().payments.len(), 1);
+    e.assert_books_match().await;
+}
+
+async fn staff_member(e: &Env, id: i64, role: storage::staff::Role) -> storage::staff::StaffMember {
+    let mut conn = e.pool.acquire().await.unwrap();
+    let owner = storage::staff::ensure_owner(&mut conn, 1, "Владелец")
+        .await
+        .unwrap();
+    if id != owner.tg_user_id {
+        storage::staff::add(&mut conn, id, role, "Сотрудник", owner.tg_user_id)
+            .await
+            .unwrap();
+    }
+    storage::staff::get(&mut conn, id).await.unwrap().unwrap()
+}
+
+fn excess_request<'a>(
+    order_id: i64,
+    decision: engine::OperatorDecision,
+    staff: &'a storage::staff::StaffMember,
+) -> engine::OperatorRequest<'a> {
+    engine::OperatorRequest {
+        order_id,
+        decision,
+        staff,
+        reason: "проверил «Мои чеки» xRocket",
+        double_confirmed: true,
+    }
+}
+
+fn excess_refused(r: Result<OrderRow, engine::OperatorError>) -> engine::Refusal {
+    match r {
+        Err(engine::OperatorError::Refused(refusal)) => refusal,
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+}
+
+/// Счёт оплачен, а чек на переплату не создался: «✅ Подтверждаю» не дошло, исход неясен.
+async fn stuck_excess(e: &Env) -> OrderRow {
+    let inv = shop_invoice(e, InvoiceSpec::crypto(CB, usdt(dec!(10))));
+    let order = quoted(e, &inv).await;
+    pay_in(e, &order, XR, dec!(15)).await;
+    e.world
+        .inject(e.ub, Call::CheckPress, Fault::TimeoutBeforeEffect, 1);
+    e.drain().await;
+    e.engine.resolve_unknown().await.unwrap();
+    let (o, d) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::Completed);
+    assert_eq!(d.refund_amount, Some(dec!(4.70)));
+    assert_eq!(d.payout_check_url, None);
+    let excess: Vec<_> = e
+        .ops(order.id)
+        .await
+        .into_iter()
+        .filter(|op| op.kind == OpKind::CreateExcessCheck)
+        .collect();
+    assert_eq!(excess.len(), 1);
+    assert!(
+        matches!(excess[0].status, OpStatus::Unknown | OpStatus::Failed),
+        "{:?}",
+        excess[0].status
+    );
+    assert!(e.world.checks_created_by(e.ub).is_empty(), "чек не создан");
+    o
+}
+
+async fn in_review_queue(e: &Env, order: i64) -> Option<storage::admin::QueueItem> {
+    let mut conn = e.pool.acquire().await.unwrap();
+    storage::admin::review_queue(&mut conn)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|q| q.id == order)
+}
+
+async fn client_view(e: &Env, order: i64) -> storage::client::OrderView {
+    let mut conn = e.pool.acquire().await.unwrap();
+    storage::client::order_view(&mut conn, order)
+        .await
+        .unwrap()
+        .unwrap()
+}
+
+/// Д-19.1 (проверка 19.11, картинка принята 20.11): чек на переплату застрял. Раньше — тупик:
+/// клиенту навсегда «возвращаю», в пульте «заявка не на разборе». Теперь заявка в «Разборе»,
+/// клиенту — «у меня, вернёт оператор»; «Повторить чек переплаты» — только после «проверил: чека
+/// нет», один новый чек, учёт сходится.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn stuck_overpayment_check_is_retried_after_a_human_check(pool: PgPool) {
+    let e = setup(pool).await;
+    let order = stuck_excess(&e).await;
+    let queued = in_review_queue(&e, order.id).await.expect("в «Разборе»");
+    assert_eq!(queued.excess, Some(dec!(4.70)));
+    assert!(client_view(&e, order.id).await.excess_stuck);
+
+    let operator = staff_member(&e, 10, storage::staff::Role::Operator).await;
+    let admin = staff_member(&e, 20, storage::staff::Role::Admin).await;
+    let retry = |checked| engine::OperatorDecision::RetryExcess {
+        previous_failed: checked,
+    };
+    assert_eq!(
+        excess_refused(
+            e.engine
+                .operator_decide(excess_request(order.id, retry(true), &operator))
+                .await
+        ),
+        engine::Refusal::Forbidden(storage::staff::Role::Admin)
+    );
+    let unknown = e
+        .ops(order.id)
+        .await
+        .into_iter()
+        .any(|op| op.kind == OpKind::CreateExcessCheck && op.status == OpStatus::Unknown);
+    if unknown {
+        assert!(matches!(
+            excess_refused(
+                e.engine
+                    .operator_decide(excess_request(order.id, retry(false), &admin))
+                    .await
+            ),
+            engine::Refusal::PreviousUnknown(_)
+        ));
+    }
+    e.engine
+        .operator_decide(excess_request(order.id, retry(true), &admin))
+        .await
+        .unwrap();
+    e.drain().await;
+
+    let (o, d) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::Completed);
+    let url = d.payout_check_url.expect("чек на переплату");
+    assert_eq!(e.world.checks_created_by(e.ub).len(), 1, "один новый чек");
+    assert_eq!(held(&e, order.id).await, None);
+    assert_eq!(e.ledger("liability:payable:USDT").await, dec!(0));
+    assert!(
+        in_review_queue(&e, order.id).await.is_none(),
+        "из «Разбора» ушла"
+    );
+    let view = client_view(&e, order.id).await;
+    assert!(!view.excess_stuck);
+    assert!(view.excess_done_at.is_some());
+    // Повторить ещё раз нечего.
+    assert_eq!(
+        excess_refused(
+            e.engine
+                .operator_decide(excess_request(order.id, retry(true), &admin))
+                .await
+        ),
+        engine::Refusal::AlreadySettled(
+            e.ops(order.id)
+                .await
+                .into_iter()
+                .find(|op| op.kind == OpKind::CreateExcessCheck && op.status == OpStatus::Succeeded)
+                .unwrap()
+                .idempotency_key
+        )
+    );
+    e.world.claim_check(e.client, &url).unwrap();
+    assert_eq!(e.world.balance(e.client, XR, Asset::Usdt), dec!(4.70));
+    e.assert_books_match().await;
+}
+
+/// Д-19.1: чек на переплату нашёлся (или его выдали вручную) — «Чек выдан» со ссылкой на чек
+/// кошелька переплаты: клиенту «Забрать», проводка и удержание — как у автоматики.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn stuck_overpayment_is_closed_with_the_check_found_in_the_wallet(pool: PgPool) {
+    let e = setup(pool).await;
+    let order = stuck_excess(&e).await;
+    let admin = staff_member(&e, 20, storage::staff::Role::Admin).await;
+    let issued = |evidence: &str| engine::OperatorDecision::CloseExcessIssued {
+        evidence: evidence.to_owned(),
+    };
+    assert_eq!(
+        excess_refused(
+            e.engine
+                .operator_decide(excess_request(
+                    order.id,
+                    issued("https://t.me/send?start=CQAbCdEfGhIj"),
+                    &admin
+                ))
+                .await
+        ),
+        engine::Refusal::CheckLinkRequired(XR)
+    );
+    let check = e
+        .world
+        .create_check(CheckSpec::new(XR, usdt(dec!(4.70))).by(e.ub))
+        .unwrap();
+    e.engine
+        .operator_decide(excess_request(order.id, issued(&check.url), &admin))
+        .await
+        .unwrap();
+
+    let (o, d) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::Completed);
+    assert_eq!(d.payout_check_url.as_deref(), Some(check.url.as_str()));
+    let excess = e
+        .ops(order.id)
+        .await
+        .into_iter()
+        .find(|op| op.kind == OpKind::CreateExcessCheck)
+        .unwrap();
+    assert_eq!(excess.status, OpStatus::Succeeded);
+    assert_eq!(excess.external_id.as_deref(), Some(check.code.as_str()));
+    assert_eq!(held(&e, order.id).await, None);
+    assert_eq!(e.ledger("liability:payable:USDT").await, dec!(0));
+    assert!(in_review_queue(&e, order.id).await.is_none());
+    e.world.claim_check(e.client, &check.url).unwrap();
     e.assert_books_match().await;
 }

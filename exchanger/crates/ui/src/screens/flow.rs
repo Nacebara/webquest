@@ -390,6 +390,21 @@ impl Ui {
                     None => (self.fill(&t.excess_refund_pending, &args), Keyboard::None),
                 }
             }
+            Some(Excess::Held(amount)) => (
+                self.fill(
+                    &t.excess_held,
+                    &[
+                        ("inv_amount", &inv_amount),
+                        ("excess", &self.money(amount)),
+                        ("src", &src),
+                    ],
+                ),
+                Keyboard::inline_rows(vec![vec![self.cb_button(
+                    Some(Emoji::Support),
+                    &self.texts.buttons.support,
+                    &Callback::Support(Some(q.order.id.clone())),
+                )]]),
+            ),
             Some(Excess::Kept { amount, min_refund }) => (
                 self.fill(
                     &t.excess_kept,

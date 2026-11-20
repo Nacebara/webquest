@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.state,\n               o.intake_amount, o.fee_pct_applied, o.fee_amount, o.payout_amount,\n               o.refund_amount, o.invoice_amount, o.quote_amount_in, o.quote_expires_at,\n               o.invoice_fiat, o.invoice_fiat_amount,\n               COALESCE((SELECT d.fiat_buffer_pct FROM directions d WHERE d.code = o.direction),\n                        0) AS \"fiat_buffer_pct!\",\n               COALESCE((SELECT t.data->>'event' = 'CheckRejected' FROM order_transitions t\n                          WHERE t.order_id = o.id ORDER BY t.id DESC LIMIT 1),\n                        FALSE) AS \"last_check_rejected!\",\n               o.payout_check_url, o.failure_code, o.created_at, o.finished_at,\n               COALESCE((SELECT max(t.at) FROM order_transitions t\n                          WHERE t.order_id = o.id AND t.to_state = o.state),\n                        o.created_at) AS \"state_since!\",\n               o.progress_chat_id, o.progress_message_id, o.progress_sent_at,\n               (SELECT t.from_state FROM order_transitions t\n                 WHERE t.order_id = o.id AND t.to_state = o.state\n                 ORDER BY t.id DESC LIMIT 1) AS previous_state,\n               o.invoice_start_param\n          FROM orders o\n         WHERE o.id = $1\n        ",
+  "query": "\n        SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.state,\n               o.intake_amount, o.fee_pct_applied, o.fee_amount, o.payout_amount,\n               o.refund_amount, o.invoice_amount, o.quote_amount_in, o.quote_expires_at,\n               o.invoice_fiat, o.invoice_fiat_amount,\n               COALESCE((SELECT d.fiat_buffer_pct FROM directions d WHERE d.code = o.direction),\n                        0) AS \"fiat_buffer_pct!\",\n               COALESCE((SELECT t.data->>'event' = 'CheckRejected' FROM order_transitions t\n                          WHERE t.order_id = o.id ORDER BY t.id DESC LIMIT 1),\n                        FALSE) AS \"last_check_rejected!\",\n               o.payout_check_url, o.failure_code, o.created_at, o.finished_at,\n               COALESCE((SELECT max(t.at) FROM order_transitions t\n                          WHERE t.order_id = o.id AND t.to_state = o.state),\n                        o.created_at) AS \"state_since!\",\n               o.progress_chat_id, o.progress_message_id, o.progress_sent_at,\n               (SELECT t.from_state FROM order_transitions t\n                 WHERE t.order_id = o.id AND t.to_state = o.state\n                 ORDER BY t.id DESC LIMIT 1) AS previous_state,\n               o.invoice_start_param,\n               (EXISTS (SELECT 1 FROM operations x WHERE x.order_id = o.id\n                          AND x.kind = 'create_excess_check' AND x.status IN ('unknown', 'failed'))\n                AND NOT EXISTS (SELECT 1 FROM operations x WHERE x.order_id = o.id\n                          AND x.kind = 'create_excess_check'\n                          AND x.status IN ('pending', 'dispatched', 'succeeded'))) AS \"excess_stuck!\",\n               (SELECT max(x.finished_at) FROM operations x WHERE x.order_id = o.id\n                  AND x.kind = 'create_excess_check' AND x.status = 'succeeded') AS excess_done_at\n          FROM orders o\n         WHERE o.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -290,6 +290,18 @@
             "name": "invoice_start_param"
           }
         }
+      },
+      {
+        "ordinal": 28,
+        "name": "excess_stuck!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 29,
+        "name": "excess_done_at",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -325,8 +337,10 @@
       true,
       true,
       null,
-      true
+      true,
+      null,
+      null
     ]
   },
-  "hash": "78a97512cdf65415c4a4e332e29ab45266cdf059f439a6cd776980a300cd2b6d"
+  "hash": "5c5819f58a8ca0693acc2b4dcbf29cd795de7b2694c0399f1d0014d20c77dd1d"
 }

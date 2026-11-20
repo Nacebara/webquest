@@ -1,0 +1,19 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+🛡 <b>Счёт оплачен</b> · <code>10.00</code> USDT
+Лишние <code>5.00</code> USDT у меня — оператор вернёт их чеком xRocket.
+<i>Ничего делать не нужно — напишу сюда.</i>
+--- keyboard: inline
+[{"callback_data":"support:A1B2C3D4E5","text":"💬 Поддержка"}]
+
+### premium
+--- html
+<tg-emoji emoji-id="5368000000000000039">🛡</tg-emoji> <b>Счёт оплачен</b> · <code>10.00</code> USDT
+Лишние <code>5.00</code> USDT у меня — оператор вернёт их чеком xRocket.
+<i>Ничего делать не нужно — напишу сюда.</i>
+--- keyboard: inline
+[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]

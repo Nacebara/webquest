@@ -50,6 +50,7 @@ pub(crate) enum Input {
     DecisionEvidence {
         order: i64,
         reason: String,
+        kind: DecisionKind,
     },
     Term(i64, Direction, TermField),
     Daily(i64),
@@ -264,11 +265,7 @@ impl Action {
                 check: Some(c),
                 ..
             } if off_check(*a, *c) => Role::Owner,
-            Action::Decide { kind, .. } => match kind {
-                DecisionKind::Close => Role::Owner,
-                DecisionKind::ClosePaid | DecisionKind::Intake => Role::Admin,
-                _ => Role::Operator,
-            },
+            Action::Decide { kind, .. } => kind.min_role(),
             Action::Flag {
                 flag: Flag::KillSwitch,
                 on,
@@ -474,6 +471,11 @@ fn refusal_text(inner: &Inner, r: &Refusal) -> String {
         Refusal::NoSettleAttempt => t.t("refusal.no_attempt"),
         Refusal::CheckAlreadyUsed => t.t("refusal.check_used"),
         Refusal::Changed => t.t("refusal.changed"),
+        Refusal::CheckLinkRequired(p) => t.f(
+            "refusal.check_link",
+            &[("wallet", &inner.platform_name(*p))],
+        ),
+        Refusal::NoStuckExcess => t.t("refusal.no_stuck_excess"),
     }
 }
 
@@ -596,6 +598,49 @@ impl Inner {
             },
             text,
         )))
+    }
+
+    /// Кошелёк, которым возвращаем клиенту (возврат и переплата — кошелёк входа).
+    pub(crate) async fn refund_wallet(&self, order: i64) -> Result<Platform, OpsError> {
+        let mut conn = self.pool.acquire().await?;
+        Ok(storage::admin::order_card(&mut conn, order)
+            .await?
+            .direction
+            .source())
+    }
+
+    /// Макет «Ссылка на чек» (принят 20.11): что сделать и что прислать.
+    pub(crate) async fn ask_check_text(
+        &self,
+        order: i64,
+        kind: DecisionKind,
+    ) -> Result<String, OpsError> {
+        let card = {
+            let mut conn = self.pool.acquire().await?;
+            storage::admin::order_card(&mut conn, order).await?
+        };
+        let t = &self.texts;
+        Ok(t.f(
+            "order.ask_check",
+            &[
+                (
+                    "action",
+                    &t.t(if kind == DecisionKind::RefundIssued {
+                        "order.n_refund_issued"
+                    } else {
+                        "order.n_excess_issued"
+                    }),
+                ),
+                ("public", &esc(&card.public_id)),
+                ("wallet", &self.platform_name(card.direction.source())),
+                (
+                    "amount",
+                    &card
+                        .refund_amount
+                        .map_or_else(|| "—".to_owned(), crate::dash::amount),
+                ),
+            ],
+        ))
     }
 
     /// Сумма по чеку заявки (приход или котировка); нет — `None`.
@@ -819,8 +864,22 @@ impl Inner {
                         Input::DecisionEvidence {
                             order,
                             reason: text,
+                            kind,
                         },
                         "order.ask_evidence",
+                    ));
+                }
+                if kind.needs_evidence() {
+                    // «Возврат выдан» / «Чек выдан» (Д-19.11, Д-19.1; макет «Ссылка на чек»).
+                    let ask = self.ask_check_text(order, kind).await?;
+                    return Ok(self.prompt_with(
+                        staff,
+                        Input::DecisionEvidence {
+                            order,
+                            reason: text,
+                            kind,
+                        },
+                        ask,
                     ));
                 }
                 let check = if kind == DecisionKind::Intake {
@@ -837,13 +896,33 @@ impl Inner {
                     check,
                 }
             }
-            Input::DecisionEvidence { order, reason } => {
+            Input::DecisionEvidence {
+                order,
+                reason,
+                kind,
+            } => {
                 if text.chars().count() < 5 {
                     return Ok(self.prompt_with(staff, input, t.t("refusal.evidence")));
                 }
+                if kind != DecisionKind::ClosePaid {
+                    // Клиент получит ссылку кнопкой: только чек кошелька, которым возвращаем.
+                    let wallet = self.refund_wallet(order).await?;
+                    let fits = text.split_whitespace().any(|w| {
+                        parsers::links::parse_url(w).is_ok_and(|l| {
+                            l.kind == parsers::links::LinkKind::Check && l.platform == wallet
+                        })
+                    });
+                    if !fits {
+                        let why = t.f(
+                            "refusal.check_link",
+                            &[("wallet", &self.platform_name(wallet))],
+                        );
+                        return Ok(self.prompt_with(staff, input, why));
+                    }
+                }
                 Action::Decide {
                     order,
-                    kind: DecisionKind::ClosePaid,
+                    kind,
                     reason,
                     evidence: Some(text),
                     amount: None,
@@ -1264,7 +1343,14 @@ impl Inner {
                     ));
                 }
                 if let Some(e) = evidence {
-                    extra.push_str(&t.f("order.preview_evidence", &[("evidence", &esc(e))]));
+                    // Ссылка на чек на предъявителя — под спойлером (правило «Ссылки на чеки в
+                    // пульте — под спойлером»).
+                    let key = if kind.needs_evidence() && *kind != DecisionKind::ClosePaid {
+                        "order.preview_check"
+                    } else {
+                        "order.preview_evidence"
+                    };
+                    extra.push_str(&t.f(key, &[("evidence", &esc(e))]));
                 }
                 if let Some(a) = amount {
                     extra.push_str(&t.f("order.preview_amount", &[("amount", &usdt(*a))]));
@@ -1289,6 +1375,14 @@ impl Inner {
                                             | "pay_invoice"
                                     )
                             })
+                            .map(|o| o.key.clone())
+                    });
+                }
+                if *kind == DecisionKind::RetryExcess {
+                    unknown_key = card.as_ref().and_then(|c| {
+                        c.operations
+                            .iter()
+                            .find(|o| o.status == "unknown" && o.kind == "create_excess_check")
                             .map(|o| o.key.clone())
                     });
                 }
@@ -1338,6 +1432,24 @@ impl Inner {
                         c.direction.source(),
                         *amount,
                     ),
+                    DecisionKind::RefundIssued => (
+                        "order.q_refund_issued",
+                        "order.what_refund_issued",
+                        c.direction.source(),
+                        c.refund_amount,
+                    ),
+                    DecisionKind::RetryExcess => (
+                        "order.q_retry_excess",
+                        "order.what_retry",
+                        c.direction.source(),
+                        c.refund_amount,
+                    ),
+                    DecisionKind::ExcessIssued => (
+                        "order.q_excess_issued",
+                        "order.what_excess_issued",
+                        c.direction.source(),
+                        c.refund_amount,
+                    ),
                 };
                 let what = t.f(
                     what,
@@ -1349,7 +1461,10 @@ impl Inner {
                 );
                 let money_kinds = matches!(
                     kind,
-                    DecisionKind::RetryPayout | DecisionKind::RetryInvoice | DecisionKind::Refund
+                    DecisionKind::RetryPayout
+                        | DecisionKind::RetryInvoice
+                        | DecisionKind::Refund
+                        | DecisionKind::RetryExcess
                 );
                 let previous = if let Some(op) = c
                     .operations
@@ -1366,10 +1481,14 @@ impl Inner {
                 } else if let Some(op) = c.operations.iter().rev().find(|o| {
                     money_kinds
                         && o.status == "failed"
-                        && matches!(
-                            o.kind.as_str(),
-                            "create_payout_check" | "create_refund_check" | "pay_invoice"
-                        )
+                        && if *kind == DecisionKind::RetryExcess {
+                            o.kind == "create_excess_check"
+                        } else {
+                            matches!(
+                                o.kind.as_str(),
+                                "create_payout_check" | "create_refund_check" | "pay_invoice"
+                            )
+                        }
                 }) {
                     t.f(
                         "order.prev_failed",
@@ -1398,6 +1517,9 @@ impl Inner {
                         DecisionKind::ClosePaid => "order.b_do_paid",
                         DecisionKind::Close => "order.b_do_close",
                         DecisionKind::Intake => "order.b_do_intake",
+                        DecisionKind::RefundIssued => "order.b_do_refund_issued",
+                        DecisionKind::RetryExcess => "order.b_do_retry_excess",
+                        DecisionKind::ExcessIssued => "order.b_do_excess_issued",
                     },
                     &[("amount", &money(sum))],
                 ));
@@ -1760,6 +1882,13 @@ impl Inner {
                 DecisionKind::Close => OperatorDecision::CloseWithoutPayout,
                 DecisionKind::Intake => OperatorDecision::ConfirmIntake {
                     amount: amount.unwrap_or_default(),
+                },
+                DecisionKind::RefundIssued => OperatorDecision::CloseAsRefunded {
+                    evidence: evidence.clone().unwrap_or_default(),
+                },
+                DecisionKind::RetryExcess => OperatorDecision::RetryExcess { previous_failed },
+                DecisionKind::ExcessIssued => OperatorDecision::CloseExcessIssued {
+                    evidence: evidence.clone().unwrap_or_default(),
                 },
             };
             let result = self

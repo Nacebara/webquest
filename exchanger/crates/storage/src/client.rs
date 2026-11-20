@@ -58,6 +58,10 @@ pub struct OrderView {
     pub previous_state: Option<OrderState>,
     /// Код счёта из ссылки клиента (оплата счёта).
     pub invoice_code: Option<String>,
+    /// Чек на переплату не создался или исход неясен, нового нет (Д-19.1): деньги у нас.
+    pub excess_stuck: bool,
+    /// Когда создан чек на переплату — чтобы поздний (после человека) пришёл новым сообщением.
+    pub excess_done_at: Option<DateTime<Utc>>,
 }
 
 /// Строка истории клиента.
@@ -212,6 +216,8 @@ struct ViewRow {
     progress_sent_at: Option<DateTime<Utc>>,
     previous_state: Option<String>,
     invoice_start_param: Option<String>,
+    excess_stuck: bool,
+    excess_done_at: Option<DateTime<Utc>>,
 }
 
 impl ViewRow {
@@ -248,6 +254,8 @@ impl ViewRow {
                 .map(|s| parse("order_transitions.from_state", s))
                 .transpose()?,
             invoice_code: self.invoice_start_param,
+            excess_stuck: self.excess_stuck,
+            excess_done_at: self.excess_done_at,
         })
     }
 }
@@ -277,7 +285,14 @@ pub async fn order_view(
                (SELECT t.from_state FROM order_transitions t
                  WHERE t.order_id = o.id AND t.to_state = o.state
                  ORDER BY t.id DESC LIMIT 1) AS previous_state,
-               o.invoice_start_param
+               o.invoice_start_param,
+               (EXISTS (SELECT 1 FROM operations x WHERE x.order_id = o.id
+                          AND x.kind = 'create_excess_check' AND x.status IN ('unknown', 'failed'))
+                AND NOT EXISTS (SELECT 1 FROM operations x WHERE x.order_id = o.id
+                          AND x.kind = 'create_excess_check'
+                          AND x.status IN ('pending', 'dispatched', 'succeeded'))) AS "excess_stuck!",
+               (SELECT max(x.finished_at) FROM operations x WHERE x.order_id = o.id
+                  AND x.kind = 'create_excess_check' AND x.status = 'succeeded') AS excess_done_at
           FROM orders o
          WHERE o.id = $1
         "#,
@@ -314,7 +329,14 @@ pub async fn order_view_for_user(
                (SELECT t.from_state FROM order_transitions t
                  WHERE t.order_id = o.id AND t.to_state = o.state
                  ORDER BY t.id DESC LIMIT 1) AS previous_state,
-               o.invoice_start_param
+               o.invoice_start_param,
+               (EXISTS (SELECT 1 FROM operations x WHERE x.order_id = o.id
+                          AND x.kind = 'create_excess_check' AND x.status IN ('unknown', 'failed'))
+                AND NOT EXISTS (SELECT 1 FROM operations x WHERE x.order_id = o.id
+                          AND x.kind = 'create_excess_check'
+                          AND x.status IN ('pending', 'dispatched', 'succeeded'))) AS "excess_stuck!",
+               (SELECT max(x.finished_at) FROM operations x WHERE x.order_id = o.id
+                  AND x.kind = 'create_excess_check' AND x.status = 'succeeded') AS excess_done_at
           FROM orders o
          WHERE o.public_id = $1 AND o.user_id = $2
         "#,

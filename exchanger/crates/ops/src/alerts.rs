@@ -89,6 +89,7 @@ impl Inner {
                         "amount_in": item.intake_amount.map(|a| a.to_string()),
                         "amount_out": item.payout_amount.map(|a| a.to_string()),
                         "reason": item.manual_reason,
+                        "excess": item.excess.map(|a| a.to_string()),
                         "since": item.since.to_rfc3339(),
                         "reply": reply,
                     }),
@@ -1007,12 +1008,26 @@ pub fn review_alert_screen(t: &crate::Texts, p: &Value, id: i64) -> Screen {
         .as_str()
         .map_or_else(|| order.to_string(), str::to_owned);
     let reason = s(p, "reason");
-    let reason = if reason.is_empty() {
-        String::new()
-    } else {
-        t.f("alert.review_reason", &[("reason", &esc(&reason))])
+    // Застрявшая переплата (Д-19.1, макет «Нужен разбор · переплата»): «Переплата 8.75: …».
+    let reason = match money("excess") {
+        Some(excess) => t.f(
+            "alert.review_excess",
+            &[
+                ("amount", &crate::dash::amount(excess)),
+                ("reason", &esc(&reason)),
+            ],
+        ),
+        None if reason.is_empty() => String::new(),
+        None => t.f("alert.review_reason", &[("reason", &esc(&reason))]),
     };
-    let wallet = direction.map(|d| crate::review::wallet(d.target()));
+    // Чей ответ ждём: выплата и счёт — кошелёк выплаты, чек на переплату — кошелёк входа.
+    let wallet = direction.map(|d| {
+        crate::review::wallet(if money("excess").is_some() {
+            d.source()
+        } else {
+            d.target()
+        })
+    });
     let reply = match &p["reply"] {
         Value::Object(m) => {
             let at = m

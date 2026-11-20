@@ -1931,7 +1931,7 @@ async fn system_screen_and_screen_preview_from_the_panel(pool: PgPool) {
     )
     .await;
     // Экраны идут по порядку макета, с паузой между сообщениями: проверяем начало.
-    o.tg.screen(mark, OWNER, "1/35 · Приветствие").await;
+    o.tg.screen(mark, OWNER, "1/36 · Приветствие").await;
     o.tg.screen(mark, OWNER, "Что меняем?").await;
 }
 
@@ -2367,4 +2367,172 @@ async fn a_support_question_never_carries_someone_elses_order(pool: PgPool) {
         question.text()
     );
     assert!(question.button("Заявка").is_none(), "{:?}", question.body);
+}
+
+/// Д-19.1 (проверка 19.11, картинка «Застрявшие переплата и возврат» принята 20.11). Чек на
+/// переплату по оплаченному счёту не создался: тревога «Нужен разбор» со строкой «Переплата»,
+/// карточка выполненной заявки с «Повторить чек переплаты» и «Чек выдан»; «Чек выдан» —
+/// причина, ссылка на чек кошелька переплаты (чужой — отказ), подтверждение; клиент получает
+/// «Забрать», заявка уходит из «Разбора».
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn stuck_overpayment_is_closed_from_the_console_with_the_found_check(pool: PgPool) {
+    use userbot::sim::{Call as SimCall, CheckSpec, Fault, InvoiceSpec};
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        for d in [Direction::PayCbInvoice, Direction::PayXrInvoice] {
+            storage::directions::set_open(&mut conn, d, true)
+                .await
+                .unwrap();
+        }
+    }
+    let shop = o.world.add_account("shop");
+    let inv = o
+        .world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))).by(shop))
+        .unwrap();
+    let link = parsers::links::parse_url(&inv.url).unwrap();
+    let order = match o
+        .engine
+        .submit_invoice(common::CLIENT, &link)
+        .await
+        .unwrap()
+    {
+        engine::InvoiceSubmitted::Quoted(order) => order,
+        other => panic!("{other:?}"),
+    };
+    let check = o.world.client_check(XR, usdt(dec!(15))).unwrap();
+    let check = parsers::links::parse_url(&check).unwrap();
+    accepted(o.engine.submit_check(common::CLIENT, &check).await.unwrap());
+    // «✅ Подтверждаю» чека на переплату не дошло: исход неясен, чек не создан.
+    o.world
+        .inject(o.ub, SimCall::CheckPress, Fault::TimeoutBeforeEffect, 1);
+    let mark = o.tg.mark();
+    o.drain().await;
+    o.engine.resolve_unknown().await.unwrap();
+    let alert = o.tg.screen(mark, OWNER, "Нужен разбор").await;
+    let text = alert.text();
+    assert!(text.contains(&order.public_id), "{text}");
+    assert!(text.contains("Переплата 4.70"), "{text}");
+    assert!(text.contains("15.00 → 10.00"), "{text}");
+
+    let card = o
+        .press(OWNER, &alert, "Открыть", "Переплата не вернулась")
+        .await;
+    // Состояние — словом утверждённых экранов пульта («Готово»), не «Выполнена» с картинки.
+    assert!(card.text().contains("Готово"), "{}", card.text());
+    assert!(
+        card.button("Повторить чек переплаты").is_some(),
+        "{:?}",
+        card.buttons()
+    );
+    let ask = o.press(OWNER, &card, "Чек выдан", "Коротко причина").await;
+    assert!(ask.text().contains(&order.public_id), "{}", ask.text());
+    let prompt = o
+        .say(
+            OWNER,
+            "нашёл чек в «Мои чеки» xRocket",
+            "Пришлите ссылку на чек xRocket",
+        )
+        .await;
+    assert!(prompt.text().contains("4.70"), "{}", prompt.text());
+    o.say(
+        OWNER,
+        "https://t.me/send?start=CQAbCdEfGhIj",
+        "ссылка на чек xRocket",
+    )
+    .await;
+    let found = o
+        .world
+        .create_check(CheckSpec::new(XR, usdt(dec!(4.70))).by(o.ub))
+        .unwrap();
+    let preview = o
+        .say(OWNER, &found.url, "Отметить чек переплаты выданным?")
+        .await;
+    assert!(
+        preview.text().contains("<tg-spoiler>"),
+        "{}",
+        preview.text()
+    );
+    let done = o.press(OWNER, &preview, "Чек выдан", "Заявка").await;
+    assert!(done.text().contains(&order.public_id), "{}", done.text());
+
+    let mut conn = o.pool.acquire().await.unwrap();
+    let (_, d) = (
+        storage::orders::get(&mut conn, order.id, false)
+            .await
+            .unwrap(),
+        storage::orders::details(&mut conn, order.id).await.unwrap(),
+    );
+    assert_eq!(d.payout_check_url.as_deref(), Some(found.url.as_str()));
+    assert!(
+        storage::admin::review_queue(&mut conn)
+            .await
+            .unwrap()
+            .iter()
+            .all(|q| q.id != order.id)
+    );
+    let audit = storage::audit::recent(&mut conn, 10, None, Some(("order", &order.id.to_string())))
+        .await
+        .unwrap();
+    assert!(
+        audit
+            .iter()
+            .any(|a| a.action == "order.excess_issued" && a.staff_id == OWNER)
+    );
+}
+
+/// Д-19.11: неясный возврат на разборе — «Вернуть» и «Возврат выдан» вместо «Повторить выплату»
+/// и «Выплачено»; «Возврат выдан» со ссылкой закрывает заявку возвратом.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn unclear_refund_is_closed_from_the_console_with_the_found_check(pool: PgPool) {
+    use userbot::sim::{Call as SimCall, CheckSpec, Fault};
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    let url = o.world.client_check(CB, usdt(dec!(1))).unwrap();
+    let link = parsers::links::parse_url(&url).unwrap();
+    let order = accepted(o.engine.submit_check(common::CLIENT, &link).await.unwrap());
+    o.world.inject(
+        o.ub,
+        SimCall::SendText,
+        Fault::DelayReply(Duration::ZERO),
+        3,
+    );
+    o.world.inject(o.ub, SimCall::SendText, Fault::NoReply, 1);
+    let mark = o.tg.mark();
+    o.drain().await;
+    let alert = o.tg.screen(mark, OWNER, "Нужен разбор").await;
+    let card = o.press(OWNER, &alert, "Открыть", "Ручной разбор").await;
+    assert!(
+        card.button("Возврат выдан").is_some(),
+        "{:?}",
+        card.buttons()
+    );
+    assert!(card.button("Вернуть").is_some(), "{:?}", card.buttons());
+    assert!(
+        card.button("Повторить выплату").is_none(),
+        "{:?}",
+        card.buttons()
+    );
+    assert!(card.button("Выплачено").is_none(), "{:?}", card.buttons());
+    o.press(OWNER, &card, "Возврат выдан", "Коротко причина")
+        .await;
+    o.say(
+        OWNER,
+        "чек есть в «Мои чеки»",
+        "Пришлите ссылку на чек CryptoBot",
+    )
+    .await;
+    let found = o
+        .world
+        .create_check(CheckSpec::new(CB, usdt(dec!(1))).by(o.ub))
+        .unwrap();
+    let preview = o.say(OWNER, &found.url, "Отметить возврат выданным?").await;
+    o.press(OWNER, &preview, "Возврат выдан", "Заявка").await;
+    let mut conn = o.pool.acquire().await.unwrap();
+    let after = storage::orders::get(&mut conn, order.id, false)
+        .await
+        .unwrap();
+    assert_eq!(after.state, OrderState::Refunded);
 }

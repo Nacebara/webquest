@@ -604,6 +604,15 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
             ),
         ),
         (
+            "invoice_paid_excess_held",
+            ui.invoice_paid(
+                &quote(None, false),
+                Some(&Excess::Held(usdt(dec!(5)))),
+                None,
+                at(12, 40),
+            ),
+        ),
+        (
             "invoice_check_rejected",
             ui.invoice_check_rejected(&quote(None, false), &UiError::AlreadyActivated, at(12, 34)),
         ),

@@ -243,6 +243,21 @@ pub fn client_at(ui: &Ui, quoted_at: DateTime<Utc>) -> Vec<PreviewScreen> {
                 msk(5, 14, 13),
             ),
         ),
+        one(
+            "Переплата у меня",
+            ui.invoice_paid(
+                &InvoiceQuote {
+                    order: OrderRef {
+                        direction: Direction::PayCbInvoice,
+                        ..invoice_order()
+                    },
+                    ..q.clone()
+                },
+                Some(&Excess::Held(usdt(875, 2))),
+                None,
+                msk(5, 14, 13),
+            ),
+        ),
         PreviewScreen {
             title: "Возврат",
             messages: vec![

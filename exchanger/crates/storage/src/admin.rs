@@ -29,9 +29,13 @@ pub struct QueueItem {
     pub direction: Direction,
     pub asset: Asset,
     pub intake_amount: Option<Decimal>,
+    /// Что уходит: выплата обмена или сумма счёта (оплата счёта).
     pub payout_amount: Option<Decimal>,
     pub manual_reason: Option<String>,
-    /// Когда заявка пришла на разбор (последний переход в `MANUAL_REVIEW`).
+    /// Застрявший чек на переплату выполненной заявки (Д-19.1): его сумма. `None` — заявка на
+    /// разборе; тогда `manual_reason` — причина разбора, иначе — ошибка чека переплаты.
+    pub excess: Option<Decimal>,
+    /// Когда заявка пришла на разбор (последний переход в `MANUAL_REVIEW`) или застряла переплата.
     pub since: DateTime<Utc>,
     /// Кто взял (`staff:<id>` из журнала аудита), если взяли.
     pub taken_by: Option<i64>,
@@ -54,23 +58,42 @@ pub async fn taker(conn: &mut PgConnection, order_id: i64) -> Result<Option<i64>
 
 /// Заявки на ручном разборе, старые сверху.
 pub async fn review_queue(conn: &mut PgConnection) -> Result<Vec<QueueItem>, StorageError> {
+    // Кроме заявок на разборе — выполненные заявки на оплату счёта, у которых чек на переплату
+    // не создался или исход неясен и нового нет (Д-19.1): заявку не трогаем, а решает человек.
     let rows = sqlx::query!(
         r#"
-        SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.intake_amount,
-               o.payout_amount, o.manual_reason,
-               COALESCE((SELECT max(t.at) FROM order_transitions t
-                          WHERE t.order_id = o.id AND t.to_state = 'MANUAL_REVIEW'),
-                        o.updated_at) AS "since!",
+        WITH stuck AS (
+            SELECT DISTINCT ON (x.order_id) x.order_id, x.amount, x.last_error,
+                   COALESCE(x.finished_at, x.created_at) AS at
+              FROM operations x
+             WHERE x.kind = 'create_excess_check' AND x.status IN ('unknown', 'failed')
+               AND NOT EXISTS (SELECT 1 FROM operations y
+                                WHERE y.order_id = x.order_id AND y.kind = 'create_excess_check'
+                                  AND y.status IN ('pending', 'dispatched', 'succeeded'))
+             ORDER BY x.order_id, x.id DESC
+        ), queue AS (
+            SELECT o.id, o.public_id, o.user_id, o.direction, o.asset, o.intake_amount,
+                   COALESCE(o.payout_amount, o.invoice_amount) AS payout_amount,
+                   o.manual_reason, s.amount AS excess_amount,
+                   s.last_error AS excess_error,
+                   CASE WHEN o.state = 'MANUAL_REVIEW'
+                        THEN COALESCE((SELECT max(t.at) FROM order_transitions t
+                                        WHERE t.order_id = o.id AND t.to_state = 'MANUAL_REVIEW'),
+                                      o.updated_at)
+                        ELSE s.at END AS since
+              FROM orders o LEFT JOIN stuck s ON s.order_id = o.id
+             WHERE o.state = 'MANUAL_REVIEW' OR (o.state = 'COMPLETED' AND s.order_id IS NOT NULL)
+        )
+        SELECT q.id AS "id!", q.public_id AS "public_id!", q.user_id AS "user_id!",
+               q.direction AS "direction!", q.asset AS "asset!", q.intake_amount,
+               q.payout_amount, q.manual_reason, q.excess_amount, q.excess_error,
+               q.since AS "since!",
                (SELECT a.staff_id FROM admin_audit a
-                 WHERE a.target_type = 'order' AND a.target_id = o.id::TEXT
-                   AND a.action = 'order.take'
-                   AND a.at >= COALESCE((SELECT max(t.at) FROM order_transitions t
-                                          WHERE t.order_id = o.id
-                                            AND t.to_state = 'MANUAL_REVIEW'), '-infinity')
+                 WHERE a.target_type = 'order' AND a.target_id = q.id::TEXT
+                   AND a.action = 'order.take' AND a.at >= q.since
                  ORDER BY a.id DESC LIMIT 1) AS taken_by
-          FROM orders o
-         WHERE o.state = 'MANUAL_REVIEW'
-         ORDER BY 9
+          FROM queue q
+         ORDER BY q.since
         "#
     )
     .fetch_all(conn)
@@ -85,7 +108,12 @@ pub async fn review_queue(conn: &mut PgConnection) -> Result<Vec<QueueItem>, Sto
                 asset: parse("orders.asset", &r.asset)?,
                 intake_amount: r.intake_amount,
                 payout_amount: r.payout_amount,
-                manual_reason: r.manual_reason,
+                manual_reason: if r.excess_amount.is_some() {
+                    r.excess_error
+                } else {
+                    r.manual_reason
+                },
+                excess: r.excess_amount,
                 since: r.since,
                 taken_by: r.taken_by,
             })

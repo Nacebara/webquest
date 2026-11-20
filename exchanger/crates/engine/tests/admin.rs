@@ -945,6 +945,136 @@ async fn a_restart_before_the_human_decision_does_not_hold_the_wallet_chat(pool:
     e.assert_books_match().await;
 }
 
+/// Д-19.11 (проверка 19.11, картинка принята 20.11). Сумма чека возврата отправлена, ответа нет:
+/// возврат неясен, заявка на разборе. Раньше закрыть её найденным чеком было нечем — только
+/// «вернуть ещё раз» (второй возврат) или «закрыть без выплаты». Теперь «Возврат выдан» со ссылкой
+/// на чек кошелька возврата: заявка — «Возвращено», клиенту — «Забрать», учёт сходится.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn unclear_refund_is_closed_with_the_check_found_in_the_wallet(pool: PgPool) {
+    let e = env(pool).await;
+    let url = e.world.client_check(CB, usdt(dec!(1))).unwrap();
+    let order = accepted(e.submit(&url).await);
+    // Активация, метка, «/checks» — с ответом; сумма чека возврата — без.
+    e.world.inject(
+        e.ub,
+        Call::SendText,
+        Fault::DelayReply(std::time::Duration::ZERO),
+        3,
+    );
+    e.world.inject(e.ub, Call::SendText, Fault::NoReply, 1);
+    e.drain().await;
+    assert_eq!(e.order(order.id).await.0.state, OrderState::ManualReview);
+    let refund = e
+        .ops(order.id)
+        .await
+        .into_iter()
+        .find(|o| o.kind == domain::fsm::OpKind::CreateRefundCheck)
+        .unwrap();
+    assert_eq!(refund.status, OpStatus::Unknown);
+    // Чек возврата есть в «Мои чеки» кошелька юзербота (создан той командой или вручную).
+    let found = e
+        .world
+        .create_check(CheckSpec::new(CB, usdt(dec!(1))).by(e.ub))
+        .unwrap();
+    let found = &found;
+
+    let operator = staff(&e.pool, 10, Role::Operator).await;
+    let admin = staff(&e.pool, 20, Role::Admin).await;
+    let decide = |evidence: &str, who| {
+        request(
+            order.id,
+            OperatorDecision::CloseAsRefunded {
+                evidence: evidence.to_owned(),
+            },
+            who,
+        )
+    };
+    assert_eq!(
+        refused(
+            e.engine
+                .operator_decide(decide(&found.url, &operator))
+                .await
+        ),
+        Refusal::Forbidden(Role::Admin)
+    );
+    assert_eq!(
+        refused(
+            e.engine
+                .operator_decide(decide("нашёл чек в кошельке", &admin))
+                .await
+        ),
+        Refusal::CheckLinkRequired(CB)
+    );
+    // Чек другого кошелька — не возврат этой заявки.
+    assert_eq!(
+        refused(
+            e.engine
+                .operator_decide(decide(
+                    "https://t.me/xrocket?start=t_AbCdEfGhIjKlMnO",
+                    &admin
+                ))
+                .await
+        ),
+        Refusal::CheckLinkRequired(CB)
+    );
+    // «Выплачено» по-прежнему не для возврата.
+    assert_eq!(
+        refused(
+            e.engine
+                .operator_decide(request(
+                    order.id,
+                    OperatorDecision::CloseAsPaid {
+                        evidence: found.url.clone()
+                    },
+                    &admin
+                ))
+                .await
+        ),
+        Refusal::NoSettleAttempt
+    );
+
+    let closed = e
+        .engine
+        .operator_decide(decide(&format!("вот он: {}", found.url), &admin))
+        .await
+        .unwrap();
+    assert_eq!(closed.state, OrderState::Refunded);
+    let (o, d) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::Refunded);
+    assert_eq!(d.refund_amount, Some(dec!(1)));
+    assert_eq!(d.payout_check_url.as_deref(), Some(found.url.as_str()));
+    let refund = e
+        .ops(order.id)
+        .await
+        .into_iter()
+        .find(|o| o.kind == domain::fsm::OpKind::CreateRefundCheck)
+        .unwrap();
+    assert_eq!(refund.status, OpStatus::Succeeded);
+    assert_eq!(refund.external_id.as_deref(), Some(found.code.as_str()));
+    let held: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM holds WHERE order_id = $1 AND state = 'active'")
+            .bind(order.id)
+            .fetch_one(&e.pool)
+            .await
+            .unwrap();
+    assert_eq!(held, 0, "удержание закрыто");
+    assert_eq!(e.ledger("liability:payable:USDT").await, dec!(0));
+    // Чат кошелька свободен: следующая заявка через CryptoBot проходит.
+    let paused: i64 = sqlx::query_scalar("SELECT count(*) FROM directions WHERE auto_paused")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    assert_eq!(paused, 0);
+    e.world.claim_check(e.client, &found.url).unwrap();
+    assert_eq!(e.world.balance(e.client, CB, Asset::Usdt), dec!(1));
+    // Тот же чек второй заявке не отдать, а эту — не закрыть второй раз.
+    assert_eq!(
+        refused(e.engine.operator_decide(decide(&found.url, &admin)).await),
+        Refusal::NotInReview(OrderState::Refunded)
+    );
+    e.assert_books_match().await;
+}
+
 /// Шаг 1.2 (аудит 11.11.2026). Сумма чека выплаты CryptoBot осталась без ответа: чек мог создать
 /// сама сумма, а его поздний экран — новое сообщение — достался бы следующей выплате. Кошелёк
 /// сразу на паузе: новые заявки через CryptoBot не принимаются. Человек проверил: чека нет,

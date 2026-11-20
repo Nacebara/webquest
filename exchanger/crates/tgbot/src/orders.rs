@@ -105,10 +105,18 @@ fn late_result(view: &OrderView) -> bool {
             | OrderState::Expired
     );
     let late = chrono::Duration::from_std(LATE_AFTER).unwrap_or_default();
-    result
+    // Чек на переплату выдал оператор (Д-19.1): заявка давно выполнена, итог — тоже новым
+    // сообщением, если прошло больше минуты (макет «Клиенту: переплата вернулась»).
+    let late_excess = view.state == OrderState::Completed
         && view
-            .progress_sent_at
-            .is_some_and(|sent| view.state_since - sent > late)
+            .excess_done_at
+            .zip(view.progress_sent_at)
+            .is_some_and(|(done, sent)| done - sent > late);
+    late_excess
+        || result
+            && view
+                .progress_sent_at
+                .is_some_and(|sent| view.state_since - sent > late)
 }
 
 /// Эффект «конфетти» (🎉) из стандартных эффектов сообщений Telegram. Если Telegram его не
@@ -310,6 +318,8 @@ fn render_invoice(ui: &Ui, cfg: &RenderCfg<'_>, view: &OrderView, extra: &Extra)
                 .filter(|e| *e > Decimal::ZERO);
             let excess = match (excess, money(view, view.refund_amount)) {
                 (None, _) => None,
+                // Чек не создался или исход неясен — деньги у нас, вернёт оператор (Д-19.1).
+                (Some(_), Some(refund)) if view.excess_stuck => Some(Excess::Held(refund)),
                 (Some(_), Some(refund)) => Some(Excess::Refund(refund)),
                 (Some(amount), None) => Some(Excess::Kept {
                     amount: money(view, Some(amount))?,
@@ -910,6 +920,8 @@ mod tests {
             progress_sent_at: None,
             previous_state: None,
             invoice_code: None,
+            excess_stuck: false,
+            excess_done_at: None,
         }
     }
 

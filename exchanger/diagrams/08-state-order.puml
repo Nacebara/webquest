@@ -46,6 +46,7 @@ MANUAL_REVIEW --> PAYOUT_PENDING : оператор: RetryPayout\n(после с
 MANUAL_REVIEW --> INVOICE_PAY_PENDING : оператор: RetryInvoicePayment\n(после проверки статуса счёта)
 MANUAL_REVIEW --> REFUND_PENDING : оператор: Refund
 MANUAL_REVIEW --> COMPLETED : оператор: CloseAsPaid\n(с доказательством)
+MANUAL_REVIEW --> REFUNDED : оператор: CloseAsRefunded\n(ссылка на найденный чек возврата)
 MANUAL_REVIEW --> CLOSED_MANUAL : владелец: CloseWithoutPayout\n(с причиной)
 
 REJECTED --> [*]

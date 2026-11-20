@@ -269,15 +269,38 @@ impl OrderView {
                 .map_or_else(String::new, |p| format!(" · {}", ui::fmt::percent(p)));
             rows.push((t.t("order.r_fee"), format!("{}{pct}", amount(f))));
         }
+        // Переплата по оплаченному счёту — своей строкой (макет «Карточка заявки · переплата»).
+        let excess = c.direction.flow() == Flow::InvoicePayment && c.state == OrderState::Completed;
         if let Some(r) = c.refund_amount {
-            rows.push((t.t("order.r_refund"), amount(r)));
+            if excess {
+                rows.push((
+                    t.t("order.r_excess"),
+                    format!("{} {}", amount(r), wallet(c.direction.source())),
+                ));
+            } else {
+                rows.push((t.t("order.r_refund"), amount(r)));
+            }
         }
-        if let Some(r) = &c.manual_reason {
+        if let Some(r) = c
+            .manual_reason
+            .as_ref()
+            .filter(|_| c.state == OrderState::ManualReview)
+        {
             rows.push((t.t("order.r_reason"), esc(r)));
         }
+        let stuck = stuck_excess(c);
 
         let mut rich = format!("<h3>{title}</h3><p>{head}</p>");
         let mut plain = format!("<b>{title}</b>\n{head}\n");
+        if let Some(op) = stuck {
+            let why = op
+                .last_error
+                .as_deref()
+                .map_or_else(|| t.t("common.none"), esc);
+            let line = t.f("order.excess_stuck", &[("why", &why)]);
+            rich.push_str(&format!("<blockquote>{line}</blockquote>"));
+            plain.push_str(&format!("{line}\n"));
+        }
         if let Some(h) = &self.reconcile {
             let line = h.line(t);
             rich.push_str(&format!("<blockquote>{line}</blockquote>"));
@@ -409,6 +432,36 @@ impl OrderView {
         }
         let mut s = Screen::card(rich, plain.trim_end().to_owned());
         let write = btn(t.t("order.b_write"), &Cb::SupportReply(c.user_id));
+        let decide = |k: DecisionKind, key: &str| btn(t.t(key), &Cb::Decide(c.id, k));
+        // Застрявшая переплата (Д-19.1, макет принят 20.11): заявка выполнена, решает админ.
+        if stuck.is_some() {
+            let take = btn(t.t("order.b_take"), &Cb::Take(c.id));
+            s = s.row(vec![
+                if self.taken_by.is_none() {
+                    take.style(botapi::ButtonStyle::Primary)
+                } else {
+                    take
+                },
+                write,
+            ]);
+            if role >= Role::Admin {
+                s = s
+                    .row(vec![decide(
+                        DecisionKind::RetryExcess,
+                        "order.b_retry_excess",
+                    )])
+                    .row(vec![decide(
+                        DecisionKind::ExcessIssued,
+                        "order.b_excess_issued",
+                    )]);
+            } else {
+                s = s.row(vec![
+                    btn(t.t("order.b_call_admin"), &Cb::CallAdmin(c.id))
+                        .style(botapi::ButtonStyle::Primary),
+                ]);
+            }
+            return s;
+        }
         if c.state != OrderState::ManualReview {
             return s.row(vec![write, btn(t.t("order.b_refresh"), &Cb::Order(c.id))]);
         }
@@ -423,7 +476,19 @@ impl OrderView {
             write,
         ]);
         let posted = c.intake_posted();
-        let decide = |k: DecisionKind, key: &str| btn(t.t(key), &Cb::Decide(c.id, k));
+        // Неясен возврат, а не выплата (Д-19.11, макет принят 20.11): «Выплачено» → «Возврат
+        // выдан», повтора выплаты нет — её не было.
+        let refund_case = c
+            .operations
+            .iter()
+            .rev()
+            .find(|o| {
+                matches!(
+                    o.kind.as_str(),
+                    "create_payout_check" | "create_refund_check" | "pay_invoice"
+                )
+            })
+            .is_some_and(|o| o.kind == "create_refund_check");
         if !posted && role >= Role::Admin {
             s = s.row(vec![decide(DecisionKind::Intake, "order.b_intake")]);
         }
@@ -444,7 +509,18 @@ impl OrderView {
                     decide(DecisionKind::ClosePaid, "order.b_paid")
                         .style(botapi::ButtonStyle::Primary),
                 ]);
+            } else if refund_case && role >= Role::Admin {
+                s = s.row(vec![
+                    decide(DecisionKind::RefundIssued, "order.b_refund_issued")
+                        .style(botapi::ButtonStyle::Primary),
+                ]);
             }
+        } else if posted && !operator_blocked && refund_case {
+            let mut row = vec![decide(DecisionKind::Refund, "order.b_refund")];
+            if role >= Role::Admin {
+                row.push(decide(DecisionKind::RefundIssued, "order.b_refund_issued"));
+            }
+            s = s.row(row);
         } else if posted && !operator_blocked {
             s = s.row(vec![match c.direction.flow() {
                 Flow::CheckExchange => decide(DecisionKind::RetryPayout, "order.b_retry"),
@@ -472,6 +548,23 @@ impl OrderView {
         }
         s
     }
+}
+
+/// Застрявший чек на переплату (Д-19.1): последняя операция переплаты с неясным исходом или
+/// неудачная, а живой или успешной нет. Только у выполненной заявки на оплату счёта.
+fn stuck_excess(c: &OrderCard) -> Option<&storage::admin::OpLine> {
+    if c.state != OrderState::Completed || c.direction.flow() != Flow::InvoicePayment {
+        return None;
+    }
+    let excess = || {
+        c.operations
+            .iter()
+            .filter(|o| o.kind == "create_excess_check")
+    };
+    if excess().any(|o| matches!(o.status.as_str(), "pending" | "dispatched" | "succeeded")) {
+        return None;
+    }
+    excess().rfind(|o| matches!(o.status.as_str(), "unknown" | "failed"))
 }
 
 fn is_final(state: &str) -> bool {
@@ -626,7 +719,14 @@ impl Inner {
             rows.push(QueueRow {
                 id: item.id,
                 public_id: item.public_id.clone(),
-                what: brief(item.manual_reason.as_deref().unwrap_or("")),
+                what: match item.excess {
+                    // Застрявшая переплата (Д-19.1): видно, что разбирать.
+                    Some(_) => brief(&self.texts.f(
+                        "queue.what_excess",
+                        &[("why", &item.manual_reason.as_deref().unwrap_or(""))],
+                    )),
+                    None => brief(item.manual_reason.as_deref().unwrap_or("")),
+                },
                 minutes: (Utc::now() - item.since).num_minutes().max(0),
                 taken_by,
                 mine: item.taken_by.is_some() && item.taken_by == viewer,

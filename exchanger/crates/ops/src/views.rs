@@ -1666,11 +1666,7 @@ impl Inner {
                 });
             }
             Cb::Decide(id, kind) => {
-                let need = match kind {
-                    DecisionKind::Close => Role::Owner,
-                    DecisionKind::ClosePaid | DecisionKind::Intake => Role::Admin,
-                    _ => Role::Operator,
-                };
+                let need = kind.min_role();
                 if let Some(denied) = self.deny(staff, need) {
                     return Ok(denied);
                 }
@@ -1764,6 +1760,9 @@ impl Inner {
             DecisionKind::ClosePaid => "order.b_paid",
             DecisionKind::Close => "order.b_close",
             DecisionKind::Intake => "order.b_intake",
+            DecisionKind::RefundIssued => "order.b_refund_issued",
+            DecisionKind::RetryExcess => "order.b_retry_excess",
+            DecisionKind::ExcessIssued => "order.b_excess_issued",
         })
     }
 

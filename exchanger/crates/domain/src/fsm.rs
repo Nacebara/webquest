@@ -145,6 +145,9 @@ pub enum OperatorAction {
     Refund,
     /// «Закрыть: выплачено» — только с доказательством (ссылка на созданный чек).
     CloseAsPaid,
+    /// «Возврат выдан»: неясный возврат нашёлся в кошельке, ссылка на чек — клиенту
+    /// (проверка 19.11, Д-19.11; картинка принята владельцем 20.11).
+    CloseAsRefunded,
     /// «Закрыть без выплаты» — только владелец, с причиной.
     CloseWithoutPayout,
 }
@@ -231,6 +234,7 @@ impl Event {
             OperatorAction::RetryInvoicePayment,
             OperatorAction::Refund,
             OperatorAction::CloseAsPaid,
+            OperatorAction::CloseAsRefunded,
             OperatorAction::CloseWithoutPayout,
         ] {
             v.push(Event::Operator(a));
@@ -366,7 +370,7 @@ pub enum FsmError {
 }
 
 /// Все разрешённые переходы — 1:1 с `order_state_transitions` в `schema.sql`.
-pub const ALLOWED: [(OrderState, OrderState); 31] = {
+pub const ALLOWED: [(OrderState, OrderState); 32] = {
     use OrderState::*;
     [
         (New, Rejected),
@@ -400,6 +404,7 @@ pub const ALLOWED: [(OrderState, OrderState); 31] = {
         (ManualReview, Completed),
         (ManualReview, ClosedManual),
         (ManualReview, InvoicePayPending),
+        (ManualReview, Refunded),
     ]
 };
 
@@ -536,6 +541,11 @@ pub fn transition(flow: Flow, state: OrderState, event: Event) -> Result<Transit
                 }),
                 Hold(HoldAction::Consume),
             ],
+        )),
+        // Возврат найден в кошельке: как подтверждённый возврат — проводка и удержание закрыто.
+        (S::ManualReview, _, E::Operator(OperatorAction::CloseAsRefunded)) => Some((
+            S::Refunded,
+            vec![Post(PostingKind::Refund), Hold(HoldAction::Consume)],
         )),
         (S::ManualReview, _, E::Operator(OperatorAction::CloseWithoutPayout)) => Some((
             S::ClosedManual,

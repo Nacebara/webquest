@@ -43,10 +43,17 @@ pub enum OperatorDecision {
     Refund { previous_failed: bool },
     /// Выплата есть: ссылка на созданный чек или описание доказательства.
     CloseAsPaid { evidence: String },
+    /// Неясный возврат нашёлся в кошельке: ссылка на чек возврата — клиенту (Д-19.11).
+    CloseAsRefunded { evidence: String },
     /// Закрыть без выплаты (владелец).
     CloseWithoutPayout,
     /// Автоматика не увидела приход, сотрудник видит деньги в кошельке: сумма прихода.
     ConfirmIntake { amount: Decimal },
+    /// Чек на переплату по оплаченному счёту не создался или исход неясен (Д-19.1): новый чек.
+    /// Заявка остаётся выполненной. `previous_failed` — проверил: прежнего чека нет.
+    RetryExcess { previous_failed: bool },
+    /// Чек на переплату нашёлся в кошельке: ссылка на него — клиенту (Д-19.1).
+    CloseExcessIssued { evidence: String },
 }
 
 impl OperatorDecision {
@@ -57,17 +64,30 @@ impl OperatorDecision {
             OperatorDecision::RetryInvoicePayment { .. } => "order.retry_invoice_payment",
             OperatorDecision::Refund { .. } => "order.refund",
             OperatorDecision::CloseAsPaid { .. } => "order.close_as_paid",
+            OperatorDecision::CloseAsRefunded { .. } => "order.close_as_refunded",
             OperatorDecision::CloseWithoutPayout => "order.close_without_payout",
             OperatorDecision::ConfirmIntake { .. } => "order.confirm_intake",
+            OperatorDecision::RetryExcess { .. } => "order.retry_excess",
+            OperatorDecision::CloseExcessIssued { .. } => "order.excess_issued",
         }
+    }
+
+    /// Решение по переплате выполненной заявки на оплату счёта, а не по заявке на разборе.
+    fn is_excess(&self) -> bool {
+        matches!(
+            self,
+            OperatorDecision::RetryExcess { .. } | OperatorDecision::CloseExcessIssued { .. }
+        )
     }
 
     fn min_role(&self) -> Role {
         match self {
             OperatorDecision::CloseWithoutPayout => Role::Owner,
-            OperatorDecision::CloseAsPaid { .. } | OperatorDecision::ConfirmIntake { .. } => {
-                Role::Admin
-            }
+            OperatorDecision::CloseAsPaid { .. }
+            | OperatorDecision::CloseAsRefunded { .. }
+            | OperatorDecision::ConfirmIntake { .. }
+            | OperatorDecision::RetryExcess { .. }
+            | OperatorDecision::CloseExcessIssued { .. } => Role::Admin,
             _ => Role::Operator,
         }
     }
@@ -133,6 +153,12 @@ pub enum Refusal {
     NoSettleAttempt,
     #[error("this check already settles another operation")]
     CheckAlreadyUsed,
+    /// «Возврат выдан» / «Чек выдан»: нужна ссылка на чек кошелька, которым возвращаем.
+    #[error("a check link of {0:?} is required")]
+    CheckLinkRequired(domain::Platform),
+    /// Решение по переплате, а переплата не застряла (её нет, она в пути или уже вернулась).
+    #[error("no stuck overpayment refund on this order")]
+    NoStuckExcess,
     #[error("the order changed meanwhile, open it again")]
     Changed,
 }
@@ -176,14 +202,23 @@ impl From<sqlx::Error> for OperatorError {
     }
 }
 
+/// Чек кошелька `platform` из ссылки сотрудника: код и каноническая ссылка для клиента.
+fn check_link(evidence: &str, platform: domain::Platform) -> Option<(String, String)> {
+    evidence.split_whitespace().find_map(|word| {
+        let link = parsers::links::parse_url(word).ok()?;
+        (link.kind == parsers::links::LinkKind::Check && link.platform == platform)
+            .then(|| (link.param.clone(), link.canonical_url()))
+    })
+}
+
 fn settled_by(ops: &[OperationRow]) -> Option<&OperationRow> {
     ops.iter()
         .find(|o| o.role == MoneyRole::Settle && o.status == OpStatus::Succeeded)
 }
 
-fn unknown_settle(ops: &[OperationRow]) -> Vec<&OperationRow> {
+fn unknown_of(ops: &[OperationRow], role: MoneyRole) -> Vec<&OperationRow> {
     ops.iter()
-        .filter(|o| o.role == MoneyRole::Settle && o.status == OpStatus::Unknown)
+        .filter(|o| o.role == role && o.status == OpStatus::Unknown)
         .collect()
 }
 
@@ -195,7 +230,19 @@ async fn retire_unknown(
     staff: i64,
     reason: &str,
 ) -> Result<(), OperatorError> {
-    let unknown = unknown_settle(ops);
+    retire_unknown_of(conn, ops, MoneyRole::Settle, confirmed, staff, reason).await
+}
+
+/// [`retire_unknown`] для операций роли `role` (расчёт заявки или чек на переплату).
+async fn retire_unknown_of(
+    conn: &mut PgConnection,
+    ops: &[OperationRow],
+    role: MoneyRole,
+    confirmed: bool,
+    staff: i64,
+    reason: &str,
+) -> Result<(), OperatorError> {
+    let unknown = unknown_of(ops, role);
     if let Some(op) = unknown.first()
         && !confirmed
     {
@@ -402,6 +449,9 @@ impl Engine {
             self.measure_before_intake(req.order_id, staff, *amount)
                 .await?;
         }
+        if req.decision.is_excess() {
+            return self.excess_decide(&req, reason).await;
+        }
         let mut tx = self.pool.begin().await?;
         let order = storage::orders::get(&mut tx, req.order_id, true).await?;
         if order.state != OrderState::ManualReview {
@@ -445,6 +495,7 @@ impl Engine {
                             OperatorDecision::RetryPayout { .. }
                                 | OperatorDecision::Refund { .. }
                                 | OperatorDecision::CloseAsPaid { .. }
+                                | OperatorDecision::CloseAsRefunded { .. }
                                 | OperatorDecision::CloseWithoutPayout
                         ),
                         _ => false,
@@ -678,6 +729,56 @@ impl Engine {
                 }
                 closed
             }
+            OperatorDecision::CloseAsRefunded { evidence } => {
+                if !received {
+                    return Err(Refusal::FundsNotReceived.into());
+                }
+                if let Some(op) = settled_by(&ops) {
+                    return Err(Refusal::AlreadySettled(op.idempotency_key.clone()).into());
+                }
+                let op = ops
+                    .iter()
+                    .rev()
+                    .find(|o| {
+                        o.role == MoneyRole::Settle
+                            && o.kind == OpKind::CreateRefundCheck
+                            && matches!(o.status, OpStatus::Unknown | OpStatus::Failed)
+                    })
+                    .ok_or(Refusal::NoSettleAttempt)?;
+                let (param, url) = check_link(evidence, op.platform)
+                    .ok_or(Refusal::CheckLinkRequired(op.platform))?;
+                let amount = op.amount.unwrap_or_default();
+                check_limit(staff, amount)?;
+                storage::operations::resolve_by_staff(
+                    &mut tx,
+                    op.id,
+                    OpStatus::Succeeded,
+                    &json!({ "resolved_by": format!("staff:{staff_id}"), "verdict": "refunded", "evidence": url }),
+                    Some(&param),
+                )
+                .await?;
+                let patch = OrderPatch {
+                    payout_check_url: Some(&url),
+                    refund_amount: Some(amount),
+                    ..OrderPatch::default()
+                };
+                transit(
+                    &mut tx,
+                    &order,
+                    Event::Operator(OperatorAction::CloseAsRefunded),
+                    &patch,
+                    Some(reason),
+                    EffectCtx {
+                        cause_op: Some(op.id),
+                        ..ctx
+                    },
+                )
+                .await?
+                .0
+            }
+            OperatorDecision::RetryExcess { .. } | OperatorDecision::CloseExcessIssued { .. } => {
+                return Err(Refusal::NotInReview(order.state).into());
+            }
             OperatorDecision::CloseWithoutPayout => {
                 if let Some(op) = settled_by(&ops) {
                     return Err(Refusal::AlreadySettled(op.idempotency_key.clone()).into());
@@ -708,8 +809,11 @@ impl Engine {
 
         let after_details = storage::orders::details(&mut tx, order.id).await?;
         let mut after = snapshot(&updated, &after_details);
-        if let (OperatorDecision::CloseAsPaid { evidence }, Value::Object(map)) =
-            (&req.decision, &mut after)
+        if let (
+            OperatorDecision::CloseAsPaid { evidence }
+            | OperatorDecision::CloseAsRefunded { evidence },
+            Value::Object(map),
+        ) = (&req.decision, &mut after)
         {
             map.insert("evidence".to_owned(), json!(evidence));
         }
@@ -749,5 +853,145 @@ impl Engine {
         );
         self.notify(&updated);
         Ok(updated)
+    }
+
+    /// Д-19.1 (проверка 19.11, картинка принята 20.11): чек на переплату по оплаченному счёту не
+    /// создался или исход неясен. Заявка выполнена и такой остаётся; решение — только об
+    /// операции переплаты: новый чек («Повторить чек переплаты») или найденный в кошельке
+    /// («Чек выдан»). Проводка и удержание — как у автоматики (`worker::confirm_excess`).
+    async fn excess_decide(
+        &self,
+        req: &OperatorRequest<'_>,
+        reason: &str,
+    ) -> Result<OrderRow, OperatorError> {
+        let staff = req.staff;
+        let staff_id = staff.tg_user_id;
+        let mut tx = self.pool.begin().await?;
+        let order = storage::orders::get(&mut tx, req.order_id, true).await?;
+        if order.state != OrderState::Completed || order.direction.flow() != Flow::InvoicePayment {
+            return Err(Refusal::NoStuckExcess.into());
+        }
+        let ops = storage::operations::for_order(&mut tx, order.id).await?;
+        let excess: Vec<&OperationRow> = ops
+            .iter()
+            .filter(|o| o.role == MoneyRole::ExcessRefund)
+            .collect();
+        if let Some(op) = excess.iter().find(|o| {
+            matches!(
+                o.status,
+                OpStatus::Pending | OpStatus::Dispatched | OpStatus::Succeeded
+            )
+        }) {
+            return Err(match op.status {
+                OpStatus::Succeeded => Refusal::AlreadySettled(op.idempotency_key.clone()),
+                _ => Refusal::InFlight(op.idempotency_key.clone()),
+            }
+            .into());
+        }
+        let stuck = excess
+            .iter()
+            .rev()
+            .find(|o| matches!(o.status, OpStatus::Unknown | OpStatus::Failed))
+            .copied()
+            .ok_or(Refusal::NoStuckExcess)?;
+        let d = storage::orders::details(&mut tx, order.id).await?;
+        let before = snapshot(&order, &d);
+        let amount = stuck
+            .amount
+            .or(d.refund_amount)
+            .ok_or(Refusal::NoStuckExcess)?;
+        check_limit(staff, amount)?;
+        let was_unknown = stuck.status == OpStatus::Unknown;
+        let platform = stuck.platform;
+        let mut evidence_url = None;
+        match &req.decision {
+            OperatorDecision::RetryExcess { previous_failed } => {
+                retire_unknown_of(
+                    &mut tx,
+                    &ops,
+                    MoneyRole::ExcessRefund,
+                    *previous_failed,
+                    staff_id,
+                    reason,
+                )
+                .await?;
+                // Прежнее удержание на кошельке входа — под новый чек.
+                storage::holds::close(&mut tx, order.id, false).await?;
+                crate::effects::create_op(
+                    &mut tx,
+                    &order,
+                    &d,
+                    OpKind::CreateExcessCheck,
+                    MoneyRole::ExcessRefund,
+                )
+                .await?;
+            }
+            OperatorDecision::CloseExcessIssued { evidence } => {
+                let (param, url) =
+                    check_link(evidence, platform).ok_or(Refusal::CheckLinkRequired(platform))?;
+                storage::operations::resolve_by_staff(
+                    &mut tx,
+                    stuck.id,
+                    OpStatus::Succeeded,
+                    &json!({ "resolved_by": format!("staff:{staff_id}"), "verdict": "issued", "evidence": url }),
+                    Some(&param),
+                )
+                .await?;
+                let asset = stuck.asset.unwrap_or(order.asset);
+                storage::ledger::post(
+                    &mut tx,
+                    &ledger::excess_refund(platform, asset, amount)?,
+                    storage::ledger::PostingRefs {
+                        order_id: Some(order.id),
+                        operation_id: Some(stuck.id),
+                        memo: Some(reason),
+                        created_by: Some(&format!("staff:{staff_id}")),
+                        ..Default::default()
+                    },
+                )
+                .await?;
+                storage::holds::close(&mut tx, order.id, true).await?;
+                storage::orders::set_check_url(&mut tx, order.id, &url).await?;
+                evidence_url = Some(url);
+            }
+            _ => return Err(Refusal::WrongFlow.into()),
+        }
+        // Неясная сумма чека держала чат кошелька и кошелёк на паузе (шаг 1.2): решение по ней
+        // снимает и то и другое, если других неясных денежных команд по кошельку нет.
+        if was_unknown {
+            crate::Engine::clear_unanswered_if_settled(&mut tx, platform).await?;
+        }
+        let after_details = storage::orders::details(&mut tx, order.id).await?;
+        let mut after = snapshot(&order, &after_details);
+        if let (Some(url), Value::Object(map)) = (&evidence_url, &mut after) {
+            map.insert("evidence".to_owned(), json!(url));
+        }
+        let target = order.id.to_string();
+        storage::audit::record(
+            &mut tx,
+            &NewAudit {
+                staff_id,
+                action: req.decision.audit_action(),
+                target_type: Some("order"),
+                target_id: Some(&target),
+                before: Some(before),
+                after: Some(after),
+                reason: Some(reason),
+                double_confirmed: req.double_confirmed,
+            },
+        )
+        .await?;
+        tx.commit().await?;
+        if was_unknown {
+            self.unanswered_resolved(platform).await;
+        }
+        tracing::info!(
+            order = order.id,
+            staff = staff_id,
+            action = req.decision.audit_action(),
+            "overpayment decision applied"
+        );
+        self.notify(&order);
+        Ok(order)
     }
 }

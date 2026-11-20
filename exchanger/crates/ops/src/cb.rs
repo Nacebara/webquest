@@ -79,17 +79,48 @@ pub enum DecisionKind {
     ClosePaid,
     Close,
     Intake,
+    /// Неясный возврат нашёлся в кошельке (Д-19.11).
+    RefundIssued,
+    /// Застрявший чек на переплату — новый чек (Д-19.1).
+    RetryExcess,
+    /// Застрявший чек на переплату нашёлся в кошельке (Д-19.1).
+    ExcessIssued,
 }
 
 impl DecisionKind {
-    pub const ALL: [DecisionKind; 6] = [
+    pub const ALL: [DecisionKind; 9] = [
         DecisionKind::RetryPayout,
         DecisionKind::RetryInvoice,
         DecisionKind::Refund,
         DecisionKind::ClosePaid,
         DecisionKind::Close,
         DecisionKind::Intake,
+        DecisionKind::RefundIssued,
+        DecisionKind::RetryExcess,
+        DecisionKind::ExcessIssued,
     ];
+
+    /// Решение по ссылке на найденный чек: сначала причина, потом ссылка.
+    pub fn needs_evidence(self) -> bool {
+        matches!(
+            self,
+            DecisionKind::ClosePaid | DecisionKind::RefundIssued | DecisionKind::ExcessIssued
+        )
+    }
+
+    /// Кто решает: «Закрыть без выплаты» — владелец; найденный чек, приход, переплата — админ.
+    pub fn min_role(self) -> storage::staff::Role {
+        use storage::staff::Role;
+        match self {
+            DecisionKind::Close => Role::Owner,
+            DecisionKind::ClosePaid
+            | DecisionKind::Intake
+            | DecisionKind::RefundIssued
+            | DecisionKind::RetryExcess
+            | DecisionKind::ExcessIssued => Role::Admin,
+            _ => Role::Operator,
+        }
+    }
 
     fn code(self) -> &'static str {
         match self {
@@ -99,6 +130,9 @@ impl DecisionKind {
             DecisionKind::ClosePaid => "cp",
             DecisionKind::Close => "cl",
             DecisionKind::Intake => "in",
+            DecisionKind::RefundIssued => "rd",
+            DecisionKind::RetryExcess => "rx",
+            DecisionKind::ExcessIssued => "xi",
         }
     }
 }
