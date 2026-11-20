@@ -493,6 +493,12 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
             "kill_switch",
             serde_json::json!({"by": "Олег", "at": now.to_rfc3339()}),
         ),
+        // П-19.2 (картинка link-missing.png принята 20.11).
+        (
+            "check_link_missing",
+            serde_json::json!({"user_id": 777000111, "platform": "cryptobot",
+                "shape": {"via_bot": "send", "edited": false, "text_len": 28, "buttons": []}}),
+        ),
     ];
     for (title, payload) in critical {
         if let Some(screen) = crate::critical_screen(&texts, title, &payload, 0, now) {

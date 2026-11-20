@@ -201,6 +201,12 @@ fn critical_alerts() {
             "kill_switch",
             serde_json::json!({"by": "Олег", "at": "2026-11-14T11:20:00+00:00"}),
         ),
+        // П-19.2 (картинка link-missing.png принята 20.11): «Нет ссылки на чек».
+        (
+            "check_link_missing",
+            serde_json::json!({"user_id": 777000111, "platform": "cryptobot",
+                "shape": {"via_bot": "send", "edited": false, "text_len": 28, "buttons": []}}),
+        ),
         // Макет «Новая авторизация»: «Новый вход · ub-1 / iPhone 15 · Telegram iOS · NL · 185.…41 · 13:58».
         (
             "new_login",

@@ -1927,6 +1927,57 @@ async fn the_owner_sets_the_passcode_free_limit_in_reserves(pool: PgPool) {
     assert_eq!(o.audit("settings.passcode_free_limit").await.len(), 1);
 }
 
+/// П-19.2 (картинка link-missing.png принята 20.11): «Нет ссылки на чек» — только владельцу и без
+/// звука, русским текстом; «Сохранить фикстуру» — устройство сообщения без ссылок. Раньше —
+/// всем со звуком, заголовок `check_link_missing` и строка JSON.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_missing_check_link_goes_to_the_owner_quietly(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        storage::alerts::raise(
+            &mut conn,
+            &storage::alerts::NewAlert {
+                level: storage::alerts::Level::Warn,
+                topic: storage::alerts::Topic::Errors,
+                dedup_key: "check_link_missing:111:80",
+                title: "check_link_missing",
+                payload: json!({"user_id": 111, "platform": "cryptobot",
+                    "shape": {"via_bot": "send", "edited": true, "text_len": 3,
+                        "buttons": ["url:https://t.me/send"]}}),
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let mark = o.tg.mark();
+    o.bot.deliver_alerts().await.unwrap();
+    let alert = o.tg.screen(mark, OWNER, "Нет ссылки на чек").await;
+    assert_eq!(alert.body["disable_notification"], true, "без звука");
+    let text = alert.text();
+    assert!(
+        text.contains("@send · правкой · текст 3 знака · кнопки: url:https://t.me/send"),
+        "{text}"
+    );
+    assert!(
+        !text.contains("check_link_missing") && !text.contains("{\""),
+        "{text}"
+    );
+    assert!(
+        o.tg.calls()
+            .iter()
+            .skip(mark)
+            .all(|c| c.chat() != Some(ADMIN) || !c.text().contains("Нет ссылки")),
+        "админу не приходит"
+    );
+    let dev = o
+        .press(OWNER, &alert, "Сохранить фикстуру", "Для разработчика")
+        .await;
+    assert!(dev.text().contains("text_len"), "{}", dev.text());
+}
+
 /// П-19.4 (проверка 19.11): «Сверить сейчас» идёт в фоне — пока кошельки отвечают на запрос
 /// баланса, клиенты получают ответы. Раньше сверка шла внутри опроса Telegram: следующую порцию
 /// обновлений бот забирал только после неё, и все клиенты ждали.

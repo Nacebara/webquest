@@ -1,0 +1,13 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&text)
+---
+--- rich
+
+--- html
+⚠️ <b>Нет ссылки на чек</b> · CryptoBot · <tg-time unix="1794654900" format="t">14:15</tg-time>
+<blockquote expandable>@send · без правки · текст 28 знаков · кнопок нет</blockquote>Клиент <code>777000111</code> · чек не открыт, деньги в нём
+<i>Клиенту сказано. Решать нечего — подсказка разработчику.</i>
+--- keyboard
+[{"text":"📤 Сохранить фикстуру","callback_data":"a:fx:9"}]
+[{"text":"👤 Клиент","callback_data":"a:u:777000111"}]

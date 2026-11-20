@@ -55,6 +55,8 @@ pub(crate) fn audience(title: &str, level: Level, role: Role) -> Option<bool> {
             admin.then_some(true)
         }
         t if t.starts_with("invest_") => admin.then_some(true),
+        // Подсказка разработчику, решать нечего (П-19.2, картинка link-missing.png): владельцу, тихо.
+        "check_link_missing" => (role == Role::Owner).then_some(false),
         // Выгодный курс и перекос резерва: админу и владельцу, тихо.
         "promo_hint" | "promo_started" | "promo_stopped" => admin.then_some(false),
         _ => Some(level >= Level::Warn),
@@ -430,17 +432,28 @@ impl Inner {
             let mut conn = self.pool.acquire().await?;
             storage::alerts::get(&mut conn, id).await?
         };
-        let Some(alert) = alert.filter(|a| a.title == "unknown_reply") else {
+        let Some(alert) =
+            alert.filter(|a| matches!(a.title.as_str(), "unknown_reply" | "check_link_missing"))
+        else {
             return Ok(());
         };
-        let case = json!({
-            "platform": alert.payload["platform"],
-            "text": alert.payload["text"],
-            "class": "?",
-        });
-        let text = self
-            .texts
-            .f("alert.fixture", &[("json", &esc(&case.to_string()))]);
+        let text = if alert.title == "check_link_missing" {
+            // Устройство сообщения (виды кнопок, хосты, длина текста) — без ссылок и кодов (П-19.2).
+            let case = json!({
+                "platform": alert.payload["platform"],
+                "shape": alert.payload["shape"],
+            });
+            self.texts
+                .f("alert.fixture_shape", &[("json", &esc(&case.to_string()))])
+        } else {
+            let case = json!({
+                "platform": alert.payload["platform"],
+                "text": alert.payload["text"],
+                "class": "?",
+            });
+            self.texts
+                .f("alert.fixture", &[("json", &esc(&case.to_string()))])
+        };
         self.api
             .send_message(&SendMessage::html(chat, text))
             .await?;
@@ -1014,6 +1027,57 @@ pub fn critical_screen(
             }
             sc.row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
         }
+        // П-19.2 (картинка link-missing.png принята 20.11): «Нет ссылки на чек» — устройство
+        // сообщения свёрнутой цитатой, где деньги — строкой ниже.
+        "check_link_missing" => {
+            let platform = s(p, "platform");
+            let name = platform_of(&platform).map_or_else(
+                || esc(&platform),
+                |x| t.t(&format!("names.{}", x.db_name())),
+            );
+            let shape = &p["shape"];
+            let mut parts = Vec::new();
+            if let Some(bot) = shape["via_bot"].as_str() {
+                parts.push(esc(&format!("@{bot}")));
+            }
+            parts.push(t.t(if shape["edited"].as_bool() == Some(true) {
+                "alert.shape_edited"
+            } else {
+                "alert.shape_not_edited"
+            }));
+            let len = shape["text_len"].as_i64().unwrap_or(0);
+            parts.push(t.f(
+                "alert.shape_text",
+                &[
+                    ("n", &len),
+                    ("chars", &ui::fmt::plural(len, ["знак", "знака", "знаков"])),
+                ],
+            ));
+            let buttons: Vec<String> = shape["buttons"]
+                .as_array()
+                .map(|b| b.iter().filter_map(|x| x.as_str()).map(esc).collect())
+                .unwrap_or_default();
+            parts.push(if buttons.is_empty() {
+                t.t("alert.shape_no_buttons")
+            } else {
+                t.f("alert.shape_buttons", &[("list", &buttons.join(", "))])
+            });
+            let user = p["user_id"].as_i64().unwrap_or(0);
+            let mut sc = Screen::new(t.f(
+                "alert.link_missing",
+                &[
+                    ("platform", &name),
+                    ("at", &crate::dash::hhmm(first_at)),
+                    ("shape", &parts.join(" · ")),
+                    ("user", &user),
+                ],
+            ))
+            .row(vec![btn(t.t("alert.b_fixture"), &Cb::Fixture(id))]);
+            if user != 0 {
+                sc = sc.row(vec![btn(t.t("alert.b_client"), &Cb::User(user))]);
+            }
+            sc
+        }
         "kill_switch" => {
             let at = s(p, "at")
                 .parse::<chrono::DateTime<chrono::Utc>>()
@@ -1399,7 +1463,20 @@ mod audience_tests {
         }
         // Остальное — как раньше: звук от Warn.
         assert_eq!(
-            audience("check_link_missing", Level::Notice, Role::Operator),
+            audience("reserve_low", Level::Notice, Role::Operator),
+            Some(false)
+        );
+        assert_eq!(
+            audience("reserve_low", Level::Warn, Role::Operator),
+            Some(true)
+        );
+        // П-19.2 (картинка link-missing.png принята 20.11): «Нет ссылки на чек» — подсказка
+        // разработчику, решать нечего: только владельцу и без звука.
+        for role in [Role::Operator, Role::Admin] {
+            assert_eq!(audience("check_link_missing", Level::Warn, role), None);
+        }
+        assert_eq!(
+            audience("check_link_missing", Level::Warn, Role::Owner),
             Some(false)
         );
     }
