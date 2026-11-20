@@ -2153,6 +2153,44 @@ async fn owner_grants_investor_access_and_admin_approves_a_withdrawal(pool: PgPo
     assert_eq!(o.audit("invest.approve").await.len(), 1);
 }
 
+/// Д-19.9 (картинка last-fixes.png принята 20.11): карточка направления показывает все причины
+/// автопаузы — у каждой время и кошелёк. Раньше видна была только самая ранняя.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn the_direction_card_lists_every_pause_reason(pool: PgPool) {
+    let o = ops(pool).await;
+    let short = "сверка: в кошельке 628.00 USDT, ожидалось 640.00 — не хватает 12.00";
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        storage::directions::auto_pause_platform(
+            &mut conn,
+            XR,
+            storage::directions::Side::Source,
+            engine::UNKNOWN_REPLY_PAUSE,
+        )
+        .await
+        .unwrap();
+        storage::directions::auto_pause_platform(
+            &mut conn,
+            CB,
+            storage::directions::Side::Target,
+            short,
+        )
+        .await
+        .unwrap();
+    }
+    let dirs = o.say(OWNER, "/dir", "Направления").await;
+    let card = o
+        .follow(OWNER, &dirs, "xRocket → CryptoBot", "Статус")
+        .await;
+    let text = card.text();
+    assert!(
+        text.contains(&format!("xRocket — {}", engine::UNKNOWN_REPLY_PAUSE)),
+        "{text}"
+    );
+    assert!(text.contains(&format!("CryptoBot — {short}")), "{text}");
+    assert_eq!(text.matches("· с ").count(), 2, "две причины: {text}");
+}
+
 /// Д-19.6 (картинка last-fixes.png принята 20.11, вариант Б): чек возврата пополнения меньше
 /// минимума не создался (исход неясен) — у владельца выбор «Чек создан» / «Ничего не было», как у
 /// вывода, а не «Деньги пришли» с вопросом о сумме. «Ничего не было» — новый чек, один.

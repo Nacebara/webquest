@@ -440,16 +440,39 @@ impl Inner {
         let mut conn = self.pool.acquire().await?;
         let row = storage::directions::get(&mut conn, d).await?;
         let mut lines = vec![t.f("dir.title", &[("name", &self.dir_name(d))])];
-        lines.push(if !row.is_open {
-            t.t("dir.state_closed")
+        if !row.is_open {
+            lines.push(t.t("dir.state_closed"));
         } else if row.auto_paused {
-            t.f(
-                "dir.state_auto",
-                &[("reason", &esc(row.pause_reason.as_deref().unwrap_or("")))],
-            )
+            // Д-19.9 (картинка last-fixes.png принята 20.11): все причины — время и кошелёк.
+            let pauses = storage::directions::pauses(&mut conn, d).await?;
+            if pauses.is_empty() {
+                lines.push(t.f(
+                    "dir.state_auto",
+                    &[("reason", &esc(row.pause_reason.as_deref().unwrap_or("")))],
+                ));
+            } else {
+                lines.push(t.t("dir.state_auto_list"));
+                for p in &pauses {
+                    let since = crate::dash::hhmm(p.since);
+                    lines.push(match p.platform {
+                        Some(w) => t.f(
+                            "dir.pause_line",
+                            &[
+                                ("since", &since),
+                                ("wallet", &self.platform_name(w)),
+                                ("reason", &esc(&p.reason)),
+                            ],
+                        ),
+                        None => t.f(
+                            "dir.pause_line_any",
+                            &[("since", &since), ("reason", &esc(&p.reason))],
+                        ),
+                    });
+                }
+            }
         } else {
-            t.t("dir.state_open")
-        });
+            lines.push(t.t("dir.state_open"));
+        }
         // Открыто, но не принимает (нет резерва, кошелёк не подключён…) — почему.
         if let Some(a) = self
             .engine

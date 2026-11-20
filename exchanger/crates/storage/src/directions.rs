@@ -260,6 +260,40 @@ async fn add_pause(
     Ok(u64::try_from(open.len()).unwrap_or(u64::MAX))
 }
 
+/// Причина автопаузы направления (Д-19.9): кошелёк (`None` — без кошелька), текст, с какого
+/// времени.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirectionPause {
+    pub platform: Option<domain::Platform>,
+    pub reason: String,
+    pub since: chrono::DateTime<chrono::Utc>,
+}
+
+/// Все причины автопаузы направления, от ранней к поздней (карточка направления в пульте).
+pub async fn pauses(
+    conn: &mut PgConnection,
+    direction: Direction,
+) -> Result<Vec<DirectionPause>, StorageError> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT platform, reason, since FROM direction_pauses
+         WHERE direction = $1
+         ORDER BY since, kind, platform
+        "#,
+        direction.code()
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| DirectionPause {
+            platform: domain::Platform::from_db_name(&r.platform),
+            reason: r.reason,
+            since: r.since,
+        })
+        .collect())
+}
+
 /// Сводка в `directions`: на паузе, пока есть причина; показывается самая ранняя.
 async fn sync_pauses(conn: &mut PgConnection, codes: &[String]) -> Result<(), StorageError> {
     sqlx::query!(

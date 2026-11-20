@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT platform, reason, since FROM direction_pauses\n         WHERE direction = $1\n         ORDER BY since, kind, platform\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "platform",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "direction_pauses",
+            "name": "platform"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "direction_pauses",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "since",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "direction_pauses",
+            "name": "since"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6a348768588953f19e21267bccf7bb1f1b6d20561b409c73d4ea77392ce6aa38"
+}
