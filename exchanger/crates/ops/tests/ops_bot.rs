@@ -1867,6 +1867,47 @@ async fn an_unexplained_shortage_is_written_off_as_a_loss(pool: PgPool) {
 /// CryptoBot — в «Резервах». Строка «Без код-пароля» — лимит и сколько осталось на сутки; лимит
 /// кончается — строкой ниже, что встало и до скольки; кнопка «Без код-пароля» — только владельцу:
 /// было → стало, «Сохранить», запись в журнал. Раньше лимит поставить было негде (всегда $500).
+/// Д-19.6 (проверка 19.11, картинка last-fixes.png принята 20.11): «Персонал → Добавить» с ID
+/// владельца и ролью admin молча понижал владельца до админа. Теперь — отказ, роль та же.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn adding_the_owner_as_staff_is_refused(pool: PgPool) {
+    let o = ops(pool).await;
+    let menu = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    let staff = o.press(OWNER, &menu, "Персонал", "Персонал").await;
+    let ask = o.press(OWNER, &staff, "Добавить", "ID в Telegram").await;
+    assert!(ask.button("Отмена").is_some(), "{:?}", ask.buttons());
+    let refused = o
+        .say(OWNER, &format!("{OWNER} admin Иван"), "это владелец")
+        .await;
+    assert!(
+        refused.text().contains(&format!(
+            "<code>{OWNER}</code> — это владелец, его роль не меняю"
+        )),
+        "{}",
+        refused.text()
+    );
+    assert!(
+        refused.button("Подтвердить").is_none(),
+        "{:?}",
+        refused.buttons()
+    );
+    let mut conn = o.pool.acquire().await.unwrap();
+    let owner = storage::staff::get(&mut conn, OWNER)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(owner.role, Role::Owner, "владелец остался владельцем");
+    // И в базе: добавление с ID владельца роль владельца не перезаписывает.
+    storage::staff::add(&mut conn, OWNER, Role::Admin, "Иван", ADMIN)
+        .await
+        .unwrap();
+    let owner = storage::staff::get(&mut conn, OWNER)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(owner.role, Role::Owner, "add не понижает владельца");
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn the_owner_sets_the_passcode_free_limit_in_reserves(pool: PgPool) {
     let o = ops(pool).await;
@@ -2881,6 +2922,79 @@ async fn stuck_overpayment_is_closed_from_the_console_with_the_found_check(pool:
         audit
             .iter()
             .any(|a| a.action == "order.excess_issued" && a.staff_id == OWNER)
+    );
+}
+
+/// Д-19.3 (картинка last-fixes.png принята 20.11): подтверждение «Отметить выплаченной» по
+/// счёту говорит, что будет с переплатой, — вернётся чеком или останется в доходе. Красная
+/// кнопка — отдельной строкой: рядом с «Отмена» надпись обрезалась до «Отметить вып…».
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn marking_an_invoice_paid_says_what_happens_to_the_overpayment(pool: PgPool) {
+    use userbot::sim::{Call as SimCall, Fault, InvoiceSpec};
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        for d in [Direction::PayCbInvoice, Direction::PayXrInvoice] {
+            storage::directions::set_open(&mut conn, d, true)
+                .await
+                .unwrap();
+        }
+    }
+    let shop = o.world.add_account("shop");
+    let inv = o
+        .world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))).by(shop))
+        .unwrap();
+    let link = parsers::links::parse_url(&inv.url).unwrap();
+    let order = match o
+        .engine
+        .submit_invoice(common::CLIENT, &link)
+        .await
+        .unwrap()
+    {
+        engine::InvoiceSubmitted::Quoted(order) => order,
+        other => panic!("{other:?}"),
+    };
+    let check = o.world.client_check(XR, usdt(dec!(15))).unwrap();
+    let check = parsers::links::parse_url(&check).unwrap();
+    accepted(o.engine.submit_check(common::CLIENT, &check).await.unwrap());
+    // «Оплатить» сработало, но бот молчит — заявка у человека.
+    o.world
+        .inject(o.ub, SimCall::Press, Fault::DelayReply(Duration::ZERO), 1);
+    o.world.inject(o.ub, SimCall::Press, Fault::NoReply, 1);
+    let mark = o.tg.mark();
+    o.drain().await;
+    let alert = o.tg.screen(mark, OWNER, "Нужен разбор").await;
+    let card = o.press(OWNER, &alert, "Открыть", "Ручной разбор").await;
+    o.press(OWNER, &card, "Выплачено", "Коротко причина").await;
+    o.say(OWNER, "счёт оплачен вручную", "Доказательство выплаты")
+        .await;
+    let preview = o
+        .say(
+            OWNER,
+            "оплатил кнопкой в @send, 14:10",
+            "Отметить выплаченной?",
+        )
+        .await;
+    let text = preview.text();
+    assert!(text.contains(&order.public_id), "{text}");
+    assert!(
+        text.contains("Переплата <code>4.70</code> USDT вернётся клиенту чеком xRocket."),
+        "{text}"
+    );
+    let rows = preview.body["reply_markup"]["inline_keyboard"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let confirm_row = rows
+        .iter()
+        .find(|r| r.to_string().contains("Отметить выплаченной"))
+        .expect("кнопка подтверждения");
+    assert_eq!(
+        confirm_row.as_array().map(Vec::len),
+        Some(1),
+        "красная кнопка — отдельной строкой: {rows:?}"
     );
 }
 

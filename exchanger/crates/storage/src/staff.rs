@@ -177,7 +177,8 @@ pub async fn ensure_owner(
         .ok_or_else(|| StorageError::corrupt("staff", "owner row missing after insert"))
 }
 
-/// Добавить сотрудника или вернуть отключённого (роль и имя — новые).
+/// Добавить сотрудника или вернуть отключённого (роль и имя — новые). Владельца не трогает: его
+/// роль из пульта не меняется (Д-19.6).
 pub async fn add(
     conn: &mut PgConnection,
     tg_user_id: i64,
@@ -191,6 +192,7 @@ pub async fn add(
         ON CONFLICT (tg_user_id) DO UPDATE
            SET role = EXCLUDED.role, display_name = EXCLUDED.display_name,
                added_by = EXCLUDED.added_by, disabled_at = NULL
+         WHERE staff.role <> 'owner'
         "#,
         tg_user_id,
         role.as_db_str(),

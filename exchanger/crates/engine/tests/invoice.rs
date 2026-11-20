@@ -876,6 +876,35 @@ async fn overpayment_comes_back_after_a_manual_close(pool: PgPool) {
         .unwrap();
         storage::staff::get(&mut conn, 20).await.unwrap().unwrap()
     };
+    // Подтверждение в пульте говорит заранее, что будет с переплатой (Д-19.3).
+    let preview = e.engine.paid_excess(order.id).await.unwrap().unwrap();
+    assert_eq!(preview.refund, Some(dec!(4.80)), "{preview:?}");
+    assert_eq!(preview.platform, CB);
+    {
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::settings::set(
+            &mut conn,
+            "min_refund_amount",
+            &serde_json::json!("10"),
+            None,
+        )
+        .await
+        .unwrap();
+    }
+    let small = e.engine.paid_excess(order.id).await.unwrap().unwrap();
+    assert_eq!(small.refund, None, "меньше порога — останется в доходе");
+    assert_eq!(small.threshold, dec!(10));
+    {
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::settings::set(
+            &mut conn,
+            "min_refund_amount",
+            &serde_json::json!("0.50"),
+            None,
+        )
+        .await
+        .unwrap();
+    }
     let closed = e
         .engine
         .operator_decide(engine::OperatorRequest {

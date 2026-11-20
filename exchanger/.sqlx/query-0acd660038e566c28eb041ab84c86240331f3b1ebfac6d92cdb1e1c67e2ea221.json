@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO staff (tg_user_id, role, display_name, added_by) VALUES ($1, $2, $3, $4)\n        ON CONFLICT (tg_user_id) DO UPDATE\n           SET role = EXCLUDED.role, display_name = EXCLUDED.display_name,\n               added_by = EXCLUDED.added_by, disabled_at = NULL\n         WHERE staff.role <> 'owner'\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0acd660038e566c28eb041ab84c86240331f3b1ebfac6d92cdb1e1c67e2ea221"
+}

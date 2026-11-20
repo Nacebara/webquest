@@ -119,6 +119,19 @@ pub enum InvoiceSubmitted {
     Rejected(InvoiceReject),
 }
 
+/// Переплата по счёту при закрытии «Выплачено» (см. [`Engine::paid_excess`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PaidExcess {
+    /// Сколько клиент прислал сверх счёта.
+    pub excess: Decimal,
+    /// Сколько вернётся чеком; `None` — переплата остаётся в доходе (меньше `threshold`).
+    pub refund: Option<Decimal>,
+    /// Меньше этого не возвращаем: `min_refund_amount` или минимальный чек кошелька.
+    pub threshold: Decimal,
+    /// Кошелёк, чеком которого вернётся переплата (кошелёк входа).
+    pub platform: Platform,
+}
+
 /// Направление по платформе счёта: счёт CryptoBot оплачиваем деньгами из xRocket и наоборот.
 pub fn direction_for_invoice(platform: Platform) -> Direction {
     match platform {
@@ -532,6 +545,37 @@ impl Engine {
         )
         .await?;
         Ok(order)
+    }
+
+    /// Что будет с переплатой по счёту, если заявку закрыть «Выплачено» (Д-19.3, подтверждение в
+    /// пульте): тот же расчёт, что при автоматической оплате. `None` — не счёт или переплаты нет.
+    pub async fn paid_excess(&self, order_id: i64) -> Result<Option<PaidExcess>, EngineError> {
+        let mut conn = self.pool.acquire().await?;
+        let order = storage::orders::get(&mut conn, order_id, false).await?;
+        if order.direction.flow() != Flow::InvoicePayment {
+            return Ok(None);
+        }
+        let d = storage::orders::details(&mut conn, order.id).await?;
+        let (Some(intake), Some(to_pay)) = (d.intake_amount, d.quote_amount_in) else {
+            return Ok(None);
+        };
+        let excess = intake - to_pay;
+        if excess <= Decimal::ZERO {
+            return Ok(None);
+        }
+        let refund = self.excess_refund_amount(&mut conn, &order).await?;
+        let min_refund = setting_decimal(&mut conn, "min_refund_amount")
+            .await?
+            .unwrap_or(Decimal::new(50, 2));
+        let asset = d.intake_asset.unwrap_or(order.asset);
+        let min_check =
+            storage::directions::min_check(&mut conn, order.direction.source(), asset).await?;
+        Ok(Some(PaidExcess {
+            excess,
+            refund,
+            threshold: min_refund.max(min_check),
+            platform: order.direction.source(),
+        }))
     }
 
     /// Переплата по оплаченному счёту, в транзакции `InvoicePaid` (до перехода): сколько

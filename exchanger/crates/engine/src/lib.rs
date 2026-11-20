@@ -40,7 +40,8 @@ use tokio::sync::broadcast;
 use userbot::WalletBot;
 
 pub use invoice::{
-    InvoiceIssue, InvoiceReject, InvoiceSubmitted, direction_for_invoice, payable_amount,
+    InvoiceIssue, InvoiceReject, InvoiceSubmitted, PaidExcess, direction_for_invoice,
+    payable_amount,
 };
 pub use operator::{OperatorDecision, OperatorError, OperatorRequest, Refusal};
 

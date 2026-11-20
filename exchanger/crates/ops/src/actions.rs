@@ -21,6 +21,9 @@ use crate::texts::esc;
 use crate::views::{pct, usdt};
 use crate::{Inner, OpsError, Screen, btn};
 
+/// Сколько букв надписи помещается на кнопке рядом с «Отмена» в телефоне.
+const LONG_BUTTON: usize = 16;
+
 /// Чего ждём от сотрудника.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Input {
@@ -1047,6 +1050,15 @@ impl Inner {
                 let Some((id, role, name)) = parsed else {
                     return Ok(self.retry(staff, input, "staff.hint_add"));
                 };
+                // Д-19.6: ID владельца с ролью admin понижал владельца — отказ, ничего не меняется.
+                let existing = {
+                    let mut conn = self.pool.acquire().await?;
+                    storage::staff::get(&mut conn, id).await?
+                };
+                if existing.is_some_and(|m| m.role == Role::Owner) {
+                    let text = self.texts.f("staff.owner_add", &[("id", &id.to_string())]);
+                    return Ok(self.prompt_with(staff, input, text));
+                }
                 Action::StaffAdd { id, role, name }
             }
         };
@@ -1483,7 +1495,7 @@ impl Inner {
                         c.refund_amount,
                     ),
                 };
-                let what = t.f(
+                let mut what = t.f(
                     what,
                     &[
                         ("wallet", &self.platform_name(wallet)),
@@ -1491,6 +1503,29 @@ impl Inner {
                         ("client", &client),
                     ],
                 );
+                // Д-19.3 (картинка last-fixes.png принята 20.11): что будет с переплатой по счёту —
+                // тот же расчёт, что при автоматической оплате.
+                if *kind == DecisionKind::ClosePaid
+                    && let Some(x) = self.engine.paid_excess(*order).await?
+                {
+                    let line = match x.refund {
+                        Some(r) => t.f(
+                            "order.paid_excess_refund",
+                            &[
+                                ("amount", &crate::dash::amount(r)),
+                                ("wallet", &self.platform_name(x.platform)),
+                            ],
+                        ),
+                        None => t.f(
+                            "order.paid_excess_kept",
+                            &[
+                                ("amount", &crate::dash::amount(x.excess)),
+                                ("min", &crate::dash::amount(x.threshold)),
+                            ],
+                        ),
+                    };
+                    what = format!("{what}\n{line}");
+                }
                 let money_kinds = matches!(
                     kind,
                     DecisionKind::RetryPayout
@@ -1841,19 +1876,30 @@ impl Inner {
             let nonce = self.hold_for(staff.tg_user_id, action, ttl);
             // Неясный исход: на кнопке — что именно произойдёт и сколько (аудит 16.11, П-1),
             // а не голое «подтверждаю».
-            let confirm = match unknown_key {
-                Some(_) => btn(
+            let (label, cb) = match unknown_key {
+                Some(_) => (
                     t.f(
                         "order.b_do_unknown",
                         &[("action", &unknown_label.clone().unwrap_or_default())],
                     ),
-                    &Cb::ConfirmUnknown(nonce),
+                    Cb::ConfirmUnknown(nonce),
                 ),
-                None => btn(
+                None => (
                     confirm_label.unwrap_or_else(|| t.t("common.confirm")),
-                    &Cb::Confirm(nonce),
+                    Cb::Confirm(nonce),
                 ),
             };
+            // Длинная надпись рядом с «Отмена» обрезается («Отметить вып…»): такая кнопка —
+            // отдельной строкой (макеты «Подтверждение · переплата», last-fixes.png).
+            let long = label
+                .chars()
+                .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+                .collect::<String>()
+                .trim()
+                .chars()
+                .count()
+                > LONG_BUTTON;
+            let confirm = btn(label, &cb);
             let confirm = if danger {
                 confirm.style(botapi::ButtonStyle::Danger)
             } else if confirm_primary {
@@ -1861,7 +1907,12 @@ impl Inner {
             } else {
                 confirm
             };
-            s = s.row(vec![confirm, btn(t.t("common.cancel"), &Cb::Cancel)]);
+            s = if long {
+                s.row(vec![confirm])
+                    .row(vec![btn(t.t("common.cancel"), &Cb::Cancel)])
+            } else {
+                s.row(vec![confirm, btn(t.t("common.cancel"), &Cb::Cancel)])
+            };
         } else if need == Role::Owner {
             // Решает владелец: предложить ему одной кнопкой (шаг 3, макет «решает владелец»).
             s.text

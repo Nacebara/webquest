@@ -535,6 +535,9 @@ what_retry = "Новый чек {wallet} на <code>{amount}</code> USDT кли�
 what_retry_invoice = "Оплатить счёт {wallet} на <code>{amount}</code> USDT."
 what_refund = "Чек {wallet} на <code>{amount}</code> USDT клиенту {client} — возврат."
 what_paid = "Клиент {client} получил деньги вне бота — заявка закроется выплаченной."
+# Д-19.3 (картинка last-fixes.png принята 20.11): переплата по счёту при «Выплачено».
+paid_excess_refund = "Переплата <code>{amount}</code> USDT вернётся клиенту чеком {wallet}."
+paid_excess_kept = "Переплата <code>{amount}</code> USDT останется в доходе — меньше <code>{min}</code> не возвращаем."
 what_close = "<code>{amount}</code> USDT клиента {client} остаются у сервиса."
 what_intake = "В кошелёк пришло <code>{amount}</code> USDT по заявке клиента {client}."
 what_refund_issued = "Клиент {client} получит чек {wallet} на <code>{amount}</code> USDT кнопкой «Забрать» — возврат."
@@ -761,6 +764,8 @@ b_role = "Сделать: {role}"
 b_disable = "Отключить"
 ask_add = "ID в Telegram, роль (admin или operator) и имя через пробел: <code>123456789 operator Анна</code>\nПусть человек сначала напишет боту /start."
 hint_add = "«id роль имя», роль admin или operator"
+# Д-19.6 (картинка last-fixes.png принята 20.11): ID владельца не понижает владельца.
+owner_add = "<code>{id}</code> — это владелец, его роль не меняю. Пришлите ID другого человека."
 preview_add = "Добавить {name} (<code>{id}</code>) с ролью «{role}»."
 preview_role = "{name}: роль «{before}» → <b>«{after}»</b>."
 preview_disable = "Отключить {name}: пульт перестанет ему отвечать."
