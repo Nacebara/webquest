@@ -6,9 +6,11 @@
 
 mod common;
 
+use std::time::Duration;
+
 use common::{CB, CLIENT, XR, accepted, env, usdt};
 use domain::fsm::OpKind;
-use domain::{Decimal, Platform};
+use domain::{Asset, Decimal, Platform};
 use engine::invest::{InvestError, InvestRefusal, InvestVerdict, investor_share};
 use rust_decimal_macros::dec;
 use sqlx::PgPool;
@@ -321,6 +323,56 @@ async fn profit_is_a_share_of_fee_revenue_by_capital(pool: PgPool) {
     assert!(e.engine.invest_accrue().await.unwrap().credited.is_empty());
     assert_eq!(balance(&e).await, dec!(1000) + expected);
     e.assert_books_match().await;
+}
+
+/// Д-19.5 (проверка 19.11): доход, проведённый, пока идёт начисление, не теряется. Пульт провёл
+/// доход: номер проводки выдан, транзакция ещё не закоммичена; следом закоммичена проводка с
+/// бо́льшим номером. Раньше начисление брало последний номер и сдвигало окно за неудачную проводку —
+/// её доход не попадал ни в одно окно.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn revenue_posted_during_the_accrual_is_not_skipped(pool: PgPool) {
+    let e = env(pool).await;
+    grant(&e, 0, dec!(0)).await;
+    deposit(&e, CB, dec!(1000)).await;
+    e.engine.invest_accrue().await.unwrap();
+
+    let mut slow = e.pool.begin().await.unwrap();
+    for posting in [
+        domain::ledger::intake(CB, Asset::Usdt, dec!(10)).unwrap(),
+        domain::ledger::excess_kept(Asset::Usdt, dec!(10)).unwrap(),
+    ] {
+        storage::ledger::post(&mut slow, &posting, storage::ledger::PostingRefs::default())
+            .await
+            .unwrap();
+    }
+    let later = async {
+        let mut tx = e.pool.begin().await.unwrap();
+        storage::ledger::post(
+            &mut tx,
+            &domain::ledger::capital_in(XR, Asset::Usdt, dec!(1)).unwrap(),
+            storage::ledger::PostingRefs {
+                memo: Some("взнос владельца"),
+                created_by: Some("staff:1"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+    };
+    // Проводка с бо́льшим номером закоммичена раньше (или ждёт начисления — тоже верно).
+    let _ = tokio::time::timeout(Duration::from_millis(300), later).await;
+    let commit_slow = async {
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        slow.commit().await.unwrap();
+    };
+    let (first, ()) = tokio::join!(e.engine.invest_accrue(), commit_slow);
+    let second = e.engine.invest_accrue().await.unwrap();
+    assert_eq!(
+        first.unwrap().revenue + second.revenue,
+        dec!(10),
+        "доход незакоммиченной проводки вошёл в окно"
+    );
 }
 
 /// Шаг 5.2: пополнение инвестора, ответ на активацию потерян («выполнил и вернул таймаут» или

@@ -154,7 +154,8 @@ pub enum InvestVerdict {
 
 const ACCRUAL_KEY: &str = "invest_accrual";
 /// Ключ advisory-блокировки начисления: два прохода одновременно не начислят дважды.
-const ACCRUAL_LOCK: (i32, i32) = (7003, 1);
+/// Тот же ключ берёт каждая проводка — общим (Д-19.5, [`storage::ledger::ACCRUAL_LOCK`]).
+const ACCRUAL_LOCK: (i32, i32) = storage::ledger::ACCRUAL_LOCK;
 /// Инвестиции — только в USDT.
 const ASSET: Asset = Asset::Usdt;
 

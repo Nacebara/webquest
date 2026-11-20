@@ -43,6 +43,10 @@ pub async fn ensure_account(
     Ok(id)
 }
 
+/// Ключ advisory-блокировки начисления прибыли инвесторам (`engine::invest`): проводки берут его
+/// общим, начисление — исключительным (Д-19.5).
+pub const ACCRUAL_LOCK: (i32, i32) = (7003, 1);
+
 /// Записать проводку; возвращает `ledger_transactions.id`.
 ///
 /// Вызывать внутри транзакции вместе с переходом заявки: шапка и строки проводки —
@@ -52,6 +56,16 @@ pub async fn post(
     posting: &Posting,
     refs: PostingRefs<'_>,
 ) -> Result<i64, StorageError> {
+    // Д-19.5: проводка держит общую блокировку до конца своей транзакции, начисление инвесторам —
+    // исключительную на тот же ключ. Начисление ждёт, пока все начатые проводки закоммитятся, и не
+    // сдвигает окно за проводку, чей номер выдан, а транзакция ещё идёт.
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock_shared($1, $2)",
+        ACCRUAL_LOCK.0,
+        ACCRUAL_LOCK.1
+    )
+    .execute(&mut *conn)
+    .await?;
     let codes: Vec<String> = posting
         .lines()
         .iter()
