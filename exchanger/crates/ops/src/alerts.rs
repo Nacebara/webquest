@@ -196,6 +196,9 @@ impl Inner {
         };
         let screen = self.look().screen(&self.render_alert(&alert));
         let mut first = None;
+        // Отправка не удалась по временной причине (связь, 5xx, 429): повторить на следующем
+        // круге. Сотрудник заблокировал бота (403) — так и останется, ждать его незачем (С-19.1).
+        let mut transient = false;
         for m in recipients {
             let chat = m.tg_user_id;
             let Some(sound) = audience(&alert.title, alert.level, m.role) else {
@@ -228,6 +231,7 @@ impl Inner {
                     Err(e) if e.is_message_gone() => {}
                     Err(e) => {
                         tracing::info!(chat, error = %e, "alert not updated");
+                        transient |= !e.is_forbidden();
                         continue;
                     }
                 }
@@ -249,8 +253,21 @@ impl Inner {
                     }
                 }
                 // Сотрудник не начинал диалог с пультом или заблокировал его.
-                Err(e) => tracing::info!(chat, error = %e, "alert not delivered"),
+                Err(e) => {
+                    tracing::info!(chat, error = %e, "alert not delivered");
+                    transient |= !e.is_forbidden();
+                }
             }
+        }
+        // Ни одной копии из-за сбоя связи: тревога остаётся в очереди и уйдёт на следующем
+        // круге (С-19.1). Иначе она считалась бы доставленной и не пришла бы никогда.
+        if first.is_none() && transient {
+            tracing::warn!(
+                alert = alert.id,
+                title = %alert.title,
+                "alert reached nobody, will retry"
+            );
+            return Ok(());
         }
         let mut conn = self.pool.acquire().await?;
         storage::alerts::mark_delivered(&mut conn, alert.id, first).await?;

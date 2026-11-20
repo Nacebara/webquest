@@ -81,6 +81,8 @@ struct State {
     next_update: i64,
     next_message: i64,
     calls: Vec<Call>,
+    /// Сколько следующих `sendMessage` Telegram не примет (500): связь с ним пропала.
+    fail_sends: usize,
 }
 
 #[derive(Clone)]
@@ -112,7 +114,12 @@ impl FakeTelegram {
                         return;
                     };
                     let result = server.respond(&method, body).await;
-                    let payload = json!({ "ok": true, "result": result }).to_string();
+                    let payload = if result.get("__fail").is_some() {
+                        json!({ "ok": false, "error_code": 500, "description": "Internal Server Error" })
+                            .to_string()
+                    } else {
+                        json!({ "ok": true, "result": result }).to_string()
+                    };
                     let response = format!(
                         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
                         payload.len()
@@ -240,6 +247,10 @@ impl FakeTelegram {
             return json!([]);
         }
         let mut s = self.lock();
+        if method == "sendMessage" && s.fail_sends > 0 {
+            s.fail_sends -= 1;
+            return json!({ "__fail": true });
+        }
         let (result, message_id) = match method {
             "getMe" => (
                 json!({ "id": 999, "is_bot": true, "first_name": "Exch", "username": "exch_test_bot" }),
@@ -2535,4 +2546,26 @@ async fn unclear_refund_is_closed_from_the_console_with_the_found_check(pool: Pg
         .await
         .unwrap();
     assert_eq!(after.state, OrderState::Refunded);
+}
+
+/// С-19.1 (проверка 19.11): первая отправка тревоги не дошла ни до кого (нет связи с Telegram).
+/// Раньше тревога считалась доставленной и больше не уходила, а повтор критичных считался от
+/// копий, которых не было, — «Нужен разбор» не приходил никогда. Теперь она уходит, как только
+/// Telegram снова отвечает.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn an_alert_that_could_not_be_sent_goes_out_when_telegram_answers_again(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    o.say(ADMIN, "/menu", "<b>Пульт</b>").await;
+    // Пульт молчит: тревоги разносит только явный круг ниже.
+    o.cancel.cancel();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    o.tg.lock().fail_sends = 1_000;
+    order_in_review(&o).await;
+    o.bot.deliver_alerts().await.unwrap();
+    let mark = o.tg.mark();
+    o.tg.lock().fail_sends = 0;
+    o.bot.deliver_alerts().await.unwrap();
+    o.tg.screen(mark, OWNER, "Нужен разбор").await;
+    o.tg.screen(mark, ADMIN, "Нужен разбор").await;
 }
