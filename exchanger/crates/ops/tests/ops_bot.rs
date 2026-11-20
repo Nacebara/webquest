@@ -83,6 +83,9 @@ struct State {
     calls: Vec<Call>,
     /// Сколько следующих `sendMessage` Telegram не примет (500): связь с ним пропала.
     fail_sends: usize,
+    /// Чаты, где бот заблокирован: любой запрос в них — 403. Попытки — в `refused`.
+    blocked: std::collections::HashSet<i64>,
+    refused: Vec<(String, i64)>,
 }
 
 #[derive(Clone)]
@@ -114,7 +117,10 @@ impl FakeTelegram {
                         return;
                     };
                     let result = server.respond(&method, body).await;
-                    let payload = if result.get("__fail").is_some() {
+                    let payload = if result.get("__fail").is_some_and(|f| f == 403) {
+                        json!({ "ok": false, "error_code": 403, "description": "Forbidden: bot was blocked by the user" })
+                            .to_string()
+                    } else if result.get("__fail").is_some() {
                         json!({ "ok": false, "error_code": 500, "description": "Internal Server Error" })
                             .to_string()
                     } else {
@@ -247,6 +253,12 @@ impl FakeTelegram {
             return json!([]);
         }
         let mut s = self.lock();
+        if let Some(chat) = body["chat_id"].as_i64()
+            && s.blocked.contains(&chat)
+        {
+            s.refused.push((method.to_owned(), chat));
+            return json!({ "__fail": 403 });
+        }
         if method == "sendMessage" && s.fail_sends > 0 {
             s.fail_sends -= 1;
             return json!({ "__fail": true });
@@ -1504,6 +1516,69 @@ async fn a_foreign_login_is_shown_and_ended_from_the_panel(pool: PgPool) {
     );
     drop(conn);
     assert_eq!(o.audit("userbot.end_session").await.len(), 1);
+}
+
+/// П-19.3 (проверка 19.11): копию решённой тревоги у сотрудника, заблокировавшего бота, поправить
+/// нельзя (403) — она закрывается с первого раза. Раньше такие копии оставались в очереди «Решено»
+/// навсегда: 50 самых старых каждый круг пробовались снова, а у остальных решённое висело с кнопками.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn copies_in_a_chat_that_blocked_the_bot_do_not_hold_the_resolved_queue(pool: PgPool) {
+    let o = ops(pool).await;
+    let mut conn = o.pool.acquire().await.unwrap();
+    async fn raise(conn: &mut sqlx::PgConnection, key: &str) -> i64 {
+        storage::alerts::raise(
+            conn,
+            &storage::alerts::NewAlert {
+                level: storage::alerts::Level::Warn,
+                topic: storage::alerts::Topic::Errors,
+                dedup_key: key,
+                title: "reserve_low",
+                payload: json!({"platform": "xrocket"}),
+            },
+        )
+        .await
+        .unwrap()
+    }
+    // 50 старых тревог — копии у бывшего оператора; потом одна — у владельца.
+    for n in 0..50 {
+        let id = raise(&mut conn, &format!("old:{n}")).await;
+        storage::alerts::save_copy(&mut conn, id, OPERATOR, 100 + n)
+            .await
+            .unwrap();
+        storage::alerts::mark_delivered(&mut conn, id, Some(100 + n))
+            .await
+            .unwrap();
+    }
+    let owner_alert = raise(&mut conn, "fresh").await;
+    storage::alerts::save_copy(&mut conn, owner_alert, OWNER, 7)
+        .await
+        .unwrap();
+    storage::alerts::mark_delivered(&mut conn, owner_alert, Some(7))
+        .await
+        .unwrap();
+    for n in 0..50 {
+        storage::alerts::resolve(&mut conn, &format!("old:{n}"))
+            .await
+            .unwrap();
+    }
+    storage::alerts::resolve(&mut conn, "fresh").await.unwrap();
+    drop(conn);
+    o.tg.lock().blocked.insert(OPERATOR);
+
+    let mark = o.tg.mark();
+    o.bot.deliver_alerts().await.unwrap();
+    o.bot.deliver_alerts().await.unwrap();
+    let owner_closed = o.tg.calls().into_iter().skip(mark).any(|c| {
+        c.method == "editMessageText"
+            && c.chat() == Some(OWNER)
+            && c.body["message_id"].as_i64() == Some(7)
+    });
+    assert!(owner_closed, "копия владельца стала «Решено»");
+    let tries = o.tg.lock().refused.len();
+    assert_eq!(
+        tries, 50,
+        "каждая копия в заблокированном чате — одна попытка"
+    );
 }
 
 /// Б-19.3 (проверка 19.11): «Принял» («Это я») и показ тревоги по номеру — только тем, кому она

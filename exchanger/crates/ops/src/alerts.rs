@@ -565,6 +565,11 @@ impl Inner {
             match self.api.edit_message_text(&request).await {
                 Ok(_) => {}
                 Err(e) if e.is_not_modified() || e.is_message_gone() => {}
+                // П-19.3: Telegram отказал насовсем (сотрудник заблокировал бота — 403, чата нет) —
+                // повтор не поможет, а копия держала бы очередь «Решено» для всех.
+                Err(e) if e.is_rejection() => {
+                    tracing::info!(chat, error = %e, "resolved alert copy cannot be updated, closed");
+                }
                 Err(e) => {
                     tracing::info!(chat, error = %e, "resolved alert copy not updated");
                     continue;
