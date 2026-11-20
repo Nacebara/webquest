@@ -79,6 +79,9 @@ pub(crate) enum Action {
     },
     DirClearAuto {
         direction: Direction,
+        /// Только пауза «незнакомый ответ» кошелька приёма (кнопка тревоги, Д-19.9); `false` —
+        /// все причины (кнопка в карточке направления).
+        only_unknown: bool,
     },
     PromoSettings {
         before: PromoSettings,
@@ -1201,7 +1204,7 @@ impl Inner {
                     ("notes", &""),
                 ],
             ),
-            Action::DirClearAuto { direction } => t.f(
+            Action::DirClearAuto { direction, .. } => t.f(
                 "dir.preview",
                 &[
                     ("name", &self.dir_name(*direction)),
@@ -1964,8 +1967,20 @@ impl Inner {
                     Cb::Dir(*direction),
                 )
             }
-            Action::DirClearAuto { direction } => {
-                storage::directions::clear_auto_pause(&mut tx, *direction, staff_id).await?;
+            Action::DirClearAuto {
+                direction,
+                only_unknown,
+            } => {
+                if *only_unknown {
+                    storage::directions::clear_auto_pause_reason(
+                        &mut tx,
+                        direction.source(),
+                        engine::UNKNOWN_REPLY_PAUSE,
+                    )
+                    .await?;
+                } else {
+                    storage::directions::clear_auto_pause(&mut tx, *direction, staff_id).await?;
+                }
                 (
                     "direction.clear_auto_pause",
                     "direction",

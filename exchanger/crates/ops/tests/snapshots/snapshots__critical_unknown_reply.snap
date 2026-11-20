@@ -9,5 +9,5 @@ expression: dump(&text)
 <blockquote>Чек CQ12…9F временно недоступен, попробуйте позже</blockquote>xRocket → CryptoBot на автопаузе · заявка <code>7F3A1C9D2B</code> в разборе
 --- keyboard
 [{"text":"📤 Сохранить фикстуру","callback_data":"a:fx:9"}]
-[{"text":"▶️ Снять паузу","callback_data":"a:da:xc"},{"text":"🔖 Заявка","callback_data":"a:o:41"}]
+[{"text":"▶️ Снять паузу","callback_data":"a:du:xc"},{"text":"🔖 Заявка","callback_data":"a:o:41"}]
 [{"text":"👍 Принял","callback_data":"a:ack:9"}]

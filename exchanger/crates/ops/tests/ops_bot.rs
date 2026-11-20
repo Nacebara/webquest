@@ -1556,6 +1556,9 @@ async fn copies_in_a_chat_that_blocked_the_bot_do_not_hold_the_resolved_queue(po
     storage::alerts::mark_delivered(&mut conn, owner_alert, Some(7))
         .await
         .unwrap();
+    // Бывший оператор заблокировал бота раньше, чем тревоги решились: фоновый круг тревог не
+    // должен успеть поправить его копии.
+    o.tg.lock().blocked.insert(OPERATOR);
     for n in 0..50 {
         storage::alerts::resolve(&mut conn, &format!("old:{n}"))
             .await
@@ -1563,7 +1566,6 @@ async fn copies_in_a_chat_that_blocked_the_bot_do_not_hold_the_resolved_queue(po
     }
     storage::alerts::resolve(&mut conn, "fresh").await.unwrap();
     drop(conn);
-    o.tg.lock().blocked.insert(OPERATOR);
 
     let mark = o.tg.mark();
     o.bot.deliver_alerts().await.unwrap();
@@ -1579,6 +1581,69 @@ async fn copies_in_a_chat_that_blocked_the_bot_do_not_hold_the_resolved_queue(po
         tries, 50,
         "каждая копия в заблокированном чате — одна попытка"
     );
+}
+
+/// Д-19.9 в пульте: «Снять паузу» в тревоге «Незнакомый ответ» снимает только эту причину. У
+/// направления xR → CB может стоять и пауза по недостаче в CryptoBot — она остаётся, выплаты из
+/// кошелька, где не хватает денег, не идут. Раньше кнопка снимала паузу целиком.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn unpausing_from_an_unknown_reply_keeps_a_shortfall_pause(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    let short = "сверка: в кошельке 988 USDT, ожидалось 1000 — не хватает 12";
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        storage::directions::auto_pause_platform(
+            &mut conn,
+            XR,
+            storage::directions::Side::Source,
+            engine::UNKNOWN_REPLY_PAUSE,
+        )
+        .await
+        .unwrap();
+        storage::directions::auto_pause_platform(
+            &mut conn,
+            CB,
+            storage::directions::Side::Target,
+            short,
+        )
+        .await
+        .unwrap();
+        storage::alerts::raise(
+            &mut conn,
+            &storage::alerts::NewAlert {
+                level: storage::alerts::Level::Critical,
+                topic: storage::alerts::Topic::Errors,
+                dedup_key: "unknown_reply:xrocket:1",
+                title: "unknown_reply",
+                payload: json!({"platform": "xrocket", "text": "Чек временно недоступен",
+                    "public": "7F3A1C9D2B", "direction": "xr_to_cb_check",
+                    "at": "2026-11-20T11:02:00+00:00"}),
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let mark = o.tg.mark();
+    o.bot.deliver_alerts().await.unwrap();
+    let alert = o.tg.screen(mark, OWNER, "Незнакомый ответ").await;
+    let preview = o
+        .press(OWNER, &alert, "Снять паузу", "проверьте изменение")
+        .await;
+    o.press(OWNER, &preview, "Подтвердить", "xRocket").await;
+    let mut conn = o.pool.acquire().await.unwrap();
+    for d in [Direction::XrToCbCheck, Direction::PayCbInvoice] {
+        let row = storage::directions::get(&mut conn, d).await.unwrap();
+        assert!(row.auto_paused, "{d:?}: недостача CryptoBot держит паузу");
+        assert_eq!(row.pause_reason.as_deref(), Some(short), "{d:?}");
+    }
+    let unknown: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM direction_pauses WHERE reason = $1")
+            .bind(engine::UNKNOWN_REPLY_PAUSE)
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+    assert_eq!(unknown, 0, "пауза «незнакомый ответ» снята");
 }
 
 /// Б-19.3 (проверка 19.11): «Принял» («Это я») и показ тревоги по номеру — только тем, кому она

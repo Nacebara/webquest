@@ -1002,7 +1002,9 @@ pub fn critical_screen(
             .row(vec![btn(t.t("alert.b_fixture"), &Cb::Fixture(id))]);
             let mut second = Vec::new();
             if let Some(d) = direction {
-                second.push(btn(t.t("alert.b_unpause"), &Cb::DirClearAuto(d)));
+                // Снимает только паузу «незнакомый ответ» — недостача или другая причина у того же
+                // направления остаётся (Д-19.9).
+                second.push(btn(t.t("alert.b_unpause"), &Cb::DirClearUnknown(d)));
             }
             if let Some(order) = p["order"].as_i64() {
                 second.push(btn(t.t("alert.b_order"), &Cb::Order(order)));

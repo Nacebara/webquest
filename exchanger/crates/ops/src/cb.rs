@@ -183,6 +183,8 @@ pub enum Cb {
     DirMode(Direction),
     DirOpen(Direction),
     DirClearAuto(Direction),
+    /// «Снять паузу» в тревоге «Незнакомый ответ»: только эта причина паузы (Д-19.9).
+    DirClearUnknown(Direction),
     Promo,
     PromoMode(PromoMode),
     PromoRate,
@@ -364,6 +366,7 @@ impl Cb {
             Cb::DirMode(d) => format!("dm:{}", dir_code(*d)),
             Cb::DirOpen(d) => format!("do:{}", dir_code(*d)),
             Cb::DirClearAuto(d) => format!("da:{}", dir_code(*d)),
+            Cb::DirClearUnknown(d) => format!("du:{}", dir_code(*d)),
             Cb::Promo => "pr".into(),
             Cb::PromoMode(m) => format!("pm:{}", mode_code(*m)),
             Cb::PromoRate => "prr".into(),
@@ -468,6 +471,7 @@ impl Cb {
             ["dm", _] => Cb::DirMode(dir(1)?),
             ["do", _] => Cb::DirOpen(dir(1)?),
             ["da", _] => Cb::DirClearAuto(dir(1)?),
+            ["du", _] => Cb::DirClearUnknown(dir(1)?),
             ["pr"] => Cb::Promo,
             ["pm", m] => Cb::PromoMode(
                 [PromoMode::Off, PromoMode::Hint, PromoMode::Auto]
@@ -636,6 +640,7 @@ mod tests {
                 Cb::DirMode(d),
                 Cb::DirOpen(d),
                 Cb::DirClearAuto(d),
+                Cb::DirClearUnknown(d),
                 Cb::PromoSwitch(d, true),
                 Cb::PromoSwitch(d, false),
                 Cb::UserDir(big, d),

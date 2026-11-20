@@ -1835,7 +1835,14 @@ impl Inner {
                     open: !row.is_open,
                 }
             }
-            Cb::DirClearAuto(d) => Action::DirClearAuto { direction: d },
+            Cb::DirClearAuto(d) => Action::DirClearAuto {
+                direction: d,
+                only_unknown: false,
+            },
+            Cb::DirClearUnknown(d) => Action::DirClearAuto {
+                direction: d,
+                only_unknown: true,
+            },
             Cb::PromoMode(mode) => {
                 let before = engine::fees::promo_settings(&mut conn).await?;
                 let after = engine::fees::PromoSettings { mode, ..before };
