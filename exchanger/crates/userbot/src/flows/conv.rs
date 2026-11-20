@@ -192,6 +192,12 @@ impl<'a, T: Transport> Conv<'a, T> {
     }
 
     /// Дождаться права на действие; на паузе FLOOD_WAIT — ошибка «не выполнялось».
+    /// Право на просмотр чужого счёта в этой минуте (З-19.1, [`super::gate::GateState::take_view`]).
+    pub fn take_view(&mut self) -> bool {
+        let cfg = self.w.cfg.clone();
+        self.gate.take_view(&cfg)
+    }
+
     pub async fn pace(&mut self, kind: Pace) -> Result<(), BotError> {
         let cfg = self.w.cfg.clone();
         self.gate

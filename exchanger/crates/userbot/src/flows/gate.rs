@@ -46,6 +46,8 @@ pub(crate) struct GateState {
     /// последняя денежная команда без ответа в истории чата признаётся при первой же проверке
     /// чата. Новая команда до этой проверки уйти не может: каждая отправка начинается с неё.
     release: HashSet<Chat>,
+    /// Просмотры чужих счетов за последние 60 с (З-19.1).
+    views: VecDeque<Instant>,
 }
 
 impl AccountGate {
@@ -144,6 +146,28 @@ impl GateState {
         }
     }
 
+    /// Право на просмотр чужого счёта (З-19.1): не больше 3/8 минутного бюджета обращений к ботам
+    /// (из 8 — 3), минимум один. Нет права — `false` сразу, без ожидания: ворота держат замок, и
+    /// ждать здесь значило бы задержать выплаты. Ссылки на счета бесплатны — иначе ими можно было
+    /// бы занять весь бюджет аккаунта.
+    pub(crate) fn take_view(&mut self, cfg: &FlowConfig) -> bool {
+        let now = Instant::now();
+        while self
+            .views
+            .front()
+            .is_some_and(|t| now.duration_since(*t) >= WINDOW)
+        {
+            self.views.pop_front();
+        }
+        let limit = usize::try_from((cfg.bot_actions_per_minute.saturating_mul(3) / 8).max(1))
+            .unwrap_or(usize::MAX);
+        if self.views.len() >= limit {
+            return false;
+        }
+        self.views.push_back(now);
+        true
+    }
+
     pub(crate) fn quarantine_until(&self, chat: Chat) -> Option<Instant> {
         self.quarantine
             .get(&chat)
@@ -219,6 +243,34 @@ mod tests {
         // Своё сообщение бюджет ботов не тратит, но интервал соблюдает.
         st.pace(&cfg(), Pace::Own).await.unwrap();
         assert_eq!(start.elapsed(), Duration::from_millis(61_500));
+    }
+
+    /// З-19.1: просмотры чужих счетов — не больше 3/8 минутного бюджета обращений к ботам, без
+    /// ожидания под замком: остальное всегда остаётся выплатам и активациям.
+    #[tokio::test(start_paused = true)]
+    async fn invoice_views_take_at_most_three_eighths_of_the_minute() {
+        let cfg = FlowConfig {
+            bot_actions_per_minute: 8,
+            ..FlowConfig::default()
+        };
+        let gate = AccountGate::new("ub");
+        let mut st = gate.lock().await;
+        for _ in 0..3 {
+            assert!(st.take_view(&cfg));
+        }
+        assert!(
+            !st.take_view(&cfg),
+            "четвёртый просмотр в ту же минуту — нет"
+        );
+        tokio::time::advance(Duration::from_secs(60)).await;
+        assert!(st.take_view(&cfg), "через минуту — снова можно");
+        let one = FlowConfig {
+            bot_actions_per_minute: 1,
+            ..FlowConfig::default()
+        };
+        let gate = AccountGate::new("ub-2");
+        let mut st = gate.lock().await;
+        assert!(st.take_view(&one), "хотя бы один просмотр в минуту");
     }
 
     #[tokio::test(start_paused = true)]

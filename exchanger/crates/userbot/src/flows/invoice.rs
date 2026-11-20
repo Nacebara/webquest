@@ -59,9 +59,17 @@ async fn open_card<T: Transport>(
     conv: &mut Conv<'_, T>,
     param: &str,
     random_id: i64,
+    view: bool,
 ) -> Result<Opened, BotError> {
     let platform = conv.platform();
     let chat = Chat::WalletBot(platform);
+    // Только просмотр (клиент прислал ссылку) — в своей доле минутного бюджета (З-19.1); оплата
+    // уже принятой заявки — нет.
+    if view && !conv.take_view() {
+        return Err(BotError::Unavailable(
+            "invoice views of this minute are used up".to_owned(),
+        ));
+    }
     conv.wait_quarantine(chat).await;
     let mark = conv.mark().await;
     let sent = match conv
@@ -108,7 +116,7 @@ pub(crate) async fn inspect<T: Transport>(
     param: &str,
 ) -> Result<InvoiceInfo, BotError> {
     let mut conv = Conv::open(w, None).await;
-    let opened = open_card(&mut conv, param, rid::new_random_id()).await?;
+    let opened = open_card(&mut conv, param, rid::new_random_id(), true).await?;
     Ok(InvoiceInfo {
         param: param.to_owned(),
         card: screens::read_invoice_card(
@@ -227,6 +235,7 @@ pub(crate) async fn pay<T: Transport>(
         &mut conv,
         param,
         rid::derive(tag.random_id, rid::INVOICE_OPEN),
+        false,
     )
     .await?;
     // Эту оплату уже начинал прошлый вызов: «Оплатить» могли нажать. Второго нажатия нет.

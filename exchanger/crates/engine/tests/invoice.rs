@@ -87,6 +87,58 @@ async fn expire_quote(e: &Env, order: i64) {
         .unwrap();
 }
 
+/// З-19.1 (проверка 19.11): ссылки на чужие счета бесплатны — их просмотры занимают не больше
+/// 3/8 минутного бюджета обращений аккаунта к ботам. Сверх — «кошелёк не показал его, попробуйте
+/// через минуту», а обмен чека в ту же минуту проходит. Раньше пачка ссылок забирала весь бюджет,
+/// и выплаты ждали своей минуты.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn invoice_views_leave_the_wallet_budget_to_payouts(pool: PgPool) {
+    let e = common::env_with(
+        pool,
+        userbot::FlowConfig {
+            bot_actions_per_minute: 16,
+            ..common::fast()
+        },
+    )
+    .await;
+    open_invoices(&e).await;
+    let mut answers = Vec::new();
+    for n in 0..7 {
+        let user = 1_000 + n;
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::users::upsert(&mut conn, user, &storage::users::Profile::default())
+            .await
+            .unwrap();
+        drop(conn);
+        let inv = shop_invoice(&e, InvoiceSpec::crypto(CB, usdt(dec!(10))));
+        let link = parsers::links::parse_url(&inv.url).unwrap();
+        answers.push(e.engine.submit_invoice(user, &link).await.unwrap());
+    }
+    let quoted = answers
+        .iter()
+        .filter(|a| matches!(a, InvoiceSubmitted::Quoted(_)))
+        .count();
+    assert_eq!(
+        quoted, 6,
+        "16 обращений в минуту — 6 просмотров: {answers:?}"
+    );
+    assert!(
+        matches!(
+            answers.last(),
+            Some(InvoiceSubmitted::Rejected(InvoiceReject::WalletUnavailable))
+        ),
+        "{answers:?}"
+    );
+    // Выплата в ту же минуту — своим бюджетом.
+    let url = e.world.client_check(XR, usdt(dec!(20))).unwrap();
+    let order = match e.submit(&url).await {
+        Submitted::Accepted(o) => o,
+        other => panic!("{other:?}"),
+    };
+    e.drain().await;
+    assert_eq!(e.order(order.id).await.0.state, OrderState::Completed);
+}
+
 /// Д-19.4 (проверка 19.11): аккаунт кошелька на паузе — счёт не берём, как при закрытом
 /// направлении; «Курс» показывает ту же паузу.
 #[sqlx::test(migrator = "storage::MIGRATOR")]
