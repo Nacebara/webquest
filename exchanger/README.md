@@ -35,9 +35,11 @@ target/release/exch            # Windows: дважды щёлкните target\r
 |---|---|
 | Запустить | `target/release/exch` (двойной щелчок по `exch.exe`) — работает, пока открыто окно |
 | Остановить | Ctrl+C; начатые заявки бот доведёт при следующем запуске |
+| На сервере | службой Windows: `exch service install` (из PowerShell от администратора), затем `exch service start` / `stop` / `status` — [`docs/DEPLOY.md`](docs/DEPLOY.md) |
 | Проверить всё | `exch check` — ✅ готово, ⚠️ стоит поправить, ❌ не заработает |
 | Поменять настройку | `exch setup` (можно повторять) или Блокнотом `.env` / `config.toml`, затем перезапуск |
-| Обновить | новые файлы проекта → `cargo build --release` → перезапуск (новые таблицы применятся сами) |
+| Обновить | по [`docs/RUNBOOK.md`](docs/RUNBOOK.md), «Обновление exch и откат»: «Обслуживание» в пульте → `exch backup` → прежний `exch.exe` переименовать в `exch.prev.exe`, новый — на его место → запуск → `exch check` → «Самопроверка» → «Обслуживание» выкл |
+| Что-то случилось | [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — «что делать, если…»: разбор заявки, недостача, вход сброшен, стоп-кран и др. |
 
 ## Настройки
 
@@ -53,20 +55,37 @@ target/release/exch            # Windows: дважды щёлкните target\r
 
 ## Команды
 
-`exch` без команды — запуск (первый раз — мастер). Остальное: `exch setup`, `exch check`,
-`exch migrate`, `exch login`, `exch selftest`, `exch emoji …`, `exch record`, `exch listen` —
-подробности в `exch --help`.
+`exch` без команды — запуск (первый раз — мастер). Остальное — подробности в `exch --help`:
+
+| Команда | Что делает |
+|---|---|
+| `exch setup` | Мастер настройки; можно повторять (войти заново, перенести кошелёк) |
+| `exch check` | Проверить всё: ✅ / ⚠️ / ❌ |
+| `exch demo` | Бот и пульт на симуляторе кошельков, без денег, на отдельной базе |
+| `exch backup` / `exch backup --check` | Копия базы сейчас / проверить последнюю копию |
+| `exch restore <файл>` | Восстановить базу из копии (только в пустую базу) |
+| `exch service install / start / stop / status / uninstall` | Служба Windows |
+| `exch login` | Войти аккаунтом юзербота и привязать кошелёк |
+| `exch selftest` | Чек туда и обратно на каждом кошельке (при остановленном exch; в пульте — «Самопроверка») |
+| `exch migrate` | Применить изменения базы и выйти |
+| `exch emoji …`, `exch avatar <файл>` | Премиум-эмодзи и живая аватарка бота |
+| `exch record`, `exch listen` | Запись ответов ботов кошельков для разработчика |
 
 ## Документы
 
 | Файл | Что внутри |
 |---|---|
+| [`docs/NEXT.md`](docs/NEXT.md) | Где мы и что дальше — начинать отсюда |
+| [`docs/PLAN-v2.md`](docs/PLAN-v2.md) | План до запуска |
+| [`docs/launch-checklist.json`](docs/launch-checklist.json) | Критерии запуска и доказательства |
+| [`docs/RUNBOOK.md`](docs/RUNBOOK.md) | Что делать, если… (для владельца и персонала) |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Сервер Windows, служба, резервные копии |
 | [`docs/LAPTOP.md`](docs/LAPTOP.md) | Запуск на ноутбуке на одной странице и частые проблемы |
-| [`docs/PLAN-v1.md`](docs/PLAN-v1.md) | Текущий план по утверждённым макетам и приёмка экранов |
+| [`docs/PLAN-v1.md`](docs/PLAN-v1.md) | План по утверждённым макетам и приёмка экранов |
 | [`docs/mockups/template.html`](docs/mockups/template.html) | Утверждённые макеты интерфейса |
-| [`docs/HANDOVER.md`](docs/HANDOVER.md) | Состояние проекта и порядок работ |
 | [`docs/DESIGN-v0.2.md`](docs/DESIGN-v0.2.md) | Решения владельца (только юзербот, основной поток CryptoBot → xRocket) |
-| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Сервер, бэкапы |
+| [`docs/audit-prr/FINDINGS.md`](docs/audit-prr/FINDINGS.md) | Находки проверки 19.11 и их исправления |
+| [`docs/HANDOVER.md`](docs/HANDOVER.md) | Архив: состояние на 10 октября 2026 |
 | [`SPEC.md`](SPEC.md) | Спецификация v0.2 |
 | [`CLAUDE.md`](CLAUDE.md) | Правила разработки |
 | [`docs/PROGRESS.md`](docs/PROGRESS.md) | Что сделано, что дальше, известные проблемы |
