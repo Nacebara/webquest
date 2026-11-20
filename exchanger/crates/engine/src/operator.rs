@@ -649,11 +649,19 @@ impl Engine {
                 )
                 .await?;
                 let url = check.as_ref().map(|_| evidence);
+                // Счёт оплачен: переплата клиента — как после автоматической оплаты (Д-19.3):
+                // чек на излишек или остаток в доходе ниже `min_refund_amount`.
+                let refund_amount = if flow == Flow::InvoicePayment {
+                    self.excess_refund_amount(&mut tx, &order).await?
+                } else {
+                    None
+                };
                 let patch = OrderPatch {
                     payout_check_url: url.filter(|_| flow == Flow::CheckExchange),
+                    refund_amount,
                     ..OrderPatch::default()
                 };
-                transit(
+                let (closed, _) = transit(
                     &mut tx,
                     &order,
                     Event::Operator(OperatorAction::CloseAsPaid),
@@ -664,8 +672,11 @@ impl Engine {
                         ..ctx
                     },
                 )
-                .await?
-                .0
+                .await?;
+                if flow == Flow::InvoicePayment {
+                    self.settle_excess(&mut tx, &closed, op.id).await?;
+                }
+                closed
             }
             OperatorDecision::CloseWithoutPayout => {
                 if let Some(op) = settled_by(&ops) {

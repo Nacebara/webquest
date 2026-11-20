@@ -765,3 +765,73 @@ async fn dollar_invoice_pay_press_timeout_pays_once(pool: PgPool) {
     assert_eq!(e.world.invoice(&inv.code).unwrap().payments.len(), 1);
     e.assert_books_match().await;
 }
+
+/// Д-19.3 (проверка 19.11): счёт закрыт вручную «Выплачено» — переплата клиента возвращается
+/// так же, как после автоматической оплаты, а не остаётся молча в долге клиенту.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn overpayment_comes_back_after_a_manual_close(pool: PgPool) {
+    let e = setup(pool).await;
+    let inv = shop_invoice(&e, InvoiceSpec::crypto(XR, usdt(dec!(10))));
+    let order = quoted(&e, &inv).await;
+    pay_in(&e, &order, CB, dec!(15)).await;
+    // «Оплатить» срабатывает, но бот молчит — заявка у человека.
+    e.world
+        .inject(e.ub, Call::Press, Fault::DelayReply(Duration::ZERO), 1);
+    e.world.inject(e.ub, Call::Press, Fault::NoReply, 1);
+    e.drain().await;
+    assert_eq!(e.order(order.id).await.0.state, OrderState::ManualReview);
+    assert_eq!(e.world.invoice(&inv.code).unwrap().payments.len(), 1);
+
+    let admin = {
+        let mut conn = e.pool.acquire().await.unwrap();
+        let owner = storage::staff::ensure_owner(&mut conn, 1, "Владелец")
+            .await
+            .unwrap();
+        storage::staff::add(
+            &mut conn,
+            20,
+            storage::staff::Role::Admin,
+            "Админ",
+            owner.tg_user_id,
+        )
+        .await
+        .unwrap();
+        storage::staff::get(&mut conn, 20).await.unwrap().unwrap()
+    };
+    let closed = e
+        .engine
+        .operator_decide(engine::OperatorRequest {
+            order_id: order.id,
+            decision: engine::OperatorDecision::CloseAsPaid {
+                evidence: "счёт оплачен — видно в истории xRocket".into(),
+            },
+            staff: &admin,
+            reason: "проверил кошелёк",
+            double_confirmed: true,
+        })
+        .await
+        .unwrap();
+    assert_eq!(closed.state, OrderState::Completed);
+    e.drain().await;
+
+    let (o, d) = e.order(order.id).await;
+    assert_eq!(o.state, OrderState::Completed);
+    assert_eq!(
+        d.refund_amount,
+        Some(dec!(4.80)),
+        "переплата вернётся чеком"
+    );
+    let url = d.payout_check_url.expect("чек на переплату");
+    assert!(url.starts_with("https://t.me/send?start="), "{url}");
+    let excess: Vec<_> = e
+        .ops(order.id)
+        .await
+        .into_iter()
+        .filter(|op| op.kind == OpKind::CreateExcessCheck)
+        .collect();
+    assert_eq!(excess.len(), 1);
+    assert_eq!(excess[0].status, OpStatus::Succeeded);
+    assert_eq!(e.ledger("liability:payable:USDT").await, dec!(0));
+    assert_eq!(e.world.invoice(&inv.code).unwrap().payments.len(), 1);
+    e.assert_books_match().await;
+}
