@@ -156,6 +156,7 @@ impl Inner {
         let mut conn = self.pool.acquire().await?;
         crate::terms::load(
             &mut conn,
+            self.engine.config(),
             self.cfg.reserve_safety,
             self.cfg.bind_username.as_deref(),
             Some(user),
@@ -183,6 +184,7 @@ impl Inner {
             let mut conn = self.pool.acquire().await?;
             crate::terms::load(
                 &mut conn,
+                self.engine.config(),
                 self.cfg.reserve_safety,
                 self.cfg.bind_username.as_deref(),
                 None,

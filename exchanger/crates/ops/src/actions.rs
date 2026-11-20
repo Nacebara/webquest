@@ -39,6 +39,8 @@ pub(crate) enum Input {
     PromoRate,
     PromoThresholds,
     Target(Platform),
+    /// Лимит без код-пароля CryptoBot, $ (Д-19.10).
+    PasscodeLimit,
     DecisionAmount {
         order: i64,
     },
@@ -100,6 +102,11 @@ pub(crate) enum Action {
     Target {
         platform: Platform,
         target: Decimal,
+    },
+    /// Лимит без код-пароля CryptoBot: было → стало (Д-19.10).
+    PasscodeLimit {
+        before: Option<Decimal>,
+        after: Decimal,
     },
     Decide {
         order: i64,
@@ -285,6 +292,7 @@ impl Action {
             | Action::Capital { .. }
             | Action::WriteOff { .. }
             | Action::PromoBroadcast { .. }
+            | Action::PasscodeLimit { .. }
             | Action::Selftest { .. } => Role::Owner,
             Action::Invest(op) => op.min_role(),
             _ => Role::Admin,
@@ -816,6 +824,20 @@ impl Inner {
                 }
                 Action::PromoSettings { before, after }
             }
+            Input::PasscodeLimit => {
+                let cleaned: String = text
+                    .chars()
+                    .filter(|c| !c.is_whitespace() && *c != '$')
+                    .collect();
+                let Some(after) = num(&cleaned).filter(|v| *v > Decimal::ZERO) else {
+                    return Ok(self.retry(staff, input, "reserves.hint_passcode"));
+                };
+                let before = {
+                    let mut conn = self.pool.acquire().await?;
+                    engine::passcode_free_limit(&mut conn, self.engine.config()).await?
+                };
+                Action::PasscodeLimit { before, after }
+            }
             Input::Target(platform) => {
                 let Some(target) = num(&text).filter(|v| *v > Decimal::ZERO) else {
                     return Ok(self.retry(staff, input, "promo.hint_target"));
@@ -1098,6 +1120,8 @@ impl Inner {
         let mut unknown_label: Option<String> = None;
         // Подпись кнопки «Подтвердить» по действию («Повторить выплату 97.50»).
         let mut confirm_label: Option<String> = None;
+        // Синяя кнопка — главное действие экрана (макет «Изменить значение»: «Сохранить»).
+        let mut confirm_primary = false;
         let text = match &action {
             Action::Direction { before, after } => {
                 let mut changes = Vec::new();
@@ -1304,6 +1328,11 @@ impl Inner {
                 } else {
                     t.f("promo.switch_off", &[("name", &self.dir_name(*direction))])
                 }
+            }
+            Action::PasscodeLimit { before, after } => {
+                confirm_label = Some(t.t("reserves.b_save"));
+                confirm_primary = true;
+                crate::reserves::passcode_preview(t, *before, *after)
             }
             Action::Target { platform, target } => t.f(
                 "promo.preview",
@@ -1827,6 +1856,8 @@ impl Inner {
             };
             let confirm = if danger {
                 confirm.style(botapi::ButtonStyle::Danger)
+            } else if confirm_primary {
+                confirm.style(botapi::ButtonStyle::Primary)
             } else {
                 confirm
             };
@@ -2034,6 +2065,23 @@ impl Inner {
                     None,
                     Some(json!({ "on": on })),
                     Cb::Promo,
+                )
+            }
+            Action::PasscodeLimit { before, after } => {
+                storage::settings::set(
+                    &mut tx,
+                    engine::PASSCODE_FREE_LIMIT_KEY,
+                    &json!(after.to_string()),
+                    Some(staff_id),
+                )
+                .await?;
+                (
+                    "settings.passcode_free_limit",
+                    "setting",
+                    engine::PASSCODE_FREE_LIMIT_KEY.to_owned(),
+                    Some(json!({ "limit": before.map(|b| b.to_string()) })),
+                    Some(json!({ "limit": after.to_string() })),
+                    Cb::Reserves,
                 )
             }
             Action::Target { platform, target } => {
@@ -2442,6 +2490,7 @@ impl Inner {
             Cb::Bots => self.bots().await?,
             Cb::Staff => self.staff_list(staff).await?,
             Cb::Dash => self.dash().await?,
+            Cb::Reserves => self.reserves(staff).await?,
             _ => self.menu(staff).await?,
         };
         Ok(screen.notice(&t.t("common.saved")))

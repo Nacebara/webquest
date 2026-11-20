@@ -190,6 +190,8 @@ pub enum Cb {
     PromoRate,
     PromoThresholds,
     PromoTarget(Platform),
+    /// «Без код-пароля» в «Резервах»: изменить лимит (владелец, Д-19.10).
+    PasscodeLimit,
     PromoSwitch(Direction, bool),
     /// Выбор режима ребалансировки (выкл / подсказывать / авто).
     PromoModes,
@@ -372,6 +374,7 @@ impl Cb {
             Cb::PromoRate => "prr".into(),
             Cb::PromoThresholds => "prt".into(),
             Cb::PromoTarget(p) => format!("pt:{}", platform_code(*p)),
+            Cb::PasscodeLimit => "pl".into(),
             Cb::PromoSwitch(d, on) => format!("ps:{}:{}", dir_code(*d), bit(*on)),
             Cb::PromoModes => "prm".into(),
             Cb::PromoBroadcast(on) => format!("pb:{}", bit(*on)),
@@ -483,6 +486,7 @@ impl Cb {
             ["pb", _] => Cb::PromoBroadcast(on(1)?),
             ["prt"] => Cb::PromoThresholds,
             ["pt", p] => Cb::PromoTarget(platform_of(p)?),
+            ["pl"] => Cb::PasscodeLimit,
             ["ps", _, _] => Cb::PromoSwitch(dir(1)?, on(2)?),
             ["q"] => Cb::Queue,
             ["o", _] => Cb::Order(id(1)?),
@@ -615,6 +619,7 @@ mod tests {
             Cb::BotPause(i16::MAX, true),
             Cb::PromoTarget(Platform::CryptoBot),
             Cb::PromoTarget(Platform::XRocket),
+            Cb::PasscodeLimit,
             Cb::Investors,
             Cb::SupportReply(big),
             Cb::SupportReplyAgain(big),

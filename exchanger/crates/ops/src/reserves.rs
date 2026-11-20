@@ -48,6 +48,8 @@ pub struct ReservesData {
     pub mismatches: Vec<Mismatch>,
     /// Строки под сверкой: точка и текст (у порога, ниже критичного, баланс не читается).
     pub notes: Vec<(&'static str, String)>,
+    /// Лимит без код-пароля CryptoBot и сколько из него осталось на сутки (Д-19.10).
+    pub passcode: Option<(Decimal, Decimal)>,
 }
 
 fn name(p: Platform) -> &'static str {
@@ -68,7 +70,13 @@ pub(crate) fn short(d: Direction) -> &'static str {
 }
 
 impl ReservesData {
+    /// Карточка, как её видит владелец (с кнопкой «Без код-пароля»).
     pub fn screen(&self, t: &Texts) -> Screen {
+        self.screen_for(t, true)
+    }
+
+    /// Карточка; `owner` — показать кнопку «Без код-пароля» (менять лимит — владельцу, Д-19.10).
+    pub fn screen_for(&self, t: &Texts, owner: bool) -> Screen {
         let title = t.t("reserves.title");
         let mut rich = format!("<h3>{title}</h3><table striped compact><tr><th></th>");
         for w in &self.wallets {
@@ -78,7 +86,7 @@ impl ReservesData {
         let cell = |v: &dyn Fn(&WalletReserve) -> String| -> Vec<String> {
             self.wallets.iter().map(v).collect()
         };
-        let rows: Vec<(String, Vec<String>)> = vec![
+        let mut rows: Vec<(String, Vec<String>)> = vec![
             (t.t("reserves.r_ledger"), cell(&|w| amount(w.ledger))),
             (
                 t.t("reserves.r_actual"),
@@ -100,6 +108,23 @@ impl ReservesData {
                 }),
             ),
         ];
+        // Макет «Резервы» (картинка passcode-limit.png): «Без код-пароля · 30 000 · осталось 27 300»
+        // у CryptoBot, у xRocket лимита нет.
+        if let Some((limit, left)) = self.passcode {
+            rows.push((
+                t.t("reserves.r_passcode"),
+                cell(&|w| match w.platform {
+                    Platform::CryptoBot => t.f(
+                        "reserves.passcode_cell",
+                        &[
+                            ("limit", &ui::fmt::grouped(limit)),
+                            ("left", &ui::fmt::grouped(left)),
+                        ],
+                    ),
+                    Platform::XRocket => t.t("reserves.unknown"),
+                }),
+            ));
+        }
         let mut plain = format!("<b>{title}</b>\n");
         for w in &self.wallets {
             plain.push_str(&format!(
@@ -183,11 +208,16 @@ impl ReservesData {
                 None => b,
             }]);
         }
-        s.row(vec![btn(t.t("reserves.b_rebalance"), &Cb::Promo)])
+        s = s
+            .row(vec![btn(t.t("reserves.b_rebalance"), &Cb::Promo)])
             .row(vec![
                 btn(t.t("reserves.b_profit"), &Cb::Profit),
                 btn(t.t("reserves.b_thresholds"), &Cb::Thresholds),
-            ])
+            ]);
+        if owner && self.passcode.is_some() {
+            s = s.row(vec![btn(t.t("reserves.b_passcode"), &Cb::PasscodeLimit)]);
+        }
+        s
     }
 }
 
@@ -218,6 +248,7 @@ pub fn sample_reserves(t: &Texts) -> ReservesData {
         reconciled_at: Some(msk(14, 0)),
         next_at: Some(msk(14, 15)),
         mismatches: Vec::new(),
+        passcode: Some((Decimal::from(30_000), Decimal::from(27_300))),
         notes: vec![(
             "{e:dot_wait}",
             t.f(
@@ -230,6 +261,57 @@ pub fn sample_reserves(t: &Texts) -> ReservesData {
             ),
         )],
     }
+}
+
+/// «Резервы · лимит кончается» (картинка passcode-limit.png): лимит 500, осталось 25 — строка, что
+/// встало и до скольки.
+pub fn sample_reserves_passcode_low(t: &Texts) -> ReservesData {
+    let mut d = sample_reserves(t);
+    for w in &mut d.wallets {
+        w.in_flight = Decimal::ZERO;
+        w.held = Decimal::ZERO;
+    }
+    let left = Decimal::from(25);
+    d.passcode = Some((Decimal::from(500), left));
+    d.notes = vec![(
+        "{e:dot_wait}",
+        t.f("reserves.passcode_low", &[("left", &amount(left))]),
+    )];
+    d
+}
+
+/// Было → стало у лимита без код-пароля и сколько exch потратит за сутки (Д-19.10).
+pub fn passcode_preview(t: &Texts, before: Option<Decimal>, after: Decimal) -> String {
+    t.f(
+        "reserves.passcode_preview",
+        &[
+            (
+                "before",
+                &before.map_or_else(|| t.t("common.none"), ui::fmt::grouped),
+            ),
+            ("after", &ui::fmt::grouped(after)),
+            (
+                "cap",
+                &ui::fmt::grouped(domain::pricing::passcode_free_headroom(
+                    after,
+                    Decimal::ZERO,
+                )),
+            ),
+        ],
+    )
+}
+
+/// «Изменить значение» лимита на данных макета: 500 → 30 000, «Сохранить» и «Отмена» (образцы).
+pub fn sample_passcode_preview(t: &Texts) -> Screen {
+    Screen::new(passcode_preview(
+        t,
+        Some(Decimal::from(500)),
+        Decimal::from(30_000),
+    ))
+    .row(vec![
+        btn(t.t("reserves.b_save"), &Cb::Sample).style(botapi::ButtonStyle::Primary),
+        btn(t.t("common.cancel"), &Cb::Sample),
+    ])
 }
 
 impl Inner {
@@ -252,6 +334,7 @@ impl Inner {
         let mut out = Vec::new();
         let mut mismatches = Vec::new();
         let mut notes = Vec::new();
+        let mut passcode = None;
         for w in wallets.iter().filter(|w| w.is_active) {
             let Some(b) = balances
                 .iter()
@@ -302,6 +385,19 @@ impl Inner {
                         ],
                     ),
                 ));
+            }
+            // Лимит без код-пароля держит CryptoBot ниже резерва — что встало и до скольки (Д-19.10).
+            if w.platform == Platform::CryptoBot
+                && let Some((limit, left)) =
+                    engine::passcode_free(&mut conn, self.engine.config(), w.wallet_id).await?
+            {
+                passcode = Some((limit, left));
+                if left < b.available {
+                    notes.push((
+                        "{e:dot_wait}",
+                        t.f("reserves.passcode_low", &[("left", &amount(left))]),
+                    ));
+                }
             }
             // Порог: доступно меньше «мало» — что сделал рычаг комиссии.
             if let Some(th) = th {
@@ -362,21 +458,22 @@ impl Inner {
             next_at: reconciled_at.map(|at| at + every),
             mismatches,
             notes,
+            passcode,
         })
     }
 
-    /// «Резервы и сверка»; внизу — возврат в меню.
-    pub(crate) async fn reserves(&self) -> Result<Screen, OpsError> {
+    /// «Резервы и сверка» глазами сотрудника `staff`; внизу — возврат в меню.
+    pub(crate) async fn reserves(&self, staff: &StaffMember) -> Result<Screen, OpsError> {
         Ok(self
             .reserves_data()
             .await?
-            .screen(&self.texts)
+            .screen_for(&self.texts, staff.role == storage::staff::Role::Owner)
             .row(crate::nav::back(&self.texts, &Cb::Menu)))
     }
 
     /// «Сверить сейчас»: сверка и та же карточка со свежими цифрами; что не прочиталось —
     /// строкой над ней.
-    pub(crate) async fn reconcile_now(&self) -> Result<Screen, OpsError> {
+    pub(crate) async fn reconcile_now(&self, staff: &StaffMember) -> Result<Screen, OpsError> {
         let report = self.engine.reconcile_balances().await?;
         let t = &self.texts;
         let mut lines = Vec::new();
@@ -395,7 +492,7 @@ impl Inner {
                 _ => {}
             }
         }
-        let card = self.reserves().await?;
+        let card = self.reserves(staff).await?;
         let head = if report.is_empty() {
             t.t("reserves.no_wallets")
         } else if lines.is_empty() {
@@ -434,7 +531,7 @@ impl Inner {
             Some(a) => self
                 .render_alert(&a)
                 .row(crate::nav::back(&self.texts, &Cb::Reserves)),
-            None => self.reserves().await?,
+            None => self.reserves(staff).await?,
         })
     }
 
@@ -466,7 +563,7 @@ impl Inner {
                 ("account", &account),
             ],
         );
-        Ok(self.reserves().await?.notice(&head))
+        Ok(self.reserves(staff).await?.notice(&head))
     }
 
     /// «Пороги»: цель и порог «мало» по кошелькам, изменить цель.

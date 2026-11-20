@@ -347,6 +347,37 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
         &look.screen(&crate::sample_reserves(&texts).screen(&texts)),
     )
     .await;
+    // Д-19.10 (картинка passcode-limit.png принята 20.11): лимит кончается и его изменение.
+    let _ = api
+        .send_message(
+            &SendMessage::html(
+                chat,
+                "<b>Пульт · Резервы · лимит без код-пароля кончается</b> (данные макета)",
+            )
+            .silent(),
+        )
+        .await;
+    send_card(
+        api,
+        chat,
+        &look.screen(&crate::sample_reserves_passcode_low(&texts).screen(&texts)),
+    )
+    .await;
+    let _ = api
+        .send_message(
+            &SendMessage::html(
+                chat,
+                "<b>Пульт · Изменить значение · без код-пароля</b> (данные макета)",
+            )
+            .silent(),
+        )
+        .await;
+    send_card(
+        api,
+        chat,
+        &look.screen(&crate::sample_passcode_preview(&texts)),
+    )
+    .await;
     let _ = api
         .send_message(&SendMessage::html(chat, "<b>Пульт · Недостача</b> (данные макета)").silent())
         .await;

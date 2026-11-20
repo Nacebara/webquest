@@ -43,6 +43,7 @@ fn floor_cents(value: Decimal) -> Decimal {
 
 pub(crate) async fn load(
     conn: &mut PgConnection,
+    engine_cfg: &engine::EngineConfig,
     safety: Decimal,
     bind_username: Option<&str>,
     user: Option<i64>,
@@ -71,6 +72,15 @@ pub(crate) async fn load(
         let (lever, effective, free) = match wallet {
             Some((wallet, _)) => {
                 let available = storage::holds::available(&mut *conn, wallet, asset).await?;
+                // Потолок — как у движка при приёме: у CryptoBot ещё и остаток лимита без
+                // код-пароля (Д-19.10). Рычаг комиссии — по резерву леджера, как в движке.
+                let spendable =
+                    engine::spendable(&mut *conn, engine_cfg, direction.target(), wallet, asset)
+                        .await
+                        .map_err(|e| match e {
+                            engine::EngineError::Storage(s) => TgBotError::Storage(s),
+                            other => TgBotError::Engine(other),
+                        })?;
                 let target = storage::directions::reserve_target(&mut *conn, wallet, asset).await?;
                 let lever = target.map(|target| LeverInput {
                     k_pct: row.skew_k_pct,
@@ -85,8 +95,8 @@ pub(crate) async fn load(
                 };
                 (
                     lever,
-                    max_order_effective(limits, available, safety),
-                    available - safety,
+                    max_order_effective(limits, spendable, safety),
+                    spendable - safety,
                 )
             }
             None => (None, None, Decimal::ZERO),

@@ -56,7 +56,10 @@ pub use cb::Cb;
 pub use dash::{DashData, sample_dash};
 pub use look::Look;
 pub use nav::Links;
-pub use reserves::{ReservesData, sample_reserves};
+pub use reserves::{
+    ReservesData, passcode_preview, sample_passcode_preview, sample_reserves,
+    sample_reserves_passcode_low,
+};
 pub use review::{
     OrderView, QueueData, QueueRow, ReconcileHint, sample_now, sample_order, sample_queue,
 };

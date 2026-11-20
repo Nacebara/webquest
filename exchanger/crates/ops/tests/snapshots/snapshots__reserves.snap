@@ -36,6 +36,11 @@ expression: dump(&reserves)
 <td align="right">1 500 · 600</td>
 <td align="right">1 500 · 600</td>
 </tr>
+<tr>
+<td>Без код-пароля</td>
+<td align="right">30 000 · осталось 27 300</td>
+<td align="right">—</td>
+</tr>
 </table>
 <p>🟢 Сверка <tg-time unix="1793876400" format="t">14:00</tg-time> · расхождений нет · следующая <tg-time unix="1793877300" format="t">14:15</tg-time>
 </p>
@@ -47,16 +52,19 @@ expression: dump(&reserves)
 Реально: 2 140.00
 В полёте: 0.00
 Удержано: 300.00
-Цель · порог: 1 500 · 600</blockquote>
+Цель · порог: 1 500 · 600
+Без код-пароля: 30 000 · осталось 27 300</blockquote>
 <blockquote><b>xRocket</b>
 Леджер: 640.00
 Реально: 640.00
 В полёте: 97.50
 Удержано: 120.00
-Цель · порог: 1 500 · 600</blockquote>
+Цель · порог: 1 500 · 600
+Без код-пароля: —</blockquote>
 🟢 Сверка <tg-time unix="1793876400" format="t">14:00</tg-time> · расхождений нет · следующая <tg-time unix="1793877300" format="t">14:15</tg-time>
 🟠 xRocket у порога: комиссия CB → xR поднята до 2.5 %
 --- keyboard
 [{"text":"🔄 Сверить сейчас","style":"primary","callback_data":"a:rc"}]
 [{"text":"🔁 Ребалансировка","callback_data":"a:pr"}]
 [{"text":"🪙 Прибыль","callback_data":"a:pf"},{"text":"📏 Пороги","callback_data":"a:th"}]
+[{"text":"🔒 Без код-пароля","callback_data":"a:pl"}]

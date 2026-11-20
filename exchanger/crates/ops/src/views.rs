@@ -1582,9 +1582,9 @@ impl Inner {
                 if let Some(denied) = self.deny(staff, Role::Admin) {
                     return Ok(denied);
                 }
-                self.reconcile_now().await
+                self.reconcile_now(staff).await
             }
-            Cb::Reserves => self.reserves().await,
+            Cb::Reserves => self.reserves(staff).await,
             Cb::AlertShow(id) => self.alert_screen(staff, id).await,
             // «Нет, разбираться» на недостаче — админ и выше (шаг 3, таблица прав).
             Cb::Investigate(id) => match self.deny(staff, Role::Admin) {
@@ -1779,6 +1779,7 @@ impl Inner {
             | Cb::MemberRole(..)
             | Cb::MemberDisable(_)
             | Cb::Selftest
+            | Cb::PasscodeLimit
             | Cb::Capital(_) => Role::Owner,
             _ => Role::Admin,
         };
@@ -1863,6 +1864,13 @@ impl Inner {
                 );
                 let text = t.f("promo.ask_thresholds", &[("now", &now)]);
                 return Ok(self.prompt_with(staff, Input::PromoThresholds, text));
+            }
+            Cb::PasscodeLimit => {
+                let now = engine::passcode_free_limit(&mut conn, self.engine.config())
+                    .await?
+                    .map_or_else(|| t.t("common.none"), ui::fmt::grouped);
+                let text = t.f("reserves.ask_passcode", &[("now", &now)]);
+                return Ok(self.prompt_with(staff, Input::PasscodeLimit, text));
             }
             Cb::PromoTarget(p) => {
                 let now = match storage::wallets::active(&mut conn, p).await? {

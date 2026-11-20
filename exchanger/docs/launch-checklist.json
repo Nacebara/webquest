@@ -181,8 +181,8 @@
       "id": "cb-passcode-limit",
       "milestone": 4,
       "criterion": "Лимит без код-пароля CryptoBot: в exch то же значение, что в настройке CryptoBot (SPEC §15.1 п. 2); меняется в пульте, «Курс» и приём считают остаток лимита (Д-19.10)",
-      "status": "todo",
-      "evidence": "20.11: картинка «Лимит без код-пароля в пульте» (docs/mockups/widgets/passcode-limit.png) — на утверждении владельца. Сейчас exch считает лимит $500 в сутки; что поставить в CryptoBot — RUNBOOK, «Лимит без код-пароля CryptoBot»."
+      "status": "done",
+      "evidence": "20.11: картинка «Лимит без код-пароля в пульте» (docs/mockups/widgets/passcode-limit.png) — на утверждении владельца. Сейчас exch считает лимит $500 в сутки; что поставить в CryptoBot — RUNBOOK, «Лимит без код-пароля CryptoBot». 20.11, картинка принята владельцем: «Резервы» — строка и кнопка «Без код-пароля» (владелец), изменение с подтверждением и записью в журнал (settings.passcode_free_limit), строка «лимит кончается»; «Курс» клиента — тем же engine::spendable, что приём. Тесты: ops_bot::the_owner_sets_the_passcode_free_limit_in_reserves, client_bot::terms_show_the_passcode_free_limit_as_the_cryptobot_ceiling, снимки reserves, reserves_admin, reserves_passcode_low, passcode_change. Вживую не проверено."
     },
     {
       "id": "yu-1",

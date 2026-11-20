@@ -1892,6 +1892,43 @@ async fn a_late_result_comes_as_a_new_message(pool: PgPool) {
     );
 }
 
+/// Д-19.10 (проверка 19.11): «Курс и лимиты» считает потолок выплат из CryptoBot так же, как
+/// движок при приёме, — с лимитом без код-пароля. Раньше «Курс» обещал «до 300», а приём брал
+/// не больше остатка лимита, и чек сверх него возвращался.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn terms_show_the_passcode_free_limit_as_the_cryptobot_ceiling(pool: PgPool) {
+    let e = env(pool).await;
+    {
+        let mut conn = e.pool.acquire().await.unwrap();
+        storage::settings::set(&mut conn, "cb_passcode_free_limit_usd", &json!(200), None)
+            .await
+            .unwrap();
+    }
+    let bot = e.start_bot();
+    e.fake.client_writes("/terms");
+    let terms = e
+        .fake
+        .wait_for("terms", |c| c.method == "sendMessage" && c.contains("Курс"))
+        .await;
+    bot.stop().await;
+    let text = terms.body["text"].as_str().unwrap().to_owned();
+    let row = |name: &str| {
+        text.lines()
+            .find(|l| l.contains(name))
+            .unwrap_or_else(|| panic!("нет строки {name}: {text}"))
+            .to_owned()
+    };
+    assert!(
+        row("CryptoBot → xRocket").contains("300"),
+        "в xRocket лимита нет: {text}"
+    );
+    let to_cb = row("xRocket → CryptoBot");
+    assert!(
+        !to_cb.contains("300") && to_cb.contains("190"),
+        "выплата в CryptoBot — не больше 95 % лимита 200: {to_cb}"
+    );
+}
+
 /// Шаг 6.3 (К-4): нажатая «Поддержка» переживает перезапуск бота — состояние в базе. Раньше
 /// после перезапуска вопрос клиента получал подсказку «Пришлите чек…».
 #[sqlx::test(migrator = "storage::MIGRATOR")]

@@ -264,7 +264,7 @@ impl Engine {
 /// при выплате или оплате счёта бот не спросил код. Лимит — настройка
 /// `cb_passcode_free_limit_usd` (меняется из пульта), без неё — [`EngineConfig::cb_passcode_free_limit`].
 /// Вызывать после `holds::lock_wallet` в той же транзакции.
-pub(crate) async fn spendable(
+pub async fn spendable(
     conn: &mut sqlx::PgConnection,
     cfg: &crate::EngineConfig,
     platform: Platform,
@@ -275,19 +275,47 @@ pub(crate) async fn spendable(
     if platform != Platform::CryptoBot {
         return Ok(available);
     }
-    let limit = match setting_decimal(&mut *conn, "cb_passcode_free_limit_usd").await? {
-        Some(limit) => Some(limit),
-        None => cfg.cb_passcode_free_limit,
-    };
-    let Some(limit) = limit else {
+    let Some((limit, headroom)) = passcode_free(&mut *conn, cfg, wallet_account_id).await? else {
         return Ok(available);
     };
-    let committed = storage::holds::committed_spend_24h(&mut *conn, wallet_account_id).await?;
-    let headroom = domain::pricing::passcode_free_headroom(limit, committed);
     if headroom < available {
-        tracing::debug!(%limit, %committed, %headroom, "passcode-free limit caps the CryptoBot reserve");
+        tracing::debug!(%limit, %headroom, "passcode-free limit caps the CryptoBot reserve");
     }
     Ok(available.min(headroom))
+}
+
+/// Ключ настройки «лимит без код-пароля CryptoBot», $ в сутки (пульт → «Резервы», Д-19.10).
+pub const PASSCODE_FREE_LIMIT_KEY: &str = "cb_passcode_free_limit_usd";
+
+/// Лимит без код-пароля CryptoBot: настройка из пульта, без неё —
+/// [`EngineConfig::cb_passcode_free_limit`]. `None` — лимита нет.
+pub async fn passcode_free_limit(
+    conn: &mut sqlx::PgConnection,
+    cfg: &crate::EngineConfig,
+) -> Result<Option<domain::Decimal>, EngineError> {
+    Ok(
+        match setting_decimal(&mut *conn, PASSCODE_FREE_LIMIT_KEY).await? {
+            Some(limit) => Some(limit),
+            None => cfg.cb_passcode_free_limit,
+        },
+    )
+}
+
+/// Лимит без код-пароля и сколько из него exch ещё может потратить за сутки с кошелька CryptoBot
+/// (траты за 24 часа и удержания — уже в счёт; запас — [`domain::pricing::passcode_free_headroom`]).
+pub async fn passcode_free(
+    conn: &mut sqlx::PgConnection,
+    cfg: &crate::EngineConfig,
+    wallet_account_id: i16,
+) -> Result<Option<(domain::Decimal, domain::Decimal)>, EngineError> {
+    let Some(limit) = passcode_free_limit(&mut *conn, cfg).await? else {
+        return Ok(None);
+    };
+    let committed = storage::holds::committed_spend_24h(&mut *conn, wallet_account_id).await?;
+    Ok(Some((
+        limit,
+        domain::pricing::passcode_free_headroom(limit, committed),
+    )))
 }
 
 /// Суточный лимит клиента: личный (`users.daily_limit_usd`, пульт), иначе общий из

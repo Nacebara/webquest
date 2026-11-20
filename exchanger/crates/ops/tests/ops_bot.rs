@@ -1863,6 +1863,70 @@ async fn an_unexplained_shortage_is_written_off_as_a_loss(pool: PgPool) {
     assert_eq!(o.audit("capital.loss").await.len(), 1);
 }
 
+/// Д-19.10 (картинка `passcode-limit.png` принята владельцем 20.11): лимит без код-пароля
+/// CryptoBot — в «Резервах». Строка «Без код-пароля» — лимит и сколько осталось на сутки; лимит
+/// кончается — строкой ниже, что встало и до скольки; кнопка «Без код-пароля» — только владельцу:
+/// было → стало, «Сохранить», запись в журнал. Раньше лимит поставить было негде (всегда $500).
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn the_owner_sets_the_passcode_free_limit_in_reserves(pool: PgPool) {
+    let o = ops(pool).await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        storage::settings::set(&mut conn, "cb_passcode_free_limit_usd", &json!(500), None)
+            .await
+            .unwrap();
+    }
+    let admin_dash = o.say(ADMIN, "/dash", "Резервы").await;
+    let admin_reserves = o
+        .press(ADMIN, &admin_dash, "Резервы", "Без код-пароля")
+        .await;
+    assert!(
+        admin_reserves.button("Без код-пароля").is_none(),
+        "менять лимит — только владельцу: {:?}",
+        admin_reserves.buttons()
+    );
+    let dash = o.say(OWNER, "/dash", "Резервы").await;
+    let reserves = o.press(OWNER, &dash, "Резервы", "Без код-пароля").await;
+    let text = reserves.text();
+    assert!(text.contains("500 · осталось 475"), "{text}");
+    assert!(
+        text.contains("до лимита без код-пароля осталось 475.00"),
+        "лимит меньше резерва — строка, что встало: {text}"
+    );
+    let ask = o
+        .press(OWNER, &reserves, "Без код-пароля", "Лимит без код-пароля")
+        .await;
+    assert!(
+        ask.text().contains("Сейчас <code>500</code>"),
+        "{}",
+        ask.text()
+    );
+    let preview = o.say(OWNER, "30000", "за сутки exch потратит").await;
+    let p = preview.text();
+    assert!(
+        p.contains("<code>500</code> → <code>30\u{a0}000</code>") && p.contains("28\u{a0}500"),
+        "{p}"
+    );
+    assert!(p.contains("Поставьте то же число в CryptoBot"), "{p}");
+    let after = o
+        .press(OWNER, &preview, "Сохранить", "Без код-пароля")
+        .await;
+    assert!(
+        after.text().contains("30\u{a0}000 · осталось 28\u{a0}500"),
+        "{}",
+        after.text()
+    );
+    assert!(!after.text().contains("до лимита без код-пароля осталось"));
+    let mut conn = o.pool.acquire().await.unwrap();
+    let saved = storage::settings::get(&mut conn, "cb_passcode_free_limit_usd")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved, json!("30000"));
+    drop(conn);
+    assert_eq!(o.audit("settings.passcode_free_limit").await.len(), 1);
+}
+
 /// П-19.4 (проверка 19.11): «Сверить сейчас» идёт в фоне — пока кошельки отвечают на запрос
 /// баланса, клиенты получают ответы. Раньше сверка шла внутри опроса Telegram: следующую порцию
 /// обновлений бот забирал только после неё, и все клиенты ждали.

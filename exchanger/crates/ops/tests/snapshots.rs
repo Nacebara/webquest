@@ -57,6 +57,13 @@ fn reserves_and_shortfall() {
     let t = Texts::builtin().unwrap();
     let reserves = Look::plain().screen(&ops::sample_reserves(&t).screen(&t));
     insta::assert_snapshot!("reserves", dump(&reserves));
+    // Д-19.10: админ видит лимит, но менять его — владельцу; лимит кончается; изменение.
+    let admin = Look::plain().screen(&ops::sample_reserves(&t).screen_for(&t, false));
+    insta::assert_snapshot!("reserves_admin", dump(&admin));
+    let low = Look::plain().screen(&ops::sample_reserves_passcode_low(&t).screen(&t));
+    insta::assert_snapshot!("reserves_passcode_low", dump(&low));
+    let change = Look::plain().screen(&ops::sample_passcode_preview(&t));
+    insta::assert_snapshot!("passcode_change", dump(&change));
     let payload = serde_json::json!({
         "platform": "xrocket", "expected": "640", "actual": "628", "diff": "-12",
         "paused": true, "account": "ub-1",

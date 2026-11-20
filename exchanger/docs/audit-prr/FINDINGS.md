@@ -301,6 +301,15 @@
 
 ### Д-19.10. Лимит CryptoBot «без код-пароля» в бою всегда $500: обратный обмен и счета CryptoBot — не больше ~$475 в сутки, а «Курс» обещает больше
 
+- **Исправлено 20.11** (картинка `passcode-limit.png` принята владельцем 20.11). «Резервы»: строка «Без
+  код-пароля» (лимит и сколько осталось на сутки), строка «лимит кончается», кнопка «Без код-пароля» —
+  только владельцу: число → «было → стало, за сутки exch потратит до …» → «Сохранить», запись в журнал
+  `settings.passcode_free_limit` (`ops/src/reserves.rs`, `actions.rs`). «Курс» клиента считает потолок
+  тем же `engine::spendable`, что приём (`tgbot/src/terms.rs`). Тесты:
+  `the_owner_sets_the_passcode_free_limit_in_reserves` и
+  `terms_show_the_passcode_free_limit_as_the_cryptobot_ceiling` (оба падали до правки), снимки
+  `reserves`, `reserves_admin`, `reserves_passcode_low`, `passcode_change`; экраны — в «Предпросмотре» и
+  в `template.html`. RUNBOOK — «Лимит без код-пароля CryptoBot».
 - Тяжесть: 3 · Уверенность: подтверждено тестом (написан, прогнан, удалён) · Проверено: чтением и тестом
 - Где: `crates/app/src/runtime.rs:175` и `main.rs:972` (`EngineConfig::default()` — `cb_passcode_free_limit`
   = $500, `engine/src/lib.rs:106`); `engine/src/submit.rs:267–291` (`spendable`: резерв CryptoBot не больше
