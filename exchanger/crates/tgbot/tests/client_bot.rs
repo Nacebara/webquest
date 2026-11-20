@@ -1286,6 +1286,38 @@ async fn edited_text_without_a_link_is_ignored(pool: PgPool) {
     );
 }
 
+/// К-19.3 (проверка 19.11): чек меньше минимума — «Меньше минимума · от 1.00» остаётся и когда чек
+/// возврата готов, вместе с «Забрать» (макет «Меньше минимума»: та же строка до и после). Раньше
+/// готовый возврат превращался в «Возврат готов», и клиент не видел, почему вернули.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_refund_below_the_minimum_keeps_its_reason_when_the_check_is_ready(pool: PgPool) {
+    let e = env(pool).await;
+    sqlx::query("UPDATE directions SET min_amount = 1 WHERE code = 'cb_to_xr_check'")
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    let bot = e.start_bot();
+    let url = e.world.client_check(CB, usdt(dec!(0.5))).unwrap();
+    e.fake.client_writes(&url);
+    let (_, order_message, _) = e.order_message().await;
+    e.drain().await;
+    let (_, state, _, _, refund) = e.orders().await[0].clone();
+    assert_eq!(state, OrderState::Refunded);
+    let refund_url = refund.expect("чек возврата");
+    let button = format!("\"url\":\"{refund_url}\"");
+    let done = e
+        .fake
+        .wait_for("the ready refund", |c| {
+            c.method == "editMessageText"
+                && c.message_id() == Some(order_message)
+                && c.contains(&button)
+        })
+        .await;
+    bot.stop().await;
+    assert!(done.contains("Меньше минимума"), "{}", done.body);
+    assert!(!done.contains("Возврат готов"), "{}", done.body);
+}
+
 /// Клиент видит, почему направление на паузе: «в xRocket закончился резерв», а не голое «пауза».
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn paused_direction_tells_the_client_why(pool: PgPool) {

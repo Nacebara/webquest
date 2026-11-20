@@ -467,7 +467,9 @@ impl Inner {
             extra.other_coin = storage::operations::received_other(&mut conn, view.id).await?;
         }
         match view.state {
-            OrderState::RefundPending => {
+            // Причина возврата — и пока чек создаётся, и когда он готов (К-19.3, макет «Меньше
+            // минимума»: та же строка до и после).
+            OrderState::RefundPending | OrderState::Refunded => {
                 let mut conn = self.pool.acquire().await?;
                 let dir = storage::user_terms::effective(&mut conn, view.direction, view.user_id)
                     .await?
