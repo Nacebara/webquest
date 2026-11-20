@@ -13,6 +13,7 @@
 //! - [`demo`] — `exch demo`: бот и пульт на симуляторе кошельков, без денег.
 
 pub mod backup;
+pub mod backup_crypt;
 pub mod check;
 pub mod config;
 pub mod db;

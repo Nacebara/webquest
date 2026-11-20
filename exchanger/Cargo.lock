@@ -117,6 +117,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "botapi",
+ "chacha20poly1305",
  "chrono",
  "clap",
  "domain",
@@ -140,6 +141,7 @@ dependencies = [
  "ui",
  "userbot",
  "windows-service",
+ "zeroize",
 ]
 
 [[package]]

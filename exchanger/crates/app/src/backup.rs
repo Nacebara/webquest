@@ -22,6 +22,8 @@ use storage::PgPool;
 use storage::alerts::{Level, NewAlert, Topic};
 use tokio_util::sync::CancellationToken;
 
+pub use crate::backup_crypt::BackupKey;
+
 /// Временная база проверки восстановления (в запросах — тем же словом, литералом).
 pub const CHECK_DB: &str = "exch_restore_check";
 /// Ключ `settings` с итогом последней копии.
@@ -48,6 +50,49 @@ pub struct BackupSettings {
     pub keep: usize,
     /// Папка `pg_dump` / `pg_restore`; `None` — искать самому.
     pub pg_bin: Option<PathBuf>,
+    /// Ключ шифрования копий — `SESSION_KEY` из `.env` (Б-19.1); без него копию не снять.
+    pub key: Option<BackupKey>,
+}
+
+/// Временная папка для открытого `pg_dump`: вне папки копий (её синхронизирует облако), удаляется
+/// при выходе из области видимости — и при ошибке тоже.
+struct WorkDir(PathBuf);
+
+impl WorkDir {
+    fn new() -> anyhow::Result<Self> {
+        let dir = std::env::temp_dir().join(format!(
+            "exch-backup-work-{}-{}",
+            std::process::id(),
+            Utc::now().format("%Y%m%d%H%M%S%f")
+        ));
+        std::fs::create_dir_all(&dir)
+            .with_context(|| format!("не создать временную папку {}", dir.display()))?;
+        Ok(Self(dir))
+    }
+}
+
+impl Drop for WorkDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+/// Копия, которую может прочитать `pg_restore`: зашифрованная — расшифровывается во временную
+/// папку (она живёт, пока жив [`WorkDir`]); старая незашифрованная `.dump` — как есть.
+async fn readable(file: &Path, s: &BackupSettings) -> anyhow::Result<(PathBuf, Option<WorkDir>)> {
+    if !crate::backup_crypt::is_encrypted(file)? {
+        return Ok((file.to_path_buf(), None));
+    }
+    let key = s
+        .key
+        .clone()
+        .context("копия зашифрована, а SESSION_KEY в .env нет — нужен тот, что был при копии")?;
+    let work = WorkDir::new()?;
+    let plain = work.0.join("restore.dump");
+    let (src, dst) = (file.to_path_buf(), plain.clone());
+    tokio::task::spawn_blocking(move || crate::backup_crypt::decrypt_file(&key, &src, &dst))
+        .await??;
+    Ok((plain, Some(work)))
 }
 
 impl BackupSettings {
@@ -75,11 +120,17 @@ impl BackupSettings {
         let pg_bin = get("PG_BIN")
             .map(|p| PathBuf::from(p.trim()))
             .filter(|p| !p.as_os_str().is_empty());
+        let key = get("SESSION_KEY")
+            .map(crate::config::Config::parse_session_key)
+            .transpose()
+            .context("SESSION_KEY в .env")?
+            .map(|k| BackupKey::from_session_key(&k));
         Ok(Self {
             dir,
             at,
             keep,
             pg_bin,
+            key,
         })
     }
 }
@@ -320,6 +371,11 @@ pub async fn make(
         .context("копии выключены: [backup] dir = \"off\"")?;
     std::fs::create_dir_all(dir)
         .with_context(|| format!("не удалось создать папку копий {}", dir.display()))?;
+    // Б-19.1: в папку копий — только шифр; открытый pg_dump живёт во временной папке.
+    let key = s
+        .key
+        .clone()
+        .context("нет SESSION_KEY в .env — копию нечем зашифровать (exch setup)")?;
     let target = DbTarget::parse(database_url.expose_secret())?;
     let dump = find_tool("pg_dump", s.pg_bin.as_deref())?;
     let (before, migration) = {
@@ -327,17 +383,25 @@ pub async fn make(
         (counts(&mut conn).await?, last_migration(&mut conn).await?)
     };
     let at = Utc::now();
-    let name = format!("exch-{}.dump", at.format("%Y-%m-%d-%H%M%S"));
+    let name = format!("exch-{}.dump.enc", at.format("%Y-%m-%d-%H%M%S"));
     let part = dir.join(format!("{name}.part"));
     let file = dir.join(&name);
+    let work = WorkDir::new()?;
+    let plain = work.0.join("backup.dump");
     let args = vec![
         "--format=custom".to_owned(),
         "--no-owner".to_owned(),
         "--no-privileges".to_owned(),
-        format!("--file={}", part.display()),
+        format!("--file={}", plain.display()),
         format!("--dbname={}", target.uri),
     ];
-    if let Err(e) = run_tool(&dump, &args, &target).await {
+    run_tool(&dump, &args, &target).await?;
+    let (src, dst) = (plain.clone(), part.clone());
+    let sealed =
+        tokio::task::spawn_blocking(move || crate::backup_crypt::encrypt_file(&key, &src, &dst))
+            .await?;
+    drop(work);
+    if let Err(e) = sealed {
         let _ = std::fs::remove_file(&part);
         return Err(e);
     }
@@ -368,6 +432,9 @@ pub async fn verify(
     }
     let restore = find_tool("pg_restore", s.pg_bin.as_deref())?;
     let check = target.with_database(CHECK_DB);
+    // Зашифрованная копия — расшифровать во временную папку (до создания временной базы: чужой
+    // ключ — отказ сразу).
+    let (plain, _work) = readable(file, s).await?;
     // Создать и удалить временную базу — из служебной базы `postgres`: рабочей может ещё не быть
     // (восстановление на новом компьютере).
     {
@@ -386,7 +453,7 @@ pub async fn verify(
         "--no-privileges".to_owned(),
         "--exit-on-error".to_owned(),
         format!("--dbname={}", check.uri),
-        file.display().to_string(),
+        plain.display().to_string(),
     ];
     let result = async {
         run_tool(&restore, &args, &check).await?;
@@ -469,6 +536,7 @@ pub async fn restore(
     }
     let target = DbTarget::parse(url)?;
     let restore = find_tool("pg_restore", s.pg_bin.as_deref())?;
+    let (plain, _work) = readable(file, s).await?;
     // В пустой базе могут быть таблицы после `exch setup` — их заменяет копия.
     let args = vec![
         "--clean".to_owned(),
@@ -477,7 +545,7 @@ pub async fn restore(
         "--no-privileges".to_owned(),
         "--exit-on-error".to_owned(),
         format!("--dbname={}", target.uri),
-        file.display().to_string(),
+        plain.display().to_string(),
     ];
     run_tool(&restore, &args, &target).await?;
     Ok(checked)
@@ -502,9 +570,9 @@ pub fn list(dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
             .flatten()
             .map(|e| e.path())
             .filter(|p| {
-                p.file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with("exch-") && n.ends_with(".dump"))
+                p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
+                    n.starts_with("exch-") && (n.ends_with(".dump") || n.ends_with(".dump.enc"))
+                })
             })
             .collect(),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),

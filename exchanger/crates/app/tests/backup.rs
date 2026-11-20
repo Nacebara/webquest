@@ -65,10 +65,48 @@ async fn a_backup_is_restore_checked_and_a_broken_one_is_caught(pool: PgPool) {
         at: "04:30".into(),
         keep: 2,
         pg_bin: None,
+        key: Some(backup::BackupKey::from_bytes([7; 32])),
     };
+    // Б-19.1: в копии — ссылки на незабранные чеки клиентов (деньги на предъявителя).
+    let secret_link = "https://t.me/send?start=CQbackupSecret42";
+    {
+        let mut conn = pool.acquire().await.unwrap();
+        storage::settings::set(
+            &mut conn,
+            "backup_probe",
+            &serde_json::json!(secret_link),
+            None,
+        )
+        .await
+        .unwrap();
+    }
 
     let o = backup::make(&pool, &url, &settings).await.unwrap();
     assert!(o.file.is_file() && o.bytes > 0);
+    // Б-19.1 (проверка 19.11, решение владельца 20.11 — ключ в .env): в папке копий только шифр.
+    let bytes = std::fs::read(&o.file).unwrap();
+    assert!(!bytes.starts_with(b"PGDMP"), "копия не открытым pg_dump");
+    assert!(
+        !bytes
+            .windows(secret_link.len())
+            .any(|w| w == secret_link.as_bytes()),
+        "ссылки на чеки в копии не читаются"
+    );
+    assert_eq!(
+        std::fs::read_dir(&dir).unwrap().count(),
+        1,
+        "в папке копий ничего, кроме шифра"
+    );
+    // Чужой ключ — копию не открыть, и это сказано словами.
+    let foreign = BackupSettings {
+        key: Some(backup::BackupKey::from_bytes([8; 32])),
+        ..settings.clone()
+    };
+    let err = backup::verify(&o.file, &url, &foreign, None)
+        .await
+        .expect_err("чужой ключ");
+    assert!(err.to_string().contains("SESSION_KEY"), "{err:#}");
+    assert!(!check_db_exists(&pool).await);
     assert!(
         o.checked
             .rows
