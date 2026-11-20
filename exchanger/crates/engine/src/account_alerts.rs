@@ -145,25 +145,40 @@ pub(crate) async fn unknown_reply(
 }
 
 /// Ответ кошелька в тревогу: длинные коды (чеки, счета) — начало и конец, не больше 300 знаков.
+/// `CQ12…9F`: первые четыре и последние два знака кода.
+fn short(code: &str) -> String {
+    let head: String = code.chars().take(4).collect();
+    let tail: String = code
+        .chars()
+        .rev()
+        .take(2)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("{head}…{tail}")
+}
+
 pub fn mask(text: &str) -> String {
     let masked: Vec<String> = text
         .split(' ')
         .map(|w| {
+            // Ссылка на чек или счёт: код после `start=` — маской, хвост (знаки) — как есть (Д-19.6).
+            if let Some((head, rest)) = w.split_once("start=") {
+                let end = rest
+                    .find(|c: char| !(c.is_ascii_alphanumeric() || "_-".contains(c)))
+                    .unwrap_or(rest.len());
+                let (code, tail) = rest.split_at(end);
+                if code.chars().count() > 8 {
+                    return format!("{head}start={}{tail}", short(code));
+                }
+            }
             let alnum = w.chars().filter(char::is_ascii_alphanumeric).count();
             if alnum >= 12
                 && w.chars()
                     .all(|c| c.is_ascii_alphanumeric() || "_-".contains(c))
             {
-                let head: String = w.chars().take(4).collect();
-                let tail: String = w
-                    .chars()
-                    .rev()
-                    .take(2)
-                    .collect::<Vec<_>>()
-                    .into_iter()
-                    .rev()
-                    .collect();
-                format!("{head}…{tail}")
+                short(w)
             } else {
                 w.to_owned()
             }
@@ -250,5 +265,14 @@ mod tests {
         );
         assert_eq!(mask("short text"), "short text");
         assert_eq!(mask(&"а".repeat(400)).chars().count(), 301);
+        // Д-19.6 (проверка 19.11): ссылка на чек целиком — тоже маской (правило 16).
+        assert_eq!(
+            mask("Чек https://t.me/send?start=CQ12ABCDEFGH9F уже активирован."),
+            "Чек https://t.me/send?start=CQ12…9F уже активирован."
+        );
+        assert_eq!(
+            mask("Ссылка: t.me/xrocket?start=t_vF5RwLYE49f36gz,"),
+            "Ссылка: t.me/xrocket?start=t_vF…gz,"
+        );
     }
 }
