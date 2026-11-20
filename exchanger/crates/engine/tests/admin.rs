@@ -633,6 +633,40 @@ async fn close_as_paid_takes_the_check_from_the_evidence(pool: PgPool) {
     e.assert_books_match().await;
 }
 
+/// Найдено 20.11 при сверке RUNBOOK с кодом: доказательство к «Выплачено» — свободный текст. Если
+/// сотрудник написал ссылку словами («нашёл чек … в истории»), клиенту в «Забрать» уходил весь текст,
+/// а не ссылка: Telegram такую кнопку не примет, клиент свой чек не получит. Теперь — только ссылка.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn close_as_paid_gives_the_client_only_the_check_link_from_the_evidence(pool: PgPool) {
+    let e = env(pool).await;
+    let id = stuck_payout(&e).await;
+    let check = e
+        .world
+        .create_check(CheckSpec::new(XR, usdt(dec!(97.5))).by(e.ub))
+        .unwrap();
+    let link = format!("https://t.me/xrocket?start={}", check.code);
+    let admin = staff(&e.pool, 20, Role::Admin).await;
+    e.engine
+        .operator_decide(request(
+            id,
+            OperatorDecision::CloseAsPaid {
+                evidence: format!("нашёл чек {link} в «Мои чеки», 14:05"),
+            },
+            &admin,
+        ))
+        .await
+        .unwrap();
+    let (order, d) = e.order(id).await;
+    assert_eq!(order.state, OrderState::Completed);
+    let url = d.payout_check_url.expect("клиенту — ссылка на чек");
+    assert_eq!(
+        url,
+        parsers::links::parse_url(&link).unwrap().canonical_url()
+    );
+    e.world.claim_check(e.client, &url).unwrap();
+    e.assert_books_match().await;
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn close_without_payout_is_for_the_owner_only_and_keeps_the_money_with_a_reason(
     pool: PgPool,

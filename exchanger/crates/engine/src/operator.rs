@@ -365,14 +365,6 @@ async fn ensure_target_hold(
 }
 
 /// Чек выплаты из доказательства: ссылка на чек платформы выплаты → его код.
-fn check_param_from(evidence: &str, order: &OrderRow) -> Option<String> {
-    evidence.split_whitespace().find_map(|word| {
-        let link = parsers::links::parse_url(word).ok()?;
-        (link.kind == parsers::links::LinkKind::Check && link.platform == order.direction.target())
-            .then_some(link.param)
-    })
-}
-
 fn snapshot(order: &OrderRow, d: &storage::orders::OrderDetails) -> Value {
     json!({
         "state": order.state.as_db_str(),
@@ -690,16 +682,18 @@ impl Engine {
                     .ok_or(Refusal::NoSettleAttempt)?;
                 let amount = op.amount.unwrap_or_default();
                 check_limit(staff, amount)?;
-                let check = check_param_from(evidence, &order);
+                // Клиенту — только ссылка на чек, без слов вокруг неё: весь текст в кнопке «Забрать»
+                // Telegram не примет (найдено 20.11).
+                let check = check_link(evidence, order.direction.target());
                 storage::operations::resolve_by_staff(
                     &mut tx,
                     op.id,
                     OpStatus::Succeeded,
                     &json!({ "resolved_by": format!("staff:{staff_id}"), "verdict": "paid", "evidence": evidence }),
-                    check.as_deref(),
+                    check.as_ref().map(|(param, _)| param.as_str()),
                 )
                 .await?;
-                let url = check.as_ref().map(|_| evidence);
+                let url = check.as_ref().map(|(_, url)| url.as_str());
                 // Счёт оплачен: переплата клиента — как после автоматической оплаты (Д-19.3):
                 // чек на излишек или остаток в доходе ниже `min_refund_amount`.
                 let refund_amount = if flow == Flow::InvoicePayment {
