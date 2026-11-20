@@ -1798,6 +1798,42 @@ async fn an_unexplained_shortage_is_written_off_as_a_loss(pool: PgPool) {
     assert_eq!(o.audit("capital.loss").await.len(), 1);
 }
 
+/// П-19.4 (проверка 19.11): «Сверить сейчас» идёт в фоне — пока кошельки отвечают на запрос
+/// баланса, клиенты получают ответы. Раньше сверка шла внутри опроса Telegram: следующую порцию
+/// обновлений бот забирал только после неё, и все клиенты ждали.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn clients_are_answered_while_the_reconciliation_runs(pool: PgPool) {
+    let o = ops(pool).await;
+    let dash = o.say(OWNER, "/dash", "Резервы").await;
+    let reserves = o.press(OWNER, &dash, "Резервы", "Сверить сейчас").await;
+    // Каждый кошелёк отвечает на баланс не сразу (но в пределах ожидания ответа).
+    o.world.inject(
+        o.ub,
+        userbot::sim::Call::Any,
+        userbot::sim::Fault::DelayReply(Duration::from_millis(250)),
+        2,
+    );
+    let mark = o.tg.mark();
+    let data = reserves.button("Сверить сейчас").unwrap();
+    o.tg.presses(OWNER, reserves.message_id.unwrap(), &data);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    o.tg.writes(common::CLIENT, "/start");
+    o.tg.screen(mark, common::CLIENT, "Обмен CryptoBot").await;
+    o.tg.screen(mark, OWNER, "Сверено").await;
+    let calls = o.tg.calls();
+    let at = |chat: i64, needle: &str| {
+        calls
+            .iter()
+            .skip(mark)
+            .position(|c| c.chat() == Some(chat) && c.text().contains(needle))
+            .unwrap()
+    };
+    assert!(
+        at(common::CLIENT, "Обмен CryptoBot") < at(OWNER, "Сверено"),
+        "клиент получил ответ, не дожидаясь конца сверки"
+    );
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn selftest_from_the_panel_reports_every_step(pool: PgPool) {
     let o = ops(pool).await;
@@ -1813,10 +1849,30 @@ async fn selftest_from_the_panel_reports_every_step(pool: PgPool) {
     let preview = o
         .press(OWNER, &bots, "Самопроверка", "сам же его активирует")
         .await;
-    let report = o
-        .press(OWNER, &preview, "Подтвердить", "Всё работает")
-        .await;
+    // П-19.4: самопроверка ждёт кошельки — клиент тем временем получает ответ.
+    o.world.inject(
+        o.ub,
+        userbot::sim::Call::Any,
+        userbot::sim::Fault::DelayReply(Duration::from_millis(250)),
+        2,
+    );
+    let mark = o.tg.mark();
+    let data = preview.button("Подтвердить").unwrap();
+    o.tg.presses(OWNER, preview.message_id.unwrap(), &data);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    o.tg.writes(common::CLIENT, "/start");
+    o.tg.screen(mark, common::CLIENT, "Обмен CryptoBot").await;
+    let report = o.tg.screen(mark, OWNER, "Всё работает").await;
     assert!(!report.text().contains("❌"), "{}", report.text());
+    let calls = o.tg.calls();
+    let at = |chat: i64, needle: &str| {
+        calls
+            .iter()
+            .skip(mark)
+            .position(|c| c.chat() == Some(chat) && c.text().contains(needle))
+            .unwrap()
+    };
+    assert!(at(common::CLIENT, "Обмен CryptoBot") < at(OWNER, "Всё работает"));
     for platform in [CB, XR] {
         assert_eq!(o.world.balance(o.ub, platform, Asset::Usdt), dec!(1000));
     }

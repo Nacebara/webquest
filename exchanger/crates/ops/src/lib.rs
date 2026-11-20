@@ -427,6 +427,22 @@ impl Inner {
                 return Ok(true);
             };
             let chat = message.chat.id;
+            // П-19.4: долгое (сверка, самопроверка — ждут ответов кошельков) — в фоне, как
+            // «Предпросмотр»: опрос Telegram не ждёт, клиенты получают ответы. Итог — тем же
+            // сообщением, что и раньше.
+            if self.is_slow(&staff, &cb) {
+                let me = Arc::clone(self);
+                let message = message.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = me
+                        .open(&staff, chat, message.message_id, &message, cb)
+                        .await
+                    {
+                        tracing::warn!(error = %e, "ops background action failed");
+                    }
+                });
+                return Ok(true);
+            }
             self.open(&staff, chat, message.message_id, message, cb)
                 .await?;
             return Ok(true);
@@ -813,6 +829,20 @@ impl Inner {
     }
 
     /// Забрать действие по nonce: только свой, только живой, только один раз.
+    /// Кнопки, которые ждут кошельки десятки секунд: «Сверить сейчас» и подтверждение
+    /// самопроверки (П-19.4).
+    fn is_slow(&self, staff: &StaffMember, cb: &Cb) -> bool {
+        match cb {
+            Cb::Reconcile => true,
+            Cb::Confirm(nonce) | Cb::ConfirmUnknown(nonce) => self.state(|s| {
+                s.pending.get(nonce).is_some_and(|p| {
+                    p.staff == staff.tg_user_id && matches!(p.action, Action::Selftest { .. })
+                })
+            }),
+            _ => false,
+        }
+    }
+
     fn take_pending(&self, staff: i64, nonce: &str) -> Option<Action> {
         self.state(|s| {
             // Чужое нажатие не трогает подтверждение: иначе любой сотрудник мог бы его сжечь.
