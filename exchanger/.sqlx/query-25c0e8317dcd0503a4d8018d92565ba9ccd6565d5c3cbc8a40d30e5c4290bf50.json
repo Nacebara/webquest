@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id FROM invest_moves\n         WHERE notified_status IS DISTINCT FROM status AND status <> 'requested'\n           AND created_at >= $1\n         ORDER BY id LIMIT $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "invest_moves",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "25c0e8317dcd0503a4d8018d92565ba9ccd6565d5c3cbc8a40d30e5c4290bf50"
+}

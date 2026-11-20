@@ -541,3 +541,61 @@ pub async fn user_exists(conn: &mut PgConnection, user_id: i64) -> Result<bool, 
     .fetch_one(conn)
     .await?)
 }
+
+/// Взять на себя сообщение инвестору об итоге движения `id` в статусе `status` (К-19.2): `true` —
+/// об этом статусе ещё не говорили, теперь говорит вызывающий. Живое событие и досылка после
+/// перезапуска не пришлют одно и то же дважды.
+pub async fn claim_notice(
+    conn: &mut PgConnection,
+    id: i64,
+    status: MoveStatus,
+) -> Result<bool, StorageError> {
+    let n = sqlx::query!(
+        r#"
+        UPDATE invest_moves SET notified_status = $2
+         WHERE id = $1 AND status = $2 AND notified_status IS DISTINCT FROM $2
+        "#,
+        id,
+        status.as_db_str()
+    )
+    .execute(conn)
+    .await?
+    .rows_affected();
+    Ok(n == 1)
+}
+
+/// Сообщение не ушло (Telegram не ответил) — вернуть движение в досылку.
+pub async fn release_notice(
+    conn: &mut PgConnection,
+    id: i64,
+    status: MoveStatus,
+) -> Result<(), StorageError> {
+    sqlx::query!(
+        "UPDATE invest_moves SET notified_status = NULL WHERE id = $1 AND notified_status = $2",
+        id,
+        status.as_db_str()
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// Движения с `since`, о текущем статусе которых инвестору ещё не сказано (К-19.2).
+pub async fn unnotified(
+    conn: &mut PgConnection,
+    since: chrono::DateTime<chrono::Utc>,
+    limit: i64,
+) -> Result<Vec<i64>, StorageError> {
+    Ok(sqlx::query_scalar!(
+        r#"
+        SELECT id FROM invest_moves
+         WHERE notified_status IS DISTINCT FROM status AND status <> 'requested'
+           AND created_at >= $1
+         ORDER BY id LIMIT $2
+        "#,
+        since,
+        limit
+    )
+    .fetch_all(conn)
+    .await?)
+}

@@ -1106,6 +1106,36 @@ async fn the_invest_section_is_hidden_from_regular_clients(pool: PgPool) {
     );
 }
 
+/// К-19.2 (проверка 19.11, решение владельца 20.11): итог движения инвестора доходит и после
+/// перезапуска — по статусу в базе, ровно один раз. Раньше он уходил только «живым» событием:
+/// бот был выключен — «Зачислено» не приходило никогда.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn an_investor_result_reached_while_the_bot_was_down_is_sent_once(pool: PgPool) {
+    let e = env(pool).await;
+    grant_investor(&e).await;
+    // Бот выключен: пополнение проходит в движке.
+    let url = e.world.client_check(CB, usdt(dec!(200))).unwrap();
+    let link = parsers::links::parse_url(&url).unwrap();
+    e.engine.invest_deposit(CLIENT, &link).await.unwrap();
+    e.drain().await;
+
+    let credited = |c: &Call| {
+        c.method == "sendMessage" && c.contains("Зачислено") && c.contains("200.00 USDT")
+    };
+    let bot = e.start_bot();
+    e.fake
+        .wait_for("deposit credited after start", credited)
+        .await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    bot.stop().await;
+    // Ещё один перезапуск — второго «Зачислено» нет.
+    let bot = e.start_bot();
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    bot.stop().await;
+    let sent = e.fake.calls().iter().filter(|c| credited(c)).count();
+    assert_eq!(sent, 1, "итог — ровно один раз");
+}
+
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn investor_deposits_by_check_and_withdraws_a_check(pool: PgPool) {
     let e = env(pool).await;

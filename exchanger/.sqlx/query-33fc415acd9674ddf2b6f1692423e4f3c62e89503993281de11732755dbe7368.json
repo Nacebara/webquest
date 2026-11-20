@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE invest_moves SET notified_status = NULL WHERE id = $1 AND notified_status = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "33fc415acd9674ddf2b6f1692423e4f3c62e89503993281de11732755dbe7368"
+}

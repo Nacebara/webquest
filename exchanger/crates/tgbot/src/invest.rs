@@ -340,11 +340,12 @@ impl Inner {
 }
 
 /// Итог движения → сообщение инвестору. Промежуточные шаги, о которых он уже знает из ответа
-/// на свою кнопку (заявка у владельца, автовывод начат), не повторяем.
-async fn notify(inner: &Inner, update: InvestUpdate) -> Result<(), TgBotError> {
+/// на свою кнопку (заявка у владельца, автовывод начат), не повторяем. О каждом статусе — один
+/// раз: живое событие и досылка после перезапуска делят отметку в базе (К-19.2).
+async fn notify(inner: &Inner, move_id: i64) -> Result<(), TgBotError> {
     let (m, balance) = {
         let mut conn = inner.pool.acquire().await?;
-        let m = storage::invest::get(&mut conn, update.move_id, false).await?;
+        let m = storage::invest::get(&mut conn, move_id, false).await?;
         let lock = storage::invest::investor(&mut conn, m.user_id)
             .await?
             .map_or(0, |i| i.lock_days);
@@ -355,38 +356,81 @@ async fn notify(inner: &Inner, update: InvestUpdate) -> Result<(), TgBotError> {
     };
     let amount = m.amount.unwrap_or_default();
     let notice = match (m.kind, m.status) {
-        (MoveKind::Deposit, MoveStatus::Done) => InvestNotice::DepositDone { amount, balance },
-        (MoveKind::Deposit, MoveStatus::Failed) => InvestNotice::DepositRejected(
+        (MoveKind::Deposit, MoveStatus::Done) => {
+            Some(InvestNotice::DepositDone { amount, balance })
+        }
+        (MoveKind::Deposit, MoveStatus::Failed) => Some(InvestNotice::DepositRejected(
             crate::orders::intake_failure(m.note.as_deref(), inner.cfg.bind_username.as_deref()),
-        ),
-        (MoveKind::Deposit, MoveStatus::Manual) => InvestNotice::DepositManual,
+        )),
+        (MoveKind::Deposit, MoveStatus::Manual) => Some(InvestNotice::DepositManual),
         // Одобрил владелец — инвестор ещё не знает, что чек создаётся.
         (MoveKind::Withdrawal, MoveStatus::Processing) if m.decided_by.is_some() => {
-            InvestNotice::WithdrawProcessing {
+            Some(InvestNotice::WithdrawProcessing {
                 amount,
                 platform: m.platform,
-            }
+            })
         }
-        (MoveKind::Withdrawal, MoveStatus::Done) => match m.check_url.clone() {
-            Some(check_url) => InvestNotice::WithdrawDone {
-                amount,
-                platform: m.platform,
-                check_url,
-            },
-            // Закрыто владельцем вручную: чек он передаст сам.
-            None => return Ok(()),
-        },
-        (MoveKind::Withdrawal, MoveStatus::Rejected) => InvestNotice::WithdrawRejected {
+        // Закрыто владельцем вручную без чека: чек он передаст сам.
+        (MoveKind::Withdrawal, MoveStatus::Done) => {
+            m.check_url
+                .clone()
+                .map(|check_url| InvestNotice::WithdrawDone {
+                    amount,
+                    platform: m.platform,
+                    check_url,
+                })
+        }
+        (MoveKind::Withdrawal, MoveStatus::Rejected) => Some(InvestNotice::WithdrawRejected {
             amount,
             reason: m.note.clone().unwrap_or_default(),
-        },
-        (MoveKind::Withdrawal, MoveStatus::Failed) => InvestNotice::WithdrawFailed { amount },
-        (MoveKind::Withdrawal, MoveStatus::Manual) => InvestNotice::WithdrawManual { amount },
-        _ => return Ok(()),
+        }),
+        (MoveKind::Withdrawal, MoveStatus::Failed) => Some(InvestNotice::WithdrawFailed { amount }),
+        (MoveKind::Withdrawal, MoveStatus::Manual) => Some(InvestNotice::WithdrawManual { amount }),
+        _ => None,
     };
-    inner
+    // Отметка — и когда сказать нечего: такое движение досылка больше не перебирает.
+    let claimed = {
+        let mut conn = inner.pool.acquire().await?;
+        storage::invest::claim_notice(&mut conn, m.id, m.status).await?
+    };
+    let (true, Some(notice)) = (claimed, notice) else {
+        return Ok(());
+    };
+    if let Err(e) = inner
         .reply(m.user_id, &inner.ui().invest_notice(&notice))
         .await
+    {
+        // Не ушло — пусть дошлёт следующий проход.
+        let mut conn = inner.pool.acquire().await?;
+        storage::invest::release_notice(&mut conn, m.id, m.status).await?;
+        return Err(e);
+    }
+    Ok(())
+}
+
+/// Сколько дней назад искать движения, о которых инвестору не сказали (К-19.2).
+const RESEND_DAYS: i64 = 7;
+
+/// Дослать итоги движений, о которых инвестору ещё не сказано: после старта, при потере событий
+/// и время от времени (сообщение могло не уйти).
+async fn resend(inner: &Inner) {
+    let since = chrono::Utc::now() - chrono::Duration::days(RESEND_DAYS);
+    let ids = match inner.pool.acquire().await {
+        Ok(mut conn) => storage::invest::unnotified(&mut conn, since, 100)
+            .await
+            .map_err(TgBotError::from),
+        Err(e) => Err(e.into()),
+    };
+    match ids {
+        Ok(ids) => {
+            for id in ids {
+                if let Err(e) = notify(inner, id).await {
+                    tracing::warn!(move_id = id, error = %e, "investor notice not resent");
+                }
+            }
+        }
+        Err(e) => tracing::warn!(error = %e, "investor notices resend skipped"),
+    }
 }
 
 /// События движений инвесторов → сообщения им.
@@ -395,19 +439,28 @@ pub(crate) async fn listen(
     mut updates: broadcast::Receiver<InvestUpdate>,
     stop: CancellationToken,
 ) {
+    resend(&inner).await;
+    let mut sweep = tokio::time::interval(inner.cfg.sweep_interval);
+    sweep.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    sweep.tick().await;
     loop {
         let update = tokio::select! {
             () = stop.cancelled() => return,
+            _ = sweep.tick() => {
+                resend(&inner).await;
+                continue;
+            }
             u = updates.recv() => u,
         };
         match update {
             Ok(u) => {
-                if let Err(e) = notify(&inner, u).await {
+                if let Err(e) = notify(&inner, u.move_id).await {
                     tracing::warn!(move_id = u.move_id, error = %e, "investor notice not sent");
                 }
             }
             Err(RecvError::Lagged(n)) => {
-                tracing::warn!(skipped = n, "investor notices lagged");
+                tracing::warn!(skipped = n, "investor notices lagged, resending by status");
+                resend(&inner).await;
             }
             Err(RecvError::Closed) => return,
         }

@@ -1,5 +1,5 @@
 @startuml er
-' ER-диаграмма: схема после миграций 0001–0016 (сверено 20.11.2026). Показаны ключи и главные столбцы.
+' ER-диаграмма: схема после миграций 0001–0017 (сверено 20.11.2026). Показаны ключи и главные столбцы.
 skinparam shadowing false
 skinparam linetype ortho
 hide circle
@@ -201,6 +201,7 @@ entity invest_moves {
   kind (deposit|withdrawal), status, platform
   amount, start_param, check_url, note
   decided_by <<FK staff>>
+  notified_status (о каком статусе сказано, 0017)
 }
 entity broadcasts {
   * id <<PK>>
