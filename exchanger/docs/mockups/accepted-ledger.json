@@ -1,0 +1,1589 @@
+{
+ "tpl:client:Приветствие": {
+  "status": "match",
+  "screens": [
+   "preview:Приветствие"
+  ]
+ },
+ "tpl:client:Обменять → куда": {
+  "status": "match",
+  "screens": [
+   "preview:Обменять → куда"
+  ]
+ },
+ "tpl:client:Пришлите чек": {
+  "status": "match",
+  "screens": [
+   "preview:Пришлите чек"
+  ]
+ },
+ "tpl:client:Проверяю": {
+  "status": "match",
+  "screens": [
+   "preview:Проверяю"
+  ]
+ },
+ "tpl:client:Отправляю": {
+  "status": "match",
+  "screens": [
+   "preview:Отправляю"
+  ]
+ },
+ "tpl:client:Дольше обычного": {
+  "status": "match",
+  "screens": [
+   "preview:Дольше обычного"
+  ]
+ },
+ "tpl:client:Готово": {
+  "status": "match",
+  "screens": [
+   "preview:Готово"
+  ]
+ },
+ "tpl:client:Детали": {
+  "status": "match",
+  "screens": [
+   "preview:Детали"
+  ]
+ },
+ "tpl:client:Курс и лимиты": {
+  "status": "superseded",
+  "by": "samples:pol_client:rates_a",
+  "why": "«Полировка» 16.11; заголовок <h3> — решение 19.11"
+ },
+ "tpl:client:Оплатить счёт": {
+  "status": "match",
+  "screens": [
+   "preview:Оплатить счёт"
+  ]
+ },
+ "tpl:client:Счёт: к оплате": {
+  "status": "match",
+  "screens": [
+   "preview:Счёт: к оплате"
+  ]
+ },
+ "tpl:client:Счёт: не хватает": {
+  "status": "match",
+  "screens": [
+   "preview:Счёт: не хватает"
+  ]
+ },
+ "tpl:client:Счёт оплачен": {
+  "status": "match",
+  "screens": [
+   "preview:Счёт оплачен"
+  ]
+ },
+ "tpl:client:Переплата": {
+  "status": "match",
+  "screens": [
+   "preview:Переплата"
+  ]
+ },
+ "tpl:client:Переплата у меня": {
+  "status": "match",
+  "screens": [
+   "preview:Переплата у меня"
+  ]
+ },
+ "tpl:client:Возврат": {
+  "status": "match",
+  "screens": [
+   "preview:Возврат"
+  ]
+ },
+ "tpl:client:Ручная проверка": {
+  "status": "superseded",
+  "by": "samples:pol_client:manual_a",
+  "why": "«Полировка» 16.11"
+ },
+ "tpl:client:Не та монета": {
+  "status": "match",
+  "screens": [
+   "preview:Не та монета"
+  ]
+ },
+ "tpl:client:Закрыта оператором · выплачена": {
+  "status": "match",
+  "screens": [
+   "preview:Закрыта оператором · выплачена"
+  ]
+ },
+ "tpl:client:Закрыта оператором · без выплаты": {
+  "status": "match",
+  "screens": [
+   "preview:Закрыта оператором · без выплаты"
+  ]
+ },
+ "tpl:client:Мульти-чек xRocket": {
+  "status": "match",
+  "screens": [
+   "preview:Мульти-чек xRocket"
+  ]
+ },
+ "tpl:client:Чек уже открыт": {
+  "status": "match",
+  "screens": [
+   "preview:Чек уже открыт"
+  ]
+ },
+ "tpl:client:Чек не подошёл": {
+  "status": "match",
+  "screens": [
+   "preview:Чек не подошёл"
+  ]
+ },
+ "tpl:client:Меньше минимума": {
+  "status": "match",
+  "screens": [
+   "preview:Меньше минимума"
+  ]
+ },
+ "tpl:client:Пополнение · меньше минимума": {
+  "status": "match",
+  "screens": [
+   "preview:Пополнение · меньше минимума"
+  ]
+ },
+ "tpl:client:Больше лимита": {
+  "status": "match",
+  "screens": [
+   "preview:Больше лимита"
+  ]
+ },
+ "tpl:client:Лимит и пауза": {
+  "status": "superseded",
+  "by": "tpl:client:Лимит исчерпан · прислали чек",
+  "why": "лимит проверяется на присланном чеке (daily-limit.png 20.11)"
+ },
+ "tpl:client:Лимит исчерпан · прислали чек": {
+  "status": "match",
+  "screens": [
+   "preview:Лимит исчерпан · прислали чек"
+  ]
+ },
+ "tpl:client:Счёт не возьму · лимит": {
+  "status": "match",
+  "screens": [
+   "preview:Счёт не возьму · лимит"
+  ]
+ },
+ "tpl:client:Обслуживание": {
+  "status": "match",
+  "screens": [
+   "preview:Обслуживание"
+  ]
+ },
+ "tpl:client:История": {
+  "status": "match",
+  "screens": [
+   "preview:История"
+  ]
+ },
+ "tpl:client:Карточка заявки": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "строка «Чек не забран» — в KNOWN ui/tests/mockup.rs; после Д-19.7 проверить, можно ли её показать",
+  "screens": [
+   "preview:Карточка заявки"
+  ]
+ },
+ "tpl:client:Помощь": {
+  "status": "superseded",
+  "by": "samples:pol_client:help_a",
+  "why": "«Полировка» 16.11; заголовок <h3> — решение 19.11"
+ },
+ "tpl:client:Поддержка": {
+  "status": "match",
+  "screens": [
+   "preview:Поддержка"
+  ]
+ },
+ "tpl:client:Без ссылки": {
+  "status": "match",
+  "screens": [
+   "preview:Без ссылки"
+  ]
+ },
+ "tpl:client:Приветствие · выгодный курс": {
+  "status": "match",
+  "screens": [
+   "preview:Приветствие · выгодный курс"
+  ]
+ },
+ "tpl:client:Курс и лимиты · выгодный курс": {
+  "status": "match",
+  "screens": [
+   "preview:Курс и лимиты · выгодный курс"
+  ]
+ },
+ "tpl:client:Обменять → куда · выгодный курс": {
+  "status": "match",
+  "screens": [
+   "preview:Обменять → куда · выгодный курс"
+  ]
+ },
+ "tpl:client:Пришлите чек · выгодный курс": {
+  "status": "match",
+  "screens": [
+   "preview:Пришлите чек · выгодный курс"
+  ]
+ },
+ "tpl:client:Рассылка · выгодный курс": {
+  "status": "match",
+  "screens": [
+   "preview:Рассылка · выгодный курс"
+  ]
+ },
+ "tpl:ops:Обычный день": {
+  "status": "match",
+  "screens": [
+   "snap:dash_ok"
+  ]
+ },
+ "tpl:ops:Пожар": {
+  "status": "match",
+  "screens": [
+   "snap:dash_fire"
+  ]
+ },
+ "tpl:ops:Тишина": {
+  "status": "match",
+  "screens": [
+   "snap:dash_calm"
+  ]
+ },
+ "tpl:ops:Меню пульта": {
+  "status": "match",
+  "screens": [
+   "snap:menu_owner"
+  ]
+ },
+ "tpl:ops:Очередь разбора": {
+  "status": "match",
+  "screens": [
+   "snap:queue"
+  ]
+ },
+ "tpl:ops:Карточка заявки": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «ord-…-payout unknown → failed»; кнопка: «Повторить выплату» нет; кнопка: «Вернуть» нет",
+  "screens": [
+   "snap:order_card_hint_done"
+  ]
+ },
+ "tpl:ops:Подтверждение": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 1 из 4 строк)"
+ },
+ "tpl:ops:Контрольная строка": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Нужен разбор · переплата": {
+  "status": "match",
+  "screens": [
+   "snap:review_alert_stuck_overpayment"
+  ]
+ },
+ "tpl:ops:Карточка заявки · переплата": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Готово · # мин · Счета CB · #»; текст: «# · счёт оплачен»; текст: «# · чек переплаты: нет ответа # с»",
+  "screens": [
+   "snap:order_card_stuck_overpayment"
+  ]
+ },
+ "tpl:ops:Подтверждение · «Выплачено» с переплатой": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "строка переплаты — картинка 20.11, вид — «Полировка» 16.11 (samples:pol_ops:paid_a)",
+  "screens": [
+   "snap:paid_confirm_excess"
+  ]
+ },
+ "tpl:ops:Подтверждение · переплата": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 1 из 4 строк)"
+ },
+ "tpl:ops:Карточка заявки · неясный возврат": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Возврат # CryptoBot»; текст: «Причина меньше минимума»; текст: «# · чек возврата: нет ответа # с»",
+  "screens": [
+   "snap:order_card_unclear_refund"
+  ]
+ },
+ "tpl:ops:Ссылка на чек": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Ручная оплата счёта": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Обращение клиента": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Аккаунты": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:reserves: 3 из 8 строк)"
+ },
+ "tpl:ops:Карточка аккаунта": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Добавить: номер": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Добавить: код": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Добавить: облачный пароль": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Добавить: проверка": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Замена аккаунта": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Вход сброшен": {
+  "status": "match",
+  "screens": [
+   "snap:critical_login_lost"
+  ]
+ },
+ "tpl:ops:Как войти": {
+  "status": "match",
+  "screens": [
+   "snap:login_how"
+  ]
+ },
+ "tpl:ops:API-ключи": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Сессии": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Новая авторизация": {
+  "status": "match",
+  "screens": [
+   "snap:critical_new_login"
+  ]
+ },
+ "tpl:ops:Резервы и сверка": {
+  "status": "match",
+  "screens": [
+   "snap:reserves"
+  ]
+ },
+ "tpl:ops:Резервы · лимит без код-пароля кончается": {
+  "status": "match",
+  "screens": [
+   "snap:reserves_passcode_low"
+  ]
+ },
+ "tpl:ops:Изменить значение · без код-пароля": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Лимит без код-пароля CryptoBot, $. Сейчас #»; кнопка «Отмена»: без значка",
+  "screens": [
+   "snap:passcode_change"
+  ]
+ },
+ "tpl:ops:Недостача": {
+  "status": "match",
+  "screens": [
+   "snap:shortfall"
+  ]
+ },
+ "tpl:ops:Направления": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего crawl:a:dirs: 1 из 7 строк)"
+ },
+ "tpl:ops:Карточка направления": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Карточка направления · причины паузы": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Изменить значение": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Ребалансировка": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего crawl:a:rs>a:pr>a:pb:1>a:ok:zEdvMybLBUhP: 3 из 9 строк)"
+ },
+ "tpl:ops:Вывод прибыли": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего crawl:a:rs>a:pf: 1 из 3 строк)"
+ },
+ "tpl:ops:Корректировка": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Незабранные чеки": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:reserves_passcode_low: 1 из 5 строк)"
+ },
+ "tpl:ops:Алерт и «Принял»": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «xRocket # · # · ответа нет»; текст: «Разбор · #»; текст: «Принял Анна · # — повторы остановлены»",
+  "screens": [
+   "snap:review_alert_no_reply"
+  ]
+ },
+ "tpl:ops:Незнакомый ответ": {
+  "status": "superseded",
+  "by": "samples:pol_ops:unknown_a",
+  "why": "«Полировка» 16.11"
+ },
+ "tpl:ops:Нет ссылки на чек": {
+  "status": "match",
+  "screens": [
+   "snap:critical_check_link_missing"
+  ]
+ },
+ "tpl:ops:Стоп-кран": {
+  "status": "match",
+  "screens": [
+   "snap:critical_kill_switch"
+  ]
+ },
+ "tpl:ops:Обслуживание": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "кнопка «# мин»: без значка",
+  "screens": [
+   "snap:maintenance_until"
+  ]
+ },
+ "tpl:ops:Настройка алертов": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Карточка клиента": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:shortfall_unsettled_between: 4 из 9 строк)"
+ },
+ "tpl:ops:Бан": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 1 из 3 строк)"
+ },
+ "tpl:ops:Персонал": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего crawl:a:sf: 1 из 6 строк)"
+ },
+ "tpl:ops:Персонал · добавить владельца": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «# — это владелец, его роль не меняю. Пришлите ID другого человека.»; кнопка «Отмена»: без значка",
+  "screens": [
+   "crawl:a:sf>a:sfa"
+  ]
+ },
+ "tpl:ops:1. Черновик": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:2. Подтверждение": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:3. Идёт отправка": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:4. Отчёт": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Статистика": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:order_card_hint_done: 4 из 13 строк)"
+ },
+ "tpl:ops:Сводка дня": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Дайджест обменов": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Журнал": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего crawl:a:au: 1 из 5 строк)"
+ },
+ "tpl:ops:Экспорт": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Система": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Версия # · работает # дн»; текст: «Бэкап # · проверен»; текст: «# FLOOD до #»",
+  "screens": [
+   "crawl:a:sy"
+  ]
+ },
+ "tpl:ops:Предпросмотр экранов": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Самопроверка": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Настройки": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "кнопка: «Котировки» нет; кнопка: «Лимиты» нет; кнопка: «Возвраты» нет",
+  "screens": [
+   "snap:passcode_change"
+  ]
+ },
+ "tpl:ops:Раздел «Лимиты»": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "tpl:ops:Эмодзи": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:order_a:check": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:order_a:send": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:order_a:slow": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:order_a:done": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:order_a:manual": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:calc_b:usual": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:calc_b:promo": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:calc_b:new": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:calc_b:xr": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:calc_a:usual": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:calc_a:promo": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:calc_a:new": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:invoice:wait": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:invoice:short": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:invoice:pay": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:invoice:paid": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:promo:on": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:promo:off": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:dash:day": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:dash:fire": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:dash:calm": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:dash:silent": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:accounts:mix": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:accounts:ok": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:reserves:ok": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:reserves:bad": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:process:self": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:process:mail": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:process:mail_done": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:process:swap": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:process:emoji": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:code:code": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:card:open": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:card:taken": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:queue:q": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:queue:empty": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:value:fee": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:rebalance:on": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:rebalance:off": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:withdraw:w": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:maint:run": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:maint:late": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:system:ok": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:system:silent": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:inv_home:w": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:inv_withdraw:w": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:inv_calc:c": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:inv_home_rich:r": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего gallery:invest_home: 2 из 11 строк)"
+ },
+ "samples:inv_deposit:p": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего gallery:send_check_cb_to_xr: 1 из 4 строк)"
+ },
+ "samples:inv_deposit:ask": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:inv_deposit:done": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Зачислено # · в обороте #»",
+  "screens": [
+   "gallery:invest_notice_deposit_done"
+  ]
+ },
+ "samples:inv_status:req": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Заявка на вывод # в CryptoBot отправлена владельцу.»",
+  "screens": [
+   "gallery:invest_notice_withdraw_requested"
+  ]
+ },
+ "samples:inv_status:ok": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:inv_status:no": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Вывод # отклонён: сначала закончится блокировка свежего пополнения.»",
+  "screens": [
+   "gallery:invest_notice_withdraw_rejected"
+  ]
+ },
+ "samples:inv_howto:h": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Ваши USDT лежат в кошельках обменника и работают в обмене. С прибыли сервиса — часть ваша.»; текст: «Потери за день (курс по счетам, списания) #»; текст: «Прибыль сервиса за день #»",
+  "screens": [
+   "gallery:invest_howto"
+  ]
+ },
+ "samples:ops_inv_list:l": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего crawl:a:pg:u:0>a:iv: 1 из 6 строк)"
+ },
+ "samples:ops_inv_card:c": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего crawl:a:pg:u:0>a:u:111>a:iv:111: 1 из 10 строк)"
+ },
+ "samples:ops_inv_approve:a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_inv_admin:g": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_inv_admin:t": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_inv_admin:o": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_inv_admin:u": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:emo_style:s": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:emo_style:c": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:emo_roles:l": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:emo_role:pack": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:order_card_stuck_overpayment: 1 из 5 строк)"
+ },
+ "samples:emo_role:own": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего crawl:a:se: 1 из 5 строк)"
+ },
+ "samples:emo_ask:a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:emo_ask:c": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:emo_ask:w": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:emo_ask:no": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_find:a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_find:n": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_refusal:r": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_refusal:l": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_owner:s": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_owner:o": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_owner:r": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:cl_privacy:p": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "кнопка: «Поддержка» нет; кнопка: «Помощь» нет",
+  "screens": [
+   "gallery:privacy"
+  ]
+ },
+ "samples:cl_link_bad:nc": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Пришлите ссылку вида t.me/send?start=CQ… или t.me/xrocket?start=… Деньги не тронуты.»",
+  "screens": [
+   "gallery:error_not_check_or_invoice"
+  ]
+ },
+ "samples:cl_link_bad:fb": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Ссылка ведёт на @send_wallet_bot — я её не открывал. Проверьте, у кого вы взяли чек.»",
+  "screens": [
+   "gallery:error_foreign_bot"
+  ]
+ },
+ "samples:cl_link_bad:tn": {
+  "status": "match",
+  "screens": [
+   "gallery:error_testnet"
+  ]
+ },
+ "samples:cl_link_bad:pw": {
+  "status": "match",
+  "screens": [
+   "gallery:error_password"
+  ]
+ },
+ "samples:cl_link_bad:cp": {
+  "status": "superseded",
+  "by": "samples:cx_errors:b1",
+  "why": "концепция Б 15.11"
+ },
+ "samples:cl_link_bad:pr": {
+  "status": "match",
+  "screens": [
+   "gallery:error_premium_only"
+  ]
+ },
+ "samples:ops_crit:restricted": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Telegram ограничил аккаунт — отправлять сообщения ботам кошельков он не может. # на паузе: приём и выплаты через CryptoBot закрыты, через xRocket идут через #»",
+  "screens": [
+   "snap:critical_account_restricted"
+  ]
+ },
+ "samples:ops_crit:flood": {
+  "status": "match",
+  "screens": [
+   "snap:critical_flood_long"
+  ]
+ },
+ "samples:ops_crit:engine": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_crit:twice": {
+  "status": "match",
+  "screens": [
+   "snap:critical_second_instance"
+  ]
+ },
+ "samples:ops_crit:login": {
+  "status": "superseded",
+  "by": "tpl:ops:Вход сброшен",
+  "why": "картинка console-login.png 20.11 и решение 21.11"
+ },
+ "samples:ops_crit:unknown": {
+  "status": "superseded",
+  "by": "samples:pol_ops:unknown_a",
+  "why": "«Полировка» 16.11"
+ },
+ "samples:ops_crit:kill": {
+  "status": "match",
+  "screens": [
+   "snap:critical_kill_switch"
+  ]
+ },
+ "samples:ops_crit_repeat:r": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:critical_login_lost: 1 из 3 строк)"
+ },
+ "samples:ops_crit_repeat:a": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Принял Анна · # — повторы остановлены»; кнопка: «Аккаунты» нет",
+  "screens": [
+   "snap:critical_login_lost"
+  ]
+ },
+ "samples:dash_p3:after": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:cl_late:late": {
+  "status": "superseded",
+  "by": "samples:cx_flows:late",
+  "why": "концепция Б 15.11"
+ },
+ "samples:cl_late:refund": {
+  "status": "superseded",
+  "by": "samples:cx_flows:late",
+  "why": "концепция Б 15.11"
+ },
+ "samples:cl_errors:nf": {
+  "status": "superseded",
+  "by": "samples:pol_client:nf_a",
+  "why": "«Полировка» 16.11"
+ },
+ "samples:cl_errors:bound": {
+  "status": "match",
+  "screens": [
+   "gallery:error_not_for_us"
+  ]
+ },
+ "samples:cl_errors:min": {
+  "status": "superseded",
+  "by": "samples:cx_errors:b3",
+  "why": "концепция Б 15.11"
+ },
+ "samples:cl_errors:max": {
+  "status": "superseded",
+  "by": "tpl:client:Больше лимита",
+  "why": "картинка daily-limit.png 20.11"
+ },
+ "samples:cl_errors:reserve": {
+  "status": "match",
+  "screens": [
+   "gallery:error_no_reserve"
+  ]
+ },
+ "samples:cl_errors:daily": {
+  "status": "superseded",
+  "by": "tpl:client:Лимит исчерпан · прислали чек",
+  "why": "картинка daily-limit.png 20.11: «сутки подряд»"
+ },
+ "samples:cl_errors:rate": {
+  "status": "match",
+  "screens": [
+   "gallery:error_rate_limited"
+  ]
+ },
+ "samples:cl_errors:ban": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Причина: спам ссылками. Новые чеки не открываю — деньги в них. Заявку в работе доведу до конца.»",
+  "screens": [
+   "gallery:error_banned"
+  ]
+ },
+ "samples:cl_errors:dup": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "кнопка: «История» нет",
+  "screens": [
+   "gallery:error_duplicate"
+  ]
+ },
+ "samples:cl_errors:asset": {
+  "status": "superseded",
+  "by": "samples:cx_errors:b4",
+  "why": "концепция Б 15.11"
+ },
+ "samples:cl_errors:paid": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Верну # чеком xRocket.»",
+  "screens": [
+   "gallery:error_invoice_paid_elsewhere"
+  ]
+ },
+ "samples:cl_errors:moved": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Счёт не оплачивал. Верну # чеком xRocket — пришлите ссылку на счёт ещё раз, посчитаю заново.»",
+  "screens": [
+   "gallery:error_rate_moved"
+  ]
+ },
+ "samples:cl_errors:inwork": {
+  "status": "match",
+  "screens": [
+   "gallery:error_invoice_in_work"
+  ]
+ },
+ "samples:cl_errors:pending": {
+  "status": "match",
+  "screens": [
+   "gallery:error_invoice_pending"
+  ]
+ },
+ "samples:cl_errors:busy": {
+  "status": "match",
+  "screens": [
+   "gallery:error_invoice_check_busy"
+  ]
+ },
+ "samples:cl_errors:expired": {
+  "status": "match",
+  "screens": [
+   "gallery:error_quote_expired"
+  ]
+ },
+ "samples:cl_errors:internal": {
+  "status": "match",
+  "screens": [
+   "gallery:error_internal"
+  ]
+ },
+ "samples:ops_dir:fee": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_dir:limits": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_dir:paused": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_dir:auto": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_tiers:ask": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Ступени · CB → xR. Сейчас ступеней нет.»; текст: «Строка — «от суммы процент», первая с нуля:»; кнопка: «Отмена» нет",
+  "screens": [
+   "snap:critical_account_restricted"
+  ]
+ },
+ "samples:ops_tiers:diff": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_tiers:warn": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_client:extra": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:shortfall_unsettled_between: 4 из 11 строк)"
+ },
+ "samples:ops_client:terms": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_client:banned": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:critical_account_restricted: 3 из 7 строк)"
+ },
+ "samples:ops_promo:mode": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Авто — выгодный курс включается и выключается сам по порогам. Подсказывать — бот пишет вам, включаете вы. Выкл — только вручную.»; кнопка: «Авто · сейчас» нет; кнопка «Выкл»: без значка",
+  "screens": [
+   "crawl:a:rs>a:pr>a:prm"
+  ]
+ },
+ "samples:ops_capital:extra": {
+  "status": "match",
+  "screens": [
+   "snap:surplus"
+  ]
+ },
+ "samples:ops_capital:out": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 2 из 5 строк)"
+ },
+ "samples:ops_capital:in": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 2 из 5 строк)"
+ },
+ "samples:ops_kill:confirm": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 1 из 4 строк)"
+ },
+ "samples:ops_kill:menu_on": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Выплаты остановлены · Олег, #»; кнопка: «Снять стоп-кран» нет",
+  "screens": [
+   "snap:menu_owner"
+  ]
+ },
+ "samples:ops_thresholds:th": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Порог «мало» — половина цели: так его считает рычаг комиссии.»; кнопка: «Цель CryptoBot · # # · порог #» нет; кнопка: «Цель xRocket · # # · порог #» нет",
+  "screens": [
+   "crawl:a:rs>a:th"
+  ]
+ },
+ "samples:ops_alerts:u": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:critical_login_lost: 1 из 3 строк)"
+ },
+ "samples:ops_alerts:im": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_alerts:if": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_alerts:ph": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_alerts:ps": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_support:empty": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Новых обращений нет.»",
+  "screens": [
+   "crawl:a:ib"
+  ]
+ },
+ "samples:ops_support:fail": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_intake:a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_intake:c": {
+  "status": "superseded",
+  "by": "samples:pol_ops:intake_a",
+  "why": "«Полировка» 16.11"
+ },
+ "samples:ops_intake:x": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_intake:m": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_paid:a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:ops_paid:c": {
+  "status": "superseded",
+  "by": "samples:pol_ops:paid_a",
+  "why": "«Полировка» 16.11"
+ },
+ "samples:emo_home:h": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:emo_home:bad": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:emo_sets:l": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:emo_sets:d": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:cl_invoice_bad:exp": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:cl_invoice_bad:paid": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:cl_invoice_bad:fiat": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:cl_invoice_bad:reuse": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:cl_invoice_bad:none": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:cl_invoice_bad:soon": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:cx_errors:b1": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Деньги в чеке — пришлите обычный.»",
+  "screens": [
+   "gallery:error_captcha"
+  ]
+ },
+ "samples:cx_errors:b2": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:cx_errors:b3": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "кнопка: «Курс» нет",
+  "screens": [
+   "gallery:refund_done_below_minimum"
+  ]
+ },
+ "samples:cx_errors:b4": {
+  "status": "match",
+  "screens": [
+   "gallery:other_coin_review"
+  ]
+ },
+ "samples:cx_flows:late": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Деньги у меня · # USDT»; текст: «# USDT ждут вас в xRocket»; кнопка: «Забрать» нет",
+  "screens": [
+   "gallery:result_below"
+  ]
+ },
+ "samples:cx_flows:closed_paid": {
+  "status": "match",
+  "screens": [
+   "gallery:closed_by_operator_paid"
+  ]
+ },
+ "samples:cx_flows:closed_kept": {
+  "status": "match",
+  "screens": [
+   "gallery:closed_by_operator_kept"
+  ]
+ },
+ "samples:cx_flows:support": {
+  "status": "superseded",
+  "by": "samples:pol_client:answer_a",
+  "why": "«Полировка» 16.11"
+ },
+ "samples:cx_pult:done_new": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:cx_pult:refuse_new": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:cx_pult:inv_new": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:pol_client:nf_a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего gallery:error_not_found: 1 из 3 строк)"
+ },
+ "samples:pol_client:used_a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:pol_client:unk_a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде"
+ },
+ "samples:pol_client:manual_a": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Обычно до # минут — напишу сюда.»",
+  "screens": [
+   "gallery:manual_review"
+  ]
+ },
+ "samples:pol_client:refund_a": {
+  "status": "superseded",
+  "by": "tpl:client:Больше лимита",
+  "why": "картинка daily-limit.png 20.11"
+ },
+ "samples:pol_client:answer_a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего gallery:operator_answer: 1 из 3 строк)"
+ },
+ "samples:pol_client:rates_a": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Выгодно до # USDT: # % # %»; текст: «Комиссия от # USDT · первые обмены до # USDT»; кнопка: «Посчитать» нет",
+  "screens": [
+   "gallery:terms"
+  ]
+ },
+ "samples:pol_client:help_a": {
+  "status": "todo",
+  "kind": "не по макету",
+  "why": "текст: «Наберите @send # или @xrocket # и выберите чек. Верну чеком другого кошелька — обычно за # секунд.»; текст: «Чек — в USDT, для одного человека, без капчи и подписок. Мульти-чеки — только CryptoBot.»",
+  "screens": [
+   "gallery:help"
+  ]
+ },
+ "samples:pol_ops:dash_a": {
+  "status": "superseded",
+  "by": "tpl:ops:Обычный день",
+  "why": "решение 19.11: заголовок <h3>"
+ },
+ "samples:pol_ops:alert_a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:review_alert_no_reply: 1 из 3 строк)"
+ },
+ "samples:pol_ops:unknown_a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:critical_unknown_reply: 1 из 3 строк)"
+ },
+ "samples:pol_ops:intake_a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 1 из 5 строк)"
+ },
+ "samples:pol_ops:paid_a": {
+  "status": "todo",
+  "kind": "нет в коде или нет снимка",
+  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 2 из 5 строк)"
+ },
+ "samples:pol_w_calc:promo_b": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:pol_w_calc:promo_a": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:pol_w_calc:usual_b": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:pol_w_calc:usual_a": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:pol_w_invoice:wait_b": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:pol_w_invoice:wait_a": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:pol_w_invoice:short_b": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:pol_w_invoice:short_a": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:pol_w_dash:day_b": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:pol_w_dash:day_a": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:pol_w_dash:fire_b": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ },
+ "samples:pol_w_dash:fire_a": {
+  "status": "later",
+  "why": "виджет — ждёт, пока Telegram включит виджеты"
+ }
+}
