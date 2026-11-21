@@ -3299,3 +3299,142 @@ async fn the_dash_login_button_shows_how_to_log_in_again(pool: PgPool) {
         .await;
     assert!(how.text().contains("Как войти · ub-1"), "{}", how.text());
 }
+
+/// Возврат с каждого экрана пульта (решение владельца 21.11, SCREENS-21-11, раздел 1): бот
+/// нажимает каждую кнопку каждого экрана от меню; на каждом экране, кроме меню, есть путь назад,
+/// а домой ведёт одна кнопка — «Меню». Сегодняшние нарушения — `BAD_BACK`, список только
+/// сокращается.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn every_panel_screen_has_a_way_back(pool: PgPool) {
+    /// Кусок текста экрана, у которого нарушение известно (исправить — и убрать строку).
+    const BAD_BACK: &[&str] = &[
+        // «Отмена» ведёт в «Пульт», а не на экран, где нажали.
+        "Отменено. Ничего не изменено.",
+        // Итог самопроверки: «Главный экран» и «Пульт» вместо экрана, откуда пришли.
+        "Самопроверка",
+        // «‹ Назад» и «🏠 Пульт» вместо «◀️ Клиент» и «🎛 Меню».
+        "Инвестиции клиента",
+    ];
+    let o = ops(pool).await;
+    let first_line = |c: &Call| -> String {
+        let body = c.body["rich_message"]["html"]
+            .as_str()
+            .map(str::to_owned)
+            .unwrap_or_else(|| c.text());
+        let mut text = String::new();
+        let mut tag = false;
+        for ch in body
+            .replace("<br/>", "\n")
+            .replace("</p>", "\n")
+            .replace("</h3>", "\n")
+            .chars()
+        {
+            match ch {
+                '<' => tag = true,
+                '>' if tag => tag = false,
+                c if !tag => text.push(c),
+                _ => {}
+            }
+        }
+        text.lines()
+            .map(str::trim)
+            .find(|l| !l.is_empty())
+            .unwrap_or("")
+            .to_owned()
+    };
+    let mut seen: std::collections::HashSet<String> = Default::default();
+    let mut queue: std::collections::VecDeque<Vec<String>> = Default::default();
+    let mut problems: Vec<String> = Vec::new();
+    let mut found: std::collections::BTreeSet<String> = Default::default();
+    queue.push_back(Vec::new());
+    while let Some(path) = queue.pop_front() {
+        if path.len() > 4 {
+            continue;
+        }
+        let mut screen = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+        let mut reached = true;
+        for data in &path {
+            let mark = o.tg.mark();
+            o.tg.presses(OWNER, screen.message_id.unwrap_or(1), data);
+            let next = tokio::time::timeout(Duration::from_millis(800), async {
+                loop {
+                    let calls: Vec<Call> = o.tg.calls().into_iter().skip(mark).collect();
+                    let mine = |c: &&Call| c.chat() == Some(OWNER);
+                    // Экран, на котором нажали (правка), важнее тревоги, пришедшей новым
+                    // сообщением в тот же момент.
+                    let edit = calls
+                        .iter()
+                        .filter(mine)
+                        .rev()
+                        .find(|c| c.method.starts_with("editMessage"));
+                    let sent =
+                        calls.iter().filter(mine).rev().find(|c| {
+                            matches!(c.method.as_str(), "sendMessage" | "sendRichMessage")
+                        });
+                    if let Some(c) = edit.or(sent) {
+                        return c.clone();
+                    }
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                }
+            })
+            .await;
+            match next {
+                Ok(c) => screen = c,
+                Err(_) => {
+                    reached = false;
+                    break;
+                }
+            }
+        }
+        if !reached {
+            continue;
+        }
+        let labels = screen.labels();
+        let head = first_line(&screen);
+        let text = screen.body["rich_message"]["html"]
+            .as_str()
+            .map(str::to_owned)
+            .unwrap_or_else(|| screen.text());
+        if !path.is_empty() && !head.starts_with("Пульт") {
+            let back = labels.iter().any(|l| {
+                l.contains('◀') || l.ends_with("Меню") || l == "Отмена" || l.starts_with("Отмена")
+            });
+            let odd_home = labels
+                .iter()
+                .any(|l| l.ends_with("Пульт") || l.contains("Главный экран") || l == "‹ Назад");
+            if !back || odd_home {
+                let known = BAD_BACK.iter().any(|k| text.contains(k));
+                found.insert(text.clone());
+                if !known {
+                    problems.push(format!(
+                        "«{head}»: кнопки {labels:?} — нет возврата или домой не «Меню»"
+                    ));
+                }
+            }
+        }
+        let mut datas: Vec<String> = screen.buttons();
+        let body = screen.body["rich_message"]["html"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        for part in body.split("data=\"").skip(1) {
+            if let Some(d) = part.split('"').next() {
+                datas.push(d.to_owned());
+            }
+        }
+        for d in datas {
+            if d == "a:x" || d == "a:pv" || !seen.insert(d.clone()) {
+                continue;
+            }
+            let mut p = path.clone();
+            p.push(d);
+            queue.push_back(p);
+        }
+    }
+    for k in BAD_BACK {
+        if !found.iter().any(|h| h.contains(k)) {
+            problems.push(format!("«{k}»: уже в порядке — уберите из BAD_BACK"));
+        }
+    }
+    assert!(problems.is_empty(), "{problems:#?}");
+}
