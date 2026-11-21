@@ -1056,7 +1056,7 @@ impl Inner {
                     storage::staff::get(&mut conn, id).await?
                 };
                 if existing.is_some_and(|m| m.role == Role::Owner) {
-                    let text = self.texts.f("staff.owner_add", &[("id", &id.to_string())]);
+                    let text = crate::owner_add_refusal(&self.texts, id);
                     return Ok(self.prompt_with(staff, input, text));
                 }
                 Action::StaffAdd { id, role, name }
@@ -1508,22 +1508,7 @@ impl Inner {
                 if *kind == DecisionKind::ClosePaid
                     && let Some(x) = self.engine.paid_excess(*order).await?
                 {
-                    let line = match x.refund {
-                        Some(r) => t.f(
-                            "order.paid_excess_refund",
-                            &[
-                                ("amount", &crate::dash::amount(r)),
-                                ("wallet", &self.platform_name(x.platform)),
-                            ],
-                        ),
-                        None => t.f(
-                            "order.paid_excess_kept",
-                            &[
-                                ("amount", &crate::dash::amount(x.excess)),
-                                ("min", &crate::dash::amount(x.threshold)),
-                            ],
-                        ),
-                    };
+                    let line = paid_excess_line(t, &x, &self.platform_name(x.platform));
                     what = format!("{what}\n{line}");
                 }
                 let money_kinds = matches!(
@@ -1889,30 +1874,14 @@ impl Inner {
                     Cb::Confirm(nonce),
                 ),
             };
-            // Длинная надпись рядом с «Отмена» обрезается («Отметить вып…»): такая кнопка —
-            // отдельной строкой (макеты «Подтверждение · переплата», last-fixes.png).
-            let long = label
-                .chars()
-                .filter(|c| c.is_alphanumeric() || c.is_whitespace())
-                .collect::<String>()
-                .trim()
-                .chars()
-                .count()
-                > LONG_BUTTON;
-            let confirm = btn(label, &cb);
-            let confirm = if danger {
-                confirm.style(botapi::ButtonStyle::Danger)
+            let style = if danger {
+                Some(botapi::ButtonStyle::Danger)
             } else if confirm_primary {
-                confirm.style(botapi::ButtonStyle::Primary)
+                Some(botapi::ButtonStyle::Primary)
             } else {
-                confirm
+                None
             };
-            s = if long {
-                s.row(vec![confirm])
-                    .row(vec![btn(t.t("common.cancel"), &Cb::Cancel)])
-            } else {
-                s.row(vec![confirm, btn(t.t("common.cancel"), &Cb::Cancel)])
-            };
+            s = confirm_rows(t, s, label, &cb, style, &Cb::Cancel);
         } else if need == Role::Owner {
             // Решает владелец: предложить ему одной кнопкой (шаг 3, макет «решает владелец»).
             s.text
@@ -2584,6 +2553,97 @@ impl Inner {
             btn(t.t("common.home"), &Cb::Menu),
         ]))
     }
+}
+
+/// Строка о переплате на «Отметить выплаченной?» (Д-19.3, картинка last-fixes.png принята 20.11).
+pub(crate) fn paid_excess_line(t: &crate::Texts, x: &engine::PaidExcess, wallet: &str) -> String {
+    match x.refund {
+        Some(r) => t.f(
+            "order.paid_excess_refund",
+            &[("amount", &crate::dash::amount(r)), ("wallet", &wallet)],
+        ),
+        None => t.f(
+            "order.paid_excess_kept",
+            &[
+                ("amount", &crate::dash::amount(x.excess)),
+                ("min", &crate::dash::amount(x.threshold)),
+            ],
+        ),
+    }
+}
+
+/// Кнопка подтверждения и «Отмена». Длинная надпись рядом с «Отмена» обрезается («Отметить
+/// вып…»): такая кнопка — отдельной строкой (макеты «Подтверждение · переплата», last-fixes.png).
+pub(crate) fn confirm_rows(
+    t: &crate::Texts,
+    s: Screen,
+    label: String,
+    cb: &Cb,
+    style: Option<botapi::ButtonStyle>,
+    cancel: &Cb,
+) -> Screen {
+    let long = label
+        .chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+        .collect::<String>()
+        .trim()
+        .chars()
+        .count()
+        > LONG_BUTTON;
+    let mut confirm = btn(label, cb);
+    if let Some(style) = style {
+        confirm = confirm.style(style);
+    }
+    let cancel = btn(t.t("common.cancel"), cancel);
+    if long {
+        s.row(vec![confirm]).row(vec![cancel])
+    } else {
+        s.row(vec![confirm, cancel])
+    }
+}
+
+/// «Отметить выплаченной?» по счёту с переплатой на данных макета: `refund` — вернётся чеком,
+/// иначе останется в доходе (предпросмотр, снимок).
+pub fn sample_paid_confirm(t: &crate::Texts, refund: bool) -> Screen {
+    let x = engine::PaidExcess {
+        excess: if refund {
+            Decimal::new(875, 2)
+        } else {
+            Decimal::new(30, 2)
+        },
+        refund: refund.then(|| Decimal::new(875, 2)),
+        threshold: Decimal::new(50, 2),
+        platform: Platform::XRocket,
+    };
+    let what = format!(
+        "{}\n{}",
+        t.f("order.what_paid", &[("client", &"51234567")]),
+        paid_excess_line(t, &x, &t.t("names.xrocket"))
+    );
+    let extra = t.f(
+        "order.preview_evidence",
+        &[("evidence", &"оплатил кнопкой в @send, 14:10")],
+    );
+    let text = t.f(
+        "order.confirm",
+        &[
+            ("question", &t.t("order.q_paid")),
+            ("public", &"7F3A1C9D2B"),
+            ("what", &what),
+            ("previous", &""),
+            ("reason", &"счёт оплачен вручную"),
+            ("extra", &extra),
+            ("warning", &t.t("order.irreversible")),
+        ],
+    );
+    confirm_rows(
+        t,
+        Screen::new(text),
+        t.t("order.b_do_paid"),
+        &Cb::Sample,
+        Some(botapi::ButtonStyle::Danger),
+        &Cb::Sample,
+    )
 }
 
 #[cfg(test)]

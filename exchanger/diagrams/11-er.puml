@@ -199,6 +199,7 @@ entity invest_moves {
   --
   user_id <<FK investors>>
   kind (deposit|withdrawal), status, platform
+  (status: … refunding / refunded — возврат пополнения меньше минимума, 0018)
   amount, start_param, check_url, note
   decided_by <<FK staff>>
   notified_status (о каком статусе сказано, 0017)

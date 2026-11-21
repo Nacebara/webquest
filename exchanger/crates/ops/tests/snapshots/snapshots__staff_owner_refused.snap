@@ -1,0 +1,12 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: "dump(&Look::plain().screen(&screen))"
+---
+--- rich
+
+--- html
+<code>70001234</code> — это владелец, его роль не меняю. Пришлите ID другого человека.
+
+<i>Пришлите ответ одним сообщением или нажмите «Отмена».</i>
+--- keyboard
+[{"text":"Отмена","callback_data":"a:x"}]

@@ -52,6 +52,7 @@ use sqlx::PgPool;
 use storage::staff::{Role, StaffMember};
 use tokio_util::sync::CancellationToken;
 
+pub use actions::sample_paid_confirm;
 pub use cb::Cb;
 pub use dash::{DashData, sample_dash};
 pub use look::Look;
@@ -172,6 +173,22 @@ impl Screen {
 
 pub(crate) fn btn(text: impl Into<String>, cb: &Cb) -> InlineKeyboardButton {
     InlineKeyboardButton::callback(text, cb.encode())
+}
+
+/// Вопрос сотруднику: текст, подсказка «Пришлите ответ одним сообщением…» и «Отмена».
+pub(crate) fn prompt_screen(t: &Texts, text: &str, cancel: &Cb) -> Screen {
+    Screen::new(format!("{text}\n\n{}", t.t("common.input_hint")))
+        .row(vec![btn(t.t("common.cancel"), cancel)])
+}
+
+/// Д-19.6 (картинка last-fixes.png принята 20.11): ID владельца в «Персонал → Добавить» — отказ.
+pub(crate) fn owner_add_refusal(t: &Texts, id: i64) -> String {
+    t.f("staff.owner_add", &[("id", &id.to_string())])
+}
+
+/// «Персонал → Добавить» с ID владельца на данных макета (предпросмотр, снимок).
+pub fn sample_owner_add_refused(t: &Texts) -> Screen {
+    prompt_screen(t, &owner_add_refusal(t, 70_001_234), &Cb::Sample)
 }
 
 /// Ждём ответа сотрудника.
@@ -922,9 +939,7 @@ impl Inner {
 
     pub(crate) fn prompt_with(&self, staff: &StaffMember, input: Input, text: String) -> Screen {
         self.ask(staff.tg_user_id, input);
-        let t = &self.texts;
-        Screen::new(format!("{text}\n\n{}", t.t("common.input_hint")))
-            .row(vec![btn(t.t("common.cancel"), &Cb::Cancel)])
+        prompt_screen(&self.texts, &text, &Cb::Cancel)
     }
 
     async fn on_callback(

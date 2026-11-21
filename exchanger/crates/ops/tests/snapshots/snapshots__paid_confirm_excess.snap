@@ -1,0 +1,17 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: "dump(&Look::plain().screen(&screen))"
+---
+--- rich
+
+--- html
+<b>Отметить выплаченной?</b> · заявка <code>7F3A1C9D2B</code>
+Клиент 51234567 получил деньги вне бота — заявка закроется выплаченной.
+Переплата <code>8.75</code> USDT вернётся клиенту чеком xRocket.
+Причина: <i>счёт оплачен вручную</i>
+Доказательство: <i>оплатил кнопкой в @send, 14:10</i>
+
+<b>Необратимо.</b> <i>Кнопка действует 60 с.</i>
+--- keyboard
+[{"text":"✅ Отметить выплаченной","style":"danger","callback_data":"a:x"}]
+[{"text":"Отмена","callback_data":"a:x"}]

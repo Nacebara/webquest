@@ -64,6 +64,17 @@ fn reserves_and_shortfall() {
     insta::assert_snapshot!("reserves_passcode_low", dump(&low));
     let change = Look::plain().screen(&ops::sample_passcode_preview(&t));
     insta::assert_snapshot!("passcode_change", dump(&change));
+    // Картинка last-fixes.png принята 20.11.
+    for (name, screen) in [
+        ("paid_confirm_excess", ops::sample_paid_confirm(&t, true)),
+        (
+            "paid_confirm_excess_kept",
+            ops::sample_paid_confirm(&t, false),
+        ),
+        ("staff_owner_refused", ops::sample_owner_add_refused(&t)),
+    ] {
+        insta::assert_snapshot!(name, dump(&Look::plain().screen(&screen)));
+    }
     let payload = serde_json::json!({
         "platform": "xrocket", "expected": "640", "actual": "628", "diff": "-12",
         "paused": true, "account": "ub-1",

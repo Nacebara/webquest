@@ -378,6 +378,27 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
         &look.screen(&crate::sample_passcode_preview(&texts)),
     )
     .await;
+    // Картинка last-fixes.png принята 20.11: «Выплачено» с переплатой (Д-19.3), отказ в «Персонал →
+    // Добавить» с ID владельца (Д-19.6).
+    for (caption, screen) in [
+        (
+            "<b>Пульт · Подтверждение · «Выплачено» с переплатой</b> (данные макета)",
+            crate::sample_paid_confirm(&texts, true),
+        ),
+        (
+            "<b>Пульт · Подтверждение · «Выплачено», переплата мала</b> (данные макета)",
+            crate::sample_paid_confirm(&texts, false),
+        ),
+        (
+            "<b>Пульт · Персонал · добавить владельца</b> (данные макета)",
+            crate::sample_owner_add_refused(&texts),
+        ),
+    ] {
+        let _ = api
+            .send_message(&SendMessage::html(chat, caption).silent())
+            .await;
+        send_card(api, chat, &look.screen(&screen)).await;
+    }
     let _ = api
         .send_message(&SendMessage::html(chat, "<b>Пульт · Недостача</b> (данные макета)").silent())
         .await;
