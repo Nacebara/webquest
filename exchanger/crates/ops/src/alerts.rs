@@ -71,6 +71,22 @@ pub(crate) fn may_see(a: &AlertRow, role: Role) -> bool {
 }
 
 impl Inner {
+    /// «Как войти» из тревоги «Вход сброшен»: имя аккаунта — из тревоги; видят те, кому она
+    /// приходит (Б-19.3). Тревоги нет или она другая — «Аккаунты».
+    pub(crate) async fn login_how(&self, staff: &StaffMember, id: i64) -> Result<Screen, OpsError> {
+        let a = {
+            let mut conn = self.pool.acquire().await?;
+            storage::alerts::get(&mut conn, id).await?
+        };
+        match a {
+            Some(a) if a.title == "login_lost" && may_see(&a, staff.role) => Ok(login_how_screen(
+                &self.texts,
+                a.payload["account"].as_str().unwrap_or_default(),
+            )),
+            _ => self.bots().await,
+        }
+    }
+
     pub(crate) async fn alerts_once(&self) -> Result<(), OpsError> {
         let mut conn = self.pool.acquire().await?;
         // 1. Ручной разбор: событие на каждую заявку в очереди.
@@ -867,6 +883,34 @@ impl Inner {
 /// Критичные тревоги шага 2.8 (утверждены владельцем 14.11 и в макете пульта): вход сброшен,
 /// аккаунт ограничен, долгая пауза Telegram, движок не работает, бот запущен дважды, незнакомый
 /// ответ, стоп-кран. `None` — тревога другого вида.
+/// «Как войти» (Т-5, картинка console-login.png принята 20.11): шаги на сервере карточкой, как
+/// справка; войти из пульта нельзя — код и облачный пароль вводятся только в `exch setup`.
+pub fn login_how_screen(t: &crate::Texts, account: &str) -> Screen {
+    let account = esc(account);
+    let title = t.f("alert.login_how_title", &[("account", &account)]);
+    let steps: Vec<String> = (1..=4)
+        .map(|n| t.t(&format!("alert.login_how_{n}")))
+        .collect();
+    let footer = t.t("alert.login_how_footer");
+    let todo = "{e:step_todo}";
+    let rich = format!(
+        "<h3>{title}</h3>{}<footer>{footer}</footer>",
+        steps
+            .iter()
+            .map(|s| format!("<p>{todo} {s}</p>"))
+            .collect::<String>()
+    );
+    let plain = format!(
+        "<b>{title}</b>\n{}\n<i>{footer}</i>",
+        steps
+            .iter()
+            .map(|s| format!("{todo} {s}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    Screen::card(rich, plain).row(crate::nav::back(t, &Cb::Bots))
+}
+
 pub fn critical_screen(
     t: &crate::Texts,
     title: &str,
@@ -917,19 +961,22 @@ pub fn critical_screen(
             let ub = p["userbot_id"].as_i64().and_then(|x| i16::try_from(x).ok());
             match title {
                 "login_lost" => {
-                    let mut sc = Screen::new(t.f(
+                    // Т-5 (картинка console-login.png принята 20.11): одна «Как войти» вместо
+                    // «Войти заново» и «Заменить» — те вели в «Аккаунты», где войти нельзя.
+                    Screen::new(t.f(
                         "alert.login_lost",
                         &[("account", &account), ("route", &route)],
                     ))
                     .row(vec![
-                        btn(t.t("alert.b_relogin"), &Cb::Bots).style(botapi::ButtonStyle::Primary),
-                    ]);
-                    let mut second = vec![btn(t.t("alert.b_replace"), &Cb::Bots)];
-                    if let Some(ub) = ub {
-                        second.push(btn(t.t("alert.b_disable"), &Cb::BotPause(ub, true)));
-                    }
-                    sc = sc.row(second);
-                    sc.row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
+                        btn(t.t("alert.b_login_how"), &Cb::LoginHow(id))
+                            .style(botapi::ButtonStyle::Primary),
+                    ])
+                    .row(
+                        ub.map(|ub| btn(t.t("alert.b_disable"), &Cb::BotPause(ub, true)))
+                            .into_iter()
+                            .collect(),
+                    )
+                    .row(vec![btn(t.t("alert.b_ack"), &Cb::Ack(id))])
                 }
                 "account_restricted" => Screen::new(t.f(
                     "alert.account_restricted",

@@ -239,6 +239,14 @@ fn critical_alerts() {
     assert!(ops::critical_screen(&t, "manual_review", &serde_json::json!({}), 1, first).is_none());
 }
 
+/// Т-5 (картинка console-login.png принята 20.11): «Как войти» — шаги на сервере карточкой.
+#[test]
+fn login_how_card() {
+    let t = Texts::builtin().unwrap();
+    let screen = Look::plain().screen(&ops::login_how_screen(&t, "ub-2"));
+    insta::assert_snapshot!("login_how", dump(&screen));
+}
+
 /// П-6, П-7: макет «Алерт и „Принял“» — публичный номер, путь, суммы, клиент, причина, ответ
 /// кошелька цитатой; без ответа — «ответа нет» со временем разбора.
 #[test]

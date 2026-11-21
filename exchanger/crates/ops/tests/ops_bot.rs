@@ -62,6 +62,19 @@ impl Call {
             .and_then(|b| b["callback_data"].as_str().map(str::to_owned))
     }
 
+    /// Подписи кнопок под сообщением.
+    fn labels(&self) -> Vec<String> {
+        self.body["reply_markup"]["inline_keyboard"]
+            .as_array()
+            .map(|rows| {
+                rows.iter()
+                    .flat_map(|row| row.as_array().cloned().unwrap_or_default())
+                    .filter_map(|b| b["text"].as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     fn buttons(&self) -> Vec<String> {
         self.body["reply_markup"]["inline_keyboard"]
             .as_array()
@@ -3186,4 +3199,57 @@ async fn an_alert_that_could_not_be_sent_goes_out_when_telegram_answers_again(po
     o.bot.deliver_alerts().await.unwrap();
     o.tg.screen(mark, OWNER, "Нужен разбор").await;
     o.tg.screen(mark, ADMIN, "Нужен разбор").await;
+}
+
+/// Т-5 (картинка console-login.png принята 20.11): «Вход сброшен» → одна кнопка «Как войти» —
+/// шаги на сервере карточкой. Раньше «Войти заново» и «Заменить» вели в «Аккаунты», где войти
+/// нельзя: тупик.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_lost_login_alert_shows_how_to_log_in_again(pool: PgPool) {
+    let o = ops(pool).await;
+    o.say(OWNER, "/menu", "<b>Пульт</b>").await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        storage::alerts::raise(
+            &mut conn,
+            &storage::alerts::NewAlert {
+                level: storage::alerts::Level::Critical,
+                topic: storage::alerts::Topic::Errors,
+                dedup_key: "login_lost:ub-2",
+                title: "login_lost",
+                payload: json!({"account": "ub-2", "userbot_id": 2, "platforms": ["xrocket"]}),
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let mark = o.tg.mark();
+    o.bot.deliver_alerts().await.unwrap();
+    let alert = o.tg.screen(mark, OWNER, "вход сброшен").await;
+    let labels = alert.labels();
+    assert!(
+        labels
+            .iter()
+            .all(|b| !b.contains("Войти заново") && !b.contains("Заменить")),
+        "тупиковых кнопок нет: {labels:?}"
+    );
+    let how = o
+        .press(OWNER, &alert, "Как войти", "exch service stop")
+        .await;
+    let text = how.text();
+    for needle in [
+        "Как войти · ub-2",
+        "Завершить все",
+        "exch setup",
+        "exch service start",
+        "Номер потерян",
+    ] {
+        assert!(text.contains(needle), "{needle:?} в карточке: {text}");
+    }
+    let buttons = how.labels();
+    assert!(
+        buttons.iter().any(|b| b.contains("Аккаунты"))
+            && buttons.iter().any(|b| b.contains("Меню")),
+        "{buttons:?}"
+    );
 }

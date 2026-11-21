@@ -526,6 +526,13 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
             send_card(api, chat, &look.screen(&screen)).await;
         }
     }
+    // Т-5 (картинка console-login.png принята 20.11): «Как войти» из тревоги «Вход сброшен».
+    send_card(
+        api,
+        chat,
+        &sample(look.screen(&crate::login_how_screen(&texts, "ub-2"))),
+    )
+    .await;
     // Макет «Алерт и „Принял“» (П-6, П-7): «Нужен разбор» с номером, суммами и ответом кошелька.
     let review = serde_json::json!({"id": 15, "public": "K7M2Q9XR4T", "user": 51234567,
         "direction": "cb_to_xr_check", "amount_in": "100", "amount_out": "97.5",

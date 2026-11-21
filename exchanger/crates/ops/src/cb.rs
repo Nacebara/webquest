@@ -279,6 +279,9 @@ pub enum Cb {
     Reserves,
     /// Событие пульта по id («Недостача»).
     AlertShow(i64),
+    /// «Как войти» в тревоге «Вход сброшен»: шаги на сервере карточкой (Т-5, картинка
+    /// console-login.png принята 20.11). Номер тревоги — из неё берётся имя аккаунта.
+    LoginHow(i64),
     /// «Нет, разбираться» по событию «не сходится».
     Investigate(i64),
     /// «Пороги» резерва.
@@ -437,6 +440,7 @@ impl Cb {
             Cb::Broadcast => "bc".into(),
             Cb::Reserves => "rs".into(),
             Cb::AlertShow(id) => format!("al:{id}"),
+            Cb::LoginHow(id) => format!("lh:{id}"),
             Cb::Investigate(id) => format!("iq:{id}"),
             Cb::Thresholds => "th".into(),
             Cb::Profit => "pf".into(),
@@ -554,6 +558,7 @@ impl Cb {
             ["bc"] => Cb::Broadcast,
             ["rs"] => Cb::Reserves,
             ["al", _] => Cb::AlertShow(id(1)?),
+            ["lh", _] => Cb::LoginHow(id(1)?),
             ["iq", _] => Cb::Investigate(id(1)?),
             ["th"] => Cb::Thresholds,
             ["pf"] => Cb::Profit,
@@ -616,6 +621,7 @@ mod tests {
             Cb::MemberDisable(big),
             Cb::Ack(big),
             Cb::Fixture(big),
+            Cb::LoginHow(big),
             Cb::BotPause(i16::MAX, true),
             Cb::PromoTarget(Platform::CryptoBot),
             Cb::PromoTarget(Platform::XRocket),

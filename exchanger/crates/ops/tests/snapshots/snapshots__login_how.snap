@@ -1,0 +1,22 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&screen)
+---
+--- rich
+<h3>🤖 Как войти · ub-2</h3>
+<p>⚪ Устройства аккаунта: чужое — «Завершить все», новый облачный пароль</p>
+<p>⚪ На сервере: <code>exch service stop</code>
+</p>
+<p>⚪ <code>exch setup</code> → «Войти заново» → код и пароль</p>
+<p>⚪ <code>exch service start</code>
+</p>
+<footer>Номер потерян — тот же exch setup перенесёт кошелёк на другой аккаунт</footer>
+--- html
+<b>🤖 Как войти · ub-2</b>
+⚪ Устройства аккаунта: чужое — «Завершить все», новый облачный пароль
+⚪ На сервере: <code>exch service stop</code>
+⚪ <code>exch setup</code> → «Войти заново» → код и пароль
+⚪ <code>exch service start</code>
+<i>Номер потерян — тот же exch setup перенесёт кошелёк на другой аккаунт</i>
+--- keyboard
+[{"text":"◀️ Аккаунты","callback_data":"a:b"},{"text":"🎛 Меню","callback_data":"a:m"}]
