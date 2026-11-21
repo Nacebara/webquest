@@ -82,8 +82,13 @@ fn reserves_and_shortfall() {
     ] {
         insta::assert_snapshot!(name, dump(&Look::plain().screen(&screen)));
     }
-    // Итог решения и отказы — отдельным сообщением (макеты 13.11 и 15.11).
-    for (name, screen) in ops::sample_decision_screens(&t) {
+    // Итог решения и отказы — отдельным сообщением (макеты 13.11 и 15.11); вопросы и поиск
+    // (13.11), стоп-кран (14.11).
+    let mut more = ops::sample_decision_screens(&t);
+    more.extend(ops::sample_decision_asks(&t));
+    more.extend(ops::sample_find_screens(&t));
+    more.push(("kill_confirm", ops::sample_kill_confirm(&t)));
+    for (name, screen) in more {
         insta::assert_snapshot!(name, dump(&Look::plain().screen(&screen)));
     }
     let payload = serde_json::json!({

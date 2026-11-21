@@ -55,7 +55,8 @@ use storage::staff::{Role, StaffMember};
 use tokio_util::sync::CancellationToken;
 
 pub use actions::{
-    sample_decision_screens, sample_intake_confirm, sample_paid_confirm, sample_paid_confirm_check,
+    sample_decision_asks, sample_decision_screens, sample_intake_confirm, sample_kill_confirm,
+    sample_paid_confirm, sample_paid_confirm_check,
 };
 pub use cb::Cb;
 pub use dash::{DashData, sample_dash};
@@ -183,6 +184,31 @@ pub(crate) fn btn(text: impl Into<String>, cb: &Cb) -> InlineKeyboardButton {
 pub(crate) fn prompt_screen(t: &Texts, text: &str, cancel: &Cb) -> Screen {
     Screen::new(format!("{text}\n\n{}", t.t("common.input_hint")))
         .row(vec![btn(t.t("common.cancel"), cancel)])
+}
+
+/// Вопрос с «Отмена», которая возвращает на экран, откуда спросили (макет «Найти», 13.11).
+pub(crate) fn prompt_back_screen(t: &Texts, key: &str, back: &Cb) -> Screen {
+    Screen::new(format!("{}\n\n{}", t.t(key), t.t("common.input_hint")))
+        .row(vec![btn(t.t("common.cancel"), back)])
+}
+
+/// «Заявка … не найдена» (макет «Найти», 13.11): [Искать ещё] и назад к «Заявкам».
+pub(crate) fn order_not_found_screen(t: &Texts, query: &str) -> Screen {
+    Screen::new(t.f("order.not_found_q", &[("query", &crate::texts::esc(query))])).row(vec![
+        btn(t.t("order.b_search_more"), &Cb::OrderAsk),
+        nav::back(t, &Cb::Page(nav::List::Orders, 0)).remove(0),
+    ])
+}
+
+/// «Найти заявку» и «не найдена» на данных макета (снимки, «Предпросмотр»).
+pub fn sample_find_screens(t: &Texts) -> Vec<(&'static str, Screen)> {
+    vec![
+        (
+            "find_ask",
+            prompt_back_screen(t, "order.ask", &Cb::Page(nav::List::Orders, 0)),
+        ),
+        ("find_not_found", order_not_found_screen(t, "K7M2Q9XR4Z")),
+    ]
 }
 
 /// Д-19.6 (картинка last-fixes.png принята 20.11): ID владельца в «Персонал → Добавить» — отказ.
@@ -937,8 +963,7 @@ impl Inner {
         back: &Cb,
     ) -> Screen {
         self.ask(staff.tg_user_id, input);
-        let t = &self.texts;
-        Screen::new(format!("{}\n\n{}", t.t(key), t.t("common.input_hint"))).row(nav::back(t, back))
+        prompt_back_screen(&self.texts, key, back)
     }
 
     pub(crate) fn prompt_with(&self, staff: &StaffMember, input: Input, text: String) -> Screen {

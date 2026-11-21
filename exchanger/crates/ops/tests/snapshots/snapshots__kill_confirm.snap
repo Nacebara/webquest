@@ -1,0 +1,14 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: "dump(&Look::plain().screen(&screen))"
+---
+--- rich
+
+--- html
+<b>Остановить все выплаты?</b>
+Заявки будут ждать, деньги клиентов останутся в леджере.
+Выплат в очереди нет. Новые заявки до снятия — в разбор.
+Выключит только владелец — словом <code>ПОДТВЕРЖДАЮ</code>.
+<i>Кнопка действует 60 с.</i>
+--- keyboard
+[{"text":"🛑 Остановить","style":"danger","callback_data":"a:x"},{"text":"❌ Отмена","callback_data":"a:x"}]

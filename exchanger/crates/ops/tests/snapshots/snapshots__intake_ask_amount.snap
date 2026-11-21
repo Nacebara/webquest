@@ -1,0 +1,14 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: "dump(&Look::plain().screen(&screen))"
+---
+--- rich
+
+--- html
+<b>Сколько пришло в кошелёк?</b> · заявка <code>K7M2Q9XR4T</code>
+По чеку — <code>30.00</code> USDT. Сверьте с чатом @send. Другую сумму — пришлите числом.
+
+<i>Пришлите ответ одним сообщением или нажмите «Отмена».</i>
+--- keyboard
+[{"text":"✅ 30.00 — как в чеке","style":"primary","callback_data":"a:iac:41"}]
+[{"text":"❌ Отмена","callback_data":"a:no"}]

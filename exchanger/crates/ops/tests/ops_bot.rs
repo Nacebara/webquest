@@ -685,7 +685,12 @@ async fn settings_toggle_the_newcomer_limit_and_the_kill_switch(pool: PgPool) {
     );
     // Стоп-кран включает любой, выключает только владелец.
     let preview = o
-        .press(OWNER, &settings, "Включить стоп-кран", "Стоп-кран выплат")
+        .press(
+            OWNER,
+            &settings,
+            "Включить стоп-кран",
+            "Остановить все выплаты?",
+        )
         .await;
     // П-13: словами — сколько выплат встанет и что будет с новыми заявками.
     assert!(
@@ -696,7 +701,7 @@ async fn settings_toggle_the_newcomer_limit_and_the_kill_switch(pool: PgPool) {
         preview.text()
     );
     let mark = o.tg.mark();
-    o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
+    o.press(OWNER, &preview, "Остановить", "Сохранено").await;
     assert!(
         storage::settings::flag(&mut conn, "kill_switch_payouts", false)
             .await
@@ -751,10 +756,15 @@ async fn the_owner_lifts_the_kill_switch_by_typing_the_word(pool: PgPool) {
     assert!(calm.text().contains("<b>Пульт</b>"), "{}", calm.text());
     let settings = o.say(ADMIN, "/settings", "Настройки").await;
     let preview = o
-        .press(ADMIN, &settings, "Включить стоп-кран", "Стоп-кран выплат")
+        .press(
+            ADMIN,
+            &settings,
+            "Включить стоп-кран",
+            "Остановить все выплаты?",
+        )
         .await;
     let mark = o.tg.mark();
-    o.press(ADMIN, &preview, "Подтвердить", "Сохранено").await;
+    o.press(ADMIN, &preview, "Остановить", "Сохранено").await;
     let alert = o.tg.screen(mark, OWNER, "Выплаты остановлены").await;
     assert!(alert.text().contains("ПОДТВЕРЖДАЮ"), "{}", alert.text());
     let kill_on = || async {
@@ -795,10 +805,15 @@ async fn maintenance_for_30_minutes_from_the_kill_switch_alert(pool: PgPool) {
     let o = ops(pool).await;
     let settings = o.say(ADMIN, "/settings", "Настройки").await;
     let preview = o
-        .press(ADMIN, &settings, "Включить стоп-кран", "Стоп-кран выплат")
+        .press(
+            ADMIN,
+            &settings,
+            "Включить стоп-кран",
+            "Остановить все выплаты?",
+        )
         .await;
     let mark = o.tg.mark();
-    o.press(ADMIN, &preview, "Подтвердить", "Сохранено").await;
+    o.press(ADMIN, &preview, "Остановить", "Сохранено").await;
     let alert = o.tg.screen(mark, ADMIN, "Выплаты остановлены").await;
     let maint = |p: &PgPool| {
         let p = p.clone();
@@ -1380,7 +1395,7 @@ async fn a_check_link_from_staff_never_starts_a_client_exchange(pool: PgPool) {
     let card = o.say(ADMIN, &client_url, "из заявки").await;
     assert!(card.text().contains(&order.public_id), "{}", card.text());
     // И поиск понимает ссылку.
-    o.say(ADMIN, "/find", "Номер заявки").await;
+    o.say(ADMIN, "/find", "Найти заявку").await;
     o.say(ADMIN, &client_url, &order.public_id).await;
 
     // «Обменять как клиент»: одна следующая ссылка уходит в обмен, следующая — снова пульту.

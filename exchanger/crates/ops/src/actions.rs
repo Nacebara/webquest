@@ -383,6 +383,88 @@ fn kill_warn(t: &crate::Texts, queued: &[(domain::Asset, i64, Decimal)]) -> Stri
     t.f("settings.kill_warn", &[("what", &what)])
 }
 
+/// «Доказательство выплаты» (13.11, ops_paid: a).
+pub(crate) fn evidence_ask_text(t: &crate::Texts, action: &str, public: &str) -> String {
+    t.f(
+        "order.ask_evidence",
+        &[("action", &action), ("public", &esc(public))],
+    )
+}
+
+/// «Сколько пришло в кошелёк?» с суммой по чеку кнопкой (13.11, ops_intake: a).
+pub(crate) fn ask_amount_check_screen(
+    t: &crate::Texts,
+    public: &str,
+    check: Decimal,
+    bot: &str,
+    order: i64,
+) -> Screen {
+    let text = t.f(
+        "order.ask_amount_check",
+        &[
+            ("public", &esc(public)),
+            ("amount", &crate::dash::amount(check)),
+            ("bot", &bot),
+        ],
+    );
+    let mut s = crate::prompt_screen(t, &text, &Cb::Cancel);
+    s.keyboard.insert(
+        0,
+        vec![
+            btn(
+                t.f(
+                    "order.b_as_check",
+                    &[("amount", &crate::dash::amount(check))],
+                ),
+                &Cb::IntakeAsCheck(order),
+            )
+            .style(botapi::ButtonStyle::Primary),
+        ],
+    );
+    s
+}
+
+/// Вопросы денежных решений на данных макета (снимки, «Предпросмотр»).
+pub fn sample_decision_asks(t: &crate::Texts) -> Vec<(&'static str, Screen)> {
+    vec![
+        (
+            "intake_ask_amount",
+            ask_amount_check_screen(t, "K7M2Q9XR4T", Decimal::new(3000, 2), "@send", 41),
+        ),
+        (
+            "paid_ask_evidence",
+            crate::prompt_screen(
+                t,
+                &evidence_ask_text(t, &t.t("order.a_paid"), "K7M2Q9XR4T"),
+                &Cb::Sample,
+            ),
+        ),
+    ]
+}
+
+/// «Остановить все выплаты?» (макет 14.11): что будет с очередью и кто выключит.
+pub(crate) fn kill_confirm_text(
+    t: &crate::Texts,
+    queued: &[(domain::Asset, i64, Decimal)],
+) -> String {
+    t.f(
+        "settings.kill_confirm",
+        &[("queued", &kill_warn(t, queued))],
+    )
+}
+
+/// Подтверждение стоп-крана на данных макета (снимок, «Предпросмотр»).
+pub fn sample_kill_confirm(t: &crate::Texts) -> Screen {
+    confirm_rows(
+        t,
+        Screen::new(kill_confirm_text(t, &[])),
+        t.t("settings.b_kill_stop"),
+        &Cb::Sample,
+        Some(botapi::ButtonStyle::Danger),
+        &Cb::Sample,
+    )
+}
+
 /// Недостача по событию сверки, ещё не закрытому: кошелёк и сколько не хватает.
 pub(crate) async fn shortage_of(
     conn: &mut sqlx::PgConnection,
@@ -894,14 +976,17 @@ impl Inner {
                     return Ok(self.prompt_with(staff, input, t.t("refusal.reason_short")));
                 }
                 if kind == DecisionKind::ClosePaid {
-                    return Ok(self.prompt(
+                    // Макет «Отметить выплаченной» (13.11, ops_paid: a): действие и номер заявки.
+                    let ask =
+                        evidence_ask_text(t, &t.t("order.a_paid"), &self.public_id(order).await?);
+                    return Ok(self.prompt_with(
                         staff,
                         Input::DecisionEvidence {
                             order,
                             reason: text,
                             kind,
                         },
-                        "order.ask_evidence",
+                        ask,
                     ));
                 }
                 if kind.needs_evidence() {
@@ -1752,22 +1837,24 @@ impl Inner {
                     Flag::Maintenance => "settings.n_maint",
                     Flag::KillSwitch => "settings.n_kill",
                 });
-                let mut text = t.f(
-                    "settings.preview_toggle",
-                    &[
-                        ("name", &name),
-                        ("before", &self.onoff(!on)),
-                        ("after", &self.onoff(*on)),
-                    ],
-                );
                 if *flag == Flag::KillSwitch && *on {
+                    // Макет 14.11 (ops_kill: confirm): «Остановить все выплаты?» и кто выключит.
                     let queued = {
                         let mut conn = self.pool.acquire().await?;
                         storage::operations::queued_money_out(&mut conn).await?
                     };
-                    text.push_str(&kill_warn(t, &queued));
+                    confirm_label = Some(t.t("settings.b_kill_stop"));
+                    kill_confirm_text(t, &queued)
+                } else {
+                    t.f(
+                        "settings.preview_toggle",
+                        &[
+                            ("name", &name),
+                            ("before", &self.onoff(!on)),
+                            ("after", &self.onoff(*on)),
+                        ],
+                    )
                 }
-                text
             }
             Action::MaintText { before, after } => t.f(
                 "maint.preview_text",
@@ -2946,7 +3033,12 @@ pub(crate) fn confirm_rows(
     style: Option<botapi::ButtonStyle>,
     cancel: &Cb,
 ) -> Screen {
-    let long = label
+    // Значок `{m:…}` на кнопке — картинка, а не буквы: в длину не входит.
+    let words = match label.split_once("} ") {
+        Some((token, rest)) if token.starts_with('{') => rest,
+        _ => label.as_str(),
+    };
+    let long = words
         .chars()
         .filter(|c| c.is_alphanumeric() || c.is_whitespace())
         .collect::<String>()

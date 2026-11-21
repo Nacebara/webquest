@@ -899,10 +899,7 @@ impl Inner {
         };
         match id {
             Some(id) => self.order(Some(staff), id).await,
-            None => Ok(Screen::new(self.texts.t("order.not_found")).row(vec![
-                btn(self.texts.t("order.b_search_more"), &Cb::OrderAsk),
-                btn(self.texts.t("common.home"), &Cb::Menu),
-            ])),
+            None => Ok(crate::order_not_found_screen(&self.texts, query)),
         }
     }
 
@@ -1724,29 +1721,15 @@ impl Inner {
                         Platform::CryptoBot => "@send",
                         Platform::XRocket => "@xrocket",
                     };
-                    let text = t.f(
-                        "order.ask_amount_check",
-                        &[
-                            ("public", &esc(&card.public_id)),
-                            ("amount", &crate::dash::amount(check)),
-                            ("bot", &bot),
-                        ],
-                    );
-                    let mut s = self.prompt_with(staff, input, text);
-                    s.keyboard.insert(
-                        0,
-                        vec![
-                            btn(
-                                t.f(
-                                    "order.b_as_check",
-                                    &[("amount", &crate::dash::amount(check))],
-                                ),
-                                &Cb::IntakeAsCheck(id),
-                            )
-                            .style(botapi::ButtonStyle::Primary),
-                        ],
-                    );
-                    return Ok(s);
+                    // Вопрос «Сколько пришло?» — тот же, что в образце (13.11, ops_intake: a).
+                    self.ask(staff.tg_user_id, input);
+                    return Ok(crate::actions::ask_amount_check_screen(
+                        t,
+                        &card.public_id,
+                        check,
+                        bot,
+                        id,
+                    ));
                 }
                 let public = esc(&self.public_id(id).await?);
                 let text = t.f(

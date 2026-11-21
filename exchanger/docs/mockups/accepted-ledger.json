@@ -922,14 +922,16 @@
   "why": "нет экрана в коде"
  },
  "samples:ops_find:a": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "snap:find_ask"
+  ]
  },
  "samples:ops_find:n": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "snap:find_not_found"
+  ]
  },
  "samples:ops_refusal:r": {
   "status": "superseded",
@@ -1005,12 +1007,9 @@
   ]
  },
  "samples:ops_crit:restricted": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Telegram ограничил аккаунт — отправлять сообщения ботам кошельков он не может. # на паузе: приём и выплаты через CryptoBot закрыты, через xRocket идут через #»",
-  "screens": [
-   "snap:critical_account_restricted"
-  ]
+  "status": "superseded",
+  "by": "tpl:ops:Вход сброшен",
+  "why": "решение владельца 21.11 (пункт 1): строка о паузе аккаунта — как в коде («приём и выплаты через … закрыты»), у каждого кошелька один аккаунт"
  },
  "samples:ops_crit:flood": {
   "status": "match",
@@ -1246,18 +1245,19 @@
  },
  "samples:ops_capital:out": {
   "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 2 из 5 строк)"
+  "kind": "не по макету",
+  "why": "нет шага «Причина» — макет: «Причина: <i>…</i>» и кнопка «Провести вывод 12.00»"
  },
  "samples:ops_capital:in": {
   "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 2 из 5 строк)"
+  "kind": "не по макету",
+  "why": "нет шага «Причина» — макет: «Причина: <i>…</i>» и кнопка «Провести взнос 120.00»"
  },
  "samples:ops_kill:confirm": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 1 из 4 строк)"
+  "status": "match",
+  "screens": [
+   "snap:kill_confirm"
+  ]
  },
  "samples:ops_kill:menu_on": {
   "status": "todo",
@@ -1314,9 +1314,10 @@
   "why": "нет экрана в коде"
  },
  "samples:ops_intake:a": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "snap:intake_ask_amount"
+  ]
  },
  "samples:ops_intake:c": {
   "status": "superseded",
@@ -1335,9 +1336,10 @@
   "why": "«Полировка» 16.11 — вид подтверждения; строка «Не совпадает с чеком» и «Отправить владельцу» сохранены (снимок intake_confirm_mismatch)"
  },
  "samples:ops_paid:a": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "snap:paid_ask_evidence"
+  ]
  },
  "samples:ops_paid:c": {
   "status": "superseded",

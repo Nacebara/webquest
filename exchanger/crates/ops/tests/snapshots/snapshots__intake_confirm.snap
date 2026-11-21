@@ -11,5 +11,4 @@ expression: "dump(&Look::plain().screen(&screen))"
 <i>Анна · причина</i></blockquote>Сначала сверю кошелёк: зачислю не больше, чем там лишнего.
 <b>Необратимо.</b> <i>Кнопка действует 60 с.</i>
 --- keyboard
-[{"text":"✅ Зачислить 30.00","style":"danger","callback_data":"a:x"}]
-[{"text":"❌ Отмена","callback_data":"a:x"}]
+[{"text":"✅ Зачислить 30.00","style":"danger","callback_data":"a:x"},{"text":"❌ Отмена","callback_data":"a:x"}]

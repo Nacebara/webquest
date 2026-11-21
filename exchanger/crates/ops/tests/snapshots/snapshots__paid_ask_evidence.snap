@@ -1,0 +1,13 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: "dump(&Look::plain().screen(&screen))"
+---
+--- rich
+
+--- html
+<b>Отметить выплаченной</b> · заявка <code>K7M2Q9XR4T</code>
+Доказательство выплаты: ссылка на созданный чек или что и где проверили — одним сообщением.
+
+<i>Пришлите ответ одним сообщением или нажмите «Отмена».</i>
+--- keyboard
+[{"text":"❌ Отмена","callback_data":"a:x"}]
