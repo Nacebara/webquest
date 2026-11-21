@@ -3253,3 +3253,27 @@ async fn a_lost_login_alert_shows_how_to_log_in_again(pool: PgPool) {
         "{buttons:?}"
     );
 }
+
+/// П13: на примерах пульта из «Предпросмотра» ни одна кнопка не ведёт к настоящему действию —
+/// весь присланный «Предпросмотр», не только `sample()`: у примеров тревог настоящие номера
+/// аккаунтов и направлений («Отключить» на «Вход сброшен» — аккаунт №2).
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn panel_preview_samples_carry_no_live_buttons(pool: PgPool) {
+    let o = ops(pool).await;
+    let mark = o.tg.mark();
+    ops::preview::send_panel_preview(&o.tg.api(), &ops::Look::plain(), OWNER).await;
+    let sample = ops::Cb::Sample.encode();
+    let live: Vec<String> =
+        o.tg.calls()
+            .into_iter()
+            .skip(mark)
+            .flat_map(|c| {
+                let head: String = c.text().chars().take(60).collect();
+                c.buttons()
+                    .into_iter()
+                    .filter(|d| *d != sample)
+                    .map(move |d| format!("{d} · {head}"))
+            })
+            .collect();
+    assert!(live.is_empty(), "живые кнопки на примерах: {live:#?}");
+}

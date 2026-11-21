@@ -530,7 +530,7 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
     send_card(
         api,
         chat,
-        &sample(look.screen(&crate::login_how_screen(&texts, "ub-2"))),
+        &look.screen(&crate::login_how_screen(&texts, "ub-2")),
     )
     .await;
     // Макет «Алерт и „Принял“» (П-6, П-7): «Нужен разбор» с номером, суммами и ответом кошелька.
