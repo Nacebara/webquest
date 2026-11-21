@@ -300,9 +300,7 @@
   ]
  },
  "tpl:ops:Подтверждение · «Выплачено» с переплатой": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "строка переплаты — картинка 20.11, вид — «Полировка» 16.11 (samples:pol_ops:paid_a)",
+  "status": "match",
   "screens": [
    "snap:paid_confirm_excess"
   ]
@@ -465,12 +463,9 @@
   "why": "нет экрана в коде (ближе всего snap:reserves_passcode_low: 1 из 5 строк)"
  },
  "tpl:ops:Алерт и «Принял»": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «xRocket # · # · ответа нет»; текст: «Разбор · #»; текст: «Принял Анна · # — повторы остановлены»",
-  "screens": [
-   "snap:review_alert_no_reply"
-  ]
+  "status": "superseded",
+  "by": "samples:pol_ops:alert_a",
+  "why": "«Полировка» 16.11 — первое сообщение; второе («Принял Анна · 14:07 — повторы остановлены», [Открыть]) в коде то же: alert.acked"
  },
  "tpl:ops:Незнакомый ответ": {
   "status": "superseded",
@@ -1333,9 +1328,9 @@
   "why": "нет экрана в коде"
  },
  "samples:ops_intake:m": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "superseded",
+  "by": "samples:pol_ops:intake_a",
+  "why": "«Полировка» 16.11 — вид подтверждения; строка «Не совпадает с чеком» и «Отправить владельцу» сохранены (снимок intake_confirm_mismatch)"
  },
  "samples:ops_paid:a": {
   "status": "todo",
@@ -1519,9 +1514,10 @@
   "why": "решение 19.11: заголовок <h3>"
  },
  "samples:pol_ops:alert_a": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего snap:review_alert_no_reply: 1 из 3 строк)"
+  "status": "match",
+  "screens": [
+   "snap:review_alert_no_reply"
+  ]
  },
  "samples:pol_ops:unknown_a": {
   "status": "todo",
@@ -1529,14 +1525,16 @@
   "why": "нет экрана в коде (ближе всего snap:critical_unknown_reply: 1 из 3 строк)"
  },
  "samples:pol_ops:intake_a": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 1 из 5 строк)"
+  "status": "match",
+  "screens": [
+   "snap:intake_confirm"
+  ]
  },
  "samples:pol_ops:paid_a": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 2 из 5 строк)"
+  "status": "match",
+  "screens": [
+   "snap:paid_confirm_check"
+  ]
  },
  "samples:pol_w_calc:promo_b": {
   "status": "later",

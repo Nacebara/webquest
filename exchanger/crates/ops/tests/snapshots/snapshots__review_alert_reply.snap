@@ -6,9 +6,10 @@ expression: dump(&screen)
 
 --- html
 🚨 <b>Нужен разбор</b> · <code>K7M2Q9XR4T</code>
-CB → xR · 100.00 → 97.50 · клиент 51234567
-Выплата: нет ответа 30 с, чек не найден
-<blockquote expandable>xRocket · 14:04:04 · Чек CQ12…9F временно недоступен</blockquote>
+<code>100.00</code> CryptoBot → <code>97.50</code> xRocket · клиент <code>51234567</code>
+Выплата: нет ответа 30 с, чек не найден.
+<blockquote>Чек CQ12…9F временно недоступен
+<i>xRocket · 14:04:04</i></blockquote>
 --- keyboard
 [{"text":"🔖 Открыть","callback_data":"a:o:15"},{"text":"✋ Взять","style":"primary","callback_data":"a:ot:15"}]
 [{"text":"👍 Принял","callback_data":"a:ack:9"}]

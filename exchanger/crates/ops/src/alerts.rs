@@ -1145,36 +1145,59 @@ pub fn critical_screen(
 pub fn review_alert_screen(t: &crate::Texts, p: &Value, id: i64) -> Screen {
     let order = p["id"].as_i64().unwrap_or_default();
     let direction = s(p, "direction").parse::<Direction>().ok();
-    let route = direction.map_or_else(
-        || esc(&s(p, "direction")),
-        |d| t.t(&format!("dash.short_{}", d.code())),
-    );
     let money = |k: &str| {
         p[k].as_str()
             .and_then(|v| v.parse::<domain::Decimal>().ok())
     };
+    // «Полировка» 16.11: «<code>100.00</code> CryptoBot → <code>97.50</code> xRocket»; у счёта —
+    // «счёт CryptoBot».
+    let (src, dst) = direction.map_or((String::new(), String::new()), |d| {
+        let dst = crate::review::wallet(d.target());
+        let dst = if d.flow() == domain::fsm::Flow::InvoicePayment {
+            t.f("alert.review_invoice", &[("wallet", &dst)])
+        } else {
+            dst.to_owned()
+        };
+        (crate::review::wallet(d.source()).to_owned(), dst)
+    });
     let amounts = match (money("amount_in").or(money("amount")), money("amount_out")) {
-        (Some(a), Some(b)) => format!("{} → {}", crate::dash::amount(a), crate::dash::amount(b)),
-        (Some(a), None) | (None, Some(a)) => crate::dash::amount(a),
+        (Some(a), Some(b)) => t.f(
+            "alert.review_amounts",
+            &[
+                ("amount_in", &crate::dash::amount(a)),
+                ("src", &src),
+                ("amount_out", &crate::dash::amount(b)),
+                ("dst", &dst),
+            ],
+        ),
+        (Some(a), None) => t.f(
+            "alert.review_amount",
+            &[("amount", &crate::dash::amount(a)), ("wallet", &src)],
+        ),
+        (None, Some(b)) => t.f(
+            "alert.review_amount",
+            &[("amount", &crate::dash::amount(b)), ("wallet", &dst)],
+        ),
         (None, None) => t.t("common.none"),
     };
     let public = p["public"]
         .as_str()
         .map_or_else(|| order.to_string(), str::to_owned);
     let reason = s(p, "reason");
+    let reason = reason.trim_end_matches('.');
     // Застрявшая переплата (Д-19.1, макет «Нужен разбор · переплата»): «Переплата 8.75: …».
     let reason = match money("excess") {
         Some(excess) => t.f(
             "alert.review_excess",
             &[
                 ("amount", &crate::dash::amount(excess)),
-                ("reason", &esc(&reason)),
+                ("reason", &esc(reason)),
             ],
         ),
         None if reason.is_empty() => String::new(),
-        None => t.f("alert.review_reason", &[("reason", &esc(&reason))]),
+        None => t.f("alert.review_reason", &[("reason", &esc(reason))]),
     };
-    // Чей ответ ждём: выплата и счёт — кошелёк выплаты, чек на переплату — кошелёк входа.
+    // Чей ответ: выплата и счёт — кошелёк выплаты, чек на переплату — кошелёк входа.
     let wallet = direction.map(|d| {
         crate::review::wallet(if money("excess").is_some() {
             d.source()
@@ -1202,27 +1225,13 @@ pub fn review_alert_screen(t: &crate::Texts, p: &Value, id: i64) -> Screen {
                 &[("who", &esc(who)), ("at", &at), ("text", &esc(&text))],
             )
         }
-        _ => match (
-            wallet,
-            s(p, "since").parse::<chrono::DateTime<chrono::Utc>>(),
-        ) {
-            (Some(w), Ok(since)) => t.f(
-                "alert.review_reply",
-                &[
-                    ("who", &w),
-                    ("at", &crate::review::hms(since)),
-                    ("text", &t.t("alert.review_no_reply")),
-                ],
-            ),
-            _ => String::new(),
-        },
+        _ => String::new(),
     };
     Screen::new(
         t.f(
             "alert.manual_review",
             &[
                 ("public", &esc(&public)),
-                ("route", &route),
                 ("amounts", &amounts),
                 (
                     "user",

@@ -970,12 +970,14 @@ async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
     let mark = o.tg.mark();
     o.drain().await;
     let alert = o.tg.screen(mark, OWNER, "Нужен разбор").await;
-    // Макет «Алерт и „Принял“» (П-6, П-7): публичный номер, путь, суммы, клиент; без «№15».
+    // Макет «Алерт и „Принял“» (П-6, П-7) в виде «Полировки» 16.11: публичный номер, суммы с
+    // кошельками, клиент — моно; без «№15».
     let text = alert.text();
     assert!(text.contains(&order.public_id), "{text}");
     assert!(!text.contains(&format!("№{}", order.id)), "{text}");
     assert!(
-        text.contains("CB → xR") && text.contains("100.00") && text.contains("клиент 111"),
+        text.contains("<code>100.00</code> CryptoBot → ")
+            && text.contains(" xRocket · клиент <code>111</code>"),
         "{text}"
     );
     assert!(alert.button("Взять").is_some() && alert.button("Принял").is_some());
@@ -2983,8 +2985,11 @@ async fn stuck_overpayment_is_closed_from_the_console_with_the_found_check(pool:
     let alert = o.tg.screen(mark, OWNER, "Нужен разбор").await;
     let text = alert.text();
     assert!(text.contains(&order.public_id), "{text}");
-    assert!(text.contains("Переплата 4.70"), "{text}");
-    assert!(text.contains("15.00 → 10.00"), "{text}");
+    assert!(text.contains("Переплата <code>4.70</code>"), "{text}");
+    assert!(
+        text.contains("<code>15.00</code> ") && text.contains(" → <code>10.00</code> счёт "),
+        "{text}"
+    );
 
     let card = o
         .press(OWNER, &alert, "Открыть", "Переплата не вернулась")
@@ -3396,9 +3401,9 @@ async fn every_panel_screen_has_a_way_back(pool: PgPool) {
             .map(str::to_owned)
             .unwrap_or_else(|| screen.text());
         if !path.is_empty() && !head.starts_with("Пульт") {
-            let back = labels.iter().any(|l| {
-                l.contains('◀') || l.ends_with("Меню") || l == "Отмена" || l.starts_with("Отмена")
-            });
+            let back = labels
+                .iter()
+                .any(|l| l.contains('◀') || l.ends_with("Меню") || l.contains("Отмена"));
             let odd_home = labels
                 .iter()
                 .any(|l| l.ends_with("Пульт") || l.contains("Главный экран") || l == "‹ Назад");

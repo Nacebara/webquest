@@ -17,7 +17,7 @@ sample = "Это пример экрана — кнопка ничего не д
 back = "‹ Назад"
 home = "{m:home} Пульт"
 refresh = "{m:refresh} Обновить"
-cancel = "Отмена"
+cancel = "{m:close} Отмена"
 confirm = "{m:done} Подтвердить"
 cancelled = "Отменено. Ничего не изменено."
 expired = "Кнопка устарела — откройте экран заново."
@@ -564,6 +564,12 @@ unknown_retry = "повторить {amount}"
 unknown_retry_invoice = "оплатить снова {amount}"
 unknown_refund = "вернуть {amount}"
 preview_evidence = "\nДоказательство: <i>{evidence}</i>"
+# «Полировка» 16.11 (pol_ops: paid_a, intake_a): заголовок — действие с суммой; кошелёк и заявка;
+# причина — цитатой с подписью «Анна · причина»; ссылка на чек — под спойлером.
+confirm_paid = "{e:warn} <b>Отметить выплаченной?</b>\nКлиент <code>{client}</code> получил {got} вне бота · заявка <code>{public}</code>{lines}\n<blockquote>{reason}\n<i>{who} · причина</i></blockquote>{warning}"
+got_amount = "<code>{amount}</code> USDT"
+got_money = "деньги"
+confirm_intake = "{e:warn} <b>Зачислить {amount} USDT?</b>\n{icon} {wallet} · заявка <code>{public}</code>{lines}\n<blockquote>{reason}\n<i>{who} · причина</i></blockquote>Сначала сверю кошелёк: зачислю не больше, чем там лишнего.\n{warning}"
 preview_check = "\nЧек: <tg-spoiler>{evidence}</tg-spoiler>"
 preview_amount = "\nПриход: <b>{amount}</b>"
 warn_unknown = "{e:warn} У прежней попытки <code>{key}</code> неясный исход. Подтверждая, вы утверждаете: <b>чек не создан / счёт не оплачен</b> — проверено в кошельке."
@@ -853,11 +859,15 @@ invest_manual = "{e:maint} <b>Инвестиции: нужен человек</b
 invest_failed = "{e:warn} <b>Вывод инвестора не прошёл</b> · #{id}, {amount} в {wallet}\n{note}\nДеньги остались у инвестора в обороте; выплаты с кошелька на паузе."
 # Макет «Алерт и „Принял“» (П-6, П-7): публичный номер, путь, суммы и клиент, причина, ответ
 # кошелька цитатой; после «Принял» — «Разбор · номер».
-manual_review = "{e:alarm} <b>Нужен разбор</b> · <code>{public}</code>\n{route} · {amounts} · клиент {user}{reason}{reply}"
-review_reason = "\n{reason}"
-review_excess = "\nПереплата {amount}: {reason}"
-review_reply = "\n<blockquote expandable>{who} · {at} · {text}</blockquote>"
-review_no_reply = "ответа нет"
+# «Полировка» 16.11 (pol_ops: alert_a): суммы и клиент — моно, полные имена кошельков; ответ кошелька —
+# цитатой с подписью; «ответа нет» не пишем.
+manual_review = "{e:alarm} <b>Нужен разбор</b> · <code>{public}</code>\n{amounts} · клиент <code>{user}</code>{reason}{reply}"
+review_amounts = "<code>{amount_in}</code> {src} → <code>{amount_out}</code> {dst}"
+review_amount = "<code>{amount}</code> {wallet}"
+review_invoice = "счёт {wallet}"
+review_reason = "\n{reason}."
+review_excess = "\nПереплата <code>{amount}</code>: {reason}."
+review_reply = "\n<blockquote>{text}\n<i>{who} · {at}</i></blockquote>"
 review_head = "<b>Разбор</b> · <code>{public}</code>"
 b_take = "{m:take} Взять"
 promo_hint = "{m:scale} <b>Перекос резерва</b>\n{source}: {source_available} из цели {source_target} (нехватка {deficit} %), {target}: {target_available} из цели {target_target}.\nРекомендую выгодный курс на «{name}» — {fee} на объём до {room}: ребалансировка без вывода через сеть."

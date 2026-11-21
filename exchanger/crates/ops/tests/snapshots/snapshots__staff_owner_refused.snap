@@ -9,4 +9,4 @@ expression: "dump(&Look::plain().screen(&screen))"
 
 <i>Пришлите ответ одним сообщением или нажмите «Отмена».</i>
 --- keyboard
-[{"text":"Отмена","callback_data":"a:x"}]
+[{"text":"❌ Отмена","callback_data":"a:x"}]

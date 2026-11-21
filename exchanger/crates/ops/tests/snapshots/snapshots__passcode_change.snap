@@ -9,4 +9,4 @@ expression: dump(&change)
 <code>500</code> → <code>30 000</code> $ · за сутки exch потратит до 28 500
 <i>Поставьте то же число в CryptoBot: Кошелёк → Настройки → Безопасность.</i>
 --- keyboard
-[{"text":"✅ Сохранить","style":"primary","callback_data":"a:x"},{"text":"Отмена","callback_data":"a:x"}]
+[{"text":"✅ Сохранить","style":"primary","callback_data":"a:x"},{"text":"❌ Отмена","callback_data":"a:x"}]

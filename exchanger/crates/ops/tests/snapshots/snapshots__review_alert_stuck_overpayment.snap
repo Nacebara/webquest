@@ -6,9 +6,8 @@ expression: dump
 
 --- html
 🚨 <b>Нужен разбор</b> · <code>Q1W2E3R4T5</code>
-Счета CB · 60.00 → 50.00 · клиент 51234567
-Переплата 8.75: нет ответа 30 с, чек не найден
-<blockquote expandable>xRocket · 14:13:58 · ответа нет</blockquote>
+<code>60.00</code> xRocket → <code>50.00</code> счёт CryptoBot · клиент <code>51234567</code>
+Переплата <code>8.75</code>: нет ответа 30 с, чек не найден.
 --- keyboard
 [{"text":"🔖 Открыть","callback_data":"a:o:17"},{"text":"✋ Взять","style":"primary","callback_data":"a:ot:17"}]
 [{"text":"👍 Принял","callback_data":"a:ack:9"}]

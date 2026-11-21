@@ -1,0 +1,15 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: "dump(&Look::plain().screen(&screen))"
+---
+--- rich
+
+--- html
+⚠️ <b>Зачислить 30.00 USDT?</b>
+🔷 CryptoBot · заявка <code>K7M2Q9XR4T</code>
+<blockquote>Деньги в чате кошелька, ответа не было
+<i>Анна · причина</i></blockquote>Сначала сверю кошелёк: зачислю не больше, чем там лишнего.
+<b>Необратимо.</b> <i>Кнопка действует 60 с.</i>
+--- keyboard
+[{"text":"✅ Зачислить 30.00","style":"danger","callback_data":"a:x"}]
+[{"text":"❌ Отмена","callback_data":"a:x"}]

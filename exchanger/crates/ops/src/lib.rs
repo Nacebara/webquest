@@ -54,7 +54,7 @@ use sqlx::PgPool;
 use storage::staff::{Role, StaffMember};
 use tokio_util::sync::CancellationToken;
 
-pub use actions::sample_paid_confirm;
+pub use actions::{sample_intake_confirm, sample_paid_confirm, sample_paid_confirm_check};
 pub use cb::Cb;
 pub use dash::{DashData, sample_dash};
 pub use look::Look;

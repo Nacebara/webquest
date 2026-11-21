@@ -1374,18 +1374,19 @@ impl Inner {
                 amount,
                 check,
             } => {
-                let mut extra = String::new();
+                let mut mismatch = String::new();
                 if let (Some(a), Some(c)) = (amount, check)
                     && off_check(*a, *c)
                 {
-                    extra.push_str(&t.f(
+                    mismatch = t.f(
                         "order.intake_mismatch",
                         &[
                             ("amount", &crate::dash::amount(*a)),
                             ("check", &crate::dash::amount(*c)),
                         ],
-                    ));
+                    );
                 }
+                let mut extra = mismatch.clone();
                 if let Some(e) = evidence {
                     // Ссылка на чек на предъявителя — под спойлером (правило «Ссылки на чеки в
                     // пульте — под спойлером»).
@@ -1495,7 +1496,7 @@ impl Inner {
                         c.refund_amount,
                     ),
                 };
-                let mut what = t.f(
+                let what = t.f(
                     what,
                     &[
                         ("wallet", &self.platform_name(wallet)),
@@ -1505,12 +1506,14 @@ impl Inner {
                 );
                 // Д-19.3 (картинка last-fixes.png принята 20.11): что будет с переплатой по счёту —
                 // тот же расчёт, что при автоматической оплате.
-                if *kind == DecisionKind::ClosePaid
-                    && let Some(x) = self.engine.paid_excess(*order).await?
-                {
-                    let line = paid_excess_line(t, &x, &self.platform_name(x.platform));
-                    what = format!("{what}\n{line}");
-                }
+                let excess_line = if *kind == DecisionKind::ClosePaid {
+                    self.engine
+                        .paid_excess(*order)
+                        .await?
+                        .map(|x| paid_excess_line(t, &x, &self.platform_name(x.platform)))
+                } else {
+                    None
+                };
                 let money_kinds = matches!(
                     kind,
                     DecisionKind::RetryPayout
@@ -1575,18 +1578,44 @@ impl Inner {
                     },
                     &[("amount", &money(sum))],
                 ));
-                t.f(
-                    "order.confirm",
-                    &[
-                        ("question", &t.t(q)),
-                        ("public", &esc(&c.public_id)),
-                        ("what", &what),
-                        ("previous", &previous),
-                        ("reason", &esc(reason)),
-                        ("extra", &extra),
-                        ("warning", &warning),
-                    ],
-                )
+                match kind {
+                    // «Полировка» 16.11 (pol_ops: paid_a, intake_a).
+                    DecisionKind::ClosePaid => paid_confirm_text(
+                        t,
+                        &PaidConfirm {
+                            client: &client,
+                            amount: c
+                                .payout_amount
+                                .filter(|_| c.direction.flow() == domain::fsm::Flow::CheckExchange),
+                            public: &c.public_id,
+                            excess: excess_line,
+                            evidence: evidence.as_deref(),
+                            reason,
+                            who: &staff.display_name,
+                        },
+                    ),
+                    DecisionKind::Intake => intake_confirm_text(
+                        t,
+                        amount.unwrap_or_default(),
+                        c.direction.source(),
+                        &c.public_id,
+                        &mismatch,
+                        reason,
+                        &staff.display_name,
+                    ),
+                    _ => t.f(
+                        "order.confirm",
+                        &[
+                            ("question", &t.t(q)),
+                            ("public", &esc(&c.public_id)),
+                            ("what", &what),
+                            ("previous", &previous),
+                            ("reason", &esc(reason)),
+                            ("extra", &extra),
+                            ("warning", &warning),
+                        ],
+                    ),
+                }
             }
             Action::Terms {
                 user,
@@ -2572,6 +2601,88 @@ pub(crate) fn paid_excess_line(t: &crate::Texts, x: &engine::PaidExcess, wallet:
     }
 }
 
+/// Что сотрудник предъявил для «Отметить выплаченной?»: ссылка на чек — под спойлером
+/// («Полировка» 16.11), иначе — «Доказательство: …».
+fn paid_proof(t: &crate::Texts, evidence: &str) -> String {
+    let link = evidence.contains("t.me/") || evidence.starts_with("http");
+    t.f(
+        if link {
+            "order.preview_check"
+        } else {
+            "order.preview_evidence"
+        },
+        &[("evidence", &esc(evidence))],
+    )
+}
+
+/// «Отметить выплаченной?» по «Полировке» 16.11 (pol_ops: paid_a); строка переплаты — Д-19.3.
+pub(crate) struct PaidConfirm<'a> {
+    pub client: &'a str,
+    /// Сколько клиент получил (у обмена чеков); у счёта — `None`: «получил деньги».
+    pub amount: Option<Decimal>,
+    pub public: &'a str,
+    pub excess: Option<String>,
+    pub evidence: Option<&'a str>,
+    pub reason: &'a str,
+    pub who: &'a str,
+}
+
+pub(crate) fn paid_confirm_text(t: &crate::Texts, c: &PaidConfirm<'_>) -> String {
+    let got = c.amount.map_or_else(
+        || t.t("order.got_money"),
+        |a| t.f("order.got_amount", &[("amount", &crate::dash::amount(a))]),
+    );
+    let mut lines = String::new();
+    if let Some(x) = &c.excess {
+        lines.push('\n');
+        lines.push_str(x);
+    }
+    if let Some(e) = c.evidence {
+        lines.push_str(&paid_proof(t, e));
+    }
+    t.f(
+        "order.confirm_paid",
+        &[
+            ("client", &esc(c.client)),
+            ("got", &got),
+            ("public", &esc(c.public)),
+            ("lines", &lines),
+            ("reason", &esc(c.reason)),
+            ("who", &esc(c.who)),
+            ("warning", &t.t("order.irreversible")),
+        ],
+    )
+}
+
+/// «Зачислить … USDT?» по «Полировке» 16.11 (pol_ops: intake_a); расхождение с чеком — строкой.
+pub(crate) fn intake_confirm_text(
+    t: &crate::Texts,
+    amount: Decimal,
+    platform: Platform,
+    public: &str,
+    mismatch: &str,
+    reason: &str,
+    who: &str,
+) -> String {
+    let icon = match platform {
+        Platform::CryptoBot => "{e:cb}",
+        Platform::XRocket => "{e:xr}",
+    };
+    t.f(
+        "order.confirm_intake",
+        &[
+            ("amount", &crate::dash::amount(amount)),
+            ("icon", &icon),
+            ("wallet", &t.t(&format!("names.{}", platform.db_name()))),
+            ("public", &esc(public)),
+            ("lines", &mismatch),
+            ("reason", &esc(reason)),
+            ("who", &esc(who)),
+            ("warning", &t.t("order.irreversible")),
+        ],
+    )
+}
+
 /// Кнопка подтверждения и «Отмена». Длинная надпись рядом с «Отмена» обрезается («Отметить
 /// вып…»): такая кнопка — отдельной строкой (макеты «Подтверждение · переплата», last-fixes.png).
 pub(crate) fn confirm_rows(
@@ -2615,31 +2726,90 @@ pub fn sample_paid_confirm(t: &crate::Texts, refund: bool) -> Screen {
         threshold: Decimal::new(50, 2),
         platform: Platform::XRocket,
     };
-    let what = format!(
-        "{}\n{}",
-        t.f("order.what_paid", &[("client", &"51234567")]),
-        paid_excess_line(t, &x, &t.t("names.xrocket"))
-    );
-    let extra = t.f(
-        "order.preview_evidence",
-        &[("evidence", &"оплатил кнопкой в @send, 14:10")],
-    );
-    let text = t.f(
-        "order.confirm",
-        &[
-            ("question", &t.t("order.q_paid")),
-            ("public", &"7F3A1C9D2B"),
-            ("what", &what),
-            ("previous", &""),
-            ("reason", &"счёт оплачен вручную"),
-            ("extra", &extra),
-            ("warning", &t.t("order.irreversible")),
-        ],
+    let text = paid_confirm_text(
+        t,
+        &PaidConfirm {
+            client: "51234567",
+            amount: None,
+            public: "7F3A1C9D2B",
+            excess: Some(paid_excess_line(t, &x, &t.t("names.xrocket"))),
+            evidence: Some("оплатил кнопкой в @send, 14:10"),
+            reason: "Счёт оплачен вручную",
+            who: "Анна",
+        },
     );
     confirm_rows(
         t,
         Screen::new(text),
         t.t("order.b_do_paid"),
+        &Cb::Sample,
+        Some(botapi::ButtonStyle::Danger),
+        &Cb::Sample,
+    )
+}
+
+/// «Отметить выплаченной?» обмена со ссылкой на найденный чек — макет «Полировки» 16.11.
+pub fn sample_paid_confirm_check(t: &crate::Texts) -> Screen {
+    let text = paid_confirm_text(
+        t,
+        &PaidConfirm {
+            client: "51234567",
+            amount: Some(Decimal::new(9750, 2)),
+            public: "K7M2Q9XR4T",
+            excess: None,
+            evidence: Some("t.me/xrocket?start=mc_7Q4Hk2"),
+            reason: "Чек нашёлся в истории кошелька",
+            who: "Анна",
+        },
+    );
+    confirm_rows(
+        t,
+        Screen::new(text),
+        t.t("order.b_do_paid"),
+        &Cb::Sample,
+        Some(botapi::ButtonStyle::Danger),
+        &Cb::Sample,
+    )
+}
+
+/// «Зачислить … USDT?» на данных макета «Полировки» 16.11; `mismatch` — сумма не совпала с чеком
+/// (решает владелец).
+pub fn sample_intake_confirm(t: &crate::Texts, mismatch: bool) -> Screen {
+    let (amount, line) = if mismatch {
+        (
+            Decimal::new(3100, 2),
+            t.f(
+                "order.intake_mismatch",
+                &[("amount", &"31.00"), ("check", &"30.00")],
+            ),
+        )
+    } else {
+        (Decimal::new(3000, 2), String::new())
+    };
+    let text = intake_confirm_text(
+        t,
+        amount,
+        Platform::CryptoBot,
+        "K7M2Q9XR4T",
+        &line,
+        "Деньги в чате кошелька, ответа не было",
+        "Анна",
+    );
+    let s = Screen::new(text);
+    if mismatch {
+        return s
+            .row(vec![
+                btn(t.t("common.b_ask_owner"), &Cb::Sample).style(botapi::ButtonStyle::Primary),
+            ])
+            .row(vec![btn(t.t("common.cancel"), &Cb::Sample)]);
+    }
+    confirm_rows(
+        t,
+        s,
+        t.f(
+            "order.b_do_intake",
+            &[("amount", &crate::dash::amount(amount))],
+        ),
         &Cb::Sample,
         Some(botapi::ButtonStyle::Danger),
         &Cb::Sample,

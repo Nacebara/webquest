@@ -166,6 +166,8 @@ pub fn lines(html: &str) -> Vec<String> {
         "<div",
         "<table",
         "</table>",
+        // Подпись под цитатой: в Telegram — отдельная строка внутри цитаты.
+        "<cite>",
     ] {
         s = s.replace(tag, &format!("\n{tag}"));
     }

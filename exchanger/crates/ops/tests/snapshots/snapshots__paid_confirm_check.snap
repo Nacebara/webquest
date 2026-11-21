@@ -1,0 +1,15 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: "dump(&Look::plain().screen(&screen))"
+---
+--- rich
+
+--- html
+⚠️ <b>Отметить выплаченной?</b>
+Клиент <code>51234567</code> получил <code>97.50</code> USDT вне бота · заявка <code>K7M2Q9XR4T</code>
+Чек: <tg-spoiler>t.me/xrocket?start=mc_7Q4Hk2</tg-spoiler>
+<blockquote>Чек нашёлся в истории кошелька
+<i>Анна · причина</i></blockquote><b>Необратимо.</b> <i>Кнопка действует 60 с.</i>
+--- keyboard
+[{"text":"✅ Отметить выплаченной","style":"danger","callback_data":"a:x"}]
+[{"text":"❌ Отмена","callback_data":"a:x"}]

@@ -72,6 +72,13 @@ fn reserves_and_shortfall() {
             ops::sample_paid_confirm(&t, false),
         ),
         ("staff_owner_refused", ops::sample_owner_add_refused(&t)),
+        // «Полировка» 16.11 (pol_ops: paid_a, intake_a).
+        ("paid_confirm_check", ops::sample_paid_confirm_check(&t)),
+        ("intake_confirm", ops::sample_intake_confirm(&t, false)),
+        (
+            "intake_confirm_mismatch",
+            ops::sample_intake_confirm(&t, true),
+        ),
     ] {
         insta::assert_snapshot!(name, dump(&Look::plain().screen(&screen)));
     }
@@ -377,7 +384,8 @@ fn order_card_stuck_overpayment() {
     }
 }
 
-/// Д-19.1: тревога «Нужен разбор» по застрявшей переплате — «Переплата 8.75: …», суммы счёта.
+/// Д-19.1: тревога «Нужен разбор» по застрявшей переплате — «Переплата 8.75: …», суммы счёта
+/// (вид — «Полировка» 16.11).
 #[test]
 fn review_alert_stuck_overpayment() {
     let t = Texts::builtin().unwrap();
@@ -388,7 +396,7 @@ fn review_alert_stuck_overpayment() {
     let screen = Look::plain().screen(&ops::review_alert_screen(&t, &p, 9));
     let dump = dump(&screen);
     assert!(
-        dump.contains("Переплата 8.75: нет ответа 30 с, чек не найден"),
+        dump.contains("Переплата <code>8.75</code>: нет ответа 30 с, чек не найден."),
         "{dump}"
     );
     insta::assert_snapshot!("review_alert_stuck_overpayment", dump);
