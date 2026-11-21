@@ -58,5 +58,5 @@ expression: dump(&screen)
 <i>🔴 Аккаунты 1/2 · сверка <tg-time unix="1793877300" format="t">14:15</tg-time> — расхождение</i>
 --- keyboard
 [{"text":"⚠️ Недостача","style":"danger","callback_data":"a:al:1"},{"text":"📋 Разбор · 4","style":"primary","callback_data":"a:q"}]
-[{"text":"🔌 ub-2: войти","style":"primary","callback_data":"a:b"},{"text":"🏦 Резервы","callback_data":"a:rs"}]
+[{"text":"🔌 ub-2: войти","style":"primary","callback_data":"a:lh:2"},{"text":"🏦 Резервы","callback_data":"a:rs"}]
 [{"text":"🎛 Меню","callback_data":"a:m"}]

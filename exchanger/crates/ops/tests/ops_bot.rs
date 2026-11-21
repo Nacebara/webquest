@@ -3210,14 +3210,18 @@ async fn a_lost_login_alert_shows_how_to_log_in_again(pool: PgPool) {
     o.say(OWNER, "/menu", "<b>Пульт</b>").await;
     {
         let mut conn = o.pool.acquire().await.unwrap();
+        let ub: i16 = sqlx::query_scalar("SELECT id FROM userbot_accounts WHERE label = 'ub-1'")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
         storage::alerts::raise(
             &mut conn,
             &storage::alerts::NewAlert {
                 level: storage::alerts::Level::Critical,
                 topic: storage::alerts::Topic::Errors,
-                dedup_key: "login_lost:ub-2",
+                dedup_key: "login_lost:ub-1",
                 title: "login_lost",
-                payload: json!({"account": "ub-2", "userbot_id": 2, "platforms": ["xrocket"]}),
+                payload: json!({"account": "ub-1", "userbot_id": ub, "platforms": ["xrocket"]}),
             },
         )
         .await
@@ -3238,7 +3242,7 @@ async fn a_lost_login_alert_shows_how_to_log_in_again(pool: PgPool) {
         .await;
     let text = how.text();
     for needle in [
-        "Как войти · ub-2",
+        "Как войти · ub-1",
         "Завершить все",
         "exch setup",
         "exch service start",
@@ -3276,4 +3280,22 @@ async fn panel_preview_samples_carry_no_live_buttons(pool: PgPool) {
             })
             .collect();
     assert!(live.is_empty(), "живые кнопки на примерах: {live:#?}");
+}
+
+/// Решение владельца 21.11: «ub-1: войти» на главном экране — тоже в «Как войти», а не в
+/// «Аккаунты», где войти нельзя.
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn the_dash_login_button_shows_how_to_log_in_again(pool: PgPool) {
+    let o = ops(pool).await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        storage::sessions::mark_logged_out(&mut conn, "ub-1")
+            .await
+            .unwrap();
+    }
+    let dash = o.say(OWNER, "/dash", "вход сброшен").await;
+    let how = o
+        .press(OWNER, &dash, "ub-1: войти", "exch service stop")
+        .await;
+    assert!(how.text().contains("Как войти · ub-1"), "{}", how.text());
 }

@@ -71,19 +71,16 @@ pub(crate) fn may_see(a: &AlertRow, role: Role) -> bool {
 }
 
 impl Inner {
-    /// «Как войти» из тревоги «Вход сброшен»: имя аккаунта — из тревоги; видят те, кому она
-    /// приходит (Б-19.3). Тревоги нет или она другая — «Аккаунты».
-    pub(crate) async fn login_how(&self, staff: &StaffMember, id: i64) -> Result<Screen, OpsError> {
-        let a = {
+    /// «Как войти» для аккаунта по номеру: справка, её видит каждый, как «Аккаунты». Аккаунта
+    /// нет — «Аккаунты».
+    pub(crate) async fn login_how(&self, id: i16) -> Result<Screen, OpsError> {
+        let bots = {
             let mut conn = self.pool.acquire().await?;
-            storage::alerts::get(&mut conn, id).await?
+            storage::admin::userbots(&mut conn).await?
         };
-        match a {
-            Some(a) if a.title == "login_lost" && may_see(&a, staff.role) => Ok(login_how_screen(
-                &self.texts,
-                a.payload["account"].as_str().unwrap_or_default(),
-            )),
-            _ => self.bots().await,
+        match bots.iter().find(|b| b.id == id) {
+            Some(b) => Ok(login_how_screen(&self.texts, &b.label)),
+            None => self.bots().await,
         }
     }
 
@@ -968,7 +965,7 @@ pub fn critical_screen(
                         &[("account", &account), ("route", &route)],
                     ))
                     .row(vec![
-                        btn(t.t("alert.b_login_how"), &Cb::LoginHow(id))
+                        btn(t.t("alert.b_login_how"), &ub.map_or(Cb::Bots, Cb::LoginHow))
                             .style(botapi::ButtonStyle::Primary),
                     ])
                     .row(

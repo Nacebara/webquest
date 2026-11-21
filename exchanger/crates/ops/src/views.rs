@@ -1609,7 +1609,7 @@ impl Inner {
             }
             Cb::Reserves => self.reserves(staff).await,
             Cb::AlertShow(id) => self.alert_screen(staff, id).await,
-            Cb::LoginHow(id) => self.login_how(staff, id).await,
+            Cb::LoginHow(id) => self.login_how(id).await,
             // «Нет, разбираться» на недостаче — админ и выше (шаг 3, таблица прав).
             Cb::Investigate(id) => match self.deny(staff, Role::Admin) {
                 Some(denied) => Ok(denied),

@@ -34,7 +34,11 @@ pub enum Need {
     /// Заявки на ручном разборе; возраст старейшей, минуты.
     Review { n: i64, oldest_mins: i64 },
     /// Аккаунт юзербота потерял вход (`logged_out`) или заблокирован (`banned`).
-    Session { label: String, banned: bool },
+    Session {
+        id: i16,
+        label: String,
+        banned: bool,
+    },
     /// Счета, которые нужно оплатить руками, и их сумма.
     ManualInvoice { n: i64, amount: Decimal },
     /// Незнакомый ответ кошелька: приём на платформе на автопаузе.
@@ -260,7 +264,7 @@ impl DashData {
                     t.f("dash.v_review", &[("n", n), ("age", &age)]),
                 )
             }
-            Need::Session { label, banned } => (
+            Need::Session { label, banned, .. } => (
                 t.f(
                     if *banned {
                         "dash.n_banned"
@@ -390,8 +394,13 @@ impl DashData {
                 Need::Review { n, .. } => {
                     out.push(btn(t.f("dash.b_review", &[("n", n)]), &Cb::Queue).style(Primary));
                 }
-                Need::Session { label, .. } => out.push(
-                    btn(t.f("dash.b_login", &[("label", &esc(label))]), &Cb::Bots).style(Primary),
+                // Решение владельца 21.11: «войти» — в «Как войти», а не в «Аккаунты».
+                Need::Session { id, label, .. } => out.push(
+                    btn(
+                        t.f("dash.b_login", &[("label", &esc(label))]),
+                        &Cb::LoginHow(*id),
+                    )
+                    .style(Primary),
                 ),
                 Need::ManualInvoice { n, .. } => {
                     out.push(btn(t.f("dash.b_invoices", &[("n", n)]), &Cb::Queue).style(Primary))
@@ -668,6 +677,7 @@ pub fn sample_dash() -> [(&'static str, DashData); 4] {
                 oldest_mins: 18,
             },
             Need::Session {
+                id: 2,
                 label: "ub-2".into(),
                 banned: false,
             },
@@ -784,6 +794,7 @@ impl Inner {
             }
             if matches!(b.status.as_str(), "logged_out" | "banned") {
                 needs.push(Need::Session {
+                    id: b.id,
                     label: b.label.clone(),
                     banned: b.status == "banned",
                 });
