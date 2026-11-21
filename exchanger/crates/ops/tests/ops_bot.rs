@@ -1011,11 +1011,12 @@ async fn manual_review_alert_leads_to_a_refund_decision(pool: PgPool) {
         "{confirm}"
     );
     assert_eq!(confirm["style"], "danger", "{confirm}");
-    let done = o.press(OWNER, &preview, "Вернуть", "возврат").await;
-    // П-7: итог — с публичным номером, без внутреннего «№15».
+    let done = o.press(OWNER, &preview, "Вернуть", "<b>Возврат</b>").await;
+    // П-7: итог — с публичным номером, без внутреннего «№15» (отдельным сообщением, концепция Б
+    // пульта 15.11).
     assert!(
         done.text()
-            .contains(&format!("Заявка <code>{}</code>", order.public_id)),
+            .contains(&format!("<code>{}</code>", order.public_id)),
         "{}",
         done.text()
     );
@@ -1126,6 +1127,9 @@ async fn a_button_in_an_alert_opens_a_new_message_and_the_alert_stays(pool: PgPo
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn alerts_reach_roles_that_can_act_with_sound_by_role(pool: PgPool) {
     let o = ops(pool).await;
+    // Метка — до того, как тревоги подняты: бот в фоне сам рассылает тревоги и может успеть
+    // раньше `deliver_alerts` ниже (тест падал под нагрузкой).
+    let mark = o.tg.mark();
     {
         let mut conn = o.pool.acquire().await.unwrap();
         storage::staff::add(&mut conn, OPERATOR, Role::Operator, "Олег", OWNER)
@@ -1158,7 +1162,6 @@ async fn alerts_reach_roles_that_can_act_with_sound_by_role(pool: PgPool) {
             .unwrap();
         }
     }
-    let mark = o.tg.mark();
     o.bot.deliver_alerts().await.unwrap();
     let sent = |chat: i64, needle: &str| {
         o.tg.calls()
@@ -1283,7 +1286,7 @@ async fn taking_an_order_locks_its_decisions_to_the_taker(pool: PgPool) {
     let preview = o
         .say(OWNER, "клиент просит вернуть", "Вернуть клиенту?")
         .await;
-    o.press(OWNER, &preview, "Вернуть", "возврат").await;
+    o.press(OWNER, &preview, "Вернуть", "<b>Возврат</b>").await;
     o.drain().await;
     assert_eq!(order_state(&o, order.id).await, OrderState::Refunded);
     let takes = o.audit("order.take").await;
@@ -3029,7 +3032,9 @@ async fn stuck_overpayment_is_closed_from_the_console_with_the_found_check(pool:
         "{}",
         preview.text()
     );
-    let done = o.press(OWNER, &preview, "Чек выдан", "Заявка").await;
+    let done = o
+        .press(OWNER, &preview, "Чек выдан", "<b>Чек переплаты выдан</b>")
+        .await;
     assert!(done.text().contains(&order.public_id), "{}", done.text());
 
     let mut conn = o.pool.acquire().await.unwrap();
@@ -3176,7 +3181,8 @@ async fn unclear_refund_is_closed_from_the_console_with_the_found_check(pool: Pg
         .create_check(CheckSpec::new(CB, usdt(dec!(1))).by(o.ub))
         .unwrap();
     let preview = o.say(OWNER, &found.url, "Отметить возврат выданным?").await;
-    o.press(OWNER, &preview, "Возврат выдан", "Заявка").await;
+    o.press(OWNER, &preview, "Возврат выдан", "<b>Возврат выдан</b>")
+        .await;
     let mut conn = o.pool.acquire().await.unwrap();
     let after = storage::orders::get(&mut conn, order.id, false)
         .await

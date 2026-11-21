@@ -448,6 +448,10 @@ fn parse_tiers(s: &str) -> Option<FeeSchedule> {
 fn refusal_text(inner: &Inner, r: &Refusal) -> String {
     let t = &inner.texts;
     match r {
+        // Концепция Б пульта (15.11, cx_pult: refuse_new): «Заявка уже выплачена — разбирать нечего».
+        Refusal::NotInReview(domain::fsm::OrderState::Completed) => {
+            t.t("refusal.not_in_review_done")
+        }
         Refusal::NotInReview(s) => t.f(
             "refusal.not_in_review",
             &[("state", &inner.state_name(s.as_db_str()))],
@@ -464,7 +468,10 @@ fn refusal_text(inner: &Inner, r: &Refusal) -> String {
         Refusal::PreviousDone(k) => t.f("refusal.previous_done", &[("key", &esc(k))]),
         Refusal::OverManualLimit { amount, limit } => t.f(
             "refusal.limit",
-            &[("amount", &usdt(*amount)), ("limit", &usdt(*limit))],
+            &[
+                ("amount", &crate::dash::amount(*amount)),
+                ("limit", &crate::dash::amount(*limit)),
+            ],
         ),
         Refusal::Rules(why) => t.f("refusal.rules", &[("why", &esc(why))]),
         Refusal::NoReserve { available, needed } => t.f(
@@ -1116,7 +1123,12 @@ impl Inner {
                 tracing::warn!(owner = owner.tg_user_id, error = %e, "owner request not delivered");
             }
         }
-        Ok(Screen::new(t.t("common.request_sent")).row(vec![btn(t.t("nav.menu"), &Cb::Menu)]))
+        // Макет «Отправить владельцу» (13.11, ops_owner: s): назад — к заявке.
+        let back = match &action {
+            Action::Decide { order, .. } => btn(t.t("order.b_card"), &Cb::Order(*order)),
+            _ => btn(t.t("nav.menu"), &Cb::Menu),
+        };
+        Ok(Screen::new(t.t("common.request_sent")).row(vec![back]))
     }
 
     pub(crate) async fn preview_for(
@@ -1984,25 +1996,83 @@ impl Inner {
                     double_confirmed: true,
                 })
                 .await;
-            let public = esc(&self.public_id(*order).await?);
-            let head = match result {
-                Ok(o) => t.f(
-                    "order.done",
-                    &[
-                        ("public", &public),
-                        ("state", &self.state_name(o.state.as_db_str())),
-                    ],
-                ),
+            let public = self.public_id(*order).await?;
+            // Итог и отказ — отдельным сообщением с кнопкой «Заявка» (макеты 13.11 и 15.11).
+            match result {
+                Ok(_) => {
+                    let card = {
+                        let mut conn = self.pool.acquire().await?;
+                        storage::admin::order_card(&mut conn, *order).await.ok()
+                    };
+                    let (sum, wallet) = card.as_ref().map_or((None, None), |c| {
+                        let (src, dst) = (c.direction.source(), c.direction.target());
+                        match kind {
+                            DecisionKind::RetryPayout | DecisionKind::ClosePaid => {
+                                (c.payout_amount, Some(dst))
+                            }
+                            DecisionKind::RetryInvoice => (c.invoice_amount, Some(dst)),
+                            DecisionKind::Refund | DecisionKind::RefundIssued => {
+                                (c.refund_amount.or(c.intake_amount), Some(src))
+                            }
+                            DecisionKind::RetryExcess | DecisionKind::ExcessIssued => {
+                                (c.refund_amount, Some(src))
+                            }
+                            DecisionKind::Close => (c.intake_amount.or(c.quote_amount_in), None),
+                            DecisionKind::Intake => (*amount, None),
+                        }
+                    });
+                    return Ok(decision_result_screen(
+                        t,
+                        &DecisionResult {
+                            kind: *kind,
+                            public: &public,
+                            amount: sum,
+                            wallet: wallet.map(|w| self.platform_name(w)),
+                            who: &staff.display_name,
+                            at: crate::dash::hhmm(chrono::Utc::now()),
+                        },
+                        &Cb::Order(*order),
+                    ));
+                }
+                Err(OperatorError::Refused(Refusal::OverWalletExcess { amount, room })) => {
+                    return Ok(not_posted_screen(t, &public, amount, room, *order));
+                }
                 Err(OperatorError::Refused(r)) => {
-                    t.f("order.refusal", &[("why", &refusal_text(self, &r))])
+                    // Что нажать дальше: при неясном исходе — «Проверил — подтверждаю» (админ),
+                    // выше потолка — «Отправить владельцу».
+                    let next = match &r {
+                        Refusal::PreviousUnknown(_) if staff.role >= Role::Admin => Some(
+                            btn(
+                                t.t("order.b_confirm_unknown"),
+                                &Cb::ConfirmUnknown(self.hold(staff.tg_user_id, action.clone())),
+                            )
+                            .style(botapi::ButtonStyle::Primary),
+                        ),
+                        Refusal::OverManualLimit { .. } => Some(
+                            btn(
+                                t.t("common.b_ask_owner"),
+                                &Cb::AskOwner(self.hold(staff.tg_user_id, action.clone())),
+                            )
+                            .style(botapi::ButtonStyle::Primary),
+                        ),
+                        _ => None,
+                    };
+                    return Ok(refusal_screen(
+                        t,
+                        &public,
+                        &refusal_text(self, &r),
+                        matches!(r, Refusal::PreviousUnknown(_)),
+                        next,
+                        &Cb::Order(*order),
+                    ));
                 }
                 Err(OperatorError::Engine(e)) => {
                     tracing::error!(order, error = %e, "operator decision failed");
-                    t.f("common.error", &[("error", &esc(&e.to_string()))])
+                    let head = t.f("common.error", &[("error", &esc(&e.to_string()))]);
+                    let card = self.order(Some(staff), *order).await?;
+                    return Ok(card.notice(&head));
                 }
-            };
-            let card = self.order(Some(staff), *order).await?;
-            return Ok(card.notice(&head));
+            }
         }
 
         if let Action::Selftest { amount } = &action {
@@ -2599,6 +2669,189 @@ pub(crate) fn paid_excess_line(t: &crate::Texts, x: &engine::PaidExcess, wallet:
             ],
         ),
     }
+}
+
+/// Итог решения по заявке (концепция Б пульта 15.11, cx_pult: done_new).
+pub(crate) struct DecisionResult<'a> {
+    pub kind: DecisionKind,
+    pub public: &'a str,
+    pub amount: Option<Decimal>,
+    pub wallet: Option<String>,
+    pub who: &'a str,
+    pub at: String,
+}
+
+pub(crate) fn decision_result_screen(
+    t: &crate::Texts,
+    r: &DecisionResult<'_>,
+    card: &Cb,
+) -> Screen {
+    let what = match r.kind {
+        DecisionKind::RetryPayout => "order.res_retry",
+        DecisionKind::RetryInvoice => "order.res_retry_invoice",
+        DecisionKind::Refund => "order.res_refund",
+        DecisionKind::ClosePaid => "order.res_paid",
+        DecisionKind::Close => "order.res_close",
+        DecisionKind::Intake => "order.res_intake",
+        DecisionKind::RefundIssued => "order.res_refund_issued",
+        DecisionKind::RetryExcess => "order.res_retry_excess",
+        DecisionKind::ExcessIssued => "order.res_excess_issued",
+    };
+    let detail = match (r.amount, &r.wallet, r.kind) {
+        (Some(a), _, DecisionKind::Close) => {
+            t.f("order.d_kept", &[("amount", &crate::dash::amount(a))])
+        }
+        (Some(a), _, DecisionKind::Intake) => {
+            t.f("order.d_intake", &[("amount", &crate::dash::amount(a))])
+        }
+        (Some(a), Some(w), _) => t.f(
+            "order.d_money",
+            &[("amount", &crate::dash::amount(a)), ("wallet", w)],
+        ),
+        _ => String::new(),
+    };
+    Screen::new(t.f(
+        "order.result",
+        &[
+            ("what", &t.t(what)),
+            ("public", &esc(r.public)),
+            ("detail", &detail),
+            ("who", &esc(r.who)),
+            ("at", &r.at),
+        ],
+    ))
+    .row(vec![
+        btn(t.t("order.b_card"), card),
+        btn(t.t("order.b_journal"), &Cb::Audit),
+    ])
+}
+
+/// «Не сделано» (13.11 ops_refusal, заголовок — 15.11 cx_pult): что не так, где деньги, что дальше.
+pub(crate) fn refusal_screen(
+    t: &crate::Texts,
+    public: &str,
+    why: &str,
+    money: bool,
+    next: Option<botapi::InlineKeyboardButton>,
+    card: &Cb,
+) -> Screen {
+    let money = if money {
+        t.t("order.refused_money_unknown")
+    } else {
+        String::new()
+    };
+    let s = Screen::new(t.f(
+        "order.refused",
+        &[("public", &esc(public)), ("why", &why), ("money", &money)],
+    ));
+    let s = match next {
+        Some(b) => s.row(vec![b]),
+        None => s,
+    };
+    s.row(vec![btn(t.t("order.b_card"), card)])
+}
+
+/// «Не зачислено»: в кошельке сверх учёта меньше, чем ввели (13.11 ops_intake: x).
+pub(crate) fn not_posted_screen(
+    t: &crate::Texts,
+    public: &str,
+    amount: Decimal,
+    room: Decimal,
+    order: i64,
+) -> Screen {
+    Screen::new(t.f(
+        "order.intake_not_posted",
+        &[
+            ("public", &esc(public)),
+            ("room", &crate::dash::amount(room.max(Decimal::ZERO))),
+            ("amount", &crate::dash::amount(amount)),
+        ],
+    ))
+    .row(vec![
+        btn(
+            t.t("order.b_other_amount"),
+            &Cb::Decide(order, DecisionKind::Intake),
+        )
+        .style(botapi::ButtonStyle::Primary),
+    ])
+    .row(vec![
+        btn(t.t("order.b_reconcile"), &Cb::Reconcile),
+        btn(t.t("order.b_card"), &Cb::Order(order)),
+    ])
+}
+
+/// Образцы итога и отказов на данных макета (снимки, «Предпросмотр»).
+pub fn sample_decision_screens(t: &crate::Texts) -> Vec<(&'static str, Screen)> {
+    let card = Cb::Sample;
+    vec![
+        (
+            "decision_result_paid",
+            decision_result_screen(
+                t,
+                &DecisionResult {
+                    kind: DecisionKind::ClosePaid,
+                    public: "K7M2Q9XR4T",
+                    amount: Some(Decimal::new(9750, 2)),
+                    wallet: Some(t.t("names.xrocket")),
+                    who: "Анна",
+                    at: "14:07".into(),
+                },
+                &card,
+            ),
+        ),
+        (
+            "refusal_unknown",
+            refusal_screen(
+                t,
+                "K7M2Q9XR4T",
+                &t.f("refusal.unknown", &[("key", &"ord-41-payout-1")]),
+                true,
+                Some(
+                    btn(t.t("order.b_confirm_unknown"), &card).style(botapi::ButtonStyle::Primary),
+                ),
+                &card,
+            ),
+        ),
+        (
+            "refusal_limit",
+            refusal_screen(
+                t,
+                "K7M2Q9XR4T",
+                &t.f(
+                    "refusal.limit",
+                    &[("amount", &"450.00"), ("limit", &"300.00")],
+                ),
+                false,
+                Some(btn(t.t("common.b_ask_owner"), &card).style(botapi::ButtonStyle::Primary)),
+                &card,
+            ),
+        ),
+        (
+            "refusal_done",
+            refusal_screen(
+                t,
+                "K7M2Q9XR4T",
+                &t.t("refusal.not_in_review_done"),
+                false,
+                None,
+                &card,
+            ),
+        ),
+        (
+            "intake_not_posted",
+            not_posted_screen(
+                t,
+                "K7M2Q9XR4T",
+                Decimal::new(30000, 2),
+                Decimal::new(300, 2),
+                41,
+            ),
+        ),
+        (
+            "owner_request_sent",
+            Screen::new(t.t("common.request_sent")).row(vec![btn(t.t("order.b_card"), &card)]),
+        ),
+    ]
 }
 
 /// Что сотрудник предъявил для «Отметить выплаченной?»: ссылка на чек — под спойлером

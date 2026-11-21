@@ -1,0 +1,13 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: "dump(&Look::plain().screen(&screen))"
+---
+--- rich
+
+--- html
+❌ <b>Не зачислено</b> · заявка <code>K7M2Q9XR4T</code>
+В кошельке сверх учёта только <b>3.00</b>, а вы вводите <b>300.00</b>. Проверьте сумму или сверьте кошелёк ещё раз.
+Деньги клиента: в кошельке, в учёте их нет.
+--- keyboard
+[{"text":"📥 Ввести другую сумму","style":"primary","callback_data":"a:od:41:in"}]
+[{"text":"🔄 Сверить балансы","callback_data":"a:rc"},{"text":"🔖 Заявка","callback_data":"a:o:41"}]

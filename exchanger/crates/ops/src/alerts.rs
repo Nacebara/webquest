@@ -1050,7 +1050,7 @@ pub fn critical_screen(
                         "direction",
                         &direction.map_or_else(
                             || esc(&s(p, "direction")),
-                            |d| t.t(&format!("names.{}", d.code())),
+                            |d| t.t(&format!("dash.short_{}", d.code())),
                         ),
                     ),
                     ("public", &esc(&s(p, "public"))),

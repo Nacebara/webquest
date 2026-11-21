@@ -1,0 +1,13 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: "dump(&Look::plain().screen(&screen))"
+---
+--- rich
+
+--- html
+🚫 <b>Не сделано</b> · <code>K7M2Q9XR4T</code>
+У операции <code>ord-41-payout-1</code> неясный исход — сначала подтвердите, что чека не было.
+Деньги клиента: в учёте, выплаты не было.
+--- keyboard
+[{"text":"✅ Проверил — подтверждаю","style":"primary","callback_data":"a:x"}]
+[{"text":"🔖 Заявка","callback_data":"a:x"}]

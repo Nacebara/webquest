@@ -5,8 +5,9 @@ expression: dump(&text)
 --- rich
 
 --- html
-⚠️ <b>Незнакомый ответ</b> · xRocket · <tg-time unix="1794654120" format="t">14:02</tg-time>
-<blockquote>Чек CQ12…9F временно недоступен, попробуйте позже</blockquote>xRocket → CryptoBot на автопаузе · заявка <code>7F3A1C9D2B</code> в разборе
+⚠️ <b>Незнакомый ответ</b> · xRocket
+<blockquote>Чек CQ12…9F временно недоступен, попробуйте позже
+<i>xRocket · <tg-time unix="1794654120" format="t">14:02</tg-time></i></blockquote>xR → CB на автопаузе · заявка <code>7F3A1C9D2B</code> в разборе
 --- keyboard
 [{"text":"📤 Сохранить фикстуру","callback_data":"a:fx:9"}]
 [{"text":"▶️ Снять паузу","callback_data":"a:du:xc"},{"text":"🔖 Заявка","callback_data":"a:o:41"}]

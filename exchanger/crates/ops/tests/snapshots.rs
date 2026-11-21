@@ -82,6 +82,10 @@ fn reserves_and_shortfall() {
     ] {
         insta::assert_snapshot!(name, dump(&Look::plain().screen(&screen)));
     }
+    // Итог решения и отказы — отдельным сообщением (макеты 13.11 и 15.11).
+    for (name, screen) in ops::sample_decision_screens(&t) {
+        insta::assert_snapshot!(name, dump(&Look::plain().screen(&screen)));
+    }
     let payload = serde_json::json!({
         "platform": "xrocket", "expected": "640", "actual": "628", "diff": "-12",
         "paused": true, "account": "ub-1",

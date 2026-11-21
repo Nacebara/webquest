@@ -932,19 +932,20 @@
   "why": "нет экрана в коде"
  },
  "samples:ops_refusal:r": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "superseded",
+  "by": "samples:cx_pult:refuse_new",
+  "why": "заголовок «Не сделано · <code>номер</code>» — концепция Б 15.11; текст, «Деньги клиента: …» и кнопки 13.11 — те же (снимок refusal_unknown)"
  },
  "samples:ops_refusal:l": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "superseded",
+  "by": "samples:cx_pult:refuse_new",
+  "why": "заголовок — концепция Б 15.11; текст и кнопки 13.11 — те же (снимок refusal_limit)"
  },
  "samples:ops_owner:s": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "snap:owner_request_sent"
+  ]
  },
  "samples:ops_owner:o": {
   "status": "todo",
@@ -1323,9 +1324,10 @@
   "why": "«Полировка» 16.11"
  },
  "samples:ops_intake:x": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "snap:intake_not_posted"
+  ]
  },
  "samples:ops_intake:m": {
   "status": "superseded",
@@ -1445,14 +1447,16 @@
   "why": "«Полировка» 16.11"
  },
  "samples:cx_pult:done_new": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "snap:decision_result_paid"
+  ]
  },
  "samples:cx_pult:refuse_new": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "snap:refusal_done"
+  ]
  },
  "samples:cx_pult:inv_new": {
   "status": "todo",
@@ -1520,9 +1524,10 @@
   ]
  },
  "samples:pol_ops:unknown_a": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего snap:critical_unknown_reply: 1 из 3 строк)"
+  "status": "match",
+  "screens": [
+   "snap:critical_unknown_reply"
+  ]
  },
  "samples:pol_ops:intake_a": {
   "status": "match",

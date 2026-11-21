@@ -1,0 +1,11 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: "dump(&Look::plain().screen(&screen))"
+---
+--- rich
+
+--- html
+✅ <b>Выплачено</b> · <code>K7M2Q9XR4T</code>
+<code>97.50</code> USDT в xRocket · Анна, 14:07
+--- keyboard
+[{"text":"🔖 Заявка","callback_data":"a:x"},{"text":"📓 Журнал","callback_data":"a:au"}]

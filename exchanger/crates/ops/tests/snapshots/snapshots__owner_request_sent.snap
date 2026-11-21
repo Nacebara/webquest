@@ -1,0 +1,10 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: "dump(&Look::plain().screen(&screen))"
+---
+--- rich
+
+--- html
+✅ Отправил владельцу — он решит. Итог будет в «Журнале» и здесь.
+--- keyboard
+[{"text":"🔖 Заявка","callback_data":"a:x"}]
