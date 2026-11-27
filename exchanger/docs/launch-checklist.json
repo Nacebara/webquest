@@ -301,7 +301,7 @@
       "milestone": 7,
       "criterion": "У каждого экрана пульта есть снимок rich и HTML (П-1)",
       "status": "todo",
-      "evidence": "11.11.2026: 12 снимков. 27.11: снимок staff_list фиксирует rich-карточку «Персонал» и запасной HTML. Сверка с утверждённым макетом проходит в accepted_panel_screens_follow_the_mockups."
+      "evidence": "11.11.2026: 12 снимков. 27.11: staff_list и directions фиксируют rich-карточки «Персонал» и «Направления» с запасным HTML. В «Направлениях» базовая ставка курсивом: Bot API Rich HTML не поддерживает цвет. Связь снимков с макетами записана в accepted-ledger.json."
     },
     {
       "id": "ops-accept",

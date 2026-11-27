@@ -106,6 +106,13 @@ fn reserves_and_shortfall() {
 }
 
 #[test]
+fn directions() {
+    let texts = Texts::builtin().unwrap();
+    let screen = Look::plain().screen(&ops::sample_directions(&texts));
+    insta::assert_snapshot!("directions", dump(&screen));
+}
+
+#[test]
 fn staff_list() {
     let texts = Texts::builtin().unwrap();
     let screen = Look::plain().screen(&ops::sample_staff(&texts));

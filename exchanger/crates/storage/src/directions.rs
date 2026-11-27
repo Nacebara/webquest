@@ -95,6 +95,40 @@ pub async fn all(conn: &mut PgConnection) -> Result<Vec<DirectionRow>, StorageEr
     Ok(out)
 }
 
+/// Заблокировать настройки до проверки и записи в той же транзакции.
+pub async fn lock_terms(
+    conn: &mut PgConnection,
+    directions: &[Direction],
+) -> Result<(), StorageError> {
+    let codes: Vec<String> = directions.iter().map(|d| d.code().to_owned()).collect();
+    sqlx::query!(
+        "SELECT code FROM directions WHERE code = ANY($1) ORDER BY code FOR UPDATE",
+        &codes
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(())
+}
+
+/// Общий коэффициент рычага. Границы и другие условия направления сохраняются.
+pub async fn save_lever(
+    conn: &mut PgConnection,
+    directions: &[Direction],
+    k: Decimal,
+    staff: i64,
+) -> Result<(), StorageError> {
+    let codes: Vec<String> = directions.iter().map(|d| d.code().to_owned()).collect();
+    sqlx::query!(
+        "UPDATE directions SET skew_k_pct = $2, updated_by = $3, updated_at = now() WHERE code = ANY($1)",
+        &codes,
+        k,
+        staff
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 /// Записать настраиваемые поля направления (пульт). Проверки схемы (пол ≤ ставка ≤ потолок,
 /// мин ≤ макс, лимит новичка ≤ макс) — последняя линия; пульт проверяет раньше.
 pub async fn save_terms(

@@ -24,7 +24,7 @@ pub struct Names {
 /// Действия, у которых есть фраза (`journal.<действие с _ вместо .>`). Новое действие журнала —
 /// сюда и в `ru.toml`; тест проверяет, что фраза есть.
 #[cfg(test)]
-pub(crate) const ACTIONS: [&str; 41] = [
+pub(crate) const ACTIONS: [&str; 42] = [
     "order.take",
     "order.call_admin",
     "order.retry_payout",
@@ -38,6 +38,7 @@ pub(crate) const ACTIONS: [&str; 41] = [
     "userbot.resume",
     "wallet.move",
     "direction.set",
+    "direction.lever",
     "direction.open",
     "direction.close",
     "direction.clear_auto_pause",
@@ -240,6 +241,7 @@ pub fn what(t: &Texts, links: &Links, names: &Names, r: &AuditRow) -> String {
             ("flag", &flag),
             ("state", &state),
             ("changes", &changes),
+            ("lever", &field("skew_k_pct")),
             ("amount", &field("amount")),
             ("account", &esc(&field("account"))),
             (

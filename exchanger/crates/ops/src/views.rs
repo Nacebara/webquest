@@ -34,6 +34,153 @@ pub(crate) fn pct(v: Decimal) -> String {
     ui::fmt::percent(v)
 }
 
+fn direction_label(t: &Texts, direction: Direction) -> String {
+    t.t(&format!("dir.short_{}", direction.code()))
+}
+
+fn fee_range(
+    row: &DirectionRow,
+    lever: Option<LeverInput>,
+    format: impl Fn(Decimal) -> String,
+) -> String {
+    let rate =
+        |base: Decimal| format(domain::fees::levered_pct(row.fee_pct, base, lever).unwrap_or(base));
+    if let (FeeMode::Tiers, Some(schedule)) = (row.fee_mode, &row.fee_tiers)
+        && let Some((first, rest)) = schedule.tiers().split_first()
+    {
+        return match rest.last() {
+            Some(last) => format!("{} … {}", rate(first.fee_pct), rate(last.fee_pct)),
+            None => rate(first.fee_pct),
+        };
+    }
+    rate(row.fee_pct)
+}
+
+struct DirectionOverview {
+    direction: Direction,
+    rate: String,
+    base: String,
+    limits: String,
+    pause: Option<String>,
+}
+
+fn directions_screen(t: &Texts, rows: &[DirectionOverview], k: &str, role: Role) -> Screen {
+    let title = t.t("dir.list_title");
+    let col_direction = t.t("dir.col_direction");
+    let lever = t.f("dir.list_lever", &[("k", &k)]);
+    let footer = t.f("dir.list_footer", &[("lever", &lever)]);
+    let mut rich = format!(
+        "<h3>{title}</h3><table compact striped><tr><th></th><th>{col_direction}</th><th align=\"right\">%</th><th align=\"right\">USDT</th></tr>"
+    );
+    let mut plain = format!("<b>{title}</b>");
+    let mut pauses = Vec::new();
+    for row in rows {
+        let name = direction_label(t, row.direction);
+        let (dot, limits) = if let Some(reason) = &row.pause {
+            if !reason.is_empty() {
+                pauses.push(t.f(
+                    "dir.list_pause_line",
+                    &[("name", &name), ("reason", reason)],
+                ));
+            }
+            ("{e:dot_wait}", t.t("dir.list_paused"))
+        } else {
+            ("{e:dot_ok}", row.limits.clone())
+        };
+        let base = if row.base == row.rate {
+            String::new()
+        } else {
+            format!(" <i>{}</i>", row.base)
+        };
+        let rate = &row.rate;
+        rich.push_str(&format!(
+            "<tr><td>{dot}</td><td>{name}</td><td align=\"right\">{rate}{base}</td><td align=\"right\">{limits}</td></tr>"
+        ));
+        let plain_rate = if base.is_empty() {
+            format!("{rate}\u{a0}%")
+        } else {
+            t.f("dir.list_rate", &[("rate", rate), ("base", &row.base)])
+        };
+        let plain_limits = if row.pause.is_some() {
+            limits
+        } else {
+            format!("{limits}\u{a0}USDT")
+        };
+        plain.push_str(&format!("\n{dot} {name} · {plain_rate} · {plain_limits}"));
+    }
+    rich.push_str("</table>");
+    if !pauses.is_empty() {
+        let label = t.t("dir.list_pause_reasons");
+        let rich_lines = pauses
+            .iter()
+            .map(|l| format!("<p>{l}</p>"))
+            .collect::<String>();
+        rich.push_str(&format!(
+            "<details><summary>{label}</summary>{rich_lines}</details>"
+        ));
+        plain.push_str(&format!("\n\n<b>{label}</b>\n{}", pauses.join("\n")));
+    }
+    rich.push_str(&format!("<footer>{footer}</footer>"));
+    plain.push_str(&format!("\n\n<i>{lever}</i>"));
+    let direction_button = |direction, icon| {
+        btn(
+            format!("{{m:{icon}}} {}", direction_label(t, direction)),
+            &Cb::Dir(direction),
+        )
+    };
+    let mut screen = Screen::card(rich, plain)
+        .row(vec![
+            direction_button(Direction::CbToXrCheck, "xr"),
+            direction_button(Direction::XrToCbCheck, "cb"),
+        ])
+        .row(vec![
+            direction_button(Direction::PayCbInvoice, "invoice"),
+            direction_button(Direction::PayXrInvoice, "invoice"),
+        ]);
+    if role >= Role::Admin {
+        screen = screen.row(vec![
+            btn(t.t("dir.b_shared_lever"), &Cb::DirLever),
+            btn(t.t("dir.b_newcomers"), &Cb::Toggle(Flag::Newcomer)),
+        ]);
+    }
+    // Вход во встречный поток остаётся рядом с настройками направлений.
+    screen
+        .row(vec![btn(t.t("menu.promo"), &Cb::Promo)])
+        .row(nav::back(t, &Cb::Menu))
+}
+
+/// Образец списка направлений из утверждённого макета.
+pub fn sample_directions(t: &Texts) -> Screen {
+    let rows = DIRECTIONS
+        .into_iter()
+        .zip([
+            ("2.5", "2.0", "1–500", None),
+            ("1.5", "1.5", "1–500", None),
+            ("2.5", "2.5", "1–300", None),
+            ("2.0", "2.0", "", Some("")),
+        ])
+        .map(
+            |(direction, (rate, base, limits, pause))| DirectionOverview {
+                direction,
+                rate: rate.to_owned(),
+                base: base.to_owned(),
+                limits: limits.to_owned(),
+                pause: pause.map(str::to_owned),
+            },
+        )
+        .collect::<Vec<_>>();
+    directions_screen(t, &rows, "0.6", Role::Owner)
+}
+
+fn shared_lever(t: &Texts, rows: &[DirectionRow]) -> String {
+    match rows.first() {
+        Some(row) if rows.iter().all(|r| r.skew_k_pct == row.skew_k_pct) => {
+            row.skew_k_pct.normalize().to_string()
+        }
+        _ => t.t("dir.mixed_lever"),
+    }
+}
+
 fn staff_screen(
     t: &Texts,
     links: &nav::Links,
@@ -408,17 +555,7 @@ impl Inner {
         conn: &mut sqlx::PgConnection,
         row: &DirectionRow,
     ) -> Result<String, OpsError> {
-        let lever = self.lever(conn, row).await?;
-        let lev =
-            |base: Decimal| domain::fees::levered_pct(row.fee_pct, base, lever).unwrap_or(base);
-        Ok(match (row.fee_mode, row.fee_tiers.as_ref()) {
-            (FeeMode::Tiers, Some(s)) if s.tiers().len() > 1 => {
-                let first = s.tiers().first().map_or(row.fee_pct, |x| x.fee_pct);
-                let last = s.tiers().last().map_or(row.fee_pct, |x| x.fee_pct);
-                format!("{} … {}", pct(lev(first)), pct(lev(last)))
-            }
-            _ => pct(lev(row.fee_pct)),
-        })
+        Ok(fee_range(row, self.lever(conn, row).await?, pct))
     }
 
     /// Состояние направления с причиной: «работает · до 300.00 USDT» или
@@ -480,31 +617,26 @@ impl Inner {
     // -----------------------------------------------------------------------------------------
     // Направления
 
-    pub(crate) async fn dirs(&self) -> Result<Screen, OpsError> {
-        let t = &self.texts;
-        let mut conn = self.pool.acquire().await?;
-        let mut lines = vec![t.t("dir.list_title"), String::new()];
-        let mut s = Screen::default();
+    pub(crate) async fn dirs(&self, staff: &StaffMember) -> Result<Screen, OpsError> {
         let availability = self.engine.availability().await?;
-        for d in DIRECTIONS {
-            let row = storage::directions::get(&mut conn, d).await?;
-            let fee = self.fee_now(&mut conn, &row).await?;
-            let a = availability.iter().find(|a| a.direction == d);
-            lines.push(t.f(
-                "dir.line",
-                &[
-                    ("name", &self.link(&self.dir_name(d), &Cb::Dir(d))),
-                    ("fee", &fee),
-                    ("status", &self.availability_text(a)),
-                ],
-            ));
+        let mut conn = self.pool.acquire().await?;
+        let directions = storage::directions::all(&mut conn).await?;
+        let bare = ui::fmt::bare_amount;
+        let mut rows = Vec::with_capacity(directions.len());
+        for row in &directions {
+            let a = availability.iter().find(|a| a.direction == row.direction);
+            let lever = self.lever(&mut conn, row).await?;
+            let max = a.and_then(|a| a.max_now).unwrap_or(row.max_amount);
+            rows.push(DirectionOverview {
+                direction: row.direction,
+                rate: fee_range(row, lever, bare),
+                base: fee_range(row, None, bare),
+                limits: format!("{}–{}", bare(row.min_amount), bare(max)),
+                pause: (!a.is_some_and(Availability::accepting)).then(|| self.availability_text(a)),
+            });
         }
-        lines.push(String::new());
-        lines.push(t.t("dir.hint"));
-        s.text = lines.join("\n");
-        // Встречный поток — про направления и резерв: вход отсюда (в меню макета его нет).
-        Ok(s.row(vec![btn(t.t("menu.promo"), &Cb::Promo)])
-            .row(nav::back(t, &Cb::Menu)))
+        let k = shared_lever(&self.texts, &directions);
+        Ok(directions_screen(&self.texts, &rows, &k, staff.role))
     }
 
     pub(crate) fn tiers_text(&self, row: &DirectionRow) -> String {
@@ -1660,7 +1792,7 @@ impl Inner {
         let t = &self.texts;
         match cb {
             Cb::Dash => self.dash().await,
-            Cb::Dirs => self.dirs().await,
+            Cb::Dirs => self.dirs(staff).await,
             Cb::Dir(d) => self.dir_card(staff, d).await,
             Cb::Promo => self.promo(staff).await,
             Cb::PromoModes => self.promo_modes().await,
@@ -1916,6 +2048,12 @@ impl Inner {
         }
         let mut conn = self.pool.acquire().await?;
         let action = match cb {
+            Cb::DirLever => {
+                let directions = storage::directions::all(&mut conn).await?;
+                let k = shared_lever(t, &directions);
+                let text = t.f("dir.ask_shared_lever", &[("now", &k)]);
+                return Ok(self.prompt_with(staff, Input::DirectionLever, text));
+            }
             Cb::DirEdit(d, field) => {
                 let row = storage::directions::get(&mut conn, d).await?;
                 let (key, now) = match field {
@@ -1924,8 +2062,7 @@ impl Inner {
                     DirField::Lever => (
                         "dir.ask_lever",
                         format!(
-                            "{} {} {}",
-                            row.skew_k_pct.normalize(),
+                            "{} {}",
                             row.fee_floor_pct.normalize(),
                             row.fee_cap_pct.normalize()
                         ),

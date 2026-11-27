@@ -201,6 +201,7 @@ pub enum Cb {
     Menu,
     Dash,
     Dirs,
+    DirLever,
     Dir(Direction),
     DirEdit(Direction, DirField),
     DirMode(Direction),
@@ -392,6 +393,7 @@ impl Cb {
             Cb::Dash => "dash".into(),
             Cb::Sample => "x".into(),
             Cb::Dirs => "dirs".into(),
+            Cb::DirLever => "dirlever".into(),
             Cb::Dir(d) => format!("d:{}", dir_code(*d)),
             Cb::DirEdit(d, f) => format!("de:{}:{}", dir_code(*d), f.code()),
             Cb::DirMode(d) => format!("dm:{}", dir_code(*d)),
@@ -500,6 +502,7 @@ impl Cb {
             ["dash"] => Cb::Dash,
             ["x"] => Cb::Sample,
             ["dirs"] => Cb::Dirs,
+            ["dirlever"] => Cb::DirLever,
             ["d", _] => Cb::Dir(dir(1)?),
             ["de", _, f] => {
                 Cb::DirEdit(dir(1)?, DirField::ALL.into_iter().find(|x| x.code() == *f)?)
@@ -620,6 +623,7 @@ mod tests {
             Cb::Menu,
             Cb::Dash,
             Cb::Dirs,
+            Cb::DirLever,
             Cb::Promo,
             Cb::PromoRate,
             Cb::PromoThresholds,

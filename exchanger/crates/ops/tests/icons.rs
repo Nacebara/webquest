@@ -14,7 +14,6 @@ fn repo(path: &str) -> String {
 const BARE_BUTTONS: &[&str] = &[
     "ops:dir.b_fee",
     "ops:dir.b_min_fee",
-    "ops:dir.b_lever",
     "ops:dir.b_limits",
     "ops:dir.b_newcomer",
     "ops:dir.b_tiers",

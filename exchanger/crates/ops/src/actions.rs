@@ -18,7 +18,7 @@ use ui::{Emoji, EmojiStyle};
 
 use crate::cb::{Cb, DecisionKind, DirField, Flag, TermField};
 use crate::texts::esc;
-use crate::views::{pct, usdt};
+use crate::views::{DIRECTIONS, pct, usdt};
 use crate::{Inner, OpsError, Screen, btn};
 
 /// Сколько букв надписи помещается на кнопке рядом с «Отмена» в телефоне.
@@ -39,6 +39,7 @@ pub(crate) enum Input {
     MaintText,
     UserSearch,
     Dir(Direction, DirField),
+    DirectionLever,
     PromoRate,
     PromoThresholds,
     Target(Platform),
@@ -78,6 +79,10 @@ pub(crate) enum Action {
     Direction {
         before: DirectionRow,
         after: DirectionRow,
+    },
+    DirectionLever {
+        before: Vec<(Direction, Decimal)>,
+        after: Decimal,
     },
     DirOpen {
         direction: Direction,
@@ -270,6 +275,13 @@ impl Action {
     pub(crate) fn min_role(&self) -> Role {
         match self {
             Action::Direction { before, after } if big_change(before, after) => Role::Owner,
+            Action::DirectionLever { before, after }
+                if before
+                    .iter()
+                    .any(|(_, old)| (*after - old).abs() > Decimal::ONE) =>
+            {
+                Role::Owner
+            }
             Action::Terms {
                 before,
                 after,
@@ -854,19 +866,18 @@ impl Inner {
                     }
                     DirField::Lever => {
                         let ok = nums(&text).and_then(|v| match v.as_slice() {
-                            [k, floor, cap]
+                            [floor, cap]
                                 if floor <= &before.fee_pct
                                     && &before.fee_pct <= cap
                                     && *cap < MAX_FEE_PCT =>
                             {
-                                Some((*k, *floor, *cap))
+                                Some((*floor, *cap))
                             }
                             _ => None,
                         });
-                        let Some((k, floor, cap)) = ok else {
+                        let Some((floor, cap)) = ok else {
                             return Ok(self.retry(staff, input, "dir.hint_lever"));
                         };
-                        after.skew_k_pct = k;
                         after.fee_floor_pct = floor;
                         after.fee_cap_pct = cap;
                     }
@@ -904,6 +915,19 @@ impl Inner {
                     }
                 }
                 Action::Direction { before, after }
+            }
+            Input::DirectionLever => {
+                let Some(after) = num(&text).filter(|v| *v < Decimal::from(1000) && v.scale() <= 6)
+                else {
+                    return Ok(self.retry(staff, input, "dir.hint_shared_lever"));
+                };
+                let mut conn = self.pool.acquire().await?;
+                let before = storage::directions::all(&mut conn)
+                    .await?
+                    .into_iter()
+                    .map(|row| (row.direction, row.skew_k_pct))
+                    .collect();
+                Action::DirectionLever { before, after }
             }
             Input::PromoRate => {
                 let mut conn = self.pool.acquire().await?;
@@ -1303,17 +1327,11 @@ impl Inner {
                 change(
                     "dir.f_lever",
                     format!(
-                        "{} / {} / {}",
-                        before.skew_k_pct.normalize(),
+                        "{} / {}",
                         pct(before.fee_floor_pct),
                         pct(before.fee_cap_pct)
                     ),
-                    format!(
-                        "{} / {} / {}",
-                        after.skew_k_pct.normalize(),
-                        pct(after.fee_floor_pct),
-                        pct(after.fee_cap_pct)
-                    ),
+                    format!("{} / {}", pct(after.fee_floor_pct), pct(after.fee_cap_pct)),
                 );
                 change(
                     "dir.f_limits",
@@ -1370,6 +1388,28 @@ impl Inner {
                         ("notes", &format!("\n{}", notes.join("\n"))),
                     ],
                 )
+            }
+            Action::DirectionLever { before, after } => {
+                let changes = before
+                    .iter()
+                    .map(|(direction, old)| {
+                        t.f(
+                            "dir.change",
+                            &[
+                                ("field", &self.dir_name(*direction)),
+                                ("before", &old.normalize()),
+                                ("after", &after.normalize()),
+                            ],
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                let mut text = t.f("dir.preview_shared_lever", &[("changes", &changes)]);
+                if need == Role::Owner {
+                    text.push('\n');
+                    text.push_str(&t.t("dir.big_lever_change"));
+                }
+                text
             }
             Action::DirOpen { direction, open } => t.f(
                 "dir.preview",
@@ -2245,6 +2285,15 @@ impl Inner {
             Cb,
         ) = match &action {
             Action::Direction { before, after } => {
+                storage::directions::lock_terms(&mut tx, &[before.direction]).await?;
+                let current = storage::directions::get(&mut tx, before.direction).await?;
+                if row_json(&current) != row_json(before) {
+                    tx.rollback().await?;
+                    return Ok(self
+                        .dir_card(staff, before.direction)
+                        .await?
+                        .notice(&t.t("common.expired")));
+                }
                 storage::directions::save_terms(&mut tx, after, staff_id).await?;
                 (
                     "direction.set",
@@ -2253,6 +2302,31 @@ impl Inner {
                     Some(row_json(before)),
                     Some(row_json(after)),
                     Cb::Dir(after.direction),
+                )
+            }
+            Action::DirectionLever { before, after } => {
+                storage::directions::lock_terms(&mut tx, &DIRECTIONS).await?;
+                let current = storage::directions::all(&mut tx).await?;
+                if !current
+                    .iter()
+                    .map(|row| (row.direction, row.skew_k_pct))
+                    .eq(before.iter().copied())
+                {
+                    tx.rollback().await?;
+                    return Ok(self.dirs(staff).await?.notice(&t.t("common.expired")));
+                }
+                storage::directions::save_lever(&mut tx, &DIRECTIONS, *after, staff_id).await?;
+                let old_values = before
+                    .iter()
+                    .map(|(d, k)| (d.code().to_owned(), json!(k.normalize().to_string())))
+                    .collect::<serde_json::Map<_, _>>();
+                (
+                    "direction.lever",
+                    "direction",
+                    "all".to_owned(),
+                    Some(Value::Object(old_values)),
+                    Some(json!({ "skew_k_pct": after.normalize().to_string() })),
+                    Cb::Dirs,
                 )
             }
             Action::DirOpen { direction, open } => {
@@ -2784,6 +2858,7 @@ impl Inner {
         tx.commit().await?;
         tracing::info!(staff = staff_id, action = audit_action, target = %target_id, "ops change applied");
         let screen = match back {
+            Cb::Dirs => self.dirs(staff).await?,
             Cb::Dir(d) => self.dir_card(staff, d).await?,
             Cb::Promo => self.promo(staff).await?,
             Cb::UserDir(id, d) => self.user_dir(id, d).await?,

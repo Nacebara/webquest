@@ -70,7 +70,7 @@ pub use review::{
     OrderView, QueueData, QueueRow, ReconcileHint, sample_now, sample_order, sample_queue,
 };
 pub use texts::Texts;
-pub use views::{MenuCounts, maintenance_screen, menu_screen, sample_staff};
+pub use views::{MenuCounts, maintenance_screen, menu_screen, sample_directions, sample_staff};
 
 use crate::actions::{Action, Input};
 
@@ -926,7 +926,7 @@ impl Inner {
                 "menu" => self.menu(staff).await,
                 "system" => self.system().await,
                 "queue" => self.queue_for(Some(staff.tg_user_id), 0).await,
-                "dir" => self.dirs().await,
+                "dir" => self.dirs(staff).await,
                 "promo" => self.promo(staff).await,
                 "settings" => self.settings().await,
                 "bots" => self.bots().await,

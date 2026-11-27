@@ -1,0 +1,55 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&screen)
+---
+--- rich
+<h3>🔁 Направления</h3>
+<table compact striped>
+<tr>
+<th>
+</th>
+<th>Куда</th>
+<th align="right">%</th>
+<th align="right">USDT</th>
+</tr>
+<tr>
+<td>🟢</td>
+<td>CB → xR</td>
+<td align="right">2.5 <i>2.0</i>
+</td>
+<td align="right">1–500</td>
+</tr>
+<tr>
+<td>🟢</td>
+<td>xR → CB</td>
+<td align="right">1.5</td>
+<td align="right">1–500</td>
+</tr>
+<tr>
+<td>🟢</td>
+<td>Счёт CB</td>
+<td align="right">2.5</td>
+<td align="right">1–300</td>
+</tr>
+<tr>
+<td>🟠</td>
+<td>Счёт xR</td>
+<td align="right">2.0</td>
+<td align="right">пауза</td>
+</tr>
+</table>
+<footer>Рычаг k = 0.6 · курсивом — базовая комиссия</footer>
+--- html
+<b>🔁 Направления</b>
+🟢 CB → xR · 2.5 % · база 2.0 % · 1–500 USDT
+🟢 xR → CB · 1.5 % · 1–500 USDT
+🟢 Счёт CB · 2.5 % · 1–300 USDT
+🟠 Счёт xR · 2.0 % · пауза
+
+<i>Рычаг k = 0.6</i>
+--- keyboard
+[{"text":"🚀 CB → xR","callback_data":"a:d:cx"},{"text":"🔷 xR → CB","callback_data":"a:d:xc"}]
+[{"text":"🧾 Счёт CB","callback_data":"a:d:pc"},{"text":"🧾 Счёт xR","callback_data":"a:d:px"}]
+[{"text":"📏 Рычаг","callback_data":"a:dirlever"},{"text":"👤 Новичкам","callback_data":"a:st:n"}]
+[{"text":"⚖️ Встречный поток","callback_data":"a:pr"}]
+[{"text":"◀️ Меню","callback_data":"a:m"}]

@@ -695,12 +695,8 @@ async fn personnel_table_can_change_a_role_and_disable_the_member(pool: PgPool) 
 async fn fee_change_needs_a_preview_and_a_single_use_confirmation(pool: PgPool) {
     let o = ops(pool).await;
     let panel = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
-    let dirs = o
-        .press(OWNER, &panel, "Направления", "Комиссия, ступени")
-        .await;
-    let card = o
-        .follow(OWNER, &dirs, "CryptoBot → xRocket", "Рычаг резерва")
-        .await;
+    let dirs = o.press(OWNER, &panel, "Направления", "Рычаг k").await;
+    let card = o.press(OWNER, &dirs, "CB → xR", "Рычаг резерва").await;
     let ask = o.press(OWNER, &card, "Комиссия", "Новая комиссия").await;
     assert!(ask.text().contains("2.5"));
     // Неверный ввод — вопрос ещё раз, ничего не меняется.
@@ -737,10 +733,8 @@ async fn fee_change_needs_a_preview_and_a_single_use_confirmation(pool: PgPool) 
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn admin_cannot_move_the_fee_by_more_than_one_point(pool: PgPool) {
     let o = ops(pool).await;
-    let panel = o.say(ADMIN, "/dir", "Комиссия, ступени").await;
-    let card = o
-        .follow(ADMIN, &panel, "xRocket → CryptoBot", "Рычаг резерва")
-        .await;
+    let panel = o.say(ADMIN, "/dir", "Рычаг k").await;
+    let card = o.press(ADMIN, &panel, "xR → CB", "Рычаг резерва").await;
     let ask = o.press(ADMIN, &card, "Комиссия", "Новая комиссия").await;
     let _ = ask;
     let preview = o.say(ADMIN, "4", "проверьте изменение").await;
@@ -765,9 +759,7 @@ async fn admin_cannot_move_the_fee_by_more_than_one_point(pool: PgPool) {
     assert_eq!(row.fee_pct, dec!(4), "владелец применил");
     drop(conn);
     // Небольшое изменение админ делает сам.
-    let card = o
-        .follow(ADMIN, &panel, "xRocket → CryptoBot", "Рычаг резерва")
-        .await;
+    let card = o.press(ADMIN, &panel, "xR → CB", "Рычаг резерва").await;
     o.press(ADMIN, &card, "Комиссия", "Новая комиссия").await;
     // Владелец поставил 4 %: 3.5 % — сдвиг на 0.5 п.п.
     let preview = o.say(ADMIN, "3.5", "проверьте изменение").await;
@@ -775,12 +767,56 @@ async fn admin_cannot_move_the_fee_by_more_than_one_point(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn shared_lever_keeps_direction_bands_and_expires_old_edits(pool: PgPool) {
+    let o = ops(pool).await;
+    // Старая база могла хранить разные k. Пульт показывает это, не меняя цены при открытии.
+    sqlx::query("UPDATE directions SET skew_k_pct = 0.3 WHERE code = 'xr_to_cb_check'")
+        .execute(&o.pool)
+        .await
+        .unwrap();
+    let before = storage::directions::all(&mut o.pool.acquire().await.unwrap())
+        .await
+        .unwrap();
+    o.tg.lock().reject_next_rich = true;
+    let dirs = o.say(ADMIN, "/dir", "Рычаг k = разный").await;
+    assert_eq!(dirs.method, "sendMessage");
+    let card = o.press(ADMIN, &dirs, "CB → xR", "Рычаг резерва").await;
+    o.press(ADMIN, &card, "Пол и потолок", "через пробел").await;
+    o.say(ADMIN, "0.1 1.4 3.6", "два числа").await;
+    let old_band = o.say(ADMIN, "1.4 3.6", "проверьте изменение").await;
+
+    let dirs = o.say(OWNER, "/dir", "Рычаг k = разный").await;
+    o.press(OWNER, &dirs, "Рычаг", "Общий коэффициент").await;
+    o.say(OWNER, "1000", "до 6 знаков").await;
+    let preview = o.say(OWNER, "0,6", "Новые заявки — сразу").await;
+    assert!(preview.text().contains("<code>0.3</code> → <b>0.6</b>"));
+    let done = o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
+    assert!(done.text().contains("Рычаг k = 0.6"), "{}", done.text());
+    o.press(ADMIN, &old_band, "Подтвердить", "устарела").await;
+    let mut conn = o.pool.acquire().await.unwrap();
+    let after = storage::directions::all(&mut conn).await.unwrap();
+    for (mut expected, row) in before.into_iter().zip(after) {
+        expected.skew_k_pct = dec!(0.6);
+        assert_eq!(row, expected);
+    }
+    drop(conn);
+    let audit = o.audit("direction.lever").await;
+    assert_eq!(audit.len(), 1);
+    assert_eq!(audit[0].after.as_ref().unwrap()["skew_k_pct"], "0.6");
+    assert!(o.audit("direction.set").await.is_empty());
+
+    let dirs = o.say(ADMIN, "/dir", "Рычаг k = 0.6").await;
+    o.press(ADMIN, &dirs, "Рычаг", "Общий коэффициент").await;
+    let major = o.say(ADMIN, "2", "подтверждает владелец").await;
+    assert!(major.button("Подтвердить").is_none());
+    assert!(major.button("Отправить владельцу").is_some());
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn tiers_and_switch_to_flat_and_back(pool: PgPool) {
     let o = ops(pool).await;
-    let panel = o.say(OWNER, "/dir", "Комиссия, ступени").await;
-    let card = o
-        .follow(OWNER, &panel, "CryptoBot → xRocket", "Рычаг резерва")
-        .await;
+    let panel = o.say(OWNER, "/dir", "Рычаг k").await;
+    let card = o.press(OWNER, &panel, "CB → xR", "Рычаг резерва").await;
     // Режим ступеней без ступеней — нельзя.
     o.press(
         OWNER,
@@ -789,9 +825,7 @@ async fn tiers_and_switch_to_flat_and_back(pool: PgPool) {
         "Сначала задайте ступени",
     )
     .await;
-    let card = o
-        .follow(OWNER, &panel, "CryptoBot → xRocket", "Рычаг резерва")
-        .await;
+    let card = o.press(OWNER, &panel, "CB → xR", "Рычаг резерва").await;
     o.press(OWNER, &card, "Ступени", "Ступени: строка").await;
     o.say(OWNER, "10 2.5", "Не понял формат").await;
     let preview = o
@@ -2375,9 +2409,7 @@ async fn the_direction_card_lists_every_pause_reason(pool: PgPool) {
         .unwrap();
     }
     let dirs = o.say(OWNER, "/dir", "Направления").await;
-    let card = o
-        .follow(OWNER, &dirs, "xRocket → CryptoBot", "Статус")
-        .await;
+    let card = o.press(OWNER, &dirs, "xR → CB", "Статус").await;
     let text = card.text();
     assert!(
         text.contains(&format!("xRocket — {}", engine::UNKNOWN_REPLY_PAUSE)),
@@ -2482,11 +2514,7 @@ async fn dash_explains_pauses_and_reconcile_offers_the_top_up(pool: PgPool) {
         "{}",
         dirs.text()
     );
-    assert!(
-        dirs.text().contains("работает · заявка до"),
-        "{}",
-        dirs.text()
-    );
+    assert!(dirs.text().contains("2–300"), "{}", dirs.text());
 
     // Владелец пополнил xRocket на 20 — «Резервы» → «Сверить сейчас» показывают излишек,
     // а по кнопке — событие «Это вы пополняли?».
