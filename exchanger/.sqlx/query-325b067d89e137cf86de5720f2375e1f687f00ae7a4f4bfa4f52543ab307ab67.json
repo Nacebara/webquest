@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(SUM(h.amount), 0) AS \"amount!\"\n             FROM holds h\n             JOIN orders o ON o.id = h.order_id\n             JOIN directions d ON d.code = o.direction\n             JOIN wallet_accounts w ON w.id = h.wallet_account_id AND w.platform = d.target_platform\n            WHERE h.wallet_account_id = $1 AND h.asset = $2 AND h.state = 'active'\n              AND o.invoice_start_param IS NOT NULL\n              AND (o.intake_asset IS DISTINCT FROM o.asset OR\n                   COALESCE(o.intake_amount, 0) < o.quote_amount_in)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "amount!",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int2",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "325b067d89e137cf86de5720f2375e1f687f00ae7a4f4bfa4f52543ab307ab67"
+}

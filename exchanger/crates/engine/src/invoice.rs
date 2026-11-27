@@ -326,7 +326,18 @@ impl Engine {
             Some(_) => fiat_cap(amount, dir.fiat_buffer_pct, quote.client_pays),
             None => amount,
         };
-        let room = available - self.cfg.reserve_safety;
+        let spendable_room = available - self.cfg.reserve_safety;
+        // М-7: котировки без полной оплаты могут занять только часть свободного резерва.
+        // Считаем под блокировкой кошелька, которую держим до записи новой котировки.
+        let percent = setting_decimal(&mut tx, "invoice_unfunded_reserve_pct")
+            .await?
+            .filter(|p| (Decimal::ZERO..=Decimal::from(100)).contains(p))
+            .unwrap_or(Decimal::from(50));
+        let unfunded = storage::holds::unfunded_invoice_holds(&mut tx, wallet_id, asset).await?;
+        let free = storage::holds::available(&mut tx, wallet_id, asset).await?;
+        let budget = (free + unfunded - self.cfg.reserve_safety).max(Decimal::ZERO);
+        let invoice_room = budget * (percent / Decimal::from(100)) - unfunded;
+        let room = spendable_room.min(invoice_room);
         let reject = if quote.client_pays < dir.min_amount {
             Some(InvoiceReject::BelowMinimum {
                 min: dir.min_amount,

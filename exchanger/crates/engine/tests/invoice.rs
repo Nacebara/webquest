@@ -87,6 +87,48 @@ async fn expire_quote(e: &Env, order: i64) {
         .unwrap();
 }
 
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn unpaid_invoices_leave_room_for_check_exchanges(pool: PgPool) {
+    let e = setup(pool).await;
+    sqlx::query(
+        "UPDATE directions SET max_amount = 500, new_user_max_amount = 500 WHERE code = 'pay_xr_invoice'",
+    )
+    .execute(&e.pool)
+    .await
+    .unwrap();
+    let other = CLIENT + 1;
+    let mut conn = e.pool.acquire().await.unwrap();
+    storage::users::upsert(&mut conn, other, &storage::users::Profile::default())
+        .await
+        .unwrap();
+    drop(conn);
+
+    let first = shop_invoice(&e, InvoiceSpec::crypto(XR, usdt(dec!(350))));
+    let order = quoted(&e, &first).await;
+    assert_eq!(held(&e, order.id).await, Some(dec!(350)));
+    let second = shop_invoice(&e, InvoiceSpec::crypto(XR, usdt(dec!(200))));
+    let link = parsers::links::parse_url(&second.url).unwrap();
+    assert_eq!(
+        rejected(e.engine.submit_invoice(other, &link).await.unwrap()),
+        InvoiceReject::NoReserve { max: dec!(150) },
+    );
+
+    let check_url = e.world.client_check(CB, usdt(dec!(50))).unwrap();
+    let check_link = parsers::links::parse_url(&check_url).unwrap();
+    let exchange = common::accepted(e.engine.submit_check(other, &check_link).await.unwrap());
+    e.drain().await;
+    assert_eq!(e.order(exchange.id).await.0.state, OrderState::Completed);
+
+    expire_quote(&e, order.id).await;
+    assert_eq!(e.engine.expire_quotes().await.unwrap(), 1);
+    assert_eq!(held(&e, order.id).await, None);
+    assert!(matches!(
+        e.engine.submit_invoice(other, &link).await.unwrap(),
+        InvoiceSubmitted::Quoted(_)
+    ));
+    e.assert_books_match().await;
+}
+
 /// З-19.1 (проверка 19.11): ссылки на чужие счета бесплатны — их просмотры занимают не больше
 /// 3/8 минутного бюджета обращений аккаунта к ботам. Сверх — «кошелёк не показал его, попробуйте
 /// через минуту», а обмен чека в ту же минуту проходит. Раньше пачка ссылок забирала весь бюджет,

@@ -43,6 +43,29 @@ pub async fn available(
     Ok(available.unwrap_or(Decimal::ZERO))
 }
 
+/// Удержания под оплату счетов, по которым ещё не поступила вся сумма в нужном активе.
+pub async fn unfunded_invoice_holds(
+    conn: &mut PgConnection,
+    wallet_account_id: i16,
+    asset: Asset,
+) -> Result<Decimal, StorageError> {
+    Ok(sqlx::query_scalar!(
+        r#"SELECT COALESCE(SUM(h.amount), 0) AS "amount!"
+             FROM holds h
+             JOIN orders o ON o.id = h.order_id
+             JOIN directions d ON d.code = o.direction
+             JOIN wallet_accounts w ON w.id = h.wallet_account_id AND w.platform = d.target_platform
+            WHERE h.wallet_account_id = $1 AND h.asset = $2 AND h.state = 'active'
+              AND o.invoice_start_param IS NOT NULL
+              AND (o.intake_asset IS DISTINCT FROM o.asset OR
+                   COALESCE(o.intake_amount, 0) < o.quote_amount_in)"#,
+        wallet_account_id,
+        asset.code(),
+    )
+    .fetch_one(conn)
+    .await?)
+}
+
 /// Сколько кошелёк за последние 24 часа потратил или обязался потратить, в стейблкоинах
 /// (1 = 1 USD): операции, которые выводят деньги, кроме неудавшихся и отменённых, плюс активные
 /// удержания под будущие выплаты. Для «лимита без код-пароля» CryptoBot (DESIGN-v0.2 Р11).
