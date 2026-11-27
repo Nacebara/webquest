@@ -23,7 +23,8 @@ expression: "both(p, q)"
 <p>Зачем: чтобы выплатить деньги, разобрать спорный случай и ответить на запрос кошелька.</p>
 <p>Никогда не прошу и не храню пароли, PIN и коды от ваших кошельков.</p>
 <footer>Вопросы о данных — в поддержку.</footer>
---- keyboard: none
+--- keyboard: inline
+[{"callback_data":"support","text":"💬 Поддержка"},{"callback_data":"help","text":"◀️ Помощь"}]
 
 ### premium
 --- html
@@ -46,4 +47,5 @@ expression: "both(p, q)"
 <p>Зачем: чтобы выплатить деньги, разобрать спорный случай и ответить на запрос кошелька.</p>
 <p>Никогда не прошу и не храню пароли, PIN и коды от ваших кошельков.</p>
 <footer>Вопросы о данных — в поддержку.</footer>
---- keyboard: none
+--- keyboard: inline
+[{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"},{"callback_data":"help","icon_custom_emoji_id":"5368000000000000032","text":"Помощь"}]

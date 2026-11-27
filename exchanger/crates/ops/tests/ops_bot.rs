@@ -2520,8 +2520,12 @@ async fn system_screen_and_screen_preview_from_the_panel(pool: PgPool) {
     )
     .await;
     // Экраны идут по порядку макета, с паузой между сообщениями: проверяем начало.
-    o.tg.screen(mark, OWNER, "1/40 · Приветствие").await;
-    o.tg.screen(mark, OWNER, "Что меняем?").await;
+    let ui = ui::Ui::builtin(ui::EmojiSet::plain(), ui::UiConfig::default()).unwrap();
+    let total = ui::preview::client(&ui).len() + ui::preview::client_supplements(&ui).len();
+    o.tg.screen(mark, OWNER, &format!("1/{total} · Приветствие"))
+        .await;
+    let exchange = o.tg.screen(mark, OWNER, "Что меняем?").await;
+    assert_eq!(exchange.buttons(), vec!["a:x", "a:x"]);
 }
 
 /// Главный экран по макету («вариант А»): тишина → пожар после недостачи; карточка правится
@@ -3338,8 +3342,6 @@ async fn every_panel_screen_has_a_way_back(pool: PgPool) {
         "Отменено. Ничего не изменено.",
         // Итог самопроверки: «Главный экран» и «Пульт» вместо экрана, откуда пришли.
         "Самопроверка",
-        // «‹ Назад» и «🏠 Пульт» вместо «◀️ Клиент» и «🎛 Меню».
-        "Инвестиции клиента",
     ];
     let o = ops(pool).await;
     let first_line = |c: &Call| -> String {

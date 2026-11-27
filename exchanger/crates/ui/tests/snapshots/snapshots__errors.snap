@@ -6,14 +6,14 @@ expression: errors.trim_end()
 ### plain
 --- html
 ❌ <b>Это не чек и не счёт</b>
-Пришлите ссылку вида <code>t.me/send?start=CQ…</code> или <code>t.me/xrocket?start=t_…</code>. Деньги не тронуты.
+Пришлите ссылку вида 🔵 <code>t.me/send?start=CQ…</code> или 🚀 <code>t.me/xrocket?start=…</code> Деньги не тронуты.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","text":"❓ Как создать чек"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Это не чек и не счёт</b>
-Пришлите ссылку вида <code>t.me/send?start=CQ…</code> или <code>t.me/xrocket?start=t_…</code>. Деньги не тронуты.
+Пришлите ссылку вида <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> <code>t.me/send?start=CQ…</code> или <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> <code>t.me/xrocket?start=…</code> Деньги не тронуты.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000026","text":"Как создать чек"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 
@@ -21,14 +21,14 @@ expression: errors.trim_end()
 ### plain
 --- html
 ❌ <b>Это не официальный кошелёк</b>
-Ссылка ведёт на <code>CryptoBotX &lt;fake&gt; &amp; co</code> — я её не открывал. Проверьте, у кого вы взяли чек.
+Ссылка ведёт на <code>@send_wallet_bot</code> — я её не открывал. Проверьте, у кого вы взяли чек.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","text":"❓ Как создать чек"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Это не официальный кошелёк</b>
-Ссылка ведёт на <code>CryptoBotX &lt;fake&gt; &amp; co</code> — я её не открывал. Проверьте, у кого вы взяли чек.
+Ссылка ведёт на <code>@send_wallet_bot</code> — я её не открывал. Проверьте, у кого вы взяли чек.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000026","text":"Как создать чек"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 
@@ -65,15 +65,17 @@ expression: errors.trim_end()
 ## not_found
 ### plain
 --- html
-❌ <b>Чек не найден</b>
-Я ничего не получил. Если чек истёк или удалён — деньги у того, кто его создал. Если ссылка неполная — пришлите её целиком.
+🎟 <b>Чек не найден</b>
+Я ничего не получил — деньги у создателя чека.
+<i>Ссылка обрезана? Пришлите её целиком.</i>
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","text":"❓ Как создать чек"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Чек не найден</b>
-Я ничего не получил. Если чек истёк или удалён — деньги у того, кто его создал. Если ссылка неполная — пришлите её целиком.
+<tg-emoji emoji-id="5368000000000000038">🎟</tg-emoji> <b>Чек не найден</b>
+Я ничего не получил — деньги у создателя чека.
+<i>Ссылка обрезана? Пришлите её целиком.</i>
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000026","text":"Как создать чек"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 
@@ -140,15 +142,15 @@ expression: errors.trim_end()
 ## captcha
 ### plain
 --- html
-❌ <b>Чек с капчей не подойдёт</b>
-Деньги в чеке. Пришлите обычный чек.
+🎟 <b>Чек с капчей не подойдёт</b>
+Деньги в чеке — пришлите обычный.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","text":"❓ Как создать чек"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Чек с капчей не подойдёт</b>
-Деньги в чеке. Пришлите обычный чек.
+<tg-emoji emoji-id="5368000000000000038">🎟</tg-emoji> <b>Чек с капчей не подойдёт</b>
+Деньги в чеке — пришлите обычный.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000026","text":"Как создать чек"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 
@@ -245,15 +247,15 @@ expression: errors.trim_end()
 ## no_reserve
 ### plain
 --- html
-⏸ <b>Сейчас принимаю до <code>120.00</code> USDT</b>
-Чек не открывал — деньги в нём. Пришлите чек поменьше или через 10–15 минут.
+🎟 <b>Выплаты в xRocket закончились</b>
+Деньги в чеке — пришлите через 10–15 минут.
 --- keyboard: inline
 [{"callback_data":"terms","text":"📈 Курс"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000007">⏸</tg-emoji> <b>Сейчас принимаю до <code>120.00</code> USDT</b>
-Чек не открывал — деньги в нём. Пришлите чек поменьше или через 10–15 минут.
+<tg-emoji emoji-id="5368000000000000038">🎟</tg-emoji> <b>Выплаты в xRocket закончились</b>
+Деньги в чеке — пришлите через 10–15 минут.
 --- keyboard: inline
 [{"callback_data":"terms","icon_custom_emoji_id":"5368000000000000015","text":"Курс"}]
 
@@ -360,14 +362,14 @@ expression: errors.trim_end()
 ### plain
 --- html
 ⛔ <b>Доступ ограничен</b>
-Причина: серия неудачных чеков. Новые чеки не открываю — деньги в них. Заявку в работе доведу до конца.
+Причина: спам ссылками. Новые чеки не открываю — деньги в них. Заявку в работе доведу до конца.
 --- keyboard: inline
 [{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000009">⛔</tg-emoji> <b>Доступ ограничен</b>
-Причина: серия неудачных чеков. Новые чеки не открываю — деньги в них. Заявку в работе доведу до конца.
+Причина: спам ссылками. Новые чеки не открываю — деньги в них. Заявку в работе доведу до конца.
 --- keyboard: inline
 [{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 
@@ -392,72 +394,72 @@ expression: errors.trim_end()
 ⏳ <b>Этот чек уже в работе</b>
 Заявка <code>A1B2C3D4E5</code> — итог будет в её сообщении.
 --- keyboard: inline
-[{"callback_data":"order:A1B2C3D4E5","text":"Открыть заявку"}]
+[{"callback_data":"order:A1B2C3D4E5","text":"Открыть заявку"},{"callback_data":"history:0","text":"📜 История"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000000">⏳</tg-emoji> <b>Этот чек уже в работе</b>
 Заявка <code>A1B2C3D4E5</code> — итог будет в её сообщении.
 --- keyboard: inline
-[{"callback_data":"order:A1B2C3D4E5","text":"Открыть заявку"}]
+[{"callback_data":"order:A1B2C3D4E5","text":"Открыть заявку"},{"callback_data":"history:0","icon_custom_emoji_id":"5368000000000000016","text":"История"}]
 
 ## invoice_reusable
 ### plain
 --- html
-❌ <b>Этот счёт не оплачу</b>
-Причина: он многоразовый. Деньги не списаны.
+❌ <b>Многоразовый счёт не оплачу</b>
+Деньги не списаны. Пришлите одноразовый счёт с суммой.
 --- keyboard: inline
 [{"callback_data":"invoice","text":"🧾 Другой счёт"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Этот счёт не оплачу</b>
-Причина: он многоразовый. Деньги не списаны.
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Многоразовый счёт не оплачу</b>
+Деньги не списаны. Пришлите одноразовый счёт с суммой.
 --- keyboard: inline
 [{"callback_data":"invoice","icon_custom_emoji_id":"5368000000000000004","text":"Другой счёт"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 
 ## invoice_already_paid
 ### plain
 --- html
-❌ <b>Этот счёт не оплачу</b>
-Причина: он уже оплачен. Деньги не списаны.
+❌ <b>Счёт уже оплачен</b>
+Деньги не списаны. Если платили не вы — напишите магазину.
 --- keyboard: inline
 [{"callback_data":"invoice","text":"🧾 Другой счёт"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Этот счёт не оплачу</b>
-Причина: он уже оплачен. Деньги не списаны.
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Счёт уже оплачен</b>
+Деньги не списаны. Если платили не вы — напишите магазину.
 --- keyboard: inline
 [{"callback_data":"invoice","icon_custom_emoji_id":"5368000000000000004","text":"Другой счёт"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 
 ## invoice_expired
 ### plain
 --- html
-❌ <b>Этот счёт не оплачу</b>
-Причина: он истёк. Деньги не списаны.
+❌ <b>Счёт истёк — не оплачу</b>
+Деньги не списаны. Попросите у магазина новый счёт.
 --- keyboard: inline
 [{"callback_data":"invoice","text":"🧾 Другой счёт"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Этот счёт не оплачу</b>
-Причина: он истёк. Деньги не списаны.
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Счёт истёк — не оплачу</b>
+Деньги не списаны. Попросите у магазина новый счёт.
 --- keyboard: inline
 [{"callback_data":"invoice","icon_custom_emoji_id":"5368000000000000004","text":"Другой счёт"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 
 ## invoice_no_amount
 ### plain
 --- html
-❌ <b>Этот счёт не оплачу</b>
-Причина: в нём нет суммы. Деньги не списаны.
+❌ <b>В счёте нет суммы</b>
+Деньги не списаны. Пришлите счёт с суммой.
 --- keyboard: inline
 [{"callback_data":"invoice","text":"🧾 Другой счёт"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Этот счёт не оплачу</b>
-Причина: в нём нет суммы. Деньги не списаны.
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>В счёте нет суммы</b>
+Деньги не списаны. Пришлите счёт с суммой.
 --- keyboard: inline
 [{"callback_data":"invoice","icon_custom_emoji_id":"5368000000000000004","text":"Другой счёт"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 
@@ -479,15 +481,15 @@ expression: errors.trim_end()
 ## invoice_expires_soon
 ### plain
 --- html
-❌ <b>Этот счёт не оплачу</b>
-Причина: он истекает слишком скоро. Деньги не списаны.
+❌ <b>Счёт истекает через минуту</b>
+Деньги не списаны. Попросите у магазина новый счёт.
 --- keyboard: inline
 [{"callback_data":"invoice","text":"🧾 Другой счёт"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Этот счёт не оплачу</b>
-Причина: он истекает слишком скоро. Деньги не списаны.
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Счёт истекает через минуту</b>
+Деньги не списаны. Попросите у магазина новый счёт.
 --- keyboard: inline
 [{"callback_data":"invoice","icon_custom_emoji_id":"5368000000000000004","text":"Другой счёт"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 
@@ -555,29 +557,29 @@ expression: errors.trim_end()
 ### plain
 --- html
 ↩️ <b>Курс сдвинулся сильнее запаса</b>
-Счёт не оплачивал. Верну <code>10.30</code> USDT чеком xRocket — пришлите ссылку на счёт ещё раз, посчитаю заново.
+Счёт не оплачивал. Верну <code>10.30</code> чеком xRocket — пришлите ссылку на счёт ещё раз, посчитаю заново.
 --- keyboard: inline
 [{"callback_data":"invoice","text":"🧾 Оплатить счёт"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Курс сдвинулся сильнее запаса</b>
-Счёт не оплачивал. Верну <code>10.30</code> USDT чеком xRocket — пришлите ссылку на счёт ещё раз, посчитаю заново.
+Счёт не оплачивал. Верну <code>10.30</code> чеком xRocket — пришлите ссылку на счёт ещё раз, посчитаю заново.
 --- keyboard: inline
 [{"callback_data":"invoice","icon_custom_emoji_id":"5368000000000000004","text":"Оплатить счёт"}]
 
 ## invoice_fiat
 ### plain
 --- html
-❌ <b>Этот счёт не оплачу</b>
-Причина: кошелёк не показал его сумму в USDT. Деньги не списаны.
+❌ <b>Не вижу сумму счёта в USDT</b>
+Деньги не списаны. Попросите у магазина счёт в USDT.
 --- keyboard: inline
 [{"callback_data":"invoice","text":"🧾 Другой счёт"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Этот счёт не оплачу</b>
-Причина: кошелёк не показал его сумму в USDT. Деньги не списаны.
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Не вижу сумму счёта в USDT</b>
+Деньги не списаны. Попросите у магазина счёт в USDT.
 --- keyboard: inline
 [{"callback_data":"invoice","icon_custom_emoji_id":"5368000000000000004","text":"Другой счёт"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
 
@@ -642,15 +644,19 @@ expression: errors.trim_end()
 ## check_used
 ### plain
 --- html
-❌ <b>Этот чек уже открыт через меня</b>
-Обычный чек: деньги у того, кто прислал его первым. Мульти-чек CryptoBot: свою долю я уже взял, вашу можно забрать в @send. Если вы сами уже меняли этот чек — итог в сообщении той заявки.
+❌ <b>Чек уже открыт через меня</b>
+Деньги у того, кто прислал его первым.
+<blockquote expandable>Мульти-чек CryptoBot: свою долю я взял, вашу заберите в @send.
+Меняли его сами — итог в сообщении той заявки.</blockquote>
 --- keyboard: inline
 [{"callback_data":"history:0","text":"📜 История"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Этот чек уже открыт через меня</b>
-Обычный чек: деньги у того, кто прислал его первым. Мульти-чек CryptoBot: свою долю я уже взял, вашу можно забрать в @send. Если вы сами уже меняли этот чек — итог в сообщении той заявки.
+<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Чек уже открыт через меня</b>
+Деньги у того, кто прислал его первым.
+<blockquote expandable>Мульти-чек CryptoBot: свою долю я взял, вашу заберите в @send.
+Меняли его сами — итог в сообщении той заявки.</blockquote>
 --- keyboard: inline
 [{"callback_data":"history:0","icon_custom_emoji_id":"5368000000000000016","text":"История"}]
 

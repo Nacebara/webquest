@@ -4,8 +4,6 @@
 //! (`domain::fees`, `domain::pricing::max_order_effective`) — экран не обещает больше, чем движок
 //! примет.
 
-use std::collections::HashMap;
-
 use domain::fees::{FeeMode, LeverInput};
 use domain::pricing::{Limits, max_order_effective};
 use domain::{Asset, Decimal, Direction};
@@ -15,12 +13,10 @@ use ui::{DirectionStatus, DirectionTerms, PauseReason, PromoTerms, Terms, TierTe
 
 use crate::TgBotError;
 
-/// Условия и свободный резерв по направлениям.
+/// Условия обмена и оплаты по направлениям.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TermsSnapshot {
     pub terms: Terms,
-    /// Сколько резерва целевого кошелька свободно под новую заявку (после запаса).
-    pub room: HashMap<Direction, Decimal>,
 }
 
 /// Аккаунт юзербота кошелька на паузе (пульт): новые заявки не принимаются.
@@ -52,7 +48,6 @@ pub(crate) async fn load(
     let maintenance = storage::settings::flag_on(&mut *conn, "maintenance").await?
         || storage::settings::flag_on(&mut *conn, "kill_switch_payouts").await?;
     let mut directions = Vec::new();
-    let mut room = HashMap::new();
     // Основной спрос — CryptoBot → xRocket — первым (DESIGN-v0.2 Р1).
     for direction in [
         Direction::CbToXrCheck,
@@ -69,7 +64,7 @@ pub(crate) async fn load(
             None => (storage::directions::get(&mut *conn, direction).await?, None),
         };
         let wallet = storage::wallets::active(&mut *conn, direction.target()).await?;
-        let (lever, effective, free) = match wallet {
+        let (lever, effective) = match wallet {
             Some((wallet, _)) => {
                 let available = storage::holds::available(&mut *conn, wallet, asset).await?;
                 // Потолок — как у движка при приёме: у CryptoBot ещё и остаток лимита без
@@ -93,13 +88,9 @@ pub(crate) async fn load(
                     min_amount: row.min_amount,
                     max_amount: row.max_amount,
                 };
-                (
-                    lever,
-                    max_order_effective(limits, spendable, safety),
-                    spendable - safety,
-                )
+                (lever, max_order_effective(limits, spendable, safety))
             }
-            None => (None, None, Decimal::ZERO),
+            None => (None, None),
         };
         // Ставка с рычагом для базы; ошибка настройки рычага — базовая (экран не падает).
         let levered = |base: Decimal| {
@@ -160,7 +151,6 @@ pub(crate) async fn load(
         } else {
             (DirectionStatus::Open, None)
         };
-        room.insert(direction, floor_cents(free));
         directions.push(DirectionTerms {
             direction,
             fee_pct,
@@ -182,7 +172,6 @@ pub(crate) async fn load(
             bind_username: bind_username.map(str::to_owned),
             updated_at: Some(chrono::Utc::now()),
         },
-        room,
     })
 }
 

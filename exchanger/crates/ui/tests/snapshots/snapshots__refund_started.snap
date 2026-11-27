@@ -7,13 +7,15 @@ expression: refunds.trim_end()
 --- html
 ↩️ <b>Меньше минимума</b> · от <code>2.00</code> USDT
 Верну <code>750.00</code> чеком CryptoBot.
---- keyboard: none
+--- keyboard: inline
+[{"callback_data":"terms","text":"📈 Курс"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Меньше минимума</b> · от <code>2.00</code> USDT
 Верну <code>750.00</code> чеком CryptoBot.
---- keyboard: none
+--- keyboard: inline
+[{"callback_data":"terms","icon_custom_emoji_id":"5368000000000000015","text":"Курс"}]
 
 ## above_maximum
 ### plain
@@ -83,15 +85,17 @@ expression: refunds.trim_end()
 ## rate_moved
 ### plain
 --- html
-↩️ <b>Возвращаю <code>750.00</code> USDT</b>
-Курс доллара сдвинулся сильнее запаса, пока шёл чек.
---- keyboard: none
+↩️ <b>Курс сдвинулся сильнее запаса</b>
+Счёт не оплачивал. Верну <code>750.00</code> чеком xRocket — пришлите ссылку на счёт ещё раз, посчитаю заново.
+--- keyboard: inline
+[{"callback_data":"invoice","text":"🧾 Оплатить счёт"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Возвращаю <code>750.00</code> USDT</b>
-Курс доллара сдвинулся сильнее запаса, пока шёл чек.
---- keyboard: none
+<tg-emoji emoji-id="5368000000000000005">↩️</tg-emoji> <b>Курс сдвинулся сильнее запаса</b>
+Счёт не оплачивал. Верну <code>750.00</code> чеком xRocket — пришлите ссылку на счёт ещё раз, посчитаю заново.
+--- keyboard: inline
+[{"callback_data":"invoice","icon_custom_emoji_id":"5368000000000000004","text":"Оплатить счёт"}]
 
 ## client_request
 ### plain

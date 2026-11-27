@@ -4,28 +4,46 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-💼 <b>Инвестиции</b>
-В обороте: <code>0.00 USDT</code>
-Прибыль за всё время: <code>0.00 USDT</code> · за 24 ч: <code>0.00 USDT</code>
-Ваш процент прибыли: <b>40 %</b> · выводить можно в любой момент
-Можно вывести сейчас: <code>0.00 USDT</code>
-
+<b>💼 Инвестиции</b>
+В обороте <b><code>0.00 USDT</code></b> · за 24 ч <b><code>0.00</code></b>
+<blockquote>Прибыль за всё время: <code>0.00</code>
+Ваш процент: 40 % прибыли
+Можно вывести сейчас: <code>0.00</code></blockquote>
 Пока пусто. Нажмите «Пополнить» и пришлите чек USDT — деньги начнут работать со следующего часа.
+<i>Прибыль начисляется каждый час · обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></i>
+--- rich
+<h3>💼 Инвестиции</h3>
+<p>В обороте <b><code>0.00 USDT</code></b> · за 24 ч <b><code>0.00</code></b></p>
+<table bordered striped compact>
+<tr><td>Прибыль за всё время</td><td align="right"><code>0.00</code></td></tr>
+<tr><td>Ваш процент</td><td align="right">40 % прибыли</td></tr>
+<tr><td>Можно вывести сейчас</td><td align="right"><code>0.00</code></td></tr>
+</table>
+<p>Пока пусто. Нажмите «Пополнить» и пришлите чек USDT — деньги начнут работать со следующего часа.</p>
+<footer>Прибыль начисляется каждый час · обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></footer>
 --- keyboard: inline
-[{"callback_data":"inv:dep","style":"primary","text":"Пополнить"},{"callback_data":"inv:out","text":"Вывести"}]
-[{"callback_data":"inv:how","text":"Как это работает?"}]
-[{"callback_data":"inv","text":"Обновить"}]
+[{"callback_data":"inv:dep","style":"primary","text":"➕ Пополнить"},{"callback_data":"inv:out","text":"📤 Вывести"}]
+[{"callback_data":"inv:how","text":"❓ Как это работает?"},{"callback_data":"inv","text":"🔽 Обновить"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000020">💼</tg-emoji> <b>Инвестиции</b>
-В обороте: <code>0.00 USDT</code>
-Прибыль за всё время: <code>0.00 USDT</code> · за 24 ч: <code>0.00 USDT</code>
-Ваш процент прибыли: <b>40 %</b> · выводить можно в любой момент
-Можно вывести сейчас: <code>0.00 USDT</code>
-
+<b><tg-emoji emoji-id="5368000000000000020">💼</tg-emoji> Инвестиции</b>
+В обороте <b><code>0.00 USDT</code></b> · за 24 ч <b><code>0.00</code></b>
+<blockquote>Прибыль за всё время: <code>0.00</code>
+Ваш процент: 40 % прибыли
+Можно вывести сейчас: <code>0.00</code></blockquote>
 Пока пусто. Нажмите «Пополнить» и пришлите чек USDT — деньги начнут работать со следующего часа.
+<i>Прибыль начисляется каждый час · обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></i>
+--- rich
+<h3><tg-emoji emoji-id="5368000000000000020">💼</tg-emoji> Инвестиции</h3>
+<p>В обороте <b><code>0.00 USDT</code></b> · за 24 ч <b><code>0.00</code></b></p>
+<table bordered striped compact>
+<tr><td>Прибыль за всё время</td><td align="right"><code>0.00</code></td></tr>
+<tr><td>Ваш процент</td><td align="right">40 % прибыли</td></tr>
+<tr><td>Можно вывести сейчас</td><td align="right"><code>0.00</code></td></tr>
+</table>
+<p>Пока пусто. Нажмите «Пополнить» и пришлите чек USDT — деньги начнут работать со следующего часа.</p>
+<footer>Прибыль начисляется каждый час · обновлено <tg-time unix="1791381900" format="t">17:05 МСК</tg-time></footer>
 --- keyboard: inline
-[{"callback_data":"inv:dep","style":"primary","text":"Пополнить"},{"callback_data":"inv:out","text":"Вывести"}]
-[{"callback_data":"inv:how","text":"Как это работает?"}]
-[{"callback_data":"inv","text":"Обновить"}]
+[{"callback_data":"inv:dep","icon_custom_emoji_id":"5368000000000000044","style":"primary","text":"Пополнить"},{"callback_data":"inv:out","icon_custom_emoji_id":"5368000000000000045","text":"Вывести"}]
+[{"callback_data":"inv:how","icon_custom_emoji_id":"5368000000000000026","text":"Как это работает?"},{"callback_data":"inv","icon_custom_emoji_id":"5368000000000000034","text":"Обновить"}]

@@ -7,11 +7,11 @@ expression: "both(p, q)"
 💼 <b>Вывод</b>
 Сейчас выводить нечего: пополнение становится доступным к выводу через 0 дн., прибыль — сразу после начисления.
 --- keyboard: inline
-[{"callback_data":"inv","text":"Отмена"}]
+[{"callback_data":"inv","text":"◀️ Назад"}]
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000020">💼</tg-emoji> <b>Вывод</b>
 Сейчас выводить нечего: пополнение становится доступным к выводу через 0 дн., прибыль — сразу после начисления.
 --- keyboard: inline
-[{"callback_data":"inv","text":"Отмена"}]
+[{"callback_data":"inv","icon_custom_emoji_id":"5368000000000000032","text":"Назад"}]

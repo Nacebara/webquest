@@ -32,6 +32,7 @@ const RICH_EXTRA_TAGS: &[(&str, &[&str])] = &[
     ("h4", &[]),
     ("p", &[]),
     ("footer", &[]),
+    ("aside", &[]),
     ("details", &["open"]),
     ("summary", &[]),
     ("ul", &[]),
@@ -300,6 +301,8 @@ fn money_flow_is_plain_html_reference_screens_have_fallback() {
         "privacy",
         "terms_with_offers",
         "welcome_with_offers",
+        "invest_home",
+        "invest_deposit",
         "invest_howto",
         // Выбор владельца 8 ноября 2026: карточки.
         "invoice_prompt",

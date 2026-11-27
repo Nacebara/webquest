@@ -4,18 +4,32 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-💼 <b>Пополнение</b>
-Пришлите сюда чек USDT CryptoBot или xRocket — от <code>10.00 USDT</code>.
-Как создать чек: наберите здесь <code>@send 100usdt</code> или <code>@xrocket 100</code> и выберите чек — я сразу его заберу.
-Следующий чек в ближайшие 15 минут пойдёт в инвестиции, а не в обмен.
+<b>💼 Пополнение</b>
+Пришлите сюда чек USDT 🔵 CryptoBot или 🚀 xRocket — от <code>10</code> USDT. Деньги начнут работать со следующего часа.
+Следующий чек в течение 15 минут пойдёт в инвестиции, а не в обмен.
+<i>Скопируйте, чтобы создать чек</i> ⬇️
+--- rich
+<h3>💼 Пополнение</h3>
+<p>Пришлите сюда чек USDT 🔵 CryptoBot или 🚀 xRocket — от <code>10</code> USDT. Деньги начнут работать со следующего часа.</p>
+<p>Следующий чек в течение 15 минут пойдёт в инвестиции, а не в обмен.</p>
+<p><i>Скопируйте, чтобы создать чек</i> ⬇️</p>
 --- keyboard: inline
-[{"callback_data":"inv","text":"Отмена"}]
+[{"copy_text":{"text":"@send 100usdt"},"style":"primary","text":"@send 100usdt"}]
+[{"copy_text":{"text":"@xrocket 100"},"style":"primary","text":"@xrocket 100"}]
+[{"callback_data":"inv","text":"◀️ Назад"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000020">💼</tg-emoji> <b>Пополнение</b>
-Пришлите сюда чек USDT CryptoBot или xRocket — от <code>10.00 USDT</code>.
-Как создать чек: наберите здесь <code>@send 100usdt</code> или <code>@xrocket 100</code> и выберите чек — я сразу его заберу.
-Следующий чек в ближайшие 15 минут пойдёт в инвестиции, а не в обмен.
+<b><tg-emoji emoji-id="5368000000000000020">💼</tg-emoji> Пополнение</b>
+Пришлите сюда чек USDT <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> CryptoBot или <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> xRocket — от <code>10</code> USDT. Деньги начнут работать со следующего часа.
+Следующий чек в течение 15 минут пойдёт в инвестиции, а не в обмен.
+<i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000036">⬇️</tg-emoji>
+--- rich
+<h3><tg-emoji emoji-id="5368000000000000020">💼</tg-emoji> Пополнение</h3>
+<p>Пришлите сюда чек USDT <tg-emoji emoji-id="5368000000000000011">🔵</tg-emoji> CryptoBot или <tg-emoji emoji-id="5368000000000000012">🚀</tg-emoji> xRocket — от <code>10</code> USDT. Деньги начнут работать со следующего часа.</p>
+<p>Следующий чек в течение 15 минут пойдёт в инвестиции, а не в обмен.</p>
+<p><i>Скопируйте, чтобы создать чек</i> <tg-emoji emoji-id="5368000000000000036">⬇️</tg-emoji></p>
 --- keyboard: inline
-[{"callback_data":"inv","text":"Отмена"}]
+[{"copy_text":{"text":"@send 100usdt"},"style":"primary","text":"@send 100usdt"}]
+[{"copy_text":{"text":"@xrocket 100"},"style":"primary","text":"@xrocket 100"}]
+[{"callback_data":"inv","icon_custom_emoji_id":"5368000000000000032","text":"Назад"}]

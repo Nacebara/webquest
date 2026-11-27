@@ -198,10 +198,10 @@ impl Inner {
         self.set_wait(user, None);
         match self.invest_home(user).await? {
             Some(h) => {
-                let screen = self.ui().invest_home(&h);
+                let screen = self.ui().invest_home(&h, chrono::Utc::now());
                 match message {
                     Some(_) => self.replace(chat, message, &screen).await,
-                    None => self.reply(chat, &screen).await,
+                    None => self.reply_doc(chat, user, &screen).await,
                 }
             }
             // Не инвестор: кнопки у него нет — ответ как на непонятный текст.
@@ -403,6 +403,7 @@ async fn notify(inner: &Inner, move_id: i64) -> Result<(), TgBotError> {
                 .clone()
                 .map(|check_url| InvestNotice::WithdrawDone {
                     amount,
+                    balance,
                     platform: m.platform,
                     check_url,
                 })

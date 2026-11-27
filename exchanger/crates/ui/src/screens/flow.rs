@@ -444,8 +444,7 @@ impl Ui {
             .style(ButtonStyle::Success)
     }
 
-    /// «Проверяю вручную / Деньги у меня: 100.00 USDT. Обычно до 15 минут. / Ничего делать
-    /// не нужно — напишу сюда.» — макет B1. `amount` — `None`: исход приёма неизвестен.
+    /// «Ручная проверка» или «Сверяю, дошёл ли чек», если исход приёма ещё неизвестен.
     pub fn manual_review(&self, order: &OrderRef, amount: Option<&Money>, minutes: i64) -> Screen {
         let t = &self.texts.manual;
         let minutes = Frag::text(&fmt::minutes_gen(minutes));
@@ -586,14 +585,25 @@ impl Ui {
         }
     }
 
-    /// Возврат начат: почему и сколько. Без кнопок — чек ещё создаётся.
+    /// Возврат начат: почему и сколько. Кнопка получения появится, когда чек будет готов.
     pub fn refund_started(
         &self,
         order: &OrderRef,
         refund: &Money,
         reason: &RefundReason,
     ) -> Screen {
-        self.plain(self.refund_text(order, refund, reason), Keyboard::None)
+        if matches!(reason, RefundReason::RateMoved) {
+            return self.error(&UiError::RateMoved {
+                to_pay: *refund,
+                source: order.direction.source(),
+            });
+        }
+        let keyboard = if matches!(reason, RefundReason::BelowMinimum { .. }) {
+            self.rates_error_keyboard()
+        } else {
+            Keyboard::None
+        };
+        self.plain(self.refund_text(order, refund, reason), keyboard)
     }
 
     /// Возврат готов — [Забрать 51.25 USDT]. Чек меньше минимума — та же строка, что и до

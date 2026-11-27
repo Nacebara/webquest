@@ -9,7 +9,7 @@ expression: "both(p, q)"
 Заявки до <code>200.00 USDT</code> исполняются сразу, крупнее — после подтверждения владельца.
 --- keyboard: inline
 [{"callback_data":"inv:to:cryptobot","text":"🔵 CryptoBot"},{"callback_data":"inv:to:xrocket","text":"🚀 xRocket"}]
-[{"callback_data":"inv","text":"Отмена"}]
+[{"callback_data":"inv","text":"◀️ Назад"}]
 
 ### premium
 --- html
@@ -18,4 +18,4 @@ expression: "both(p, q)"
 Заявки до <code>200.00 USDT</code> исполняются сразу, крупнее — после подтверждения владельца.
 --- keyboard: inline
 [{"callback_data":"inv:to:cryptobot","icon_custom_emoji_id":"5368000000000000011","text":"CryptoBot"},{"callback_data":"inv:to:xrocket","icon_custom_emoji_id":"5368000000000000012","text":"xRocket"}]
-[{"callback_data":"inv","text":"Отмена"}]
+[{"callback_data":"inv","icon_custom_emoji_id":"5368000000000000032","text":"Назад"}]

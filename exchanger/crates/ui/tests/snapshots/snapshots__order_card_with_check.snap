@@ -9,7 +9,7 @@ expression: "both(p, q)"
 <blockquote>Прислали: 100.00 CryptoBot
 Комиссия: 2.50 · 2.5 %
 Получили: 97.50 xRocket
-Чек: в кнопке ниже</blockquote>
+Чек: не забран</blockquote>
 --- rich
 <h3>Заявка <code>A1B2C3D4E5</code></h3>
 <p>🟢 <b>Готово</b> · 7 окт, 15:30 · 9 секунд</p>
@@ -17,7 +17,7 @@ expression: "both(p, q)"
 <tr><td>Прислали</td><td align="right">100.00 CryptoBot</td></tr>
 <tr><td>Комиссия</td><td align="right">2.50 · 2.5 %</td></tr>
 <tr><td>Получили</td><td align="right">97.50 xRocket</td></tr>
-<tr><td>Чек</td><td align="right">в кнопке ниже</td></tr>
+<tr><td>Чек</td><td align="right">не забран</td></tr>
 </table>
 --- keyboard: inline
 [{"style":"success","text":"📥 Забрать 97.50 USDT","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"}]
@@ -30,7 +30,7 @@ expression: "both(p, q)"
 <blockquote>Прислали: 100.00 CryptoBot
 Комиссия: 2.50 · 2.5 %
 Получили: 97.50 xRocket
-Чек: в кнопке ниже</blockquote>
+Чек: не забран</blockquote>
 --- rich
 <h3>Заявка <code>A1B2C3D4E5</code></h3>
 <p><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> <b>Готово</b> · 7 окт, 15:30 · 9 секунд</p>
@@ -38,7 +38,7 @@ expression: "both(p, q)"
 <tr><td>Прислали</td><td align="right">100.00 CryptoBot</td></tr>
 <tr><td>Комиссия</td><td align="right">2.50 · 2.5 %</td></tr>
 <tr><td>Получили</td><td align="right">97.50 xRocket</td></tr>
-<tr><td>Чек</td><td align="right">в кнопке ниже</td></tr>
+<tr><td>Чек</td><td align="right">не забран</td></tr>
 </table>
 --- keyboard: inline
 [{"icon_custom_emoji_id":"5368000000000000023","style":"success","text":"Забрать 97.50 USDT","url":"https://t.me/xrocket?start=t_val6vkkTbAbxd06"}]

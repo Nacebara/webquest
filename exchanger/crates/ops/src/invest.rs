@@ -263,10 +263,7 @@ impl Inner {
             if owner {
                 s = s.row(vec![btn(t.t("invest.b_grant"), &Cb::InvestEdit(user))]);
             }
-            return Ok(s.row(vec![
-                btn(t.t("common.back"), &Cb::User(user)),
-                btn(t.t("common.home"), &Cb::Menu),
-            ]));
+            return Ok(s.row(crate::nav::back(t, &Cb::User(user))));
         };
         if !i.is_active {
             lines.push(t.t("invest.card_off"));
@@ -338,10 +335,7 @@ impl Inner {
             btn(t.t("common.refresh"), &Cb::Invest(user)),
             btn(t.t("invest.b_list"), &Cb::Investors),
         ])
-        .row(vec![
-            btn(t.t("common.back"), &Cb::User(user)),
-            btn(t.t("common.home"), &Cb::Menu),
-        ]))
+        .row(crate::nav::back(t, &Cb::User(user))))
     }
 
     /// Карточка движения с решениями.

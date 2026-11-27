@@ -297,7 +297,7 @@ async fn submit(
                     until: None,
                 },
                 SubmitReject::NoReserve => UiError::NoReserve {
-                    max: domain::Money::zero(domain::Asset::Usdt),
+                    wallet: check_direction(link.platform).target(),
                 },
                 SubmitReject::ServicePaused => {
                     let (until, note) = maintenance_until(inner).await?;

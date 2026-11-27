@@ -183,9 +183,7 @@
   ]
  },
  "tpl:client:Карточка заявки": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "строка «Чек не забран» — в KNOWN ui/tests/mockup.rs; после Д-19.7 проверить, можно ли её показать",
+  "status": "match",
   "screens": [
    "preview:Карточка заявки"
   ]
@@ -792,12 +790,16 @@
  "samples:inv_home_rich:r": {
   "status": "todo",
   "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего gallery:invest_home: 2 из 11 строк)"
+  "why": "Карточка с таблицами есть. Макет показывает срок разблокировки конкретного пополнения. В экран пока передаётся общий срок, а в таблице движений остаются время и текст статуса.",
+  "screens": [
+   "gallery:invest_home"
+  ]
  },
  "samples:inv_deposit:p": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего gallery:send_check_cb_to_xr: 1 из 4 строк)"
+  "status": "match",
+  "screens": [
+   "gallery:invest_deposit"
+  ]
  },
  "samples:inv_deposit:ask": {
   "status": "todo",
@@ -805,30 +807,25 @@
   "why": "нет экрана в коде"
  },
  "samples:inv_deposit:done": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Зачислено # · в обороте #»",
+  "status": "match",
   "screens": [
    "gallery:invest_notice_deposit_done"
   ]
  },
  "samples:inv_status:req": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Заявка на вывод # в CryptoBot отправлена владельцу.»",
+  "status": "match",
   "screens": [
    "gallery:invest_notice_withdraw_requested"
   ]
  },
  "samples:inv_status:ok": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "gallery:invest_notice_withdraw_done"
+  ]
  },
  "samples:inv_status:no": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Вывод # отклонён: сначала закончится блокировка свежего пополнения.»",
+  "status": "match",
   "screens": [
    "gallery:invest_notice_withdraw_rejected"
   ]
@@ -836,7 +833,7 @@
  "samples:inv_howto:h": {
   "status": "todo",
   "kind": "не по макету",
-  "why": "текст: «Ваши USDT лежат в кошельках обменника и работают в обмене. С прибыли сервиса — часть ваша.»; текст: «Потери за день (курс по счетам, списания) #»; текст: «Прибыль сервиса за день #»",
+  "why": "Расчёт приведён к прибыли за вычетом потерь. Кнопка «Посчитать на своей сумме» из макета ждёт поддержки виджетов Telegram.",
   "screens": [
    "gallery:invest_howto"
   ]
@@ -960,25 +957,19 @@
   "why": "нет экрана в коде"
  },
  "samples:cl_privacy:p": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "кнопка: «Поддержка» нет; кнопка: «Помощь» нет",
+  "status": "match",
   "screens": [
    "gallery:privacy"
   ]
  },
  "samples:cl_link_bad:nc": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Пришлите ссылку вида t.me/send?start=CQ… или t.me/xrocket?start=… Деньги не тронуты.»",
+  "status": "match",
   "screens": [
    "gallery:error_not_check_or_invoice"
   ]
  },
  "samples:cl_link_bad:fb": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Ссылка ведёт на @send_wallet_bot — я её не открывал. Проверьте, у кого вы взяли чек.»",
+  "status": "match",
   "screens": [
    "gallery:error_foreign_bot"
   ]
@@ -1093,10 +1084,9 @@
   "why": "картинка daily-limit.png 20.11"
  },
  "samples:cl_errors:reserve": {
-  "status": "match",
-  "screens": [
-   "gallery:error_no_reserve"
-  ]
+  "status": "superseded",
+  "by": "samples:cx_errors:b2",
+  "why": "Концепция Б 15.11: если резерва не хватает на минимальную заявку, бот сообщает, в каком кошельке закончились выплаты."
  },
  "samples:cl_errors:daily": {
   "status": "superseded",
@@ -1110,17 +1100,13 @@
   ]
  },
  "samples:cl_errors:ban": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Причина: спам ссылками. Новые чеки не открываю — деньги в них. Заявку в работе доведу до конца.»",
+  "status": "match",
   "screens": [
    "gallery:error_banned"
   ]
  },
  "samples:cl_errors:dup": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "кнопка: «История» нет",
+  "status": "match",
   "screens": [
    "gallery:error_duplicate"
   ]
@@ -1132,18 +1118,13 @@
  },
  "samples:cl_errors:paid": {
   "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Верну # чеком xRocket.»",
-  "screens": [
-   "gallery:error_invoice_paid_elsewhere"
-  ]
+  "kind": "нужно подтверждение исхода",
+  "why": "Движок отдаёт уже оплаченный счёт на ручной разбор: по ответу кошелька нельзя определить, кто заплатил. Текст о возврате безопасен только после такого подтверждения."
  },
  "samples:cl_errors:moved": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Счёт не оплачивал. Верну # чеком xRocket — пришлите ссылку на счёт ещё раз, посчитаю заново.»",
+  "status": "match",
   "screens": [
-   "gallery:error_rate_moved"
+   "gallery:refund_started_rate_moved"
   ]
  },
  "samples:cl_errors:inwork": {
@@ -1367,54 +1348,56 @@
   "why": "нет экрана в коде"
  },
  "samples:cl_invoice_bad:exp": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "gallery:error_invoice_expired"
+  ]
  },
  "samples:cl_invoice_bad:paid": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "gallery:error_invoice_already_paid"
+  ]
  },
  "samples:cl_invoice_bad:fiat": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "gallery:error_invoice_fiat"
+  ]
  },
  "samples:cl_invoice_bad:reuse": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "gallery:error_invoice_reusable"
+  ]
  },
  "samples:cl_invoice_bad:none": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "gallery:error_invoice_no_amount"
+  ]
  },
  "samples:cl_invoice_bad:soon": {
   "status": "todo",
   "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "why": "Экран отрисовывается, но ответ кошелька не содержит срока действия счёта в текущей модели InvoiceCard."
  },
  "samples:cx_errors:b1": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Деньги в чеке — пришлите обычный.»",
+  "status": "match",
   "screens": [
    "gallery:error_captcha"
   ]
  },
  "samples:cx_errors:b2": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "gallery:error_no_reserve"
+  ]
  },
  "samples:cx_errors:b3": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "кнопка: «Курс» нет",
+  "status": "match",
   "screens": [
-   "gallery:refund_done_below_minimum"
+   "gallery:refund_started_below_minimum"
   ]
  },
  "samples:cx_errors:b4": {
@@ -1424,11 +1407,9 @@
   ]
  },
  "samples:cx_flows:late": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Деньги у меня · # USDT»; текст: «# USDT ждут вас в xRocket»; кнопка: «Забрать» нет",
+  "status": "match",
   "screens": [
-   "gallery:result_below"
+   "preview:Поздний итог обмена"
   ]
  },
  "samples:cx_flows:closed_paid": {
@@ -1466,24 +1447,25 @@
   "why": "нет экрана в коде"
  },
  "samples:pol_client:nf_a": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего gallery:error_not_found: 1 из 3 строк)"
+  "status": "match",
+  "screens": [
+   "gallery:error_not_found"
+  ]
  },
  "samples:pol_client:used_a": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "gallery:error_check_used"
+  ]
  },
  "samples:pol_client:unk_a": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде"
+  "status": "match",
+  "screens": [
+   "gallery:manual_review_unknown"
+  ]
  },
  "samples:pol_client:manual_a": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Обычно до # минут — напишу сюда.»",
+  "status": "match",
   "screens": [
    "gallery:manual_review"
   ]
@@ -1494,9 +1476,10 @@
   "why": "картинка daily-limit.png 20.11"
  },
  "samples:pol_client:answer_a": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего gallery:operator_answer: 1 из 3 строк)"
+  "status": "match",
+  "screens": [
+   "preview:Поддержка"
+  ]
  },
  "samples:pol_client:rates_a": {
   "status": "todo",
@@ -1507,9 +1490,7 @@
   ]
  },
  "samples:pol_client:help_a": {
-  "status": "todo",
-  "kind": "не по макету",
-  "why": "текст: «Наберите @send # или @xrocket # и выберите чек. Верну чеком другого кошелька — обычно за # секунд.»; текст: «Чек — в USDT, для одного человека, без капчи и подписок. Мульти-чеки — только CryptoBot.»",
+  "status": "match",
   "screens": [
    "gallery:help"
   ]

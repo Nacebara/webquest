@@ -367,9 +367,7 @@ impl Inner {
         // Чек уже забрали — карточка без «Забрать» (утверждённое состояние «Чек забран»).
         if card.check_url.is_some() {
             let mut conn = self.pool.acquire().await?;
-            if storage::operations::settle_claimed(&mut conn, view.id).await? {
-                card.check_url = None;
-            }
+            card.check_claimed = storage::operations::settle_claimed(&mut conn, view.id).await?;
         }
         self.reply_doc(chat, user, &self.ui().order_card(&card, chrono::Utc::now()))
             .await
@@ -712,6 +710,7 @@ async fn callback_action(inner: &Arc<Inner>, query: &CallbackQuery) -> Result<()
         }
         Callback::PayInvoice => inner.menu(chat, user, MenuAction::PayInvoice).await,
         Callback::Terms => inner.menu(chat, user, MenuAction::Rates).await,
+        Callback::Help => inner.menu(chat, user, MenuAction::Help).await,
         Callback::Privacy => inner.command(chat, user, Command::Privacy).await,
         Callback::History { page } => inner.history_page(chat, user, page, message).await,
         Callback::Order(id) => inner.order_card(chat, user, &id).await,

@@ -17,6 +17,7 @@ pub enum Callback {
     /// «Назад» из «Пришлите чек» — выбор направления в том же сообщении.
     ExchangeBack,
     Terms,
+    Help,
     Privacy,
     /// История, страница с нуля.
     History {
@@ -72,6 +73,7 @@ impl Callback {
             Callback::ExchangeBack => "exchange:back".to_owned(),
             Callback::PayInvoice => "invoice".to_owned(),
             Callback::Terms => "terms".to_owned(),
+            Callback::Help => "help".to_owned(),
             Callback::Privacy => "privacy".to_owned(),
             Callback::History { page } => format!("history:{page}"),
             Callback::Order(id) => format!("order:{id}"),
@@ -114,6 +116,7 @@ impl Callback {
             ("exchange", Some("back")) => Some(Callback::ExchangeBack),
             ("invoice", None) => Some(Callback::PayInvoice),
             ("terms", None) => Some(Callback::Terms),
+            ("help", None) => Some(Callback::Help),
             ("privacy", None) => Some(Callback::Privacy),
             ("history", Some(page)) => page
                 .parse()
@@ -168,6 +171,7 @@ mod tests {
             Callback::ExchangeBack,
             Callback::PayInvoice,
             Callback::Terms,
+            Callback::Help,
             Callback::Privacy,
             Callback::History { page: 0 },
             Callback::History {

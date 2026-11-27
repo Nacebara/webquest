@@ -261,6 +261,7 @@ pub fn card(with_check: bool) -> OrderCard {
         invoice_amount: None,
         refunded: None,
         check_url: with_check.then(|| CHECK_URL.to_owned()),
+        check_claimed: false,
         fee_pct: Some(dec!(2.5)),
         finished_at: with_check.then(|| at(12, 30) + chrono::Duration::seconds(9)),
     }
@@ -272,7 +273,7 @@ pub fn all_errors() -> Vec<(&'static str, UiError)> {
         (
             "foreign_bot",
             UiError::ForeignBot {
-                bot: "CryptoBotX <fake> & co".to_owned(),
+                bot: "send_wallet_bot".to_owned(),
             },
         ),
         ("testnet", UiError::Testnet),
@@ -328,7 +329,7 @@ pub fn all_errors() -> Vec<(&'static str, UiError)> {
         (
             "no_reserve",
             UiError::NoReserve {
-                max: usdt(dec!(120)),
+                wallet: Platform::XRocket,
             },
         ),
         (
@@ -376,7 +377,7 @@ pub fn all_errors() -> Vec<(&'static str, UiError)> {
             "banned",
             UiError::Banned {
                 until: None,
-                reason: "серия неудачных чеков".to_owned(),
+                reason: "спам ссылками".to_owned(),
             },
         ),
         (
@@ -767,6 +768,16 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
             "order_card_with_check",
             ui.order_card(&card(true), at(18, 0)),
         ),
+        (
+            "order_card_with_claimed_check",
+            ui.order_card(
+                &OrderCard {
+                    check_claimed: true,
+                    ..card(true)
+                },
+                at(18, 0),
+            ),
+        ),
         ("help", ui.help(&t)),
         ("privacy", ui.privacy()),
         ("support_with_contact", ui.support(Some("@exch_support"))),
@@ -804,9 +815,14 @@ pub fn gallery(ui: &Ui) -> Vec<(String, Screen)> {
         out.push((format!("error_{name}"), ui.error(&error)));
     }
     for (name, reason) in all_refund_reasons() {
+        let direction = if reason == RefundReason::RateMoved {
+            Direction::PayCbInvoice
+        } else {
+            cb
+        };
         out.push((
             format!("refund_started_{name}"),
-            ui.refund_started(&order(cb), &usdt(dec!(750)), &reason),
+            ui.refund_started(&order(direction), &usdt(dec!(750)), &reason),
         ));
     }
     out.extend(invest_gallery(ui));
@@ -885,15 +901,18 @@ pub fn invest_gallery(ui: &Ui) -> Vec<(String, Screen)> {
     let n = new_investor();
     let xr = Platform::XRocket;
     let screens = vec![
-        ("invest_home", ui.invest_home(&i)),
-        ("invest_home_new", ui.invest_home(&n)),
+        ("invest_home", ui.invest_home(&i, at(14, 5))),
+        ("invest_home_new", ui.invest_home(&n, at(14, 5))),
         (
             "invest_home_losses",
-            ui.invest_home(&InvestHome {
-                profit_24h: dec!(0),
-                losses_24h: dec!(30),
-                ..investor()
-            }),
+            ui.invest_home(
+                &InvestHome {
+                    profit_24h: dec!(0),
+                    losses_24h: dec!(30),
+                    ..investor()
+                },
+                at(14, 5),
+            ),
         ),
         ("invest_howto", ui.invest_howto(&i)),
         ("invest_howto_new", ui.invest_howto(&n)),
@@ -933,7 +952,7 @@ pub fn invest_gallery(ui: &Ui) -> Vec<(String, Screen)> {
             "invest_notice_withdraw_requested",
             ui.invest_notice(&InvestNotice::WithdrawRequested {
                 amount: dec!(500),
-                platform: xr,
+                platform: Platform::CryptoBot,
             }),
         ),
         (
@@ -947,7 +966,8 @@ pub fn invest_gallery(ui: &Ui) -> Vec<(String, Screen)> {
             "invest_notice_withdraw_done",
             ui.invest_notice(&InvestNotice::WithdrawDone {
                 amount: dec!(50),
-                platform: xr,
+                balance: dec!(1200.75),
+                platform: Platform::CryptoBot,
                 check_url: CHECK_URL.to_owned(),
             }),
         ),
@@ -955,7 +975,7 @@ pub fn invest_gallery(ui: &Ui) -> Vec<(String, Screen)> {
             "invest_notice_withdraw_rejected",
             ui.invest_notice(&InvestNotice::WithdrawRejected {
                 amount: dec!(500),
-                reason: "рано, подождите неделю <b>&".to_owned(),
+                reason: "сначала закончится блокировка свежего пополнения".to_owned(),
             }),
         ),
         (

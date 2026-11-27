@@ -1057,7 +1057,12 @@ impl Ui {
             kv.push((self.fill(&t.refunded, &[]), with_wallet(m, src)));
         }
         if card.check_url.is_some() {
-            kv.push((self.fill(&t.check, &[]), self.fill(&t.check_ready, &[])));
+            let status = if card.check_claimed {
+                &t.check_claimed
+            } else {
+                &t.check_ready
+            };
+            kv.push((self.fill(&t.check, &[]), self.fill(status, &[])));
         }
         let rows = kv
             .into_iter()
@@ -1080,7 +1085,9 @@ impl Ui {
 
         let id = &card.order.id;
         let mut keyboard = Vec::new();
-        if let Some(url) = &card.check_url {
+        if let Some(url) = &card.check_url
+            && !card.check_claimed
+        {
             let amount = card.refunded.as_ref().or(card.payout.as_ref());
             match amount {
                 Some(m) => keyboard.push(vec![self.claim_button(m, url)]),
@@ -1147,8 +1154,8 @@ impl Ui {
         let mut doc = Doc::new();
         doc.title(&self.fill(&t.title, &[]));
         doc.para(&self.fill(&t.intro, &[]));
-        for (title, paras, action) in &sections {
-            doc.details(&self.fill(title, &[]), false, |d| {
+        for (index, (title, paras, action)) in sections.iter().enumerate() {
+            doc.details(&self.fill(title, &[]), index == 0, |d| {
                 for p in paras {
                     d.para(p);
                 }
@@ -1157,7 +1164,7 @@ impl Ui {
                 }
             });
         }
-        doc.footer(&self.fill(&t.footer, &[]));
+        doc.aside(&self.fill(&t.footer, &[]));
         let keyboard = Keyboard::inline_rows(vec![vec![
             self.cb_button(
                 Some(Emoji::Support),
@@ -1181,7 +1188,17 @@ impl Ui {
         doc.para(&self.fill(&t.why, &[]));
         doc.para(&self.fill(&t.never, &[]));
         doc.footer(&self.fill(&t.footer, &[]));
-        self.dual(doc, Keyboard::None)
+        self.dual(
+            doc,
+            Keyboard::inline_rows(vec![vec![
+                self.cb_button(
+                    Some(Emoji::Support),
+                    &self.texts.buttons.support,
+                    &Callback::Support(None),
+                ),
+                self.cb_button(Some(Emoji::Back), &self.texts.menu.help, &Callback::Help),
+            ]]),
+        )
     }
 
     /// «Поддержка». `contact` — `@username` оператора; если задан и корректен — кнопка-ссылка.

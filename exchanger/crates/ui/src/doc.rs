@@ -90,6 +90,15 @@ impl Doc {
         self.plain.push('\n');
     }
 
+    /// Врезка карточки, в запасном виде — отдельная строка.
+    pub fn aside(&mut self, text: &Frag) {
+        self.rich.push_str("<aside>");
+        self.rich.push_str(text.rich());
+        self.rich.push_str("</aside>");
+        self.plain.push_str(text.plain());
+        self.plain.push('\n');
+    }
+
     /// Готовый блок как есть (`<pre>` квитанции): в rich — сам блок, в обычном HTML — с
     /// переводом строки после.
     pub fn block(&mut self, block: &Frag) {

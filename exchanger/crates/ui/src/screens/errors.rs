@@ -96,6 +96,10 @@ impl Ui {
         Keyboard::inline_rows(vec![row])
     }
 
+    pub(super) fn rates_error_keyboard(&self) -> Keyboard {
+        self.err_keys(&[ErrKey::Rates])
+    }
+
     /// Экран ошибки или отказа. Обычный HTML: это часть денежного потока. Под каждой — кнопка
     /// по смыслу; без кнопки — только те, где остаётся подождать: обслуживание (так в
     /// утверждённом макете), «слишком много заявок», «ещё проверяю прошлый чек».
@@ -108,7 +112,7 @@ impl Ui {
                     &e.not_check_or_invoice,
                     &[
                         ("cb", &Frag::code("t.me/send?start=CQ…")),
-                        ("xr", &Frag::code("t.me/xrocket?start=t_…")),
+                        ("xr", &Frag::code("t.me/xrocket?start=…")),
                     ],
                 ),
                 self.err_keys(&[ErrKey::HowTo, ErrKey::Support]),
@@ -116,7 +120,13 @@ impl Ui {
             UiError::ForeignBot { bot } => (
                 self.fill(
                     &e.foreign_bot,
-                    &[("bot", &Frag::code(&clip(bot, FOREIGN_MAX_CHARS)))],
+                    &[(
+                        "bot",
+                        &Frag::code(&format!(
+                            "@{}",
+                            clip(bot.trim_start_matches('@'), FOREIGN_MAX_CHARS)
+                        )),
+                    )],
                 ),
                 self.err_keys(&[ErrKey::HowTo, ErrKey::Support]),
             ),
@@ -233,8 +243,8 @@ impl Ui {
                 ]]);
                 (body, keyboard)
             }
-            UiError::NoReserve { max } => (
-                self.fill(&e.no_reserve, &[("max", &self.money(max))]),
+            UiError::NoReserve { wallet } => (
+                self.fill(&e.no_reserve, &[("wallet", &self.wallet(*wallet))]),
                 self.err_keys(&[ErrKey::Rates]),
             ),
             UiError::Maintenance { until, note } => {
@@ -281,25 +291,24 @@ impl Ui {
                 (body, self.err_keys(&[ErrKey::Support]))
             }
             UiError::Duplicate { order } => {
-                let keyboard = if crate::callback::order_id_ok(order) {
-                    Keyboard::inline_rows(vec![vec![self.cb_button(
-                        None,
-                        &b.open_order,
-                        &Callback::Order(order.clone()),
-                    )]])
-                } else {
-                    self.err_keys(&[ErrKey::History])
-                };
+                let mut buttons = vec![self.cb_button(
+                    Some(Emoji::History),
+                    &self.texts.menu.history,
+                    &Callback::History { page: 0 },
+                )];
+                if crate::callback::order_id_ok(order) {
+                    buttons.insert(
+                        0,
+                        self.cb_button(None, &b.open_order, &Callback::Order(order.clone())),
+                    );
+                }
                 (
                     self.fill(&e.duplicate, &[("order", &self.order_id(&clip(order, 32)))]),
-                    keyboard,
+                    Keyboard::inline_rows(vec![buttons]),
                 )
             }
             UiError::InvoiceUnsuitable(problem) => (
-                self.fill(
-                    &e.invoice_unsuitable,
-                    &[("why", &self.fill(self.invoice_problem(*problem), &[]))],
-                ),
+                self.fill(self.invoice_problem(*problem), &[]),
                 self.err_keys(&[ErrKey::OtherInvoice, ErrKey::Support]),
             ),
             UiError::PayoutDelayed { order, payout } => (
@@ -333,7 +342,10 @@ impl Ui {
             UiError::RateMoved { to_pay, source } => (
                 self.fill(
                     &e.rate_moved,
-                    &[("x", &self.money(to_pay)), ("src", &self.wallet(*source))],
+                    &[
+                        ("x", &self.amount_code(to_pay)),
+                        ("src", &self.wallet(*source)),
+                    ],
                 ),
                 self.err_keys(&[ErrKey::PayInvoice]),
             ),

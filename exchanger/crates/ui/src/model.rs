@@ -274,9 +274,9 @@ pub enum UiError {
         direction: Direction,
         until: Option<DateTime<Utc>>,
     },
-    /// E12: резерва нет на такую сумму.
+    /// Резерва целевого кошелька не хватает на минимальный обмен.
     NoReserve {
-        max: Money,
+        wallet: Platform,
     },
     /// E13.
     Maintenance {
@@ -372,8 +372,10 @@ pub struct OrderCard {
     pub payout: Option<Money>,
     pub invoice_amount: Option<Money>,
     pub refunded: Option<Money>,
-    /// Ссылка на чек выплаты или возврата, пока клиент его не забрал.
+    /// Ссылка на чек выплаты или возврата.
     pub check_url: Option<String>,
+    /// Кошелёк сообщил об активации этого чека.
+    pub check_claimed: bool,
     /// Комиссия заявки, % — «2.50 · 2.5 %».
     pub fee_pct: Option<Decimal>,
     /// Когда закончилась — «· 9 секунд» в строке статуса.
@@ -470,6 +472,7 @@ pub enum InvestNotice {
     },
     WithdrawDone {
         amount: Decimal,
+        balance: Decimal,
         platform: Platform,
         check_url: String,
     },

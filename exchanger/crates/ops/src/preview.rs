@@ -228,9 +228,11 @@ pub async fn send_client_preview(api: &BotApi, look: &Look, chat: i64, only: Opt
         }
     };
     let ui = &ui;
-    let screens = ui::preview::client_at(ui, chrono::Utc::now());
+    let mut screens = ui::preview::client_at(ui, chrono::Utc::now());
+    screens.extend(ui::preview::client_supplements(ui));
     let total = screens.len();
     let only = only.map(str::to_lowercase);
+    let sample_data = crate::Cb::Sample.encode();
     for (i, screen) in screens.iter().enumerate() {
         if only
             .as_deref()
@@ -243,16 +245,21 @@ pub async fn send_client_preview(api: &BotApi, look: &Look, chat: i64, only: Opt
             .send_message(&SendMessage::html(chat, caption).silent())
             .await;
         for message in &screen.messages {
+            let mut keyboard = message.keyboard.clone();
+            if let ui::Keyboard::Inline(markup) = &mut keyboard {
+                sample_keyboard(&mut markup.inline_keyboard, &sample_data);
+            }
             let sent = match &message.rich_html {
                 Some(rich) => {
-                    let mut req = botapi::SendRichMessage::new(chat, rich.clone());
+                    let mut req =
+                        botapi::SendRichMessage::new(chat, sample_text(rich, &sample_data));
                     req.disable_notification = Some(true);
-                    req.reply_markup = message.keyboard.reply_markup();
+                    req.reply_markup = keyboard.reply_markup();
                     api.send_rich_message(&req).await.map(|_| ())
                 }
                 None => {
                     let mut req = SendMessage::html(chat, message.html.clone()).silent();
-                    req.reply_markup = message.keyboard.reply_markup();
+                    req.reply_markup = keyboard.reply_markup();
                     api.send_message(&req).await.map(|_| ())
                 }
             };

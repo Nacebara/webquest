@@ -1,8 +1,9 @@
 //! Раздел «💼 Инвестиции» (DESIGN-v0.2 Р18): экран с цифрами, пополнение, вывод, события и
-//! справка «Как это работает?» с примером в цифрах. Справка — rich с HTML-фолбэком, всё
-//! остальное — обычный HTML (это деньги).
+//! справка «Как это работает?» с примером в цифрах. Карточки имеют HTML-фолбэк,
+//! события движения денег приходят обычными сообщениями.
 
 use botapi::{ButtonStyle, KeyboardButton};
+use chrono::{DateTime, Utc};
 use domain::{Asset, Decimal, Money, Platform};
 
 use super::{Ui, inline_command};
@@ -17,9 +18,8 @@ use crate::screen::{Keyboard, Screen};
 /// Входные цифры примера в справке. Доля инвестора — его настоящая.
 const EX_DEPOSIT: i64 = 1_000;
 const EX_CAPITAL: i64 = 10_000;
-const EX_TURNOVER: i64 = 5_000;
-/// Средняя комиссия примера, %.
-const EX_FEE_PCT: i64 = 1;
+const EX_REVENUE: i64 = 35;
+const EX_LOSSES: i64 = 7;
 
 /// Пример суммы вывода: 100 или меньше, если столько нет.
 fn example_amount(withdrawable: Decimal) -> Decimal {
@@ -35,6 +35,23 @@ fn platform_icon(platform: Platform) -> Emoji {
     match platform {
         Platform::CryptoBot => Emoji::Cb,
         Platform::XRocket => Emoji::Xr,
+    }
+}
+
+fn rejection_reason(reason: &str) -> Frag {
+    let reason = reason.trim().trim_end_matches('.');
+    if reason.is_empty() {
+        return Frag::new();
+    }
+    Frag::text(&format!(": {}", crate::html::clip(reason, 300)))
+}
+
+fn investment_row(label: Frag, value: Frag) -> Row {
+    let mut line = label.clone();
+    line.push_text(": ").push(&value);
+    Row {
+        cells: vec![label, value],
+        line,
     }
 }
 
@@ -85,56 +102,72 @@ impl Ui {
         }
     }
 
+    fn investment_amount(value: Decimal) -> Frag {
+        Frag::code(&crate::fmt::amount(value, Asset::Usdt))
+    }
+
     /// Экран инвестора: баланс, прибыль, условия, что можно вывести, последние движения.
-    pub fn invest_home(&self, h: &InvestHome) -> Screen {
+    pub fn invest_home(&self, h: &InvestHome, now: DateTime<Utc>) -> Screen {
         let t = &self.texts.invest;
-        let mut lines = vec![
-            self.fill(&t.title, &[]),
-            self.fill(&t.balance, &[("balance", &self.usd(h.balance))]),
-            self.fill(
-                &t.profit,
-                &[
-                    ("profit", &self.usd(h.profit)),
-                    ("profit_24h", &self.usd(h.profit_24h)),
-                ],
-            ),
-        ];
-        if h.losses_24h > Decimal::ZERO {
-            lines.push(self.fill(&t.losses, &[("losses", &self.usd(h.losses_24h))]));
-        }
-        let days = Frag::text(&h.lock_days.to_string());
-        let share = self.pct(h.share_pct);
-        lines.push(if h.lock_days > 0 {
-            self.fill(&t.terms, &[("share", &share), ("days", &days)])
+        let mut doc = Doc::new();
+        doc.title(&self.fill(&t.title, &[]));
+        let profit = crate::fmt::amount(h.profit_24h, Asset::Usdt);
+        let profit = if h.profit_24h > Decimal::ZERO {
+            format!("+{profit}")
         } else {
-            self.fill(&t.terms_no_lock, &[("share", &share)])
-        });
-        lines.push(self.fill(
-            &t.withdrawable,
-            &[("withdrawable", &self.usd(h.withdrawable))],
+            profit
+        };
+        doc.para(&self.fill(
+            &t.balance,
+            &[
+                ("balance", &self.usd(h.balance)),
+                ("profit_24h", &Frag::code(&profit)),
+            ],
         ));
+        let row = |label: &str, value| investment_row(self.fill(label, &[]), value);
+        let mut summary = vec![
+            row(&t.profit, Self::investment_amount(h.profit)),
+            row(
+                &t.terms,
+                self.fill(&t.share, &[("share", &self.pct(h.share_pct))]),
+            ),
+            row(&t.withdrawable, Self::investment_amount(h.withdrawable)),
+        ];
         if h.locked > Decimal::ZERO {
-            lines.push(self.fill(&t.locked, &[("locked", &self.usd(h.locked))]));
+            summary.push(row(
+                &t.locked,
+                self.fill(
+                    &t.lock_term,
+                    &[
+                        ("locked", &Self::investment_amount(h.locked)),
+                        ("days", &Frag::text(&h.lock_days.to_string())),
+                    ],
+                ),
+            ));
         }
-        let mut body = Frag::join(&lines, "\n");
+        doc.table(Table {
+            attrs: "bordered striped compact",
+            head: vec![],
+            rows: summary,
+            right: &[1],
+            plain_quote: true,
+        });
+        if h.losses_24h > Decimal::ZERO {
+            doc.para(&self.fill(&t.losses, &[("losses", &self.usd(h.losses_24h))]));
+        }
         if h.moves.is_empty() && h.balance <= Decimal::ZERO {
-            body.push_text("\n\n");
-            body.push(&self.fill(&t.empty, &[]));
+            doc.para(&self.fill(&t.empty, &[]));
         } else if !h.moves.is_empty() {
-            body.push_text("\n\n");
-            body.push(&self.fill(&t.moves_title, &[]));
-            let rows: Vec<Frag> = h
+            doc.para(&self.fill(&t.moves_title, &[]));
+            let rows = h
                 .moves
                 .iter()
                 .map(|m| {
-                    let mut what = Frag::text(match m.kind {
+                    let what = Frag::text(match m.kind {
                         InvestMoveKind::Deposit => &t.kind_deposit,
                         InvestMoveKind::Withdrawal => &t.kind_withdrawal,
                     });
-                    if let Some(a) = m.amount {
-                        what.push_text(" ");
-                        what.push(&self.usd(a));
-                    }
+                    let amount = m.amount.map_or_else(Frag::new, Self::investment_amount);
                     let mut status = Frag::text(self.move_status(m.status));
                     if let Some(url) = m
                         .check_url
@@ -144,65 +177,82 @@ impl Ui {
                         status.push_text(" · ");
                         status.push(&Frag::link(url, &t.check_link));
                     }
-                    self.fill(
+                    let at = self.at(m.at, TimeFormat::DayTime);
+                    let mut description = what.clone();
+                    if !amount.is_empty() {
+                        description.push_text(" ").push(&amount);
+                    }
+                    let line = self.fill(
                         &t.move_line,
-                        &[
-                            ("at", &self.at(m.at, TimeFormat::DayTime)),
-                            ("what", &what),
-                            ("status", &status),
-                        ],
-                    )
+                        &[("at", &at), ("what", &description), ("status", &status)],
+                    );
+                    Row {
+                        cells: vec![at, what, status, amount],
+                        line,
+                    }
                 })
                 .collect();
-            body.push_text("\n");
-            body.push(&Frag::trusted("<blockquote>"));
-            body.push(&Frag::join(&rows, "\n"));
-            body.push(&Frag::trusted("</blockquote>"));
+            doc.table(Table {
+                attrs: "striped compact",
+                head: vec![],
+                rows,
+                right: &[3],
+                plain_quote: true,
+            });
         }
+        doc.footer(&self.fill(&t.accrual, &[("at", &self.at(now, TimeFormat::Time))]));
         let keyboard = Keyboard::inline_rows(vec![
             vec![
-                self.invest_button(None, &t.btn_deposit, InvestAction::Deposit)
+                self.invest_button(Some(Emoji::Add), &t.btn_deposit, InvestAction::Deposit)
                     .style(ButtonStyle::Primary),
-                self.invest_button(None, &t.btn_withdraw, InvestAction::Withdraw),
+                self.invest_button(Some(Emoji::Take), &t.btn_withdraw, InvestAction::Withdraw),
             ],
-            vec![self.invest_button(None, &t.btn_howto, InvestAction::HowTo)],
-            vec![self.invest_button(None, &t.btn_refresh, InvestAction::Home)],
+            vec![
+                self.invest_button(Some(Emoji::Help), &t.btn_howto, InvestAction::HowTo),
+                self.invest_button(Some(Emoji::More), &t.btn_refresh, InvestAction::Home),
+            ],
         ]);
-        self.plain(body, keyboard)
+        self.dual(doc, keyboard)
     }
 
-    /// «Пополнить»: какой чек прислать.
+    /// «Пополнить»: какой чек прислать и как скопировать команду для его создания.
     pub fn invest_deposit_prompt(&self, h: &InvestHome) -> Screen {
         let t = &self.texts.invest;
         let amount = Decimal::ONE_HUNDRED.max(h.min_deposit.ceil());
-        let body = self.fill(
+        let cb = inline_command(Platform::CryptoBot, amount);
+        let xr = inline_command(Platform::XRocket, amount);
+        let mut doc = Doc::new();
+        doc.title(&self.fill(&t.deposit_title, &[]));
+        doc.para(&self.fill(
             &t.deposit,
             &[
                 ("cb", &self.wallet(Platform::CryptoBot)),
                 ("xr", &self.wallet(Platform::XRocket)),
-                ("min", &self.usd(h.min_deposit)),
-                (
-                    "cb_cmd",
-                    &Frag::code(&inline_command(Platform::CryptoBot, amount)),
-                ),
-                (
-                    "xr_cmd",
-                    &Frag::code(&inline_command(Platform::XRocket, amount)),
-                ),
+                ("min", &Frag::code(&crate::fmt::bare_amount(h.min_deposit))),
             ],
-        );
-        let keyboard = Keyboard::inline_rows(vec![vec![self.invest_button(
-            None,
-            &self.texts.buttons.cancel,
-            InvestAction::Home,
-        )]]);
-        self.plain(body, keyboard)
+        ));
+        doc.para(&self.fill(&t.deposit_window, &[]));
+        doc.para(&self.fill(&t.deposit_copy, &[]));
+        let keyboard = Keyboard::inline_rows(vec![
+            vec![self.copy_button(&cb, &cb).style(ButtonStyle::Primary)],
+            vec![self.copy_button(&xr, &xr).style(ButtonStyle::Primary)],
+            vec![self.invest_button(
+                Some(Emoji::Back),
+                &self.texts.buttons.back,
+                InvestAction::Home,
+            )],
+        ]);
+        self.dual(doc, keyboard)
     }
 
     /// «Вывести»: выбор кошелька (или «выводить нечего»).
     pub fn invest_withdraw_menu(&self, h: &InvestHome) -> Screen {
         let t = &self.texts.invest;
-        let cancel = self.invest_button(None, &self.texts.buttons.cancel, InvestAction::Home);
+        let cancel = self.invest_button(
+            Some(Emoji::Back),
+            &self.texts.buttons.back,
+            InvestAction::Home,
+        );
         if h.withdrawable <= Decimal::ZERO {
             let body = self.fill(
                 &t.withdraw_nothing,
@@ -259,14 +309,14 @@ impl Ui {
         );
         let keyboard = Keyboard::inline_rows(vec![
             vec![
-                self.invest_button(
-                    Some(platform_icon(platform)),
-                    &all,
-                    InvestAction::WithdrawAll(platform),
-                )
-                .style(ButtonStyle::Primary),
+                self.invest_button(Some(Emoji::Take), &all, InvestAction::WithdrawAll(platform))
+                    .style(ButtonStyle::Primary),
             ],
-            vec![self.invest_button(None, &self.texts.buttons.cancel, InvestAction::Home)],
+            vec![self.invest_button(
+                Some(Emoji::Back),
+                &self.texts.buttons.back,
+                InvestAction::Home,
+            )],
         ]);
         self.plain(body, keyboard)
     }
@@ -283,8 +333,8 @@ impl Ui {
                 self.fill(
                     &t.deposit_done,
                     &[
-                        ("amount", &self.usd(*amount)),
-                        ("balance", &self.usd(*balance)),
+                        ("amount", &Self::investment_amount(*amount)),
+                        ("balance", &Self::investment_amount(*balance)),
                     ],
                 ),
                 home(),
@@ -322,7 +372,7 @@ impl Ui {
                 self.fill(
                     &t.withdraw_requested,
                     &[
-                        ("amount", &self.usd(*amount)),
+                        ("amount", &Self::investment_amount(*amount)),
                         ("wallet", &self.wallet(*platform)),
                     ],
                 ),
@@ -340,14 +390,16 @@ impl Ui {
             ),
             InvestNotice::WithdrawDone {
                 amount,
+                balance,
                 platform,
                 check_url,
             } => self.plain(
                 self.fill(
                     &t.withdraw_done,
                     &[
-                        ("amount", &self.usd(*amount)),
+                        ("amount", &Self::investment_amount(*amount)),
                         ("wallet", &self.wallet(*platform)),
+                        ("balance", &Self::investment_amount(*balance)),
                     ],
                 ),
                 Keyboard::inline_rows(vec![
@@ -359,8 +411,8 @@ impl Ui {
                 self.fill(
                     &t.withdraw_rejected,
                     &[
-                        ("amount", &self.usd(*amount)),
-                        ("reason", &Frag::text(&crate::html::clip(reason, 300))),
+                        ("amount", &Self::investment_amount(*amount)),
+                        ("reason", &rejection_reason(reason)),
                     ],
                 ),
                 home(),
@@ -410,27 +462,45 @@ impl Ui {
         doc.subtitle(&self.fill(&t.howto_example_title, &[]));
         let deposit = Decimal::from(EX_DEPOSIT);
         let capital = Decimal::from(EX_CAPITAL);
-        let turnover = Decimal::from(EX_TURNOVER);
-        let fee_pct = Decimal::from(EX_FEE_PCT);
-        let revenue = turnover * fee_pct / Decimal::ONE_HUNDRED;
+        let revenue = Decimal::from(EX_REVENUE);
+        let losses = Decimal::from(EX_LOSSES);
+        let profit = (revenue - losses).max(Decimal::ZERO);
         let part_pct = deposit * Decimal::ONE_HUNDRED / capital;
-        let on_you = revenue * deposit / capital;
+        let on_you = profit * deposit / capital;
         let day = (on_you * h.share_pct / Decimal::ONE_HUNDRED).trunc_with_scale(2);
         let month = day * Decimal::from(30);
-        let fee = self.pct(fee_pct);
-        let rows: Vec<(Frag, Frag)> = vec![
-            (self.fill(&t.ex_deposit, &[]), self.usd(deposit)),
-            (self.fill(&t.ex_capital, &[]), self.usd(capital)),
-            (self.fill(&t.ex_part, &[]), self.pct(part_pct)),
-            (self.fill(&t.ex_turnover, &[]), self.usd(turnover)),
+        let rows = vec![
             (
-                self.fill(&t.ex_revenue, &[("fee", &fee)]),
-                self.usd(revenue),
+                self.fill(&t.ex_deposit, &[]),
+                Self::investment_amount(deposit),
             ),
-            (self.fill(&t.ex_on_you, &[]), self.usd(on_you)),
+            (
+                self.fill(&t.ex_capital, &[]),
+                Self::investment_amount(capital),
+            ),
+            (self.fill(&t.ex_part, &[]), self.pct(part_pct)),
+            (
+                self.fill(&t.ex_revenue, &[]),
+                Self::investment_amount(revenue),
+            ),
+            (
+                self.fill(&t.ex_losses, &[]),
+                Self::investment_amount(-losses),
+            ),
+            (
+                Frag::bold(self.fill(&t.ex_profit, &[])),
+                Frag::bold(Self::investment_amount(profit)),
+            ),
+            (
+                self.fill(&t.ex_on_you, &[]),
+                Self::investment_amount(on_you),
+            ),
             (self.fill(&t.ex_share, &[]), self.pct(h.share_pct)),
-            (self.fill(&t.ex_day, &[]), Frag::bold(self.usd(day))),
-            (self.fill(&t.ex_month, &[]), Frag::bold(self.usd(month))),
+            (
+                self.fill(&t.ex_day, &[]),
+                Frag::bold(Self::investment_amount(day)),
+            ),
+            (self.fill(&t.ex_month, &[]), Self::investment_amount(month)),
         ];
         doc.table(Table {
             attrs: "bordered striped compact",
@@ -480,9 +550,9 @@ impl Ui {
 
         let keyboard = Keyboard::inline_rows(vec![
             vec![
-                self.invest_button(None, &t.btn_deposit, InvestAction::Deposit)
+                self.invest_button(Some(Emoji::Add), &t.btn_deposit, InvestAction::Deposit)
                     .style(ButtonStyle::Primary),
-                self.invest_button(None, &t.btn_withdraw, InvestAction::Withdraw),
+                self.invest_button(Some(Emoji::Take), &t.btn_withdraw, InvestAction::Withdraw),
             ],
             vec![self.invest_home_button()],
         ]);

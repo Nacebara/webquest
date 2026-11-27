@@ -10,8 +10,9 @@ use chrono::{DateTime, Duration, TimeZone as _, Utc};
 use domain::{Asset, Decimal, Direction, Money, OrderState};
 
 use crate::model::{
-    Breakdown, DirectionStatus, DirectionTerms, Excess, HistoryRow, HistorySummary, InvoiceQuote,
-    InvoiceRefusal, OrderCard, OrderRef, RefundReason, Terms, UiError,
+    Breakdown, DirectionStatus, DirectionTerms, Excess, HistoryRow, HistorySummary, InvestHome,
+    InvestMoveKind, InvestMoveRow, InvestMoveStatus, InvoiceProblem, InvoiceQuote, InvoiceRefusal,
+    OrderCard, OrderRef, RefundReason, Terms, UiError,
 };
 use crate::screen::Screen;
 use crate::screens::Ui;
@@ -189,6 +190,7 @@ fn card() -> OrderCard {
         invoice_amount: None,
         refunded: None,
         check_url: Some(CHECK_URL.to_owned()),
+        check_claimed: false,
         fee_pct: Some(Decimal::new(25, 1)),
         finished_at: Some(msk(5, 14, 4) + Duration::seconds(9)),
     }
@@ -197,6 +199,86 @@ fn card() -> OrderCard {
 /// Все экраны клиента в порядке макета, на его данных (котировка счёта — в 14:10 до 14:25).
 pub fn client(ui: &Ui) -> Vec<PreviewScreen> {
     client_at(ui, msk(5, 14, 10))
+}
+
+/// Дополнения к B1, принятые 14–16 ноября.
+pub fn client_supplements(ui: &Ui) -> Vec<PreviewScreen> {
+    let investor = InvestHome {
+        share_pct: Decimal::from(50),
+        lock_days: 7,
+        min_deposit: Decimal::TEN,
+        auto_withdraw_max: Decimal::ONE_HUNDRED,
+        balance: Decimal::new(128460, 2),
+        profit: Decimal::new(8460, 2),
+        profit_24h: Decimal::new(312, 2),
+        losses_24h: Decimal::ZERO,
+        locked: Decimal::ONE_HUNDRED,
+        withdrawable: Decimal::new(118460, 2),
+        moves: vec![
+            InvestMoveRow {
+                kind: InvestMoveKind::Deposit,
+                status: InvestMoveStatus::Done,
+                platform: domain::Platform::CryptoBot,
+                amount: Some(Decimal::ONE_HUNDRED),
+                at: msk(4, 14, 0),
+                check_url: None,
+            },
+            InvestMoveRow {
+                kind: InvestMoveKind::Withdrawal,
+                status: InvestMoveStatus::Done,
+                platform: domain::Platform::XRocket,
+                amount: Some(Decimal::from(50)),
+                at: msk(3, 16, 30),
+                check_url: Some(REFUND_URL.to_owned()),
+            },
+        ],
+    };
+    let mut screens: Vec<_> = [
+        ("Счёт истёк", InvoiceProblem::Expired),
+        ("Счёт уже оплачен", InvoiceProblem::AlreadyPaid),
+        ("Счёт в долларах без суммы в USDT", InvoiceProblem::Fiat),
+        ("Многоразовый счёт", InvoiceProblem::Reusable),
+        ("Счёт без суммы", InvoiceProblem::NoAmount),
+    ]
+    .into_iter()
+    .map(|(title, problem)| (title, ui.error(&UiError::InvoiceUnsuitable(problem))))
+    .chain([
+        ("Чек с капчей", ui.error(&UiError::Captcha)),
+        ("Чек не найден", ui.error(&UiError::NotFound)),
+        ("Чек уже открыт через меня", ui.error(&UiError::CheckUsed)),
+        ("Сверяю, дошёл ли чек", ui.manual_review(&order(), None, 15)),
+        (
+            "Выплаты закончились",
+            ui.error(&UiError::NoReserve {
+                wallet: domain::Platform::XRocket,
+            }),
+        ),
+        ("Конфиденциальность", ui.privacy()),
+        ("Инвестиции", ui.invest_home(&investor, now())),
+        (
+            "Инвестиции · Пополнение",
+            ui.invest_deposit_prompt(&investor),
+        ),
+        ("Инвестиции · Как это работает", ui.invest_howto(&investor)),
+    ])
+    .map(|(title, screen)| PreviewScreen {
+        title,
+        messages: vec![screen],
+    })
+    .collect();
+    let order = order();
+    let received = usdt(100, 0);
+    screens.push(PreviewScreen {
+        title: "Поздний итог обмена",
+        messages: vec![
+            ui.result_below(
+                &ui.manual_review(&order, Some(&received), 15),
+                Some(&received),
+            ),
+            ui.order_done(&order, &breakdown(), CHECK_URL, 9, false),
+        ],
+    });
+    screens
 }
 
 /// То же, но котировка счёта сделана в `now` и держится 15 минут: в Telegram живой отсчёт

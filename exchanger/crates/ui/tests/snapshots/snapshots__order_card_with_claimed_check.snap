@@ -1,0 +1,43 @@
+---
+source: crates/ui/tests/snapshots.rs
+expression: "both(p, q)"
+---
+### plain
+--- html
+<b>Заявка <code>A1B2C3D4E5</code></b>
+🟢 <b>Готово</b> · 7 окт, 15:30 · 9 секунд
+<blockquote>Прислали: 100.00 CryptoBot
+Комиссия: 2.50 · 2.5 %
+Получили: 97.50 xRocket
+Чек: забран</blockquote>
+--- rich
+<h3>Заявка <code>A1B2C3D4E5</code></h3>
+<p>🟢 <b>Готово</b> · 7 окт, 15:30 · 9 секунд</p>
+<table compact>
+<tr><td>Прислали</td><td align="right">100.00 CryptoBot</td></tr>
+<tr><td>Комиссия</td><td align="right">2.50 · 2.5 %</td></tr>
+<tr><td>Получили</td><td align="right">97.50 xRocket</td></tr>
+<tr><td>Чек</td><td align="right">забран</td></tr>
+</table>
+--- keyboard: inline
+[{"callback_data":"support:A1B2C3D4E5","text":"💬 Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"A1B2C3D4E5"}]
+
+### premium
+--- html
+<b>Заявка <code>A1B2C3D4E5</code></b>
+<tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> <b>Готово</b> · 7 окт, 15:30 · 9 секунд
+<blockquote>Прислали: 100.00 CryptoBot
+Комиссия: 2.50 · 2.5 %
+Получили: 97.50 xRocket
+Чек: забран</blockquote>
+--- rich
+<h3>Заявка <code>A1B2C3D4E5</code></h3>
+<p><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> <b>Готово</b> · 7 окт, 15:30 · 9 секунд</p>
+<table compact>
+<tr><td>Прислали</td><td align="right">100.00 CryptoBot</td></tr>
+<tr><td>Комиссия</td><td align="right">2.50 · 2.5 %</td></tr>
+<tr><td>Получили</td><td align="right">97.50 xRocket</td></tr>
+<tr><td>Чек</td><td align="right">забран</td></tr>
+</table>
+--- keyboard: inline
+[{"callback_data":"support:A1B2C3D4E5","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"},{"copy_text":{"text":"A1B2C3D4E5"},"text":"A1B2C3D4E5"}]

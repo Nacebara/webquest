@@ -43,8 +43,6 @@ pub(crate) struct Extra {
     pub min_amount: Option<Decimal>,
     /// Максимум для этого клиента (возврат «больше лимита»).
     pub max_amount: Option<Decimal>,
-    /// Сколько можно принять сейчас (отказ «нет резерва»).
-    pub room: Option<Decimal>,
     /// Меньше этой переплаты по счёту не возвращаем (`settings.min_refund_amount`).
     pub min_refund: Option<Decimal>,
     /// Чек не в USDT (К-3): сколько и какой монеты пришло — из ответа операции активации.
@@ -185,7 +183,7 @@ fn reject_error(view: &OrderView, extra: &Extra) -> UiError {
             until: None,
         },
         Some("no_reserve") => UiError::NoReserve {
-            max: money(view, extra.room).unwrap_or_else(|| Money::zero(view.asset)),
+            wallet: view.direction.target(),
         },
         Some("already_in_work") => UiError::Duplicate {
             order: view.public_id.clone(),
@@ -267,6 +265,7 @@ pub(crate) fn card(view: &OrderView) -> OrderCard {
         invoice_amount: money(view, view.invoice_amount),
         refunded: money(view, view.refund_amount).filter(|_| view.state == OrderState::Refunded),
         check_url,
+        check_claimed: false,
         fee_pct: view.fee_pct_applied.map(|p| p.normalize()),
         finished_at: view.finished_at,
     }
@@ -506,14 +505,6 @@ impl Inner {
             }
             OrderState::Rejected if view.failure_code.as_deref() == Some("daily_limit") => {
                 extra.daily = self.daily(view).await?;
-            }
-            OrderState::Rejected => {
-                extra.room = self
-                    .terms_for(view.user_id)
-                    .await?
-                    .room
-                    .get(&view.direction)
-                    .copied();
             }
             OrderState::Completed if view.direction.flow() == Flow::InvoicePayment => {
                 let mut conn = self.pool.acquire().await?;
@@ -1237,12 +1228,16 @@ mod tests {
         }
         let mut v = view(OrderState::Rejected);
         v.failure_code = Some("no_reserve".into());
-        let extra = Extra {
-            room: Some(dec!(42.5)),
-            ..Extra::default()
-        };
-        let screen = render(&ui, &cfg(), &v, &extra);
-        assert!(html(&screen).contains("42.50 USDT"), "{}", screen.html);
+        for direction in [Direction::CbToXrCheck, Direction::XrToCbCheck] {
+            v.direction = direction;
+            let screen = render(&ui, &cfg(), &v, &Extra::default());
+            assert_eq!(
+                screen,
+                ui.error(&UiError::NoReserve {
+                    wallet: direction.target()
+                })
+            );
+        }
     }
 
     #[test]

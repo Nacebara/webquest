@@ -25,7 +25,10 @@ fn screens() -> BTreeMap<String, guard::Code> {
         out.insert(format!("gallery:{name}"), code(&s));
     }
     // Экран макета клиента — несколько сообщений бота: сверяются вместе.
-    for p in ui::preview::client(&ui) {
+    for p in ui::preview::client(&ui)
+        .into_iter()
+        .chain(ui::preview::client_supplements(&ui))
+    {
         let parts: Vec<guard::Code> = p.messages.iter().map(code).collect();
         let rich = parts.iter().any(|c| c.rich.is_some());
         let text = parts

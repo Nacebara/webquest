@@ -4,14 +4,14 @@ expression: "both(p, q)"
 ---
 ### plain
 --- html
-✅ Зачислено <code>300.00 USDT</code>. В обороте: <code>1250.75 USDT</code>.
+✅ <b>Зачислено <code>300.00</code></b> · в обороте <code>1250.75</code>
 Деньги начнут приносить прибыль со следующего часа.
 --- keyboard: inline
 [{"callback_data":"inv","text":"💼 Инвестиции"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000001">✅</tg-emoji> Зачислено <code>300.00 USDT</code>. В обороте: <code>1250.75 USDT</code>.
+<tg-emoji emoji-id="5368000000000000001">✅</tg-emoji> <b>Зачислено <code>300.00</code></b> · в обороте <code>1250.75</code>
 Деньги начнут приносить прибыль со следующего часа.
 --- keyboard: inline
 [{"callback_data":"inv","icon_custom_emoji_id":"5368000000000000020","text":"Инвестиции"}]

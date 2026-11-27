@@ -856,6 +856,31 @@ async fn text_without_a_link_gets_a_hint_and_no_order(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn an_expired_invoice_gets_its_own_refusal_before_any_payment(pool: PgPool) {
+    let e = env(pool).await;
+    let bot = e.start_bot();
+    let invoice = e
+        .world
+        .create_invoice(InvoiceSpec::crypto(CB, usdt(dec!(10))))
+        .unwrap();
+    e.world.expire_invoice(&invoice.code).unwrap();
+    e.fake.client_writes(&invoice.url);
+
+    let refusal = e
+        .fake
+        .wait_for("expired invoice refusal", |c| {
+            c.method == "sendMessage" && c.contains("Счёт истёк — не оплачу")
+        })
+        .await;
+    assert!(refusal.contains("Деньги не списаны. Попросите у магазина новый счёт."));
+    assert!(refusal.contains("Другой счёт"));
+    assert!(refusal.contains("Поддержка"));
+    assert!(e.orders().await.is_empty());
+    assert!(e.world.invoice(&invoice.code).unwrap().payments.is_empty());
+    bot.stop().await;
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn invoice_link_gets_a_quote_and_the_check_pays_it(pool: PgPool) {
     let e = env(pool).await;
     // Rich включён: квитанция уходит rich, дальше те же правки сообщения.
@@ -1119,9 +1144,8 @@ async fn an_investor_result_reached_while_the_bot_was_down_is_sent_once(pool: Pg
     e.engine.invest_deposit(CLIENT, &link).await.unwrap();
     e.drain().await;
 
-    let credited = |c: &Call| {
-        c.method == "sendMessage" && c.contains("Зачислено") && c.contains("200.00 USDT")
-    };
+    let credited =
+        |c: &Call| c.method == "sendMessage" && c.contains("Зачислено <code>200.00</code>");
     let bot = e.start_bot();
     e.fake
         .wait_for("deposit credited after start", credited)
@@ -1195,18 +1219,18 @@ async fn a_deposit_below_the_minimum_comes_back_with_a_claim_button(pool: PgPool
 async fn investor_deposits_by_check_and_withdraws_a_check(pool: PgPool) {
     let e = env(pool).await;
     grant_investor(&e).await;
-    let bot = e.start_bot();
+    let bot = e.start_bot_with(true);
 
     e.fake.client_writes("/start");
     e.fake
         .wait_for("menu with the invest button", |c| {
-            c.method == "sendMessage" && c.contains("Инвестиции")
+            c.method == "sendRichMessage" && c.contains("Инвестиции")
         })
         .await;
     e.fake.client_writes("💼 Инвестиции");
     e.fake
         .wait_for("invest home", |c| {
-            c.method == "sendMessage" && c.contains("В обороте")
+            c.method == "sendRichMessage" && c.contains("В обороте")
         })
         .await;
 
@@ -1223,7 +1247,7 @@ async fn investor_deposits_by_check_and_withdraws_a_check(pool: PgPool) {
     e.drain().await;
     e.fake
         .wait_for("deposit credited", |c| {
-            c.method == "sendMessage" && c.contains("Зачислено") && c.contains("200.00 USDT")
+            c.method == "sendMessage" && c.contains("Зачислено <code>200.00</code>")
         })
         .await;
     assert!(
@@ -2199,7 +2223,7 @@ async fn a_claimed_check_loses_its_claim_button(pool: PgPool) {
     let bot = e.start_bot_with(true);
     let url = e.world.client_check(CB, usdt(dec!(100))).unwrap();
     e.fake.client_writes(&url);
-    let (_, order_message, _) = e.order_message().await;
+    let (_, order_message, public_id) = e.order_message().await;
     e.drain().await;
     let (order_id, _, _, _, payout) = e.orders().await[0].clone();
     let payout_url = payout.expect("ссылка на чек выплаты");
@@ -2249,6 +2273,15 @@ async fn a_claimed_check_loses_its_claim_button(pool: PgPool) {
         .last()
         .expect("сообщение заявки поправлено после уведомления");
     assert!(!last.contains(&button), "{}", last.body);
+    e.fake
+        .client_presses(order_message, &format!("order:{public_id}"));
+    let card = e
+        .fake
+        .wait_for("order card with a claimed check", |c| {
+            c.method == "sendRichMessage" && c.contains("забран</td>")
+        })
+        .await;
+    assert!(!card.contains(&button), "{}", card.body);
     bot.stop().await;
 }
 

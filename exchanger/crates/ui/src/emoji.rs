@@ -90,10 +90,12 @@ pub enum Emoji {
     Empty,
     /// Кнопка «Ответить» оператору (AUDIT-UI С3).
     Reply,
+    Add,
+    Take,
 }
 
 impl Emoji {
-    pub const ALL: [Emoji; 44] = [
+    pub const ALL: [Emoji; 46] = [
         Emoji::Wait,
         Emoji::Ok,
         Emoji::Err,
@@ -138,6 +140,8 @@ impl Emoji {
         Emoji::Closed,
         Emoji::Empty,
         Emoji::Reply,
+        Emoji::Add,
+        Emoji::Take,
     ];
 
     pub const fn key(self) -> &'static str {
@@ -186,6 +190,8 @@ impl Emoji {
             Emoji::Closed => "closed",
             Emoji::Empty => "empty",
             Emoji::Reply => "reply",
+            Emoji::Add => "add",
+            Emoji::Take => "take",
         }
     }
 
@@ -236,6 +242,8 @@ impl Emoji {
             Emoji::Closed => "📮",
             Emoji::Empty => "🫙",
             Emoji::Reply => "↩️",
+            Emoji::Add => "➕",
+            Emoji::Take => "📤",
         }
     }
 
@@ -290,6 +298,8 @@ impl Emoji {
             Emoji::Closed => "color/closed",
             Emoji::Empty => "color/empty",
             Emoji::Reply => "mono/reply",
+            Emoji::Add => "mono/plus",
+            Emoji::Take => "mono/take",
         }
     }
 
@@ -340,6 +350,8 @@ impl Emoji {
             Emoji::Closed => "mono/flag",
             Emoji::Empty => "mono/wallet",
             Emoji::Reply => "mono/reply",
+            Emoji::Add => "mono/plus",
+            Emoji::Take => "mono/take",
         }
     }
 }

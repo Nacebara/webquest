@@ -5,13 +5,13 @@ expression: "both(p, q)"
 ### plain
 --- html
 🛠 <b>Проверяю вручную</b>
-Деньги у меня: <code>100.00</code> USDT.
+🛡 <i>Деньги у меня</i> · <code>100.00</code> USDT
 <i>Итог — ниже</i> ⬇️
 --- keyboard: none
 
 ### premium
 --- html
 <tg-emoji emoji-id="5368000000000000006">🛠</tg-emoji> <b>Проверяю вручную</b>
-Деньги у меня: <code>100.00</code> USDT.
+<tg-emoji emoji-id="5368000000000000039">🛡</tg-emoji> <i>Деньги у меня</i> · <code>100.00</code> USDT
 <i>Итог — ниже</i> <tg-emoji emoji-id="5368000000000000036">⬇️</tg-emoji>
 --- keyboard: none
