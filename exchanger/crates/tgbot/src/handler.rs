@@ -39,11 +39,9 @@ impl Inner {
                 markup.keyboard.push(vec![self.ui().invest_menu_button()]);
             }
             if let Some(hook) = self.hook()
-                && let Some(label) = hook.menu_button(chat).await
+                && let Some(button) = hook.menu_button(chat).await
             {
-                markup
-                    .keyboard
-                    .push(vec![botapi::KeyboardButton::new(label)]);
+                markup.keyboard.push(vec![button]);
             }
         }
         screen

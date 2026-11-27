@@ -512,6 +512,30 @@ impl Ops {
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn the_admin_panel_entry_uses_the_installed_premium_emoji(pool: PgPool) {
+    let icon = "5438109628225335067";
+    sqlx::query("UPDATE settings SET value = $1 WHERE key = 'emoji_packs'")
+        .bind(json!({ "animated": { "mono/dash": icon }, "static": {} }))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let o = ops(pool).await;
+    let welcome = o.say(OWNER, "/start", "Обмен CryptoBot").await;
+    let rows = welcome.body["reply_markup"]["keyboard"].as_array().unwrap();
+    assert!(
+        rows.iter()
+            .flat_map(|r| r.as_array().unwrap())
+            .any(|button| {
+                button["text"] == "Админ-панель" && button["icon_custom_emoji_id"] == icon
+            }),
+        "{}",
+        welcome.body
+    );
+    o.say(OWNER, "Админ-панель", "Всё спокойно").await;
+    o.say(OWNER, "🛠 Админ-панель", "Всё спокойно").await;
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn one_bot_staff_see_the_panel_clients_do_not(pool: PgPool) {
     let o = ops(pool).await;
     // Владелец открывает бота как обычно: у него в меню есть вход в админ-панель.

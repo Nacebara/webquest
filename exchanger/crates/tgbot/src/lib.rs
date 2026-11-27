@@ -57,7 +57,7 @@ pub trait UpdateHook: Send + Sync {
     /// клиентский бот его не трогает.
     async fn try_handle(&self, update: &botapi::Update) -> bool;
     /// Дополнительная кнопка главного меню для пользователя (персоналу — вход в пульт).
-    async fn menu_button(&self, user: i64) -> Option<String>;
+    async fn menu_button(&self, user: i64) -> Option<botapi::KeyboardButton>;
     /// Вопрос клиента в поддержку (макет B1 «Поддержка»): передать персоналу в пульт.
     /// `false` — передать некому.
     async fn support_question(

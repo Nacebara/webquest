@@ -342,6 +342,10 @@ impl OpsBot {
 }
 
 impl Inner {
+    fn is_panel_entry(&self, text: &str) -> bool {
+        text == self.texts.t("menu.open") || text == self.texts.t("menu.open_premium")
+    }
+
     fn state<R>(&self, f: impl FnOnce(&mut State) -> R) -> R {
         let mut guard = match self.state.lock() {
             Ok(g) => g,
@@ -549,7 +553,7 @@ impl Inner {
         let ours = match command {
             Some(name) => Self::COMMANDS.contains(&name),
             None => {
-                text == self.texts.t("menu.open")
+                self.is_panel_entry(text)
                     || self.has_awaiting(staff.tg_user_id)
                     || actions::is_control_word(text)
             }
@@ -561,7 +565,7 @@ impl Inner {
         let screen = self.on_message(&staff, message).await?;
         let sent = self.send(message.chat.id, &screen).await?;
         let opened_dash = matches!(command, Some("dash" | "admin" | "panel"))
-            || (command.is_none() && text == self.texts.t("menu.open"));
+            || (command.is_none() && self.is_panel_entry(text));
         if opened_dash {
             self.remember_dash(sent.chat.id, sent.message_id).await?;
         }
@@ -912,7 +916,7 @@ impl Inner {
         let text = message.text.as_deref().unwrap_or("").trim();
         // Вход в пульт — главный экран (макет: «Первая строка отвечает „надо ли мне что-то
         // делать“»); меню — кнопкой «Меню» или /menu.
-        if text == self.texts.t("menu.open") {
+        if self.is_panel_entry(text) {
             self.clear_awaiting(staff.tg_user_id);
             return self.dash().await;
         }
@@ -1089,11 +1093,17 @@ impl tgbot::UpdateHook for OpsBot {
         }
     }
 
-    async fn menu_button(&self, user: i64) -> Option<String> {
-        match self.inner.staff(user).await {
-            Ok(Some(_)) => Some(self.inner.texts.t("menu.open")),
-            _ => None,
-        }
+    async fn menu_button(&self, user: i64) -> Option<botapi::KeyboardButton> {
+        self.inner.staff(user).await.ok().flatten()?;
+        self.inner.refresh_look().await;
+        let look = self.inner.look();
+        let icon = look.emoji().pack_id("mono/dash").map(str::to_owned);
+        let label = if icon.is_some() {
+            "menu.open_premium"
+        } else {
+            "menu.open"
+        };
+        Some(botapi::KeyboardButton::new(self.inner.texts.t(label)).maybe_icon(icon))
     }
 
     async fn support_question(&self, from: &botapi::User, text: &str, order: Option<&str>) -> bool {

@@ -498,7 +498,7 @@ impl tgbot::UpdateHook for DemoHook {
         self.panel.try_handle(update).await
     }
 
-    async fn menu_button(&self, user: i64) -> Option<String> {
+    async fn menu_button(&self, user: i64) -> Option<botapi::KeyboardButton> {
         self.panel.menu_button(user).await
     }
 
