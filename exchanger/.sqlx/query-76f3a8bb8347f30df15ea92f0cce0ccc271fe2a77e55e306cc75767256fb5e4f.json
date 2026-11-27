@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE staff SET max_manual_payout = $2\n          WHERE tg_user_id = $1 AND role = $3 AND role <> 'owner' AND disabled_at IS NULL\n            AND max_manual_payout IS NOT DISTINCT FROM $4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Numeric",
+        "Text",
+        "Numeric"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "76f3a8bb8347f30df15ea92f0cce0ccc271fe2a77e55e306cc75767256fb5e4f"
+}

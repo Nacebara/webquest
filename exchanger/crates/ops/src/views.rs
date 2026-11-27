@@ -14,9 +14,9 @@ use storage::staff::{Role, StaffMember};
 use ui::{Emoji, EmojiStyle};
 
 use crate::actions::{Action, Input};
-use crate::cb::{Cb, DecisionKind, DirField, Flag, TermField};
+use crate::cb::{Cb, DecisionKind, DirField, Flag, StaffEdit, TermField};
 use crate::nav::{self, List};
-use crate::texts::esc;
+use crate::texts::{Texts, esc};
 use crate::{Inner, OpsError, Screen, btn};
 
 pub(crate) const DIRECTIONS: [Direction; 4] = [
@@ -32,6 +32,98 @@ pub(crate) fn usdt(v: Decimal) -> String {
 
 pub(crate) fn pct(v: Decimal) -> String {
     ui::fmt::percent(v)
+}
+
+fn staff_screen(
+    t: &Texts,
+    links: &nav::Links,
+    viewer: i64,
+    all: &[StaffMember],
+    page: u32,
+) -> Screen {
+    let (page, range) = nav::window(all.len(), page);
+    let title = t.t("staff.title");
+    let who = t.t("staff.col_who");
+    let role = t.t("staff.col_role");
+    let ceiling = t.t("staff.col_limit");
+    let hint = t.t("staff.hint_table");
+    let mut rich = format!(
+        "<h3>{title}</h3><table striped compact><tr><th>{who}</th><th>{role}</th><th align=\"right\">{ceiling}</th></tr>"
+    );
+    let mut plain = format!("<b>{title}</b>\n{who} · {role} · {ceiling}");
+    for m in &all[range] {
+        let label = if m.tg_user_id == viewer {
+            t.t("audit.you")
+        } else {
+            esc(&ui::html::clip(&m.display_name, 64))
+        };
+        let to = Cb::Member(m.tg_user_id);
+        let (rich_name, plain_name) = if m.active() && m.role != Role::Owner {
+            (links.link(&label, &to), links.plain_link(&label, &to))
+        } else {
+            (label.clone(), label)
+        };
+        let dot = if m.active() {
+            "{e:dot_ok}"
+        } else {
+            "{e:dot_closed}"
+        };
+        let role = t.t(&format!("roles.{}", m.role.as_db_str())).to_lowercase();
+        let limit = m
+            .manual_payout_limit()
+            .map_or_else(|| "∞".to_owned(), |v| v.normalize().to_string());
+        rich.push_str(&format!(
+            "<tr><td>{dot} {rich_name}</td><td>{role}</td><td align=\"right\">{limit}</td></tr>"
+        ));
+        plain.push_str(&format!("\n{dot} {plain_name} · {role} · {limit}"));
+    }
+    rich.push_str(&format!("</table><footer>{hint}</footer>"));
+    plain.push_str(&format!("\n\n<i>{hint}</i>"));
+    Screen::card(rich, plain)
+        .row(vec![
+            btn(t.t("staff.b_add"), &Cb::StaffAdd).style(botapi::ButtonStyle::Primary),
+            btn(
+                t.t("staff.b_pick_role"),
+                &Cb::StaffSelect(StaffEdit::Role, 0),
+            ),
+        ])
+        .row(vec![
+            btn(t.t("staff.b_limit"), &Cb::StaffSelect(StaffEdit::Limit, 0)),
+            btn(
+                t.t("staff.b_disable"),
+                &Cb::StaffSelect(StaffEdit::Disable, 0),
+            ),
+        ])
+        .row(nav::pager_with(t, page, all.len(), Cb::StaffPage))
+        .row(nav::back(t, &Cb::Menu))
+}
+
+/// Образец «Персонала» из макета.
+pub fn sample_staff(t: &Texts) -> Screen {
+    let at = crate::sample_now();
+    let member = |id, role, name: &str, active| StaffMember {
+        tg_user_id: id,
+        role,
+        display_name: name.to_owned(),
+        max_manual_payout: None,
+        added_by: None,
+        created_at: at,
+        disabled_at: if active { None } else { Some(at) },
+    };
+    let all = [
+        member(42, Role::Operator, "Анна", true),
+        member(43, Role::Admin, "Олег", false),
+        member(44, Role::Owner, "Владелец", true),
+    ];
+    staff_screen(t, &nav::Links::default(), 44, &all, 0)
+}
+
+fn other_staff_role(role: Role) -> Role {
+    if role == Role::Admin {
+        Role::Operator
+    } else {
+        Role::Admin
+    }
 }
 
 /// Дата и время в пульте — по времени владельца, как время на главном экране и в тревогах
@@ -1368,67 +1460,89 @@ impl Inner {
             .row(nav::back(t, &Cb::Menu)))
     }
 
-    pub(crate) async fn staff_list(&self, staff: &StaffMember) -> Result<Screen, OpsError> {
+    pub(crate) async fn staff_list(
+        &self,
+        staff: &StaffMember,
+        page: u32,
+    ) -> Result<Screen, OpsError> {
         if let Some(denied) = self.deny(staff, Role::Owner) {
             return Ok(denied);
         }
-        let t = &self.texts;
         let mut conn = self.pool.acquire().await?;
-        let all = storage::staff::list(&mut conn).await?;
-        let mut lines = vec![t.t("staff.title")];
-        let mut s = Screen::default();
-        for m in &all {
-            let limit = match m.manual_payout_limit() {
-                Some(l) => t.f("staff.limit", &[("limit", &usdt(l))]),
-                None => String::new(),
-            };
-            let off = if m.active() {
-                String::new()
-            } else {
-                t.t("staff.off")
-            };
-            // Имя — ссылка на карточку сотрудника (владельца не меняют).
-            let name = if m.role != Role::Owner && m.active() {
-                self.link(&esc(&m.display_name), &Cb::Member(m.tg_user_id))
-            } else {
-                esc(&m.display_name)
-            };
-            lines.push(t.f(
-                "staff.item",
-                &[
-                    ("name", &name),
-                    ("role", &self.role_name(m.role)),
-                    ("id", &m.tg_user_id),
-                    ("limit", &limit),
-                    ("off", &off),
-                ],
-            ));
+        let mut all = storage::staff::list(&mut conn).await?;
+        all.sort_by_key(|m| (m.role, m.created_at, m.tg_user_id));
+        Ok(staff_screen(
+            &self.texts,
+            &self.links(),
+            staff.tg_user_id,
+            &all,
+            page,
+        ))
+    }
+
+    async fn staff_select(
+        &self,
+        staff: &StaffMember,
+        edit: StaffEdit,
+        page: u32,
+    ) -> Result<Screen, OpsError> {
+        if let Some(denied) = self.deny(staff, Role::Owner) {
+            return Ok(denied);
         }
-        s.text = lines.join("\n");
-        Ok(s.row(vec![btn(t.t("staff.b_add"), &Cb::StaffAdd)])
-            .row(nav::back(t, &Cb::Menu)))
+        let mut conn = self.pool.acquire().await?;
+        let mut all = storage::staff::list(&mut conn).await?;
+        all.retain(|m| m.active() && m.role != Role::Owner);
+        let (page, range) = nav::window(all.len(), page);
+        let t = &self.texts;
+        let key = match edit {
+            StaffEdit::Role => "staff.pick_role",
+            StaffEdit::Limit => "staff.pick_limit",
+            StaffEdit::Disable => "staff.pick_disable",
+        };
+        let mut screen = Screen::new(t.t(if all.is_empty() {
+            "staff.no_members"
+        } else {
+            key
+        }));
+        for m in &all[range] {
+            let action = match edit {
+                StaffEdit::Role => Cb::MemberRole(m.tg_user_id, other_staff_role(m.role)),
+                StaffEdit::Limit => Cb::MemberLimit(m.tg_user_id),
+                StaffEdit::Disable => Cb::MemberDisable(m.tg_user_id),
+            };
+            let label = format!("{{m:staff}} {}", ui::html::clip(&m.display_name, 64));
+            screen = screen.row(vec![btn(label, &action)]);
+        }
+        Ok(screen
+            .row(nav::pager_with(t, page, all.len(), |p| {
+                Cb::StaffSelect(edit, p)
+            }))
+            .row(self.back(Cb::Staff)))
     }
 
     pub(crate) async fn member(&self, staff: &StaffMember, id: i64) -> Result<Screen, OpsError> {
         if let Some(denied) = self.deny(staff, Role::Owner) {
             return Ok(denied);
         }
+        let current = {
+            let mut conn = self.pool.acquire().await?;
+            storage::staff::active(&mut conn, id).await?
+        };
+        let Some(m) = current.filter(|m| m.role != Role::Owner) else {
+            return self.staff_list(staff, 0).await;
+        };
         let t = &self.texts;
-        let mut conn = self.pool.acquire().await?;
-        let Some(m) = storage::staff::get(&mut conn, id).await? else {
-            return self.staff_list(staff).await;
-        };
-        let other = if m.role == Role::Admin {
-            Role::Operator
-        } else {
-            Role::Admin
-        };
+        let other = other_staff_role(m.role);
+        let limit = m
+            .manual_payout_limit()
+            .map_or_else(|| "∞".to_owned(), |v| format!("{} USDT", v.normalize()));
         Ok(Screen::new(t.f(
             "staff.member",
             &[
                 ("name", &esc(&m.display_name)),
                 ("role", &self.role_name(m.role)),
                 ("id", &m.tg_user_id),
+                ("limit", &limit),
             ],
         ))
         .row(vec![
@@ -1436,8 +1550,9 @@ impl Inner {
                 t.f("staff.b_role", &[("role", &self.role_name(other))]),
                 &Cb::MemberRole(id, other),
             ),
-            btn(t.t("staff.b_disable"), &Cb::MemberDisable(id)),
+            btn(t.t("staff.b_limit"), &Cb::MemberLimit(id)),
         ])
+        .row(vec![btn(t.t("staff.b_disable"), &Cb::MemberDisable(id))])
         .row(self.back(Cb::Staff)))
     }
 
@@ -1580,7 +1695,9 @@ impl Inner {
             Cb::Maintenance => self.maintenance().await,
             Cb::Emoji => self.emoji().await,
             Cb::Bots => self.bots().await,
-            Cb::Staff => self.staff_list(staff).await,
+            Cb::Staff => self.staff_list(staff, 0).await,
+            Cb::StaffPage(page) => self.staff_list(staff, page).await,
+            Cb::StaffSelect(edit, page) => self.staff_select(staff, edit, page).await,
             Cb::Member(id) => self.member(staff, id).await,
             Cb::Audit => self.audit(staff, 0).await,
             Cb::Investors | Cb::Invest(_) | Cb::InvestMove(_) => {
@@ -1784,6 +1901,7 @@ impl Inner {
             Cb::Toggle(Flag::KillSwitch) => Role::Operator,
             Cb::StaffAdd
             | Cb::MemberRole(..)
+            | Cb::MemberLimit(_)
             | Cb::MemberDisable(_)
             | Cb::Selftest
             | Cb::PasscodeLimit
@@ -1996,25 +2114,39 @@ impl Inner {
                 Action::BotPause { id, label, paused }
             }
             Cb::StaffAdd => return Ok(self.prompt(staff, Input::StaffAdd, "staff.ask_add")),
-            Cb::MemberRole(id, role) => {
-                let Some(m) = storage::staff::get(&mut conn, id).await? else {
-                    return self.staff_list(staff).await;
+            Cb::MemberRole(id, _) | Cb::MemberLimit(id) | Cb::MemberDisable(id) => {
+                let member = storage::staff::active(&mut conn, id).await?;
+                drop(conn);
+                let Some(m) = member.filter(|m| m.role != Role::Owner) else {
+                    return self.staff_list(staff, 0).await;
                 };
-                Action::StaffRole {
-                    id,
-                    name: m.display_name,
-                    before: m.role,
-                    after: role,
-                }
-            }
-            Cb::MemberDisable(id) => {
-                let Some(m) = storage::staff::get(&mut conn, id).await? else {
-                    return self.staff_list(staff).await;
+                let action = match cb {
+                    Cb::MemberRole(_, role) if role == other_staff_role(m.role) => {
+                        Action::StaffRole {
+                            id,
+                            name: m.display_name,
+                            before: m.role,
+                            after: role,
+                        }
+                    }
+                    Cb::MemberLimit(_) => {
+                        let now = m
+                            .manual_payout_limit()
+                            .map_or_else(|| "∞".to_owned(), |v| format!("{} USDT", v.normalize()));
+                        let text = t.f(
+                            "staff.ask_limit",
+                            &[("name", &esc(&m.display_name)), ("now", &now)],
+                        );
+                        return Ok(self.prompt_with(staff, Input::StaffLimit(id), text));
+                    }
+                    Cb::MemberDisable(_) => Action::StaffDisable {
+                        id,
+                        name: m.display_name,
+                        role: m.role,
+                    },
+                    _ => return self.staff_list(staff, 0).await,
                 };
-                Action::StaffDisable {
-                    id,
-                    name: m.display_name,
-                }
+                return self.preview(staff, action).await;
             }
             Cb::Selftest => Action::Selftest {
                 amount: Decimal::ONE,

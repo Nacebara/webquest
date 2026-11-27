@@ -581,6 +581,108 @@ async fn a_queue_order_opens_from_the_html_fallback(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn staff_payout_limit_needs_owner_confirmation_and_refuses_a_stale_change(pool: PgPool) {
+    let o = ops(pool).await;
+    let denied = o.say(ADMIN, "/staff", "Это действие доступно").await;
+    assert!(!denied.text().contains("Анна"));
+    let staff = o.say(OWNER, "/staff", "Потолок").await;
+    assert!(staff.text().contains("Анна") && staff.text().contains("300"));
+    let select = o
+        .press(OWNER, &staff, "Потолок", "Выберите сотрудника")
+        .await;
+    assert!(select.button("Игнат").is_none());
+    let prompt = o.press(OWNER, &select, "Анна", "Сейчас").await;
+    assert!(prompt.text().contains("300 USDT"));
+
+    let preview = o.say(OWNER, "125.5", "125.5 USDT").await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        let staff = storage::staff::get(&mut conn, ADMIN)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(staff.max_manual_payout, None);
+    }
+    let saved = o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
+    assert!(saved.text().contains("125.5"));
+    let audit = o.audit("staff.limit").await;
+    assert_eq!(
+        audit[0].before,
+        Some(json!({"limit":"300","personal": false}))
+    );
+    assert_eq!(
+        audit[0].after,
+        Some(json!({"limit":"125.5","personal": true}))
+    );
+
+    let select = o
+        .press(OWNER, &saved, "Потолок", "Выберите сотрудника")
+        .await;
+    o.press(OWNER, &select, "Анна", "Сейчас").await;
+    let preview = o.say(OWNER, "-", "300 USDT").await;
+    {
+        let mut conn = o.pool.acquire().await.unwrap();
+        assert!(
+            storage::staff::set_manual_payout(
+                &mut conn,
+                ADMIN,
+                Role::Admin,
+                Some(dec!(125.5)),
+                Some(dec!(175))
+            )
+            .await
+            .unwrap()
+        );
+    }
+    let stale = o
+        .press(OWNER, &preview, "Подтвердить", "Кнопка устарела")
+        .await;
+    assert!(stale.text().contains("175"));
+    assert_eq!(o.audit("staff.limit").await.len(), 1);
+
+    let select = o
+        .press(OWNER, &stale, "Потолок", "Выберите сотрудника")
+        .await;
+    o.press(OWNER, &select, "Анна", "Сейчас").await;
+    let preview = o.say(OWNER, "-", "300 USDT").await;
+    o.press(OWNER, &preview, "Подтвердить", "Сохранено").await;
+    let mut conn = o.pool.acquire().await.unwrap();
+    let staff = storage::staff::get(&mut conn, ADMIN)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(staff.max_manual_payout, None);
+    assert_eq!(staff.manual_payout_limit(), Some(dec!(300)));
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn personnel_table_can_change_a_role_and_disable_the_member(pool: PgPool) {
+    let o = ops(pool).await;
+    let staff = o.say(OWNER, "/staff", "Потолок").await;
+    let select = o.press(OWNER, &staff, "Роль", "Выберите сотрудника").await;
+    assert!(select.button("Игнат").is_none());
+    let role = o.press(OWNER, &select, "Анна", "Оператор").await;
+    let saved = o.press(OWNER, &role, "Подтвердить", "Сохранено").await;
+    assert_eq!(o.audit("staff.role").await.len(), 1);
+    let select = o
+        .press(OWNER, &saved, "Отключить", "Выберите сотрудника")
+        .await;
+    let disable = o
+        .press(OWNER, &select, "Анна", "перестанет ему отвечать")
+        .await;
+    o.press(OWNER, &disable, "Подтвердить", "Сохранено").await;
+    let mut conn = o.pool.acquire().await.unwrap();
+    let member = storage::staff::get(&mut conn, ADMIN)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(member.role, Role::Operator);
+    assert!(!member.active());
+    drop(conn);
+    assert_eq!(o.audit("staff.disable").await.len(), 1);
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn fee_change_needs_a_preview_and_a_single_use_confirmation(pool: PgPool) {
     let o = ops(pool).await;
     let panel = o.say(OWNER, "/menu", "<b>Пульт</b>").await;
@@ -1962,6 +2064,26 @@ async fn adding_the_owner_as_staff_is_refused(pool: PgPool) {
         .unwrap()
         .unwrap();
     assert_eq!(owner.role, Role::Owner, "владелец остался владельцем");
+    assert!(
+        !storage::staff::set_role(&mut conn, OWNER, Role::Owner, Role::Admin)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !storage::staff::set_role(&mut conn, ADMIN, Role::Admin, Role::Owner)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !storage::staff::disable(&mut conn, OWNER, Role::Owner)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !storage::staff::set_manual_payout(&mut conn, OWNER, Role::Owner, None, Some(dec!(50)))
+            .await
+            .unwrap()
+    );
     // И в базе: добавление с ID владельца роль владельца не перезаписывает.
     storage::staff::add(&mut conn, OWNER, Role::Admin, "Иван", ADMIN)
         .await

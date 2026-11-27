@@ -70,7 +70,7 @@ pub use review::{
     OrderView, QueueData, QueueRow, ReconcileHint, sample_now, sample_order, sample_queue,
 };
 pub use texts::Texts;
-pub use views::{MenuCounts, maintenance_screen, menu_screen};
+pub use views::{MenuCounts, maintenance_screen, menu_screen, sample_staff};
 
 use crate::actions::{Action, Input};
 
@@ -930,7 +930,7 @@ impl Inner {
                 "promo" => self.promo(staff).await,
                 "settings" => self.settings().await,
                 "bots" => self.bots().await,
-                "staff" => self.staff_list(staff).await,
+                "staff" => self.staff_list(staff, 0).await,
                 "audit" => self.audit(staff, 0).await,
                 "order" | "find" if !arg.is_empty() => self.find_order(staff, arg).await,
                 "order" | "find" => Ok(self.prompt(staff, Input::OrderSearch, "order.ask")),

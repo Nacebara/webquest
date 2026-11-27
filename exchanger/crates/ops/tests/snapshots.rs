@@ -106,6 +106,13 @@ fn reserves_and_shortfall() {
 }
 
 #[test]
+fn staff_list() {
+    let texts = Texts::builtin().unwrap();
+    let screen = Look::plain().screen(&ops::sample_staff(&texts));
+    insta::assert_snapshot!("staff_list", dump(&screen));
+}
+
+#[test]
 fn queue_and_order_card() {
     let t = Texts::builtin().unwrap();
     let links = ops::Links::new(Some("exch_bot".into()));

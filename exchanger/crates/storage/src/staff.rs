@@ -207,39 +207,57 @@ pub async fn add(
 pub async fn set_role(
     conn: &mut PgConnection,
     tg_user_id: i64,
+    previous: Role,
     role: Role,
-) -> Result<(), StorageError> {
-    sqlx::query!(
-        "UPDATE staff SET role = $2 WHERE tg_user_id = $1",
+) -> Result<bool, StorageError> {
+    if role == Role::Owner {
+        return Ok(false);
+    }
+    let result = sqlx::query!(
+        "UPDATE staff SET role = $2
+          WHERE tg_user_id = $1 AND role = $3 AND role <> 'owner' AND disabled_at IS NULL",
         tg_user_id,
-        role.as_db_str()
+        role.as_db_str(),
+        previous.as_db_str(),
     )
     .execute(conn)
     .await?;
-    Ok(())
+    Ok(result.rows_affected() == 1)
 }
 
 pub async fn set_manual_payout(
     conn: &mut PgConnection,
     tg_user_id: i64,
+    role: Role,
+    previous: Option<Decimal>,
     limit: Option<Decimal>,
-) -> Result<(), StorageError> {
-    sqlx::query!(
-        "UPDATE staff SET max_manual_payout = $2 WHERE tg_user_id = $1",
+) -> Result<bool, StorageError> {
+    let result = sqlx::query!(
+        "UPDATE staff SET max_manual_payout = $2
+          WHERE tg_user_id = $1 AND role = $3 AND role <> 'owner' AND disabled_at IS NULL
+            AND max_manual_payout IS NOT DISTINCT FROM $4",
         tg_user_id,
-        limit
+        limit,
+        role.as_db_str(),
+        previous,
     )
     .execute(conn)
     .await?;
-    Ok(())
+    Ok(result.rows_affected() == 1)
 }
 
-pub async fn disable(conn: &mut PgConnection, tg_user_id: i64) -> Result<(), StorageError> {
-    sqlx::query!(
-        "UPDATE staff SET disabled_at = now() WHERE tg_user_id = $1 AND disabled_at IS NULL",
-        tg_user_id
+pub async fn disable(
+    conn: &mut PgConnection,
+    tg_user_id: i64,
+    role: Role,
+) -> Result<bool, StorageError> {
+    let result = sqlx::query!(
+        "UPDATE staff SET disabled_at = now()
+          WHERE tg_user_id = $1 AND role = $2 AND role <> 'owner' AND disabled_at IS NULL",
+        tg_user_id,
+        role.as_db_str(),
     )
     .execute(conn)
     .await?;
-    Ok(())
+    Ok(result.rows_affected() == 1)
 }

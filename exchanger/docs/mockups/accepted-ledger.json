@@ -506,9 +506,10 @@
   "why": "нет экрана в коде (ближе всего snap:paid_confirm_excess: 1 из 3 строк)"
  },
  "tpl:ops:Персонал": {
-  "status": "todo",
-  "kind": "нет в коде или нет снимка",
-  "why": "нет экрана в коде (ближе всего crawl:a:sf: 1 из 6 строк)"
+  "status": "match",
+  "screens": [
+   "snap:staff_list"
+  ]
  },
  "tpl:ops:Персонал · добавить владельца": {
   "status": "todo",

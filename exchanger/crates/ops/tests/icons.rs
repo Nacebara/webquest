@@ -43,8 +43,6 @@ const BARE_BUTTONS: &[&str] = &[
     "ops:settings.b_maint",
     "ops:settings.b_kill_off",
     "ops:settings.b_emoji",
-    "ops:staff.b_role",
-    "ops:staff.b_disable",
     "ops:invest.b_investor",
     "ops:invest.b_move",
     "ops:maint.b_more",

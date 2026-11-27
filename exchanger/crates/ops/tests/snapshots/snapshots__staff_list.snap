@@ -1,0 +1,42 @@
+---
+source: crates/ops/tests/snapshots.rs
+expression: dump(&screen)
+---
+--- rich
+<h3>👥 Персонал</h3>
+<table striped compact>
+<tr>
+<th>Кто</th>
+<th>Роль</th>
+<th align="right">Потолок</th>
+</tr>
+<tr>
+<td>🟢 <tg-button type="callback_data" style="link" data="a:sm:42">Анна</tg-button>
+</td>
+<td>оператор</td>
+<td align="right">50</td>
+</tr>
+<tr>
+<td>⚪ Олег</td>
+<td>админ</td>
+<td align="right">300</td>
+</tr>
+<tr>
+<td>🟢 Вы</td>
+<td>владелец</td>
+<td align="right">∞</td>
+</tr>
+</table>
+<footer>Зелёным — на смене</footer>
+--- html
+<b>👥 Персонал</b>
+Кто · Роль · Потолок
+🟢 Анна · оператор · 50
+⚪ Олег · админ · 300
+🟢 Вы · владелец · ∞
+
+<i>Зелёным — на смене</i>
+--- keyboard
+[{"text":"➕ Добавить","style":"primary","callback_data":"a:sfa"},{"text":"🔑 Роль","callback_data":"a:sfs:r:0"}]
+[{"text":"📏 Потолок","callback_data":"a:sfs:l:0"},{"text":"➖ Отключить","callback_data":"a:sfs:d:0"}]
+[{"text":"◀️ Меню","callback_data":"a:m"}]

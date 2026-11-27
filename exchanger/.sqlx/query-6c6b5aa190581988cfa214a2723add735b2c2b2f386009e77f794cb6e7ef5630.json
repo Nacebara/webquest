@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE staff SET role = $2\n          WHERE tg_user_id = $1 AND role = $3 AND role <> 'owner' AND disabled_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6c6b5aa190581988cfa214a2723add735b2c2b2f386009e77f794cb6e7ef5630"
+}

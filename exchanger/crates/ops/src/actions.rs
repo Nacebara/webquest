@@ -64,6 +64,7 @@ pub(crate) enum Input {
     Note(i64),
     EmojiFor(Emoji),
     StaffAdd,
+    StaffLimit(i64),
     Invest(crate::invest::InvestInput),
     /// Ответ клиенту из «Поддержки».
     SupportReply(i64),
@@ -186,6 +187,14 @@ pub(crate) enum Action {
     StaffDisable {
         id: i64,
         name: String,
+        role: Role,
+    },
+    StaffLimit {
+        id: i64,
+        name: String,
+        role: Role,
+        before: Option<Decimal>,
+        after: Option<Decimal>,
     },
     /// Расхождение сверки — взнос (`deposit`) или вывод владельца.
     Capital {
@@ -291,6 +300,7 @@ impl Action {
             }
             Action::StaffAdd { .. }
             | Action::StaffRole { .. }
+            | Action::StaffLimit { .. }
             | Action::StaffDisable { .. }
             | Action::Capital { .. }
             | Action::WriteOff { .. }
@@ -606,6 +616,17 @@ fn terms_json(t: &UserTerms) -> Value {
         "max_amount": t.max_amount.map(|v| v.to_string()),
         "newcomer_exempt": t.newcomer_exempt,
     })
+}
+
+fn staff_limit_label(t: &crate::Texts, role: Role, limit: Option<Decimal>) -> String {
+    let amount = limit
+        .or(role.default_manual_payout())
+        .map_or_else(|| "∞".to_owned(), |v| format!("{} USDT", v.normalize()));
+    if limit.is_some() {
+        amount
+    } else {
+        t.f("staff.limit_default", &[("amount", &amount)])
+    }
 }
 
 impl Inner {
@@ -1152,6 +1173,37 @@ impl Inner {
                     return Ok(self.prompt_with(staff, input, text));
                 }
                 Action::StaffAdd { id, role, name }
+            }
+            Input::StaffLimit(id) => {
+                if let Some(denied) = self.deny(staff, Role::Owner) {
+                    return Ok(denied);
+                }
+                let after = if text == "-" {
+                    None
+                } else if let Some(amount) =
+                    parsers::amount::parse_number(&text).map(|v| v.normalize())
+                    && amount >= Decimal::ZERO
+                    && amount < Decimal::from(100_000_000_000_000_000_000_i128)
+                    && amount.scale() <= 18
+                {
+                    Some(amount)
+                } else {
+                    return Ok(self.retry(staff, input, "staff.hint_limit"));
+                };
+                let current = {
+                    let mut conn = self.pool.acquire().await?;
+                    storage::staff::active(&mut conn, id).await?
+                };
+                let Some(current) = current.filter(|m| m.role != Role::Owner) else {
+                    return self.staff_list(staff, 0).await;
+                };
+                Action::StaffLimit {
+                    id,
+                    name: current.display_name,
+                    role: current.role,
+                    before: current.max_manual_payout,
+                    after,
+                }
             }
         };
         self.preview(staff, action).await
@@ -1942,6 +1994,20 @@ impl Inner {
             Action::StaffDisable { name, .. } => {
                 t.f("staff.preview_disable", &[("name", &esc(name))])
             }
+            Action::StaffLimit {
+                name,
+                role,
+                before,
+                after,
+                ..
+            } => t.f(
+                "staff.preview_limit",
+                &[
+                    ("name", &esc(name)),
+                    ("before", &staff_limit_label(t, *role, *before)),
+                    ("after", &staff_limit_label(t, *role, *after)),
+                ],
+            ),
             Action::Capital {
                 platform,
                 amount,
@@ -2552,7 +2618,10 @@ impl Inner {
             Action::StaffRole {
                 id, before, after, ..
             } => {
-                storage::staff::set_role(&mut tx, *id, *after).await?;
+                if !storage::staff::set_role(&mut tx, *id, *before, *after).await? {
+                    tx.rollback().await?;
+                    return self.staff_changed(staff).await;
+                }
                 (
                     "staff.role",
                     "staff",
@@ -2562,14 +2631,43 @@ impl Inner {
                     Cb::Staff,
                 )
             }
-            Action::StaffDisable { id, .. } => {
-                storage::staff::disable(&mut tx, *id).await?;
+            Action::StaffDisable { id, role, .. } => {
+                if !storage::staff::disable(&mut tx, *id, *role).await? {
+                    tx.rollback().await?;
+                    return self.staff_changed(staff).await;
+                }
                 (
                     "staff.disable",
                     "staff",
                     id.to_string(),
                     None,
                     None,
+                    Cb::Staff,
+                )
+            }
+            Action::StaffLimit {
+                id,
+                role,
+                before,
+                after,
+                ..
+            } => {
+                if !storage::staff::set_manual_payout(&mut tx, *id, *role, *before, *after).await? {
+                    tx.rollback().await?;
+                    return self.staff_changed(staff).await;
+                }
+                let data = |limit: Option<Decimal>| {
+                    json!({
+                        "limit": limit.or(role.default_manual_payout()).map(|v| v.normalize().to_string()),
+                        "personal": limit.is_some()
+                    })
+                };
+                (
+                    "staff.limit",
+                    "staff",
+                    id.to_string(),
+                    Some(data(*before)),
+                    Some(data(*after)),
                     Cb::Staff,
                 )
             }
@@ -2694,12 +2792,19 @@ impl Inner {
             Cb::Maintenance => self.maintenance().await?,
             Cb::Emoji => self.emoji().await?,
             Cb::Bots => self.bots().await?,
-            Cb::Staff => self.staff_list(staff).await?,
+            Cb::Staff => self.staff_list(staff, 0).await?,
             Cb::Dash => self.dash().await?,
             Cb::Reserves => self.reserves(staff).await?,
             _ => self.menu(staff).await?,
         };
         Ok(screen.notice(&t.t("common.saved")))
+    }
+
+    async fn staff_changed(&self, staff: &StaffMember) -> Result<Screen, OpsError> {
+        Ok(self
+            .staff_list(staff, 0)
+            .await?
+            .notice(&self.texts.t("common.expired")))
     }
 }
 

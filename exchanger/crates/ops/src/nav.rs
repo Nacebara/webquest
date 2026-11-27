@@ -153,7 +153,7 @@ fn parent_name(t: &Texts, to: &Cb) -> String {
         Cb::Settings => "nav.to_settings",
         Cb::Emoji => "nav.to_emoji",
         Cb::Bots => "nav.to_bots",
-        Cb::Staff => "nav.to_staff",
+        Cb::Staff | Cb::StaffPage(_) | Cb::StaffSelect(..) => "nav.to_staff",
         Cb::Reserves => "nav.to_reserves",
         Cb::System => "nav.to_system",
         Cb::Invest(_) => "nav.to_invest",

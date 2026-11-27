@@ -170,6 +170,29 @@ impl Flag {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StaffEdit {
+    Role,
+    Limit,
+    Disable,
+}
+
+impl StaffEdit {
+    const ALL: [Self; 3] = [Self::Role, Self::Limit, Self::Disable];
+
+    fn code(self) -> &'static str {
+        match self {
+            Self::Role => "r",
+            Self::Limit => "l",
+            Self::Disable => "d",
+        }
+    }
+
+    fn of(code: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|edit| edit.code() == code)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Cb {
     /// Кнопка на примере экрана из «Предпросмотра»: ничего не делает, только всплывашка «Это
@@ -239,9 +262,12 @@ pub enum Cb {
     Bots,
     BotPause(i16, bool),
     Staff,
+    StaffPage(u32),
+    StaffSelect(StaffEdit, u32),
     StaffAdd,
     Member(i64),
     MemberRole(i64, Role),
+    MemberLimit(i64),
     MemberDisable(i64),
     Audit,
     Confirm(String),
@@ -414,9 +440,12 @@ impl Cb {
             Cb::Bots => "b".into(),
             Cb::BotPause(id, p) => format!("bp:{id}:{}", bit(*p)),
             Cb::Staff => "sf".into(),
+            Cb::StaffPage(page) => format!("sfp:{page}"),
+            Cb::StaffSelect(edit, page) => format!("sfs:{}:{page}", edit.code()),
             Cb::StaffAdd => "sfa".into(),
             Cb::Member(id) => format!("sm:{id}"),
             Cb::MemberRole(id, r) => format!("smr:{id}:{}", r.as_db_str()),
+            Cb::MemberLimit(id) => format!("sml:{id}"),
             Cb::MemberDisable(id) => format!("smd:{id}"),
             Cb::Audit => "au".into(),
             Cb::Confirm(n) => format!("ok:{n}"),
@@ -532,9 +561,12 @@ impl Cb {
             ["b"] => Cb::Bots,
             ["bp", _, _] => Cb::BotPause(i16::try_from(id(1)?).ok()?, on(2)?),
             ["sf"] => Cb::Staff,
+            ["sfp", page] => Cb::StaffPage(page.parse().ok()?),
+            ["sfs", edit, page] => Cb::StaffSelect(StaffEdit::of(edit)?, page.parse().ok()?),
             ["sfa"] => Cb::StaffAdd,
             ["sm", _] => Cb::Member(id(1)?),
             ["smr", _, r] => Cb::MemberRole(id(1)?, Role::from_db_str(r)?),
+            ["sml", _] => Cb::MemberLimit(id(1)?),
             ["smd", _] => Cb::MemberDisable(id(1)?),
             ["au"] => Cb::Audit,
             ["ok", n] => Cb::Confirm((*n).to_owned()),
@@ -601,6 +633,7 @@ mod tests {
             Cb::Emoji,
             Cb::Bots,
             Cb::Staff,
+            Cb::StaffPage(u32::MAX),
             Cb::StaffAdd,
             Cb::Audit,
             Cb::Cancel,
@@ -618,6 +651,7 @@ mod tests {
             Cb::UserUnban(big),
             Cb::UserNote(big),
             Cb::Member(big),
+            Cb::MemberLimit(big),
             Cb::MemberDisable(big),
             Cb::Ack(big),
             Cb::Fixture(big),
@@ -677,6 +711,7 @@ mod tests {
         all.extend(EmojiStyle::ALL.map(Cb::EmojiStyle));
         all.extend(Emoji::ALL.map(Cb::EmojiRole));
         all.extend(Role::ALL.map(|r| Cb::MemberRole(big, r)));
+        all.extend(StaffEdit::ALL.map(|edit| Cb::StaffSelect(edit, u32::MAX)));
         all.extend([PromoMode::Off, PromoMode::Hint, PromoMode::Auto].map(Cb::PromoMode));
         for cb in all {
             let s = cb.encode();

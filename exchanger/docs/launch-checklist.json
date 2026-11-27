@@ -301,7 +301,7 @@
       "milestone": 7,
       "criterion": "У каждого экрана пульта есть снимок rich и HTML (П-1)",
       "status": "todo",
-      "evidence": "11.11.2026: 12 снимков"
+      "evidence": "11.11.2026: 12 снимков. 27.11: снимок staff_list фиксирует rich-карточку «Персонал» и запасной HTML. Сверка с утверждённым макетом проходит в accepted_panel_screens_follow_the_mockups."
     },
     {
       "id": "ops-accept",

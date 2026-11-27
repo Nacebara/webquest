@@ -396,6 +396,10 @@ pub async fn send_panel_preview(api: &BotApi, look: &Look, chat: i64) {
             crate::sample_paid_confirm(&texts, false),
         ),
         (
+            "<b>Пульт · Персонал</b> (данные макета)",
+            crate::sample_staff(&texts),
+        ),
+        (
             "<b>Пульт · Персонал · добавить владельца</b> (данные макета)",
             crate::sample_owner_add_refused(&texts),
         ),
