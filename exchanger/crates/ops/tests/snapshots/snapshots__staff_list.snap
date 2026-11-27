@@ -17,12 +17,14 @@ expression: dump(&screen)
 <td align="right">50</td>
 </tr>
 <tr>
-<td>⚪ Олег</td>
+<td>⚪ <tg-button type="callback_data" style="link" data="a:sm:43">Олег</tg-button>
+</td>
 <td>админ</td>
 <td align="right">300</td>
 </tr>
 <tr>
-<td>🟢 Вы</td>
+<td>🟢 <tg-button type="callback_data" style="link" data="a:sm:44">Вы</tg-button>
+</td>
 <td>владелец</td>
 <td align="right">∞</td>
 </tr>

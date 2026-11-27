@@ -58,11 +58,8 @@ fn staff_screen(
             esc(&ui::html::clip(&m.display_name, 64))
         };
         let to = Cb::Member(m.tg_user_id);
-        let (rich_name, plain_name) = if m.active() && m.role != Role::Owner {
-            (links.link(&label, &to), links.plain_link(&label, &to))
-        } else {
-            (label.clone(), label)
-        };
+        let rich_name = links.link(&label, &to);
+        let plain_name = links.plain_link(&label, &to);
         let dot = if m.active() {
             "{e:dot_ok}"
         } else {
@@ -1526,17 +1523,16 @@ impl Inner {
         }
         let current = {
             let mut conn = self.pool.acquire().await?;
-            storage::staff::active(&mut conn, id).await?
+            storage::staff::get(&mut conn, id).await?
         };
-        let Some(m) = current.filter(|m| m.role != Role::Owner) else {
+        let Some(m) = current else {
             return self.staff_list(staff, 0).await;
         };
         let t = &self.texts;
-        let other = other_staff_role(m.role);
         let limit = m
             .manual_payout_limit()
             .map_or_else(|| "∞".to_owned(), |v| format!("{} USDT", v.normalize()));
-        Ok(Screen::new(t.f(
+        let mut screen = Screen::new(t.f(
             "staff.member",
             &[
                 ("name", &esc(&m.display_name)),
@@ -1544,16 +1540,23 @@ impl Inner {
                 ("id", &m.tg_user_id),
                 ("limit", &limit),
             ],
-        ))
-        .row(vec![
-            btn(
-                t.f("staff.b_role", &[("role", &self.role_name(other))]),
-                &Cb::MemberRole(id, other),
-            ),
-            btn(t.t("staff.b_limit"), &Cb::MemberLimit(id)),
-        ])
-        .row(vec![btn(t.t("staff.b_disable"), &Cb::MemberDisable(id))])
-        .row(self.back(Cb::Staff)))
+        ));
+        if !m.active() {
+            screen.text.push('\n');
+            screen.text.push_str(&t.t("staff.access_off"));
+        } else if m.role != Role::Owner {
+            let other = other_staff_role(m.role);
+            screen = screen
+                .row(vec![
+                    btn(
+                        t.f("staff.b_role", &[("role", &self.role_name(other))]),
+                        &Cb::MemberRole(id, other),
+                    ),
+                    btn(t.t("staff.b_limit"), &Cb::MemberLimit(id)),
+                ])
+                .row(vec![btn(t.t("staff.b_disable"), &Cb::MemberDisable(id))]);
+        }
+        Ok(screen.row(self.back(Cb::Staff)))
     }
 
     /// «Журнал»: кто, что, когда — по [`nav::PAGE`] на странице; заявка и клиент — ссылки.

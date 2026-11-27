@@ -659,6 +659,12 @@ async fn staff_payout_limit_needs_owner_confirmation_and_refuses_a_stale_change(
 async fn personnel_table_can_change_a_role_and_disable_the_member(pool: PgPool) {
     let o = ops(pool).await;
     let staff = o.say(OWNER, "/staff", "Потолок").await;
+    let profile = o
+        .follow(OWNER, &staff, "Вы", "Потолок ручной выплаты")
+        .await;
+    assert!(profile.text().contains(&format!("<code>{OWNER}</code>")));
+    assert!(profile.button("Отключить").is_none());
+    let staff = o.press(OWNER, &profile, "Персонал", "Потолок").await;
     let select = o.press(OWNER, &staff, "Роль", "Выберите сотрудника").await;
     assert!(select.button("Игнат").is_none());
     let role = o.press(OWNER, &select, "Анна", "Оператор").await;
@@ -670,7 +676,10 @@ async fn personnel_table_can_change_a_role_and_disable_the_member(pool: PgPool) 
     let disable = o
         .press(OWNER, &select, "Анна", "перестанет ему отвечать")
         .await;
-    o.press(OWNER, &disable, "Подтвердить", "Сохранено").await;
+    let staff = o.press(OWNER, &disable, "Подтвердить", "Сохранено").await;
+    let profile = o.follow(OWNER, &staff, "Анна", "Доступ отключён").await;
+    assert!(profile.text().contains(&format!("<code>{ADMIN}</code>")));
+    assert!(profile.button("Потолок").is_none());
     let mut conn = o.pool.acquire().await.unwrap();
     let member = storage::staff::get(&mut conn, ADMIN)
         .await
