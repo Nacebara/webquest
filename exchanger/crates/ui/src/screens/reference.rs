@@ -1027,7 +1027,7 @@ impl Ui {
             self.fill(
                 &t.amount_wallet,
                 &[
-                    ("amount", &Frag::text(&fmt::amount(m.amount(), m.asset()))),
+                    ("amount", &self.amount_code(m)),
                     ("wallet", &self.wallet(platform)),
                 ],
             )
@@ -1041,10 +1041,7 @@ impl Ui {
                 self.fill(&t.fee, &[]),
                 self.fill(
                     &t.fee_value,
-                    &[
-                        ("fee", &Frag::text(&fmt::amount(fee.amount(), fee.asset()))),
-                        ("pct", &self.pct(pct)),
-                    ],
+                    &[("fee", &self.amount_code(fee)), ("pct", &self.pct(pct))],
                 ),
             ));
         }

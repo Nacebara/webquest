@@ -6,17 +6,17 @@ expression: "both(p, q)"
 --- html
 <b>Заявка <code>A1B2C3D4E5</code></b>
 🟢 <b>Готово</b> · 7 окт, 15:30 · 9 секунд
-<blockquote>Прислали: 100.00 CryptoBot
-Комиссия: 2.50 · 2.5 %
-Получили: 97.50 xRocket
+<blockquote>Прислали: <code>100.00</code> CryptoBot
+Комиссия: <code>2.50</code> · 2.5 %
+Получили: <code>97.50</code> xRocket
 Чек: не забран</blockquote>
 --- rich
 <h3>Заявка <code>A1B2C3D4E5</code></h3>
 <p>🟢 <b>Готово</b> · 7 окт, 15:30 · 9 секунд</p>
 <table compact>
-<tr><td>Прислали</td><td align="right">100.00 CryptoBot</td></tr>
-<tr><td>Комиссия</td><td align="right">2.50 · 2.5 %</td></tr>
-<tr><td>Получили</td><td align="right">97.50 xRocket</td></tr>
+<tr><td>Прислали</td><td align="right"><code>100.00</code> CryptoBot</td></tr>
+<tr><td>Комиссия</td><td align="right"><code>2.50</code> · 2.5 %</td></tr>
+<tr><td>Получили</td><td align="right"><code>97.50</code> xRocket</td></tr>
 <tr><td>Чек</td><td align="right">не забран</td></tr>
 </table>
 --- keyboard: inline
@@ -27,17 +27,17 @@ expression: "both(p, q)"
 --- html
 <b>Заявка <code>A1B2C3D4E5</code></b>
 <tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> <b>Готово</b> · 7 окт, 15:30 · 9 секунд
-<blockquote>Прислали: 100.00 CryptoBot
-Комиссия: 2.50 · 2.5 %
-Получили: 97.50 xRocket
+<blockquote>Прислали: <code>100.00</code> CryptoBot
+Комиссия: <code>2.50</code> · 2.5 %
+Получили: <code>97.50</code> xRocket
 Чек: не забран</blockquote>
 --- rich
 <h3>Заявка <code>A1B2C3D4E5</code></h3>
 <p><tg-emoji emoji-id="5368000000000000029">🟢</tg-emoji> <b>Готово</b> · 7 окт, 15:30 · 9 секунд</p>
 <table compact>
-<tr><td>Прислали</td><td align="right">100.00 CryptoBot</td></tr>
-<tr><td>Комиссия</td><td align="right">2.50 · 2.5 %</td></tr>
-<tr><td>Получили</td><td align="right">97.50 xRocket</td></tr>
+<tr><td>Прислали</td><td align="right"><code>100.00</code> CryptoBot</td></tr>
+<tr><td>Комиссия</td><td align="right"><code>2.50</code> · 2.5 %</td></tr>
+<tr><td>Получили</td><td align="right"><code>97.50</code> xRocket</td></tr>
 <tr><td>Чек</td><td align="right">не забран</td></tr>
 </table>
 --- keyboard: inline

@@ -82,14 +82,14 @@ expression: errors.trim_end()
 ## not_for_us
 ### plain
 --- html
-❌ <b>Чек привязан к другому аккаунту</b>
+🎟 <b>Чек привязан к другому аккаунту</b>
 Деньги в чеке. Пришлите чек без привязки.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","text":"❓ Как создать чек"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Чек привязан к другому аккаунту</b>
+<tg-emoji emoji-id="5368000000000000038">🎟</tg-emoji> <b>Чек привязан к другому аккаунту</b>
 Деньги в чеке. Пришлите чек без привязки.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000026","text":"Как создать чек"}]
@@ -97,14 +97,14 @@ expression: errors.trim_end()
 ## not_for_us_bind
 ### plain
 --- html
-❌ <b>Чек привязан к другому аккаунту</b>
+🎟 <b>Чек привязан к другому аккаунту</b>
 Деньги в чеке. Пришлите чек без привязки или на <code>@exch_cb</code>.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","text":"❓ Как создать чек"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Чек привязан к другому аккаунту</b>
+<tg-emoji emoji-id="5368000000000000038">🎟</tg-emoji> <b>Чек привязан к другому аккаунту</b>
 Деньги в чеке. Пришлите чек без привязки или на <code>@exch_cb</code>.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000026","text":"Как создать чек"}]
@@ -112,14 +112,14 @@ expression: errors.trim_end()
 ## premium_only
 ### plain
 --- html
-❌ <b>Чек только для Premium не подойдёт</b>
+🎟 <b>Чек только для Premium не подойдёт</b>
 Деньги в чеке. Пришлите обычный чек.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","text":"❓ Как создать чек"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Чек только для Premium не подойдёт</b>
+<tg-emoji emoji-id="5368000000000000038">🎟</tg-emoji> <b>Чек только для Premium не подойдёт</b>
 Деньги в чеке. Пришлите обычный чек.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000026","text":"Как создать чек"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
@@ -127,14 +127,14 @@ expression: errors.trim_end()
 ## subscription
 ### plain
 --- html
-❌ <b>Чек с подпиской не подойдёт</b>
+🎟 <b>Чек с подпиской не подойдёт</b>
 Деньги в чеке. Пришлите обычный чек.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","text":"❓ Как создать чек"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Чек с подпиской не подойдёт</b>
+<tg-emoji emoji-id="5368000000000000038">🎟</tg-emoji> <b>Чек с подпиской не подойдёт</b>
 Деньги в чеке. Пришлите обычный чек.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000026","text":"Как создать чек"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
@@ -157,14 +157,14 @@ expression: errors.trim_end()
 ## password
 ### plain
 --- html
-❌ <b>Чек с паролем не подойдёт</b>
+🎟 <b>Чек с паролем не подойдёт</b>
 Деньги в чеке. Пришлите обычный чек.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","text":"❓ Как создать чек"},{"callback_data":"support","text":"💬 Поддержка"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Чек с паролем не подойдёт</b>
+<tg-emoji emoji-id="5368000000000000038">🎟</tg-emoji> <b>Чек с паролем не подойдёт</b>
 Деньги в чеке. Пришлите обычный чек.
 --- keyboard: inline
 [{"callback_data":"howto:cb_to_xr_check","icon_custom_emoji_id":"5368000000000000026","text":"Как создать чек"},{"callback_data":"support","icon_custom_emoji_id":"5368000000000000010","text":"Поддержка"}]
@@ -172,14 +172,14 @@ expression: errors.trim_end()
 ## multi_check
 ### plain
 --- html
-❌ <b>Мульти-чек не подойдёт</b>
+🎟 <b>Мульти-чек не подойдёт</b>
 Деньги в чеке, я его не открывал. Пришлите обычный: <code>@xrocket 100</code>
 --- keyboard: inline
 [{"copy_text":{"text":"@xrocket 100"},"text":"@xrocket 100"}]
 
 ### premium
 --- html
-<tg-emoji emoji-id="5368000000000000002">❌</tg-emoji> <b>Мульти-чек не подойдёт</b>
+<tg-emoji emoji-id="5368000000000000038">🎟</tg-emoji> <b>Мульти-чек не подойдёт</b>
 Деньги в чеке, я его не открывал. Пришлите обычный: <code>@xrocket 100</code>
 --- keyboard: inline
 [{"copy_text":{"text":"@xrocket 100"},"text":"@xrocket 100"}]

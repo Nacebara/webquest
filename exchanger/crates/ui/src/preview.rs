@@ -244,6 +244,7 @@ pub fn client_supplements(ui: &Ui) -> Vec<PreviewScreen> {
     .map(|(title, problem)| (title, ui.error(&UiError::InvoiceUnsuitable(problem))))
     .chain([
         ("Чек с капчей", ui.error(&UiError::Captcha)),
+        ("Чек с паролем", ui.error(&UiError::PasswordProtected)),
         ("Чек не найден", ui.error(&UiError::NotFound)),
         ("Чек уже открыт через меня", ui.error(&UiError::CheckUsed)),
         ("Сверяю, дошёл ли чек", ui.manual_review(&order(), None, 15)),

@@ -14,7 +14,6 @@ use crate::Look;
 pub async fn send_preview(api: &BotApi, look: &Look, chat: i64) {
     send_client_preview(api, look, chat, None).await;
     send_panel_preview(api, look, chat).await;
-    send_widget_preview(api, look, chat).await;
 }
 
 /// Данные макетов виджетов, принятых владельцем 13–14 ноября: подпись, кнопки и состояние.

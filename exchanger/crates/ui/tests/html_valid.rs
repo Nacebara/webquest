@@ -326,6 +326,42 @@ fn money_flow_is_plain_html_reference_screens_have_fallback() {
 }
 
 #[test]
+fn order_card_amounts_are_monospace_in_both_versions() {
+    let screen = common::plain_ui().order_card(&common::card(true), common::at(18, 0));
+    for html in [&screen.html, screen.rich_html.as_ref().unwrap()] {
+        for amount in ["100.00", "2.50", "97.50"] {
+            assert!(html.contains(&format!("<code>{amount}</code>")), "{html}");
+        }
+    }
+}
+
+#[test]
+fn rejected_checks_with_funds_use_the_in_check_icon() {
+    let ui = common::premium_ui();
+    let icon = ui.emoji().frag(ui::Emoji::InCheck);
+    for error in [
+        UiError::Captcha,
+        UiError::PasswordProtected,
+        UiError::NeedsSubscription,
+        UiError::PremiumOnly,
+        UiError::MultiCheck,
+        UiError::NotForUs {
+            bind_username: None,
+        },
+        UiError::NotForUs {
+            bind_username: Some("example_bot".into()),
+        },
+    ] {
+        let screen = ui.error(&error);
+        assert!(
+            screen.html.starts_with(icon.plain()),
+            "{error:?}: {}",
+            screen.html
+        );
+    }
+}
+
+#[test]
 fn plain_mode_has_no_custom_emoji_premium_mode_does() {
     for (name, screen) in common::gallery(&common::plain_ui()) {
         assert!(!screen.html.contains("tg-emoji"), "{name}");

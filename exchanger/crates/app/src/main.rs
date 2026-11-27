@@ -1026,7 +1026,7 @@ async fn demo(
         } else if preview_panel {
             ops::preview::send_panel_preview(&api, &look, cfg.owner_tg_id).await;
         }
-        if preview_widgets && !preview {
+        if preview_widgets {
             ops::preview::send_widget_preview(&api, &look, cfg.owner_tg_id).await;
         }
         for word in &preview_only {
