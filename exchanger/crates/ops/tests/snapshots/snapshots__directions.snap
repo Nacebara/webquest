@@ -51,5 +51,4 @@ expression: dump(&screen)
 [{"text":"🚀 CB → xR","callback_data":"a:d:cx"},{"text":"🔷 xR → CB","callback_data":"a:d:xc"}]
 [{"text":"🧾 Счёт CB","callback_data":"a:d:pc"},{"text":"🧾 Счёт xR","callback_data":"a:d:px"}]
 [{"text":"📏 Рычаг","callback_data":"a:dirlever"},{"text":"👤 Новичкам","callback_data":"a:st:n"}]
-[{"text":"⚖️ Встречный поток","callback_data":"a:pr"}]
 [{"text":"◀️ Меню","callback_data":"a:m"}]

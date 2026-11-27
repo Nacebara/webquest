@@ -143,10 +143,7 @@ fn directions_screen(t: &Texts, rows: &[DirectionOverview], k: &str, role: Role)
             btn(t.t("dir.b_newcomers"), &Cb::Toggle(Flag::Newcomer)),
         ]);
     }
-    // Вход во встречный поток остаётся рядом с настройками направлений.
-    screen
-        .row(vec![btn(t.t("menu.promo"), &Cb::Promo)])
-        .row(nav::back(t, &Cb::Menu))
+    screen.row(nav::back(t, &Cb::Menu))
 }
 
 /// Образец списка направлений из утверждённого макета.

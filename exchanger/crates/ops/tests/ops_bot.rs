@@ -780,6 +780,7 @@ async fn shared_lever_keeps_direction_bands_and_expires_old_edits(pool: PgPool) 
     o.tg.lock().reject_next_rich = true;
     let dirs = o.say(ADMIN, "/dir", "Рычаг k = разный").await;
     assert_eq!(dirs.method, "sendMessage");
+    assert!(dirs.button("Встречный поток").is_none());
     let card = o.press(ADMIN, &dirs, "CB → xR", "Рычаг резерва").await;
     o.press(ADMIN, &card, "Пол и потолок", "через пробел").await;
     o.say(ADMIN, "0.1 1.4 3.6", "два числа").await;
