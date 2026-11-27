@@ -38,10 +38,10 @@ expression: dump(&queue)
 <footer>Нажмите номер — откроется карточка: взять, решить, написать клиенту.</footer>
 --- html
 <b>📋 Разбор · 2</b>
-<blockquote>K7M2Q9XR4T — выплата: нет ответа · 6 мин
-7F3A1C9D2B — незнакомый ответ · 2 мин</blockquote>
+<blockquote><a href="https://t.me/exch_bot?start=a__o__15">K7M2Q9XR4T</a> — выплата: нет ответа · 6 мин
+<a href="https://t.me/exch_bot?start=a__o__16">7F3A1C9D2B</a> — незнакомый ответ · 2 мин</blockquote>
 <b>Оплатить вручную · 1</b>
-<blockquote>Q1W2E3R4T5 — счёт CryptoBot 12.00 · 4 мин</blockquote>
+<blockquote><a href="https://t.me/exch_bot?start=a__o__17">Q1W2E3R4T5</a> — счёт CryptoBot 12.00 · 4 мин</blockquote>
 <i>Нажмите номер — откроется карточка: взять, решить, написать клиенту.</i>
 --- keyboard
 [{"text":"🔄 Обновить","callback_data":"a:pg:q:0"}]

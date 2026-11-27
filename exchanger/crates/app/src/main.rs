@@ -929,7 +929,7 @@ async fn spawn_bot(
             token.clone(),
             world,
             Arc::new(panel),
-            emoji.clone(),
+            pool.clone(),
         )?),
         None => Arc::new(panel),
     };

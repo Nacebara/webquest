@@ -2,8 +2,8 @@
 //!
 //! - **Нажимаемые строки.** Номер заявки, клиент, сотрудник в таблице — кнопка прямо в тексте
 //!   (`<tg-button type="callback_data" style="link">`, Bot API 10.3): выглядит ссылкой, нажатие
-//!   приходит обычной кнопкой и меняет то же сообщение. Старые ссылки `start=a__…` (если
-//!   остались в чате) тоже открываются — в окне пульта.
+//!   приходит обычной кнопкой и меняет то же сообщение. Ссылки `start=a__…` в запасном HTML
+//!   открываются в том же окне пульта.
 //! - **Страницы.** Длинный список — по [`PAGE`] строк, внизу «‹ Назад · 2 / 5 · Дальше ›»;
 //!   номер страницы виден всегда.
 //! - **Возврат.** Внизу каждого экрана — куда вернуться («‹ Разбор») и «Меню»; у разделов
@@ -74,9 +74,8 @@ pub(crate) fn window(total: usize, page: u32) -> (u32, std::ops::Range<usize>) {
     (page, start.min(total)..(start + PAGE).min(total))
 }
 
-/// Метка старой ссылки-перехода: `a__` и тело кнопки, `:` → `__` (в `start` можно только
+/// Метка ссылки-перехода: `a__` и тело кнопки, `:` → `__` (в `start` можно только
 /// `A-Za-z0-9_-`, до 64 символов).
-#[cfg(test)]
 pub(crate) fn payload(cb: &Cb) -> Option<String> {
     let body = cb.encode();
     let body = body.strip_prefix("a:")?;
@@ -194,6 +193,19 @@ impl Links {
             "<tg-button type=\"callback_data\" style=\"link\" data=\"{}\">{html}</tg-button>",
             esc(&to.encode())
         )
+    }
+
+    /// Ссылка на тот же экран для HTML, где Telegram не поддерживает кнопки в тексте.
+    pub(crate) fn plain_link(&self, html: &str, to: &Cb) -> String {
+        match (&self.bot, payload(to)) {
+            (Some(bot), Some(payload)) => {
+                format!(
+                    "<a href=\"https://t.me/{}?start={payload}\">{html}</a>",
+                    esc(bot)
+                )
+            }
+            _ => html.to_owned(),
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 //! Сторожа значков (решение владельца 21.11): каждый значок, который ставит бот, есть в наборах
 //! Telegram (`tools/emoji/demo-packs.json` — наборы, которые видит владелец), и у каждой кнопки
-//! пульта и инвестора есть значок нашего набора. Сегодняшние нарушения — списками `MISSING_*`
-//! и `BARE_BUTTONS`; список только сокращается: исправили — тест скажет убрать строку.
+//! пульта и инвестора есть значок нашего набора. Кнопки без значка пока перечислены в
+//! `BARE_BUTTONS`. После исправления кнопки тест попросит убрать её из списка.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::collections::BTreeSet;
@@ -9,31 +9,6 @@ use std::collections::BTreeSet;
 fn repo(path: &str) -> String {
     format!("{}/../../{path}", env!("CARGO_MANIFEST_DIR"))
 }
-
-/// Значков нет в наборах Telegram (SCREENS-21-11, раздел 1): клиент видит обычный эмодзи.
-const MISSING_ANIMATED: &[&str] = &[
-    "color/closed",
-    "color/empty",
-    "color/in_check",
-    "color/invest",
-    "color/other_coin",
-    "color/with_me",
-    "mono/invest",
-    "mono/reply",
-];
-const MISSING_STATIC: &[&str] = &[
-    "color/closed",
-    "color/down",
-    "color/empty",
-    "color/flame",
-    "color/in_check",
-    "color/invest",
-    "color/other_coin",
-    "color/with_me",
-    "mono/down",
-    "mono/invest",
-    "mono/reply",
-];
 
 /// Кнопки без значка (SCREENS-21-11, раздел 1): ключ `ru.toml`.
 const BARE_BUTTONS: &[&str] = &[
@@ -142,20 +117,11 @@ fn every_icon_the_bot_uses_is_in_the_telegram_packs() {
     let packs = packs();
     let used = used_icons();
     let mut problems = Vec::new();
-    for (style, known) in [("animated", MISSING_ANIMATED), ("static", MISSING_STATIC)] {
+    for style in ["animated", "static"] {
         let pack = &packs[style];
         for icon in &used {
-            let missing = !in_pack(pack, icon);
-            let listed = known.contains(&icon.as_str());
-            if missing && !listed {
+            if !in_pack(pack, icon) {
                 problems.push(format!("{style}: «{icon}» нет в наборе Telegram"));
-            }
-        }
-        for icon in known.iter() {
-            if in_pack(pack, icon) {
-                problems.push(format!(
-                    "{style}: «{icon}» уже в наборе — уберите из списка"
-                ));
             }
         }
     }

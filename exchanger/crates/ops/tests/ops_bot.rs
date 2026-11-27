@@ -96,6 +96,8 @@ struct State {
     calls: Vec<Call>,
     /// Сколько следующих `sendMessage` Telegram не примет (500): связь с ним пропала.
     fail_sends: usize,
+    /// Следующая новая rich-карточка получит отказ, который допускает HTML-фолбэк.
+    reject_next_rich: bool,
     /// Чаты, где бот заблокирован: любой запрос в них — 403. Попытки — в `refused`.
     blocked: std::collections::HashSet<i64>,
     refused: Vec<(String, i64)>,
@@ -132,6 +134,9 @@ impl FakeTelegram {
                     let result = server.respond(&method, body).await;
                     let payload = if result.get("__fail").is_some_and(|f| f == 403) {
                         json!({ "ok": false, "error_code": 403, "description": "Forbidden: bot was blocked by the user" })
+                            .to_string()
+                    } else if result.get("__fail").is_some_and(|f| f == 400) {
+                        json!({ "ok": false, "error_code": 400, "description": "Bad Request: rich message rejected" })
                             .to_string()
                     } else if result.get("__fail").is_some() {
                         json!({ "ok": false, "error_code": 500, "description": "Internal Server Error" })
@@ -275,6 +280,10 @@ impl FakeTelegram {
         if method == "sendMessage" && s.fail_sends > 0 {
             s.fail_sends -= 1;
             return json!({ "__fail": true });
+        }
+        if method == "sendRichMessage" && s.reject_next_rich {
+            s.reject_next_rich = false;
+            return json!({ "__fail": 400 });
         }
         let (result, message_id) = match method {
             "getMe" => (
@@ -546,6 +555,29 @@ async fn one_bot_staff_see_the_panel_clients_do_not(pool: PgPool) {
             .skip(mark)
             .all(|c| !c.text().contains("Всё спокойно"))
     );
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn a_queue_order_opens_from_the_html_fallback(pool: PgPool) {
+    let o = ops(pool).await;
+    let (order, _, _) = review_cards(&o).await;
+    o.tg.lock().reject_next_rich = true;
+    let queue = o.say(OWNER, "/queue", &order.public_id).await;
+    assert_eq!(queue.method, "sendMessage");
+    let payload = format!("a__o__{}", order.id);
+    let url = format!("https://t.me/exch_test_bot?start={payload}");
+    assert!(
+        queue
+            .text()
+            .contains(&format!("<a href=\"{url}\">{}</a>", order.public_id)),
+        "{}",
+        queue.text()
+    );
+    let opened = o
+        .say(OWNER, &format!("/start {payload}"), "Ручной разбор")
+        .await;
+    assert_eq!(opened.message_id, queue.message_id);
+    assert!(opened.text().contains(&order.public_id));
 }
 
 #[sqlx::test(migrator = "storage::MIGRATOR")]

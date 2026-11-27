@@ -90,12 +90,15 @@ impl QueueData {
                     Some(name) => format!("{} · {{m:take}} {}", esc(&r.what), esc(name)),
                     None => esc(&r.what),
                 };
-                let num = links.link(&esc(&r.public_id), &Cb::Order(r.id));
+                let label = esc(&r.public_id);
+                let to = Cb::Order(r.id);
+                let num = links.link(&label, &to);
                 html.push_str(&format!(
                     "<tr><td>{num}</td><td>{what}</td><td align=\"right\">{}</td></tr>",
                     age(t, r.minutes)
                 ));
-                plain.push(format!("{num} — {what} · {}", age(t, r.minutes)));
+                let link = links.plain_link(&label, &to);
+                plain.push(format!("{link} — {what} · {}", age(t, r.minutes)));
             }
             html.push_str("</table>");
             (html, plain.join("\n"))
@@ -743,6 +746,12 @@ impl Inner {
         viewer: Option<i64>,
         page: u32,
     ) -> Result<Screen, OpsError> {
+        if self.bot_username().is_none()
+            && let Ok(me) = self.api.get_me().await
+            && let Some(name) = me.username
+        {
+            let _ = self.bot_username.set(name);
+        }
         Ok(self
             .queue_data(viewer)
             .await?

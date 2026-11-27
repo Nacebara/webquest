@@ -316,8 +316,7 @@ pub struct DemoHook {
     world: SimWorld,
     stranger: AccountId,
     panel: Arc<dyn tgbot::UpdateHook>,
-    /// Эмодзи демо — для «Предпросмотра экранов» клиента и пульта.
-    look: ops::Look,
+    pool: PgPool,
 }
 
 impl DemoHook {
@@ -325,19 +324,23 @@ impl DemoHook {
         token: SecretString,
         demo: &DemoWorld,
         panel: Arc<dyn tgbot::UpdateHook>,
-        emoji: ui::EmojiSet,
+        pool: PgPool,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             api: crate::telegram::bot_api(token)?,
             world: demo.world.clone(),
             stranger: demo.stranger,
             panel,
-            look: ops::Look::new(emoji),
+            pool,
         })
     }
 
+    async fn look(&self) -> ops::Look {
+        ops::Look::new(crate::runtime::emoji_set(&self.pool).await)
+    }
+
     async fn preview(&self, chat: i64) {
-        ops::preview::send_preview(&self.api, &self.look, chat).await;
+        ops::preview::send_preview(&self.api, &self.look().await, chat).await;
     }
 
     async fn send_menu(&self, chat: i64) {
@@ -441,11 +444,11 @@ impl tgbot::UpdateHook for DemoHook {
                 return true;
             }
             if text == "/preview_panel" {
-                ops::preview::send_panel_preview(&self.api, &self.look, m.chat.id).await;
+                ops::preview::send_panel_preview(&self.api, &self.look().await, m.chat.id).await;
                 return true;
             }
             if text == "/preview_widgets" {
-                ops::preview::send_widget_preview(&self.api, &self.look, m.chat.id).await;
+                ops::preview::send_widget_preview(&self.api, &self.look().await, m.chat.id).await;
                 return true;
             }
             if text == "/preview" {
@@ -453,8 +456,13 @@ impl tgbot::UpdateHook for DemoHook {
                 return true;
             }
             if let Some(word) = text.strip_prefix("/preview ").map(str::trim) {
-                ops::preview::send_client_preview(&self.api, &self.look, m.chat.id, Some(word))
-                    .await;
+                ops::preview::send_client_preview(
+                    &self.api,
+                    &self.look().await,
+                    m.chat.id,
+                    Some(word),
+                )
+                .await;
                 return true;
             }
             if text == "/start" {
