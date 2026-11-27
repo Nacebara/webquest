@@ -17,6 +17,8 @@ pub const EVERY: Duration = Duration::from_secs(60);
 /// Сколько может молчать цикл, прежде чем считаться зависшим. Опрос Telegram отвечает не
 /// реже чем раз в таймаут long polling (до минуты), движок — раз в секунду между операциями.
 pub const STALE: Duration = Duration::from_secs(180);
+pub const ENGINE: &str = "engine";
+pub const TELEGRAM_POLLING: &str = "telegram polling";
 
 /// Что должно быть живо, чтобы пинговать: имя для журнала и «когда последний раз прошёл круг».
 pub struct Probe {
@@ -36,17 +38,18 @@ impl Probe {
     }
 }
 
-/// Какие проверки молчат дольше `limit` (или ещё ни разу не отозвались). Пусто — всё живо.
-/// Нет ни одной проверки — бот не работает (движок или бот не запущены): тоже «молчит».
+/// Какие обязательные циклы не запущены, ещё не отозвались или молчат дольше `limit`.
 pub fn silent(probes: &[Probe], now: DateTime<Utc>, limit: Duration) -> Vec<&'static str> {
-    if probes.is_empty() {
-        return vec!["nothing to watch: the engine or the bot is not running"];
-    }
     let limit = chrono::Duration::from_std(limit).unwrap_or(chrono::Duration::MAX);
-    probes
-        .iter()
-        .filter(|p| (p.last)().is_none_or(|t| now - t > limit))
-        .map(|p| p.name)
+    [ENGINE, TELEGRAM_POLLING]
+        .into_iter()
+        .filter(|name| {
+            probes
+                .iter()
+                .find(|probe| probe.name == *name)
+                .and_then(|probe| (probe.last)())
+                .is_none_or(|last| now - last > limit)
+        })
         .collect()
 }
 
@@ -96,8 +99,8 @@ pub async fn run(
 mod tests {
     use super::*;
 
-    fn at(secs_ago: i64) -> Probe {
-        Probe::new("engine", move || {
+    fn at(name: &'static str, secs_ago: i64) -> Probe {
+        Probe::new(name, move || {
             Some(Utc::now() - chrono::Duration::seconds(secs_ago))
         })
     }
@@ -105,17 +108,20 @@ mod tests {
     #[test]
     fn fresh_loops_are_alive_silent_ones_are_named() {
         let now = Utc::now();
-        assert!(silent(&[at(5), at(60)], now, STALE).is_empty());
-        let stuck = Probe::new("telegram polling", move || {
-            Some(Utc::now() - chrono::Duration::seconds(600))
-        });
-        assert_eq!(silent(&[at(5), stuck], now, STALE), ["telegram polling"]);
-        let never = Probe::new("engine", || None);
-        assert_eq!(silent(&[never], now, STALE), ["engine"]);
+        assert!(silent(&[at(ENGINE, 5), at(TELEGRAM_POLLING, 60)], now, STALE).is_empty());
+        assert_eq!(
+            silent(&[at(ENGINE, 5), at(TELEGRAM_POLLING, 600)], now, STALE),
+            [TELEGRAM_POLLING]
+        );
+        let never = Probe::new(ENGINE, || None);
+        assert_eq!(
+            silent(&[never, at(TELEGRAM_POLLING, 5)], now, STALE),
+            [ENGINE]
+        );
     }
 
     #[test]
     fn nothing_running_is_not_alive() {
-        assert_eq!(silent(&[], Utc::now(), STALE).len(), 1);
+        assert_eq!(silent(&[], Utc::now(), STALE), [ENGINE, TELEGRAM_POLLING]);
     }
 }

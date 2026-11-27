@@ -157,10 +157,32 @@ jobs:
           $left = target/release/exch.exe service status | Out-String
           if ($left -notmatch "не установлена") { Write-Error "service still registered"; exit 1 }
 
+      - name: Собрать комплект для установки
+        shell: pwsh
+        run: |
+          $dist = 'target/windows-dist'
+          New-Item -ItemType Directory -Force -Path "$dist/assets", "$dist/docs/mockups/logo" | Out-Null
+          Copy-Item -LiteralPath 'target/release/exch.exe', 'config.example.toml', '.env.example' -Destination $dist
+          Copy-Item -LiteralPath 'assets/emoji' -Destination "$dist/assets" -Recurse
+          Copy-Item -LiteralPath 'docs/DEPLOY.md', 'docs/LAPTOP.md', 'docs/RUNBOOK.md', 'docs/PLAN-v2.md', 'docs/launch-checklist.json' -Destination "$dist/docs"
+          Copy-Item -LiteralPath 'docs/mockups/logo/avatar.mp4' -Destination "$dist/docs/mockups/logo"
+
+          $emoji = "$dist/assets/emoji"
+          $manifest = Get-Content -Raw -Encoding utf8 -LiteralPath "$emoji/manifest.json" | ConvertFrom-Json
+          foreach ($icon in $manifest.icons) {
+            foreach ($file in @($icon.animated, $icon.static)) {
+              if (!(Test-Path -LiteralPath (Join-Path $emoji $file) -PathType Leaf)) {
+                throw "Missing emoji asset: $file"
+              }
+            }
+          }
+
       - uses: actions/upload-artifact@v4
         with:
           name: exch-windows
-          path: exchanger/target/release/exch.exe
+          path: exchanger/target/windows-dist/
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 14
 
   # Шаг 3.3 плана: известные уязвимости зависимостей. Исключения — с причиной в

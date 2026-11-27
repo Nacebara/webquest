@@ -7,7 +7,7 @@
 //! Секреты пишутся только в `.env` (прежний — в `.env.bak`) и на экран не выводятся. Каждый
 //! шаг сохраняется сразу: прервали — следующий запуск продолжит с того же места.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anyhow::Context as _;
 use base64::Engine as _;
@@ -15,6 +15,7 @@ use botapi::{BotApi, ChatType, GetUpdates};
 use domain::Platform;
 use secrecy::{ExposeSecret as _, SecretString};
 use storage::{PgPool, sessions, wallets};
+use tokio::time::Instant;
 
 use crate::config::Config;
 use crate::db;
@@ -234,31 +235,37 @@ fn looks_like_token(t: &str) -> bool {
 }
 
 async fn owner(w: &mut Wizard<'_>, bot: &BotApi) -> anyhow::Result<()> {
-    if let Some(id) = w.get("OWNER_TG_ID").and_then(|v| v.parse::<i64>().ok()) {
+    if let Some(id) = w
+        .get("OWNER_TG_ID")
+        .and_then(|v| v.parse::<i64>().ok())
+        .filter(|id| *id > 0)
+    {
         println!("✅ Владелец: ID {id}.");
         return Ok(());
     }
-    let me = bot
-        .get_me()
-        .await
-        .ok()
-        .and_then(|m| m.username)
-        .map_or_else(|| "своему боту".to_owned(), |u| format!("боту @{u}"));
-    println!(
-        "Напишите {me} любое сообщение (например, /start) со своего аккаунта Telegram — так я узнаю ваш ID. Жду до двух минут…"
-    );
-    if let Some(user) = wait_for_owner(bot).await {
+    let random = mtproto::SessionKey::random_bytes()
+        .map_err(|e| anyhow::anyhow!("не удалось создать код настройки: {e}"))?;
+    let code = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random);
+    let command = format!("/start {code}");
+    if let Some(username) = bot.get_me().await.ok().and_then(|me| me.username) {
+        println!("Откройте ссылку со своего аккаунта Telegram и нажмите Start:");
+        println!("https://t.me/{username}?start={code}");
+    }
+    println!("Или отправьте боту в личном чате команду:");
+    println!("{command}");
+    println!("Код действует в этом окне до двух минут. Никому его не пересылайте.");
+    if let Some(user) = wait_for_owner(bot, &command).await {
         let name = match &user.username {
             Some(u) => format!("{} (@{u})", user.first_name),
             None => user.first_name.clone(),
         };
-        if prompt::yes(&format!("Это вы: {name}, ID {}?", user.id), true).await? {
+        if prompt::yes(&format!("Это вы: {name}, ID {}?", user.id), false).await? {
             w.set("OWNER_TG_ID", &user.id.to_string())?;
             println!("✅ Владелец: ID {}.", user.id);
             return Ok(());
         }
     } else {
-        println!("Сообщение не пришло.");
+        println!("Ответ с кодом не пришёл.");
     }
     loop {
         let v = prompt::line("Ваш Telegram ID (число; узнать — у @userinfobot)", None).await?;
@@ -273,13 +280,17 @@ async fn owner(w: &mut Wizard<'_>, bot: &BotApi) -> anyhow::Result<()> {
     }
 }
 
-/// Последний, кто написал боту в личку после начала ожидания. Обновления не подтверждаются
-/// (без `offset`): запущенный потом бот получит их как обычно.
-async fn wait_for_owner(bot: &BotApi) -> Option<botapi::User> {
-    let since = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0))
-        - 5;
+fn owner_reply(message: botapi::Message, command: &str) -> Option<botapi::User> {
+    if message.chat.kind != ChatType::Private || message.text.as_deref() != Some(command) {
+        return None;
+    }
+    message
+        .from
+        .filter(|user| !user.is_bot && user.id > 0 && user.id == message.chat.id)
+}
+
+/// Ответ на одноразовую команду. Обновления не подтверждаются без `offset`.
+async fn wait_for_owner(bot: &BotApi, command: &str) -> Option<botapi::User> {
     let deadline = Instant::now() + OWNER_WAIT;
     while Instant::now() < deadline {
         let req = GetUpdates {
@@ -289,14 +300,15 @@ async fn wait_for_owner(bot: &BotApi) -> Option<botapi::User> {
             // `None`: не трогать список типов обновлений бота — Telegram его запоминает.
             allowed_updates: None,
         };
-        match bot.get_updates(&req).await {
+        let Ok(response) = tokio::time::timeout_at(deadline, bot.get_updates(&req)).await else {
+            return None;
+        };
+        match response {
             Ok(updates) => {
                 let found = updates
                     .into_iter()
                     .filter_map(|u| u.message)
-                    .filter(|m| m.chat.kind == ChatType::Private && m.date >= since)
-                    .filter_map(|m| m.from)
-                    .rfind(|u| !u.is_bot);
+                    .find_map(|message| owner_reply(message, command));
                 if found.is_some() {
                     return found;
                 }
@@ -716,6 +728,31 @@ mod tests {
         assert!(!looks_like_token("123456789"));
         assert!(is_api_hash("0123456789abcdef0123456789ABCDEF"));
         assert!(!is_api_hash("0123456789abcdef"));
+    }
+
+    #[test]
+    fn owner_setup_requires_the_current_code_from_a_private_user() {
+        let command = "/start test_setup_code";
+        let message = |text, chat, id, is_bot| {
+            serde_json::from_value(serde_json::json!({
+                "message_id": 1,
+                "from": {"id": id, "is_bot": is_bot},
+                "chat": {"id": 42, "type": chat},
+                "text": text,
+            }))
+            .expect("valid Bot API message")
+        };
+        for invalid in [
+            message("/start", "private", 42, false),
+            message("/start old_code", "private", 42, false),
+            message(command, "group", 42, false),
+            message(command, "private", 43, false),
+            message(command, "private", 42, true),
+        ] {
+            assert!(owner_reply(invalid, command).is_none());
+        }
+        let verified = owner_reply(message(command, "private", 42, false), command);
+        assert_eq!(verified.map(|user| user.id), Some(42));
     }
 
     #[test]

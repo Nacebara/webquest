@@ -54,10 +54,11 @@ async fn beat_for(pool: PgPool, probes: Vec<Probe>, url: &str, how_long: Duratio
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn a_working_bot_pings(pool: PgPool) {
     let (url, hits) = service(200).await;
-    let alive = || Probe::new("engine", || Some(Utc::now()));
+    let engine = Probe::new("engine", || Some(Utc::now()));
+    let polling = Probe::new("telegram polling", || Some(Utc::now()));
     beat_for(
         pool,
-        vec![alive(), alive()],
+        vec![engine, polling],
         &url,
         Duration::from_millis(550),
     )
@@ -87,7 +88,16 @@ async fn a_stuck_loop_stops_the_pings(pool: PgPool) {
 #[sqlx::test(migrator = "storage::MIGRATOR")]
 async fn without_the_engine_there_are_no_pings(pool: PgPool) {
     let (url, hits) = service(200).await;
-    beat_for(pool, Vec::new(), &url, Duration::from_millis(550)).await;
+    let polling = Probe::new("telegram polling", || Some(Utc::now()));
+    beat_for(pool, vec![polling], &url, Duration::from_millis(550)).await;
+    assert_eq!(hits.load(Ordering::SeqCst), 0);
+}
+
+#[sqlx::test(migrator = "storage::MIGRATOR")]
+async fn without_the_client_bot_there_are_no_pings(pool: PgPool) {
+    let (url, hits) = service(200).await;
+    let engine = Probe::new("engine", || Some(Utc::now()));
+    beat_for(pool, vec![engine], &url, Duration::from_millis(550)).await;
     assert_eq!(hits.load(Ordering::SeqCst), 0);
 }
 

@@ -659,7 +659,7 @@ async fn run() -> anyhow::Result<()> {
                 engine.ensure_ledger_accounts().await?;
                 {
                     let engine = engine.clone();
-                    probes.push(app::health::Probe::new("engine", move || {
+                    probes.push(app::health::Probe::new(app::health::ENGINE, move || {
                         engine.last_beat()
                     }));
                 }
@@ -699,9 +699,10 @@ async fn run() -> anyhow::Result<()> {
                                     .max(supervisor::last_transient_retry("client-bot"))
                             }));
                         }
-                        probes.push(app::health::Probe::new("telegram polling", move || {
-                            bot.last_poll()
-                        }));
+                        probes.push(app::health::Probe::new(
+                            app::health::TELEGRAM_POLLING,
+                            move || bot.last_poll(),
+                        ));
                     }
                 }
             }
